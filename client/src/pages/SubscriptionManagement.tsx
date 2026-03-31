@@ -2,45 +2,41 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, AlertCircle, CheckCircle } from "lucide-react";
+import { Loader2, AlertCircle, CheckCircle, ArrowLeft } from "lucide-react";
 import { useLocation } from "wouter";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function SubscriptionManagement() {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, loading } = useAuth();
   const [, setLocation] = useLocation();
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
-  if (!isAuthenticated) {
-    setLocation("/");
-    return null;
-  }
+  useEffect(() => {
+    if (!loading && !isAuthenticated) {
+      setLocation("/");
+    }
+  }, [loading, isAuthenticated, setLocation]);
 
-  const { data: subscription, isLoading: subscriptionLoading } = trpc.subscription.getSubscriptionStatus.useQuery();
-  const { data: plans, isLoading: plansLoading } = trpc.subscription.getPlans.useQuery();
+  const { data: subscription, isLoading: subscriptionLoading } = trpc.subscription.getSubscriptionStatus.useQuery(
+    undefined, { enabled: isAuthenticated }
+  );
 
   const cancelMutation = trpc.subscription.cancelSubscription.useMutation({
     onSuccess: () => {
       setShowCancelConfirm(false);
-      // Invalidate subscription status to refresh
-      trpc.useUtils().subscription.getSubscriptionStatus.invalidate();
     },
   });
 
   const createCheckoutMutation = trpc.subscription.createCheckoutSession.useMutation({
     onSuccess: (data) => {
-      if (data.url) {
-        window.open(data.url, "_blank");
-      }
+      if (data.url) window.open(data.url, "_blank");
     },
   });
 
-  const isLoading = subscriptionLoading || plansLoading;
-
-  if (isLoading) {
+  if (subscriptionLoading || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin" />
+      <div className="h-screen flex items-center justify-center bg-slate-950">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
       </div>
     );
   }
@@ -49,178 +45,88 @@ export default function SubscriptionManagement() {
   const isActive = subscription?.status === "active";
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white">
-      {/* Header */}
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <h1 className="text-3xl font-bold mb-2">Subscription Management</h1>
-        <p className="text-gray-400">Manage your current subscription and billing</p>
-      </div>
+    <div className="h-screen overflow-hidden bg-slate-950 text-white flex flex-col">
+      {/* Header with Back button */}
+      <header className="shrink-0 border-b border-slate-800/50 px-4 sm:px-6 py-3 flex items-center gap-4">
+        <Button onClick={() => window.history.back()} variant="ghost" size="sm" className="text-slate-400 hover:text-white gap-1">
+          <ArrowLeft className="w-4 h-4" /> Back
+        </Button>
+        <h1 className="text-xl font-bold">Subscription</h1>
+      </header>
 
-      {/* Current Subscription */}
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
-        <Card className="bg-purple-900/20 border border-purple-500/20 p-8 mb-8">
-          <div className="flex items-start justify-between mb-6">
-            <div>
-              <h2 className="text-2xl font-bold capitalize mb-2">{currentTier} Plan</h2>
-              <div className="flex items-center gap-2">
-                {isActive ? (
-                  <>
-                    <CheckCircle className="w-5 h-5 text-green-400" />
-                    <span className="text-green-400">Active</span>
-                  </>
-                ) : (
-                  <>
-                    <AlertCircle className="w-5 h-5 text-yellow-400" />
-                    <span className="text-yellow-400">{subscription?.status || "Inactive"}</span>
-                  </>
-                )}
+      {/* Content */}
+      <div className="flex-1 flex items-center justify-center px-4 sm:px-6">
+        <div className="w-full max-w-3xl space-y-4">
+          {/* Current Subscription Card */}
+          <Card className="bg-slate-900/80 border-slate-800 p-5">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h2 className="text-lg font-bold capitalize">{currentTier} Plan</h2>
+                <div className="flex items-center gap-1.5 mt-1">
+                  {isActive ? (
+                    <><CheckCircle className="w-4 h-4 text-green-400" /><span className="text-green-400 text-sm">Active</span></>
+                  ) : (
+                    <><AlertCircle className="w-4 h-4 text-yellow-400" /><span className="text-yellow-400 text-sm">{subscription?.status || "Inactive"}</span></>
+                  )}
+                </div>
               </div>
+              {subscription?.currentPeriodEnd && (
+                <div className="text-right">
+                  <p className="text-[10px] text-slate-500 uppercase">Renews</p>
+                  <p className="text-sm font-semibold">{new Date(subscription.currentPeriodEnd).toLocaleDateString()}</p>
+                </div>
+              )}
             </div>
-            {subscription?.currentPeriodEnd && (
-              <div className="text-right">
-                <p className="text-sm text-gray-400">Renews on</p>
-                <p className="text-lg font-semibold">
-                  {new Date(subscription.currentPeriodEnd).toLocaleDateString()}
-                </p>
+
+            {subscription?.cancelAtPeriodEnd && (
+              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-2.5 mb-3 text-xs text-yellow-300">
+                Subscription will be cancelled at the end of the current billing period.
               </div>
             )}
-          </div>
 
-          {subscription?.cancelAtPeriodEnd && (
-            <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4 mb-6">
-              <p className="text-yellow-300">
-                Your subscription will be cancelled at the end of the current billing period.
-              </p>
-            </div>
-          )}
-
-          <div className="flex gap-4">
-            {currentTier !== "enterprise" && isActive && (
-              <Button
-                onClick={() => createCheckoutMutation.mutateAsync({
-                  planId: currentTier === "free" ? "pro" : "enterprise",
-                  billingCycle: "monthly",
-                })}
-                disabled={createCheckoutMutation.isPending}
-                className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
-              >
-                {createCheckoutMutation.isPending ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  `Upgrade to ${currentTier === "free" ? "Pro" : "Enterprise"}`
-                )}
-              </Button>
+            {showCancelConfirm && (
+              <div className="bg-red-900/20 border border-red-500/20 rounded-lg p-3 mb-3">
+                <p className="text-sm text-slate-300 mb-2">Are you sure? You'll lose premium features at period end.</p>
+                <div className="flex gap-2">
+                  <Button onClick={() => cancelMutation.mutateAsync()} disabled={cancelMutation.isPending} size="sm" className="bg-red-600 hover:bg-red-700">
+                    {cancelMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Confirm Cancel"}
+                  </Button>
+                  <Button onClick={() => setShowCancelConfirm(false)} variant="outline" size="sm" className="border-slate-700">Keep</Button>
+                </div>
+              </div>
             )}
 
-            {isActive && currentTier !== "free" && (
-              <Button
-                onClick={() => setShowCancelConfirm(true)}
-                variant="outline"
-                className="border-red-500/20 text-red-300 hover:bg-red-500/10"
-              >
-                Cancel Subscription
-              </Button>
-            )}
-
-            <Button onClick={() => setLocation("/payments")} variant="outline">
-              View Payment History
-            </Button>
-          </div>
-        </Card>
-
-        {/* Cancel Confirmation */}
-        {showCancelConfirm && (
-          <Card className="bg-red-900/20 border border-red-500/20 p-6 mb-8">
-            <h3 className="text-lg font-bold mb-4">Cancel Subscription?</h3>
-            <p className="text-gray-300 mb-6">
-              Your subscription will be cancelled at the end of the current billing period. You'll lose access to premium features.
-            </p>
-            <div className="flex gap-4">
-              <Button
-                onClick={() => cancelMutation.mutateAsync()}
-                disabled={cancelMutation.isPending}
-                className="bg-red-600 hover:bg-red-700"
-              >
-                {cancelMutation.isPending ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  "Confirm Cancellation"
-                )}
-              </Button>
-              <Button onClick={() => setShowCancelConfirm(false)} variant="outline">
-                Keep Subscription
-              </Button>
+            <div className="flex flex-wrap gap-2">
+              {currentTier !== "enterprise" && isActive && (
+                <Button onClick={() => createCheckoutMutation.mutateAsync({ planId: currentTier === "free" ? "pro" : "enterprise", billingCycle: "monthly" })} disabled={createCheckoutMutation.isPending} size="sm" className="bg-blue-600 hover:bg-blue-700">
+                  {createCheckoutMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : `Upgrade to ${currentTier === "free" ? "Pro" : "Enterprise"}`}
+                </Button>
+              )}
+              {isActive && currentTier !== "free" && !showCancelConfirm && (
+                <Button onClick={() => setShowCancelConfirm(true)} variant="outline" size="sm" className="border-red-500/20 text-red-300 hover:bg-red-500/10">Cancel</Button>
+              )}
+              <Button onClick={() => setLocation("/payments")} variant="outline" size="sm" className="border-slate-700">Payment History</Button>
             </div>
           </Card>
-        )}
 
-        {/* Plan Comparison */}
-        <div className="mt-12">
-          <h3 className="text-2xl font-bold mb-6">Available Plans</h3>
-          <div className="grid md:grid-cols-3 gap-6">
+          {/* Plan Comparison - compact */}
+          <div className="grid grid-cols-3 gap-3">
             {[
-              {
-                name: "free",
-                title: "Free",
-                price: "$0",
-                features: ["20 messages/month", "Basic support"],
-              },
-              {
-                name: "pro",
-                title: "Pro",
-                price: "$29",
-                period: "/month",
-                features: ["200 messages/month", "Priority support", "100 min voice/month"],
-              },
-              {
-                name: "enterprise",
-                title: "Enterprise",
-                price: "$99",
-                period: "/month",
-                features: ["Unlimited messages", "Dedicated support", "1000 min voice/month"],
-              },
+              { name: "free", title: "Free", price: "$0", features: ["20 msg/mo", "Basic support"] },
+              { name: "pro", title: "Pro", price: "$29/mo", features: ["200 msg/mo", "Priority support", "100 min voice"] },
+              { name: "enterprise", title: "Enterprise", price: "$99/mo", features: ["Unlimited", "Dedicated support", "1000 min voice"] },
             ].map((plan) => (
-              <Card
-                key={plan.name}
-                className={`p-6 border ${
-                  currentTier === plan.name
-                    ? "border-purple-500 bg-purple-900/30"
-                    : "border-purple-500/20 bg-purple-900/10"
-                }`}
-              >
-                <h4 className="text-lg font-bold mb-2">{plan.title}</h4>
-                <div className="mb-4">
-                  <span className="text-2xl font-bold">{plan.price}</span>
-                  {plan.period && <span className="text-gray-400">{plan.period}</span>}
-                </div>
-                <ul className="space-y-2 mb-6">
-                  {plan.features.map((feature) => (
-                    <li key={feature} className="text-sm text-gray-300">
-                      • {feature}
-                    </li>
-                  ))}
+              <Card key={plan.name} className={`p-3 border ${currentTier === plan.name ? "border-blue-500 bg-blue-900/20" : "border-slate-800 bg-slate-900/50"}`}>
+                <h4 className="text-sm font-bold mb-1">{plan.title}</h4>
+                <p className="text-lg font-bold mb-2">{plan.price}</p>
+                <ul className="space-y-1 mb-3">
+                  {plan.features.map((f) => <li key={f} className="text-xs text-slate-400">{f}</li>)}
                 </ul>
                 {currentTier === plan.name ? (
-                  <Button disabled className="w-full">
-                    Current Plan
-                  </Button>
+                  <Button disabled size="sm" className="w-full text-xs">Current</Button>
                 ) : (
-                  <Button
-                    onClick={() =>
-                      createCheckoutMutation.mutateAsync({
-                        planId: plan.name,
-                        billingCycle: "monthly",
-                      })
-                    }
-                    disabled={createCheckoutMutation.isPending}
-                    variant="outline"
-                    className="w-full"
-                  >
-                    {createCheckoutMutation.isPending ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      "Select Plan"
-                    )}
+                  <Button onClick={() => createCheckoutMutation.mutateAsync({ planId: plan.name, billingCycle: "monthly" })} disabled={createCheckoutMutation.isPending} variant="outline" size="sm" className="w-full text-xs border-slate-700">
+                    Select
                   </Button>
                 )}
               </Card>

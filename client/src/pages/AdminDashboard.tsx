@@ -2,7 +2,7 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, Users, MessageSquare, TrendingUp, Activity } from "lucide-react";
+import { Loader2, Users, MessageSquare, TrendingUp, Activity, ArrowLeft } from "lucide-react";
 import { useLocation } from "wouter";
 import { useState } from "react";
 
@@ -25,14 +25,14 @@ export default function AdminDashboard() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="h-screen overflow-hidden flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white">
+    <div className="h-screen overflow-hidden bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white">
       {/* Header */}
       <div className="border-b border-purple-500/20 bg-purple-900/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

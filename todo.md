@@ -247,3 +247,4 @@
 - [ ] Camera video should be hidden (not shown to user, only sent to AI)
 - [ ] Chat page should be single page without scroll
 - [ ] User adrianenc11@gmail.com needs to be admin (UPDATE failed - 0 rows)
+- [ ] SECURITY FIX: Default role for new users must be 'user' not 'admin'

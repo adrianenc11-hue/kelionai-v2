@@ -51,7 +51,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-4">
+    <div className="h-screen overflow-hidden flex items-center justify-center bg-slate-950 p-4">
       <Card className="w-full max-w-md bg-gray-800/80 border-gray-700 backdrop-blur-sm">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold text-white">
