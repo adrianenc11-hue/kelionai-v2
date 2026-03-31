@@ -200,3 +200,6 @@
 - [x] CAM button: real camera capture → upload frame → send to GPT vision for analysis
 - [x] MIC shows recording state (red pulse, timer)
 - [x] CAM shows live preview, capture button
+
+## Admin User
+- [x] Set adrianenc11@gmail.com as admin role in database (already admin)
