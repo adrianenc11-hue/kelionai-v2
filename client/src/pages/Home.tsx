@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Loader2, MessageSquare, Zap, Shield, Globe } from "lucide-react";
@@ -8,6 +9,12 @@ export default function Home() {
   const { user, loading, isAuthenticated } = useAuth();
   const [, setLocation] = useLocation();
 
+  useEffect(() => {
+    if (isAuthenticated && user && !loading) {
+      setLocation("/chat");
+    }
+  }, [isAuthenticated, user, loading, setLocation]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -17,7 +24,6 @@ export default function Home() {
   }
 
   if (isAuthenticated && user) {
-    setLocation("/chat");
     return null;
   }
 
