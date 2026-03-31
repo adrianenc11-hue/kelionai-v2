@@ -551,7 +551,7 @@ export default function Chat() {
               </button>
             </>
           ) : (
-            <a href={getLoginUrl()} className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm text-white transition-colors" style={{ background: "#4f46e5" }}>
+            <a href={getLoginUrl() || "#"} className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm text-white transition-colors" style={{ background: "#4f46e5" }}>
               <User className="w-3.5 h-3.5" />
               Login
             </a>

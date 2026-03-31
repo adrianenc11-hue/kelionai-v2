@@ -51,7 +51,7 @@ export default function Home() {
             <Button onClick={() => setLocation("/pricing")} variant="ghost" size="sm" className="text-slate-400 hover:text-white">
               Pricing
             </Button>
-            <Button onClick={() => (window.location.href = getLoginUrl())} className="bg-blue-600 hover:bg-blue-700">
+            <Button onClick={() => { const url = getLoginUrl(); if (url && url !== '#') window.location.href = url; }} className="bg-blue-600 hover:bg-blue-700">
               Sign In
             </Button>
           </div>
@@ -78,7 +78,7 @@ export default function Home() {
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
                 <Button
-                  onClick={() => (window.location.href = getLoginUrl())}
+                  onClick={() => { const url = getLoginUrl(); if (url && url !== '#') window.location.href = url; }}
                   size="lg"
                   className="bg-blue-600 hover:bg-blue-700 text-lg px-8 py-6 gap-2"
                   aria-label="Get started with KelionAI for free"
@@ -249,7 +249,7 @@ export default function Home() {
           <h2 className="text-3xl font-bold mb-4">Ready to meet your AI assistant?</h2>
           <p className="text-lg text-slate-400 mb-8">Free to start. No credit card required.</p>
           <Button
-            onClick={() => (window.location.href = getLoginUrl())}
+            onClick={() => { const url = getLoginUrl(); if (url && url !== '#') window.location.href = url; }}
             size="lg"
             className="bg-blue-600 hover:bg-blue-700 text-lg px-10 py-6 gap-2"
           >
