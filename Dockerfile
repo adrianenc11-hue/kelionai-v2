@@ -4,7 +4,7 @@ WORKDIR /app
 
 # Install dependencies
 COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --no-frozen-lockfile
 
 # Copy source
 COPY . .
@@ -14,6 +14,5 @@ RUN pnpm run build
 
 # Production
 ENV NODE_ENV=production
-EXPOSE 3000
 
 CMD ["node", "dist/index.js"]
