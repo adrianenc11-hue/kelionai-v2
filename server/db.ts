@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
+import { eq, desc, asc } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import { InsertUser, users, conversations, messages, subscriptionPlans, userUsage } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -89,4 +89,135 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add feature queries here as your schema grows.
+// Conversation queries
+export async function getConversationsByUserId(userId: number) {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot get conversations: database not available");
+    return [];
+  }
+
+  try {
+    const result = await db.select().from(conversations).where(eq(conversations.userId, userId)).orderBy(desc(conversations.updatedAt));
+    return result;
+  } catch (error) {
+    console.error("[Database] Failed to get conversations:", error);
+    return [];
+  }
+}
+
+export async function getConversationById(conversationId: number) {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot get conversation: database not available");
+    return undefined;
+  }
+
+  try {
+    const result = await db.select().from(conversations).where(eq(conversations.id, conversationId)).limit(1);
+    return result.length > 0 ? result[0] : undefined;
+  } catch (error) {
+    console.error("[Database] Failed to get conversation:", error);
+    return undefined;
+  }
+}
+
+export async function createConversation(userId: number, title: string) {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+
+  try {
+    const result = await db.insert(conversations).values({ userId, title, primaryAiModel: "gpt-4" });
+    return result;
+  } catch (error) {
+    console.error("[Database] Failed to create conversation:", error);
+    throw error;
+  }
+}
+
+// Message queries
+export async function getMessagesByConversationId(conversationId: number) {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot get messages: database not available");
+    return [];
+  }
+
+  try {
+    const result = await db.select().from(messages).where(eq(messages.conversationId, conversationId)).orderBy(asc(messages.createdAt));
+    return result;
+  } catch (error) {
+    console.error("[Database] Failed to get messages:", error);
+    return [];
+  }
+}
+
+export async function createMessage(conversationId: number, role: "user" | "assistant" | "system", content: string, aiModel?: string) {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+
+  try {
+    const result = await db.insert(messages).values({ conversationId, role, content, aiModel });
+    return result;
+  } catch (error) {
+    console.error("[Database] Failed to create message:", error);
+    throw error;
+  }
+}
+
+// Subscription queries
+export async function getSubscriptionPlans() {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot get subscription plans: database not available");
+    return [];
+  }
+
+  try {
+    const result = await db.select().from(subscriptionPlans).where(eq(subscriptionPlans.isActive, true));
+    return result;
+  } catch (error) {
+    console.error("[Database] Failed to get subscription plans:", error);
+    return [];
+  }
+}
+
+// User usage queries
+export async function getUserUsage(userId: number) {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot get user usage: database not available");
+    return undefined;
+  }
+
+  try {
+    const result = await db.select().from(userUsage).where(eq(userUsage.userId, userId)).limit(1);
+    return result.length > 0 ? result[0] : undefined;
+  } catch (error) {
+    console.error("[Database] Failed to get user usage:", error);
+    return undefined;
+  }
+}
+
+export async function updateUserUsage(userId: number, messagesThisMonth: number, voiceMinutesThisMonth: number) {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+
+  try {
+    const usage = await getUserUsage(userId);
+    if (usage) {
+      await db.update(userUsage).set({ messagesThisMonth, voiceMinutesThisMonth }).where(eq(userUsage.userId, userId));
+    } else {
+      await db.insert(userUsage).values({ userId, messagesThisMonth, voiceMinutesThisMonth });
+    }
+  } catch (error) {
+    console.error("[Database] Failed to update user usage:", error);
+    throw error;
+  }
+}
