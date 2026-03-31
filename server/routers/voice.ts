@@ -4,8 +4,38 @@ import { transcribeAudio } from "../_core/voiceTranscription";
 import { generateSpeech, cloneVoice, getElevenLabsUsage, deleteClonedVoice } from "../elevenlabs";
 import { getUserUsage, updateUserUsage, getDb } from "../db";
 import { sql } from "drizzle-orm";
+import { storagePut } from "../storage";
+
+function randomSuffix() {
+  return Math.random().toString(36).substring(2, 10);
+}
 
 export const voiceRouter = router({
+  /**
+   * Upload audio blob (base64) to S3, return URL for Whisper STT
+   */
+  uploadAudio: protectedProcedure
+    .input(z.object({ audioBase64: z.string(), mimeType: z.string().default("audio/webm") }))
+    .mutation(async ({ ctx, input }) => {
+      const buffer = Buffer.from(input.audioBase64, "base64");
+      const ext = input.mimeType.includes("wav") ? "wav" : input.mimeType.includes("mp3") ? "mp3" : "webm";
+      const key = `audio/${ctx.user.id}-${Date.now()}-${randomSuffix()}.${ext}`;
+      const { url } = await storagePut(key, buffer, input.mimeType);
+      return { audioUrl: url };
+    }),
+
+  /**
+   * Upload image blob (base64) to S3, return URL for GPT vision
+   */
+  uploadImage: protectedProcedure
+    .input(z.object({ imageBase64: z.string(), mimeType: z.string().default("image/jpeg") }))
+    .mutation(async ({ ctx, input }) => {
+      const buffer = Buffer.from(input.imageBase64, "base64");
+      const ext = input.mimeType.includes("png") ? "png" : "jpg";
+      const key = `images/${ctx.user.id}-${Date.now()}-${randomSuffix()}.${ext}`;
+      const { url } = await storagePut(key, buffer, input.mimeType);
+      return { imageUrl: url };
+    }),
   /**
    * Transcribe audio file to text using Whisper API
    */

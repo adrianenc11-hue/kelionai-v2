@@ -187,3 +187,16 @@
 
 ## Bug Fixes
 - [ ] Fix avatar 3D not showing on chat page on user's device (responsive/loading issue)
+
+## Chat Page Fixes (User Reported)
+- [x] Default language English (all UI text in English, not Romanian)
+- [x] Chat messages appear BELOW avatar (right side), not on left monitor
+- [x] Clear chat completely when switching conversations (no leftover messages)
+- [x] Real weather API calls with actual location data (already in brain-v4)
+- [x] Adjust mouth amplitude for more realistic lip-sync (AudioContext analyser)
+
+## CAM & MIC Live Buttons
+- [x] MIC button: real audio recording → Whisper STT → send transcribed text to AI brain
+- [x] CAM button: real camera capture → upload frame → send to GPT vision for analysis
+- [x] MIC shows recording state (red pulse, timer)
+- [x] CAM shows live preview, capture button
