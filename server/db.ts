@@ -203,6 +203,69 @@ export async function getUserUsage(userId: number) {
   }
 }
 
+// Message editing
+export async function updateMessage(messageId: number, content: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  try {
+    await db.update(messages).set({ content }).where(eq(messages.id, messageId));
+    return { success: true };
+  } catch (error) {
+    console.error("[Database] Failed to update message:", error);
+    throw error;
+  }
+}
+
+export async function deleteMessage(messageId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  try {
+    await db.delete(messages).where(eq(messages.id, messageId));
+    return { success: true };
+  } catch (error) {
+    console.error("[Database] Failed to delete message:", error);
+    throw error;
+  }
+}
+
+export async function getMessageById(messageId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  try {
+    const result = await db.select().from(messages).where(eq(messages.id, messageId)).limit(1);
+    return result.length > 0 ? result[0] : undefined;
+  } catch (error) {
+    console.error("[Database] Failed to get message:", error);
+    return undefined;
+  }
+}
+
+export async function deleteConversationMessages(conversationId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  try {
+    await db.delete(messages).where(eq(messages.conversationId, conversationId));
+    await db.delete(conversations).where(eq(conversations.id, conversationId));
+    return { success: true };
+  } catch (error) {
+    console.error("[Database] Failed to delete conversation:", error);
+    throw error;
+  }
+}
+
+// Profile picture
+export async function updateUserProfilePicture(userId: number, avatarUrl: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  try {
+    await db.update(users).set({ avatarUrl }).where(eq(users.id, userId));
+    return { success: true };
+  } catch (error) {
+    console.error("[Database] Failed to update profile picture:", error);
+    throw error;
+  }
+}
+
 export async function updateUserUsage(userId: number, messagesThisMonth: number, voiceMinutesThisMonth: number) {
   const db = await getDb();
   if (!db) {

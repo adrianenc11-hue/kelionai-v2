@@ -184,3 +184,6 @@
 - [x] Voice router with real ElevenLabs TTS
 - [x] Voice cloning endpoint (clone from chat)
 - [x] Contact messages saved to DB + admin notified
+
+## Bug Fixes
+- [ ] Fix avatar 3D not showing on chat page on user's device (responsive/loading issue)
