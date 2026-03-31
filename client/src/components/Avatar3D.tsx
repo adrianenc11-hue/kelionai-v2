@@ -24,6 +24,16 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
   const headBoneRef = useRef<THREE.Bone | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Arm bone refs and rest quaternions (from original avatar.js)
+  const armBonesRef = useRef<{
+    leftArm: THREE.Bone | null;
+    rightArm: THREE.Bone | null;
+    leftForeArm: THREE.Bone | null;
+    rightForeArm: THREE.Bone | null;
+  }>({ leftArm: null, rightArm: null, leftForeArm: null, rightForeArm: null });
+  const armRestLeftRef = useRef<THREE.Quaternion | null>(null);
+  const armRestRightRef = useRef<THREE.Quaternion | null>(null);
+
   const modelUrls: Record<string, string> = {
     kelion:
       "https://d2xsxph8kpxj0f.cloudfront.net/310519663494239902/fTDgTXExTnteU8v7gTpoiu/kelion-rpm_e27cb94d.glb",
@@ -33,41 +43,47 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
   useEffect(() => {
     if (!containerRef.current) return;
 
-    // Initialize scene
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x1a1a2e);
     sceneRef.current = scene;
 
-    // Initialize camera
+    // Camera settings from original: FOV 24, position (0, 0, 2.8)
     const camera = new THREE.PerspectiveCamera(
-      30,
+      24,
       containerRef.current.clientWidth / containerRef.current.clientHeight,
       0.1,
-      1000
+      100
     );
-    camera.position.z = 5.0;
-    camera.position.y = 0.9;
+    camera.position.set(0, 0.0, 2.8);
     cameraRef.current = camera;
 
-    // Initialize renderer
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(containerRef.current.clientWidth, containerRef.current.clientHeight);
-    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 3));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.2;
     containerRef.current.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
-    // Add lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
-    scene.add(ambientLight);
+    // Premium studio lighting (from original)
+    scene.add(new THREE.AmbientLight(0x404060, 0.4));
 
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.9);
-    directionalLight.position.set(5, 5, 5);
-    directionalLight.castShadow = true;
-    scene.add(directionalLight);
+    const keyLight = new THREE.DirectionalLight(0xffffff, 1.25);
+    keyLight.position.set(2, 3, 4);
+    scene.add(keyLight);
 
-    const pointLight = new THREE.PointLight(0x8b5cf6, 0.6);
-    pointLight.position.set(-5, 3, 3);
-    scene.add(pointLight);
+    const fillLight = new THREE.DirectionalLight(0x8888ff, 0.5);
+    fillLight.position.set(-2, 1, 2);
+    scene.add(fillLight);
+
+    const rimLight = new THREE.DirectionalLight(0x00ccff, 0.8);
+    rimLight.position.set(0, 2, -3);
+    scene.add(rimLight);
+
+    const bottomLight = new THREE.DirectionalLight(0x8855ff, 0.3);
+    bottomLight.position.set(0, -2, 1);
+    scene.add(bottomLight);
 
     // Load model
     const loader = new GLTFLoader();
@@ -75,48 +91,77 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
       modelUrls[character],
       (gltf: any) => {
         const model = gltf.scene;
-        model.scale.set(1.0, 1.0, 1.0);
-        model.position.y = -1.0;
-        model.position.x = 0;
+
+        // From original: center model and scale to 1.2/maxDim
+        const box = new THREE.Box3().setFromObject(model);
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
+        model.position.sub(center);
+        const maxDim = Math.max(size.x, size.y, size.z);
+        if (maxDim > 0) model.scale.setScalar(1.2 / maxDim);
+        // Override Y with user-calibrated value from original
+        model.position.y = -0.6;
+
         model.castShadow = true;
         model.receiveShadow = true;
         scene.add(model);
         modelRef.current = model;
 
-        // Find head bone for tracking and fix arm positions
+        // Find bones (from original findArmBones + _findEyeAndSpineBones)
+        const allBones: THREE.Bone[] = [];
         model.traverse((child: any) => {
-          if (child.isBone && (child.name.toLowerCase().includes("head") || child.name.toLowerCase().includes("neck"))) {
-            headBoneRef.current = child;
-          }
-          // Bring arms down to sides (fix T-pose)
-          if (child.isBone) {
-            const name = child.name.toLowerCase();
-            if (name.includes("leftarm") || name.includes("left_arm") || name.includes("leftshoulder") || name.includes("left_shoulder")) {
-              child.rotation.z = 1.2; // Rotate left arm down
-            }
-            if (name.includes("rightarm") || name.includes("right_arm") || name.includes("rightshoulder") || name.includes("right_shoulder")) {
-              child.rotation.z = -1.2; // Rotate right arm down
-            }
-          }
+          if (child.isBone) allBones.push(child);
         });
+
+        function findBone(patterns: string[]): THREE.Bone | null {
+          // Exact match first
+          for (const p of patterns) {
+            for (const b of allBones) {
+              if (b.name === p) return b;
+            }
+          }
+          // Case-insensitive fallback
+          const lowerPatterns = patterns.map(p => p.toLowerCase());
+          for (const lp of lowerPatterns) {
+            for (const b of allBones) {
+              if (b.name.toLowerCase() === lp) return b;
+            }
+          }
+          return null;
+        }
+
+        // Head bone
+        headBoneRef.current = findBone(["Head", "head"]);
+
+        // Arm bones
+        const leftArm = findBone(["LeftArm", "LeftArm1", "Left_Arm", "upperarm_l", "upper_arm.L"]);
+        const rightArm = findBone(["RightArm", "RightArm1", "Right_Arm", "upperarm_r", "upper_arm.R"]);
+        const leftForeArm = findBone(["LeftForeArm", "LeftForeArm1", "Left_ForeArm", "lowerarm_l", "forearm.L"]);
+        const rightForeArm = findBone(["RightForeArm", "RightForeArm1", "Right_ForeArm", "lowerarm_r", "forearm.R"]);
+
+        armBonesRef.current = { leftArm, rightArm, leftForeArm, rightForeArm };
+
+        // Capture rest-pose quaternions ONCE (before applying pose)
+        if (leftArm) armRestLeftRef.current = leftArm.quaternion.clone();
+        if (rightArm) armRestRightRef.current = rightArm.quaternion.clone();
+
+        // Apply relaxed arm pose (from original: _armL = {x:27, y:-9, z:-4})
+        // This rotates arms from A-pose down to natural hanging position
+        applyRelaxedPose();
 
         // Setup animations
         if (gltf.animations.length > 0) {
           const mixer = new THREE.AnimationMixer(model);
           mixerRef.current = mixer;
-
-          // Play idle animation
-          const idleAction = mixer.clipAction(gltf.animations[0]);
-          idleAction.clampWhenFinished = true;
-          idleAction.play();
+          gltf.animations.forEach((clip: THREE.AnimationClip) => {
+            mixer.clipAction(clip).play();
+          });
         }
 
         setIsLoading(false);
         onReady?.();
       },
-      (progress: any) => {
-        console.log(`Loading ${character}: ${(progress.loaded / progress.total) * 100}%`);
-      },
+      undefined,
       (error: any) => {
         console.error(`Error loading ${character} model:`, error);
         setIsLoading(false);
@@ -128,36 +173,23 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
     const animate = () => {
       requestAnimationFrame(animate);
 
+      const delta = clock.getDelta();
+
       if (mixerRef.current) {
-        mixerRef.current.update(clock.getDelta());
+        mixerRef.current.update(delta);
       }
 
-      // Head tracking - look at user (camera position)
-      if (headBoneRef.current && modelRef.current) {
-        const headWorldPos = new THREE.Vector3();
-        headBoneRef.current.getWorldPosition(headWorldPos);
-
-        // User is at camera position
-        const userPos = new THREE.Vector3(0, 0, 3);
-        const direction = userPos.clone().sub(headWorldPos).normalize();
-
-        // Smooth head rotation
-        const targetQuaternion = new THREE.Quaternion();
-        targetQuaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
-        headBoneRef.current.quaternion.slerp(targetQuaternion, 0.05);
-      }
+      // Re-enforce arm pose every frame (animations may override it)
+      applyRelaxedPose();
 
       renderer.render(scene, camera);
     };
     animate();
 
-    // Handle window resize
     const handleResize = () => {
       if (!containerRef.current) return;
-
       const width = containerRef.current.clientWidth;
       const height = containerRef.current.clientHeight;
-
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
       renderer.setSize(width, height);
@@ -174,25 +206,47 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
     };
   }, [character, onReady]);
 
+  // Apply relaxed pose from original code: _armL = {x:27, y:-9, z:-4}
+  function applyRelaxedPose() {
+    const { leftArm, rightArm } = armBonesRef.current;
+    const restLeft = armRestLeftRef.current;
+    const restRight = armRestRightRef.current;
+
+    if (!leftArm || !rightArm || !restLeft || !restRight) return;
+
+    // Original values: _armL = { x: 27, y: -9, z: -4 }
+    const armLX = 27, armLY = -9, armLZ = -4;
+    const armRX = 27, armRY = -9, armRZ = -4;
+
+    // Left arm (from original _enforcePose)
+    const rxL = (armLX * Math.PI) / 180;
+    const ryL = (armLY * Math.PI) / 180;
+    const rzL = (armLZ * Math.PI) / 180;
+    const deltaL = new THREE.Quaternion().setFromEuler(new THREE.Euler(rxL, -ryL, -rzL, "XYZ"));
+    leftArm.quaternion.copy(restLeft).multiply(deltaL);
+
+    // Right arm (from original _enforcePose)
+    const rxR = (armRX * Math.PI) / 180;
+    const ryR = (armRY * Math.PI) / 180;
+    const rzR = (armRZ * Math.PI) / 180;
+    const deltaR = new THREE.Quaternion().setFromEuler(new THREE.Euler(rxR, ryR, rzR, "XYZ"));
+    rightArm.quaternion.copy(restRight).multiply(deltaR);
+  }
+
   // Apply emotion-based transformations
   useEffect(() => {
-    if (!modelRef.current) return;
-
-    const emotionTransforms = {
-      neutral: { rotationX: 0, rotationY: 0, scale: 1 },
-      happy: { rotationX: 0.05, rotationY: 0, scale: 1.02 },
-      sad: { rotationX: -0.08, rotationY: 0, scale: 0.98 },
-      thinking: { rotationX: 0.1, rotationY: 0, scale: 1 },
-      excited: { rotationX: 0.1, rotationY: 0, scale: 1.05 },
-      confused: { rotationX: 0.08, rotationY: 0, scale: 1 },
+    if (!headBoneRef.current) return;
+    const emotionTransforms: Record<string, { rotationX: number }> = {
+      neutral: { rotationX: 0 },
+      happy: { rotationX: 0.05 },
+      sad: { rotationX: -0.08 },
+      thinking: { rotationX: 0.1 },
+      excited: { rotationX: 0.1 },
+      confused: { rotationX: 0.08 },
     };
-
     const transform = emotionTransforms[emotion];
-    if (transform) {
-      // Only rotate head, not entire body
-      if (headBoneRef.current) {
-        headBoneRef.current.rotation.x = transform.rotationX;
-      }
+    if (transform && headBoneRef.current) {
+      headBoneRef.current.rotation.x = transform.rotationX;
     }
   }, [emotion]);
 
