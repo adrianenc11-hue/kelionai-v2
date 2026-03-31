@@ -7,4 +7,10 @@ export const ENV = {
   isProduction: process.env.NODE_ENV === "production",
   forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
+  // ElevenLabs TTS & Voice Cloning
+  elevenLabsApiKey: process.env.ELEVENLABS_API_KEY ?? "",
+  elevenLabsVoiceKelion: process.env.ELEVENLABS_VOICE_KELION ?? "VR6AewLTigWG4xSOukaG",
+  elevenLabsVoiceKira: process.env.ELEVENLABS_VOICE_KIRA ?? "EXAVITQu4vr4xnSDxMaL",
+  // OpenAI for GPT-5.4 vision + Whisper STT
+  openaiApiKey: process.env.OPENAI_API_KEY ?? "",
 };

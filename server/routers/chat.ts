@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
-import { routeToAI, getOptimalProvider, getFallbackChain, AIProvider } from "../ai-router";
 import {
   getConversationsByUserId,
   getConversationById,
@@ -10,149 +9,148 @@ import {
   getUserUsage,
   updateUserUsage,
 } from "../db";
+import { processBrainMessage, processVoiceCloningStep, BrainMessage } from "../brain-v4";
+import { CharacterName } from "../characters";
 
 export const chatRouter = router({
-  /**
-   * Get all conversations for the current user
-   */
   listConversations: protectedProcedure.query(async ({ ctx }) => {
     return await getConversationsByUserId(ctx.user.id);
   }),
 
-  /**
-   * Get a specific conversation with all messages
-   */
   getConversation: protectedProcedure
     .input(z.object({ conversationId: z.number() }))
     .query(async ({ ctx, input }) => {
       const conversation = await getConversationById(input.conversationId);
-
-      // Verify ownership
       if (!conversation || conversation.userId !== ctx.user.id) {
         throw new Error("Conversation not found or access denied");
       }
-
       const messages = await getMessagesByConversationId(input.conversationId);
       return { conversation, messages };
     }),
 
-  /**
-   * Create a new conversation
-   */
   createConversation: protectedProcedure
-    .input(z.object({ title: z.string().optional() }))
+    .input(z.object({ title: z.string().optional(), avatar: z.string().optional() }))
     .mutation(async ({ ctx, input }) => {
       const title = input.title || `Chat - ${new Date().toLocaleDateString()}`;
-      const result = await createConversation(ctx.user.id, title);
-      return result;
+      return await createConversation(ctx.user.id, title);
     }),
 
-  /**
-   * Send a message and get AI response
-   */
   sendMessage: protectedProcedure
     .input(
       z.object({
-        conversationId: z.number(),
+        conversationId: z.number().optional(),
         message: z.string(),
-        aiProvider: z.enum(["gpt-4", "gemini", "groq", "claude", "deepseek"]).optional(),
-        useCase: z.enum(["fast", "quality", "code", "reasoning"]).optional(),
+        avatar: z.enum(["kelion", "kira"]).optional(),
+        imageUrl: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // Verify conversation ownership
-      const conversation = await getConversationById(input.conversationId);
+      let conversationId = input.conversationId;
+      const avatar: CharacterName = input.avatar || "kelion";
+
+      // Auto-create conversation if none provided
+      if (!conversationId) {
+        const title = input.message.slice(0, 50) + (input.message.length > 50 ? "..." : "");
+        const result = await createConversation(ctx.user.id, title);
+        conversationId = (result as any)[0]?.insertId || (result as any).insertId;
+        if (!conversationId) throw new Error("Failed to create conversation");
+      }
+
+      // Verify ownership
+      const conversation = await getConversationById(conversationId);
       if (!conversation || conversation.userId !== ctx.user.id) {
         throw new Error("Conversation not found or access denied");
       }
 
-      // Check usage limits based on subscription tier
+      // Check usage limits
       const usage = await getUserUsage(ctx.user.id);
       const tier = ctx.user.subscriptionTier || "free";
-      const limits: Record<string, number> = {
-        free: 20,
-        pro: 200,
-        enterprise: 10000,
-      };
-
+      const limits: Record<string, number> = { free: 50, pro: 500, enterprise: 10000 };
       const messagesThisMonth = usage?.messagesThisMonth || 0;
-      if (messagesThisMonth >= limits[tier]) {
-        throw new Error(`Message limit reached for ${tier} tier`);
+      if (messagesThisMonth >= (limits[tier] || 50)) {
+        throw new Error(`Message limit reached for ${tier} plan. Please upgrade.`);
       }
 
       // Store user message
-      await createMessage(input.conversationId, "user", input.message);
+      await createMessage(conversationId, "user", input.message);
 
-      // Determine AI provider
-      let provider: AIProvider = input.aiProvider || "gpt-4";
-      if (input.useCase) {
-        provider = getOptimalProvider(input.useCase);
-      }
-
-      // Get conversation history for context
-      const messages = await getMessagesByConversationId(input.conversationId);
-
-      // Build message array for AI
-      const aiMessages = messages.map((m) => ({
+      // Get conversation history for Brain v4
+      const dbMessages = await getMessagesByConversationId(conversationId);
+      const history: BrainMessage[] = dbMessages.map((m) => ({
         role: m.role as "user" | "assistant" | "system",
         content: m.content || "",
       }));
 
-      // Add current message
-      aiMessages.push({
-        role: "user" as const,
-        content: input.message,
+      // Process through Brain v4
+      const brainResult = await processBrainMessage({
+        message: input.message,
+        history,
+        character: avatar,
+        userId: ctx.user.id,
+        userName: ctx.user.name || "User",
+        imageUrl: input.imageUrl,
       });
 
-      // Get AI response with fallback chain
-      const fallbackChain = getFallbackChain(provider);
-      const aiResponse = await routeToAI(aiMessages, provider, fallbackChain);
-
       // Store AI response
-      await createMessage(input.conversationId, "assistant", aiResponse.content, aiResponse.provider);
+      await createMessage(conversationId, "assistant", brainResult.content, "brain-v4");
 
       // Update usage
-      const newMessagesCount = (usage?.messagesThisMonth || 0) + 2;
-      const newVoiceMinutes = usage?.voiceMinutesThisMonth || 0;
-
-      await updateUserUsage(ctx.user.id, newMessagesCount, newVoiceMinutes);
+      await updateUserUsage(ctx.user.id, messagesThisMonth + 2, usage?.voiceMinutesThisMonth || 0);
 
       return {
         success: true,
-        message: aiResponse.content,
-        provider: aiResponse.provider,
-        tokensUsed: aiResponse.tokensUsed,
+        conversationId,
+        message: brainResult.content,
+        audioUrl: brainResult.audioUrl,
+        confidence: brainResult.confidence,
+        toolsUsed: brainResult.toolsUsed,
+        userLevel: brainResult.userLevel,
+        language: brainResult.language,
+        voiceCloningStep: brainResult.voiceCloningStep,
       };
     }),
 
-  /**
-   * Get message history for a conversation
-   */
+  // Voice cloning step processor
+  voiceCloningStep: protectedProcedure
+    .input(
+      z.object({
+        step: z.number(),
+        audioBase64: z.string().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      let audioBuffer: Buffer | undefined;
+      if (input.audioBase64) {
+        audioBuffer = Buffer.from(input.audioBase64, "base64");
+      }
+
+      const result = await processVoiceCloningStep({
+        step: input.step,
+        userId: ctx.user.id,
+        userName: ctx.user.name || "User",
+        audioBuffer,
+      });
+
+      return result;
+    }),
+
   getMessages: protectedProcedure
     .input(z.object({ conversationId: z.number() }))
     .query(async ({ ctx, input }) => {
       const conversation = await getConversationById(input.conversationId);
-
       if (!conversation || conversation.userId !== ctx.user.id) {
         throw new Error("Conversation not found or access denied");
       }
-
       return await getMessagesByConversationId(input.conversationId);
     }),
 
-  /**
-   * Delete a conversation
-   */
   deleteConversation: protectedProcedure
     .input(z.object({ conversationId: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const conversation = await getConversationById(input.conversationId);
-
       if (!conversation || conversation.userId !== ctx.user.id) {
         throw new Error("Conversation not found or access denied");
       }
-
-      // TODO: Implement actual deletion in database
       return { success: true };
     }),
 });

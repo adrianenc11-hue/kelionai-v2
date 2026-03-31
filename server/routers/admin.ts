@@ -3,6 +3,7 @@ import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { users, conversations, messages } from "../../drizzle/schema";
 import { eq, desc } from "drizzle-orm";
+import { getBrainDiagnostics } from "../brain-v4";
 
 /**
  * Admin-only procedure that checks user role
@@ -163,6 +164,13 @@ export const adminRouter = router({
         throw error;
       }
     }),
+
+  /**
+   * Get Brain v4 diagnostics
+   */
+  getBrainDiagnostics: adminProcedure.query(async () => {
+    return getBrainDiagnostics();
+  }),
 
   /**
    * Delete user (admin only) - soft delete by anonymizing
