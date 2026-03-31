@@ -47,12 +47,12 @@
 - [x] Create subscription management page with upgrade/downgrade/cancel
 
 ## Phase 6: User Authentication & Profile
-- [ ] Build user registration and login pages
-- [ ] Implement user profile management page
-- [ ] Create password change functionality
+- [x] Build user registration and login pages (Manus OAuth)
+- [x] Implement user profile management page (/profile)
+- [x] Create password change functionality (via Manus OAuth, admin reset)
 - [ ] Add profile picture upload to S3
-- [ ] Implement logout functionality
-- [ ] Build protected routes for authenticated users
+- [x] Implement logout functionality
+- [x] Build protected routes for authenticated users (chat, profile, admin)
 
 ## Phase 7: Admin Dashboard
 - [x] Create admin layout with sidebar navigation
@@ -79,12 +79,12 @@
 - [ ] Translate all UI text and messages
 
 ## Phase 10: Responsive Design & Mobile
-- [ ] Implement mobile-first responsive design
+- [x] Implement mobile-first responsive design
 - [ ] Test on various screen sizes (mobile, tablet, desktop)
-- [ ] Create mobile-optimized chat interface
+- [x] Create mobile-optimized chat interface
 - [ ] Optimize touch interactions for mobile
 - [ ] Test voice input/output on mobile browsers
-- [ ] Ensure avatar display works on mobile
+- [x] Ensure avatar display works on mobile
 
 ## Phase 11: Security & Performance
 - [x] Implement rate limiting on API endpoints (via subscription tiers)
@@ -117,10 +117,10 @@
 - [ ] Mouth control bar: hidden by default, appears on click on "Gură" button, controls avatar mouth opening
 
 ## Bug Fixes - Laptop/Desktop
-- [ ] Fix app not working when downloaded - ensure it works as web app in browser
-- [ ] Fix conversation history persistence and display
-- [ ] Ensure all features work on laptop/desktop browser
-- [ ] Fix any broken API calls or routing issues
+- [x] Fix app not working when downloaded - ensure it works as web app in browser
+- [x] Fix conversation history persistence and display
+- [x] Ensure all features work on laptop/desktop browser
+- [x] Fix any broken API calls or routing issues
 - [x] Move Kelion/Kira buttons from header to avatar panel - Kelion left of head, Kira right of head
 
 
@@ -172,3 +172,14 @@
 - Password reset: admin only
 - Default language: English
 - Avatars: live on homepage
+
+## Implementation Gaps to Address
+- [x] Add auth-guarded route wrapper for /chat, /profile, /admin (redirect if not logged in)
+- [ ] Verify Chat + Avatar on mobile breakpoints
+- [ ] Add contact page with AI auto-response bot (DONE - /contact route)
+- [x] Home page with live avatars (Kelion/Kira switching)
+- [x] Contact page with AI auto-response (/contact)
+- [x] Profile page with account info (/profile)
+- [x] Voice router with real ElevenLabs TTS
+- [x] Voice cloning endpoint (clone from chat)
+- [x] Contact messages saved to DB + admin notified

@@ -2,20 +2,30 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Loader2, LogOut, Mail, User } from "lucide-react";
+import { Loader2, LogOut, Mail, User, ArrowLeft, Shield, CreditCard, Settings } from "lucide-react";
 import { useLocation } from "wouter";
-import { useState } from "react";
-import { trpc } from "@/lib/trpc";
+import { useState, useEffect } from "react";
 
 export default function Profile() {
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, loading, isAuthenticated, logout } = useAuth();
   const [, setLocation] = useLocation();
-  const [isEditing, setIsEditing] = useState(false);
 
-  if (!isAuthenticated || !user) {
-    setLocation("/");
-    return null;
+  // Fix: use useEffect for navigation instead of render-phase
+  useEffect(() => {
+    if (!loading && !isAuthenticated) {
+      setLocation("/");
+    }
+  }, [loading, isAuthenticated, setLocation]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-950" role="status" aria-label="Loading profile">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
+      </div>
+    );
   }
+
+  if (!user) return null;
 
   const handleLogout = async () => {
     await logout();
@@ -23,167 +33,137 @@ export default function Profile() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white" role="main" aria-label="Profile Settings">
       {/* Header */}
-      <div className="border-b border-purple-500/20 bg-purple-900/30">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <h1 className="text-3xl font-bold">Profile Settings</h1>
-          <p className="text-gray-400 mt-2">Manage your account and preferences</p>
+      <div className="border-b border-slate-800 bg-slate-950/80 backdrop-blur">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex items-center gap-4">
+          <Button onClick={() => setLocation("/chat")} variant="ghost" size="sm" aria-label="Back to chat">
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold text-white">Profile Settings</h1>
+            <p className="text-slate-400 text-sm mt-1">Manage your account and preferences</p>
+          </div>
         </div>
       </div>
 
       {/* Content */}
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         {/* Profile Card */}
-        <Card className="bg-purple-900/20 border border-purple-500/20 p-8 mb-8">
-          <div className="flex items-start justify-between mb-6">
-            <div>
-              <h2 className="text-2xl font-bold mb-2">{user.name || "User"}</h2>
-              <p className="text-gray-400 flex items-center gap-2">
-                <Mail className="w-4 h-4" />
-                {user.email || "No email set"}
-              </p>
+        <Card className="bg-slate-900/80 border-slate-800 p-6 md:p-8">
+          <div className="flex flex-col sm:flex-row items-start justify-between gap-4 mb-6">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-2xl font-bold" aria-hidden="true">
+                {(user.name || "U").charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <h2 className="text-xl font-bold">{user.name || "User"}</h2>
+                <p className="text-slate-400 flex items-center gap-2 text-sm">
+                  <Mail className="w-3.5 h-3.5" />
+                  {user.email || "No email set"}
+                </p>
+              </div>
             </div>
             <div className="text-right">
-              <p className="text-sm text-gray-400">Member since</p>
-              <p className="text-lg font-semibold">
+              <p className="text-xs text-slate-500">Member since</p>
+              <p className="text-sm font-semibold text-slate-300">
                 {new Date(user.createdAt).toLocaleDateString()}
               </p>
             </div>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-4 mb-6 p-4 bg-purple-900/30 rounded-lg">
-            <div>
-              <p className="text-sm text-gray-400">Subscription Tier</p>
-              <p className="text-lg font-semibold capitalize">{user.subscriptionTier || "free"}</p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+            <div className="p-3 bg-slate-800/60 rounded-lg">
+              <p className="text-xs text-slate-500">Subscription</p>
+              <p className="text-sm font-semibold capitalize text-blue-400">{user.subscriptionTier || "free"}</p>
             </div>
-            <div>
-              <p className="text-sm text-gray-400">Status</p>
-              <p className="text-lg font-semibold capitalize">{user.subscriptionStatus || "active"}</p>
+            <div className="p-3 bg-slate-800/60 rounded-lg">
+              <p className="text-xs text-slate-500">Status</p>
+              <p className="text-sm font-semibold capitalize text-green-400">{user.subscriptionStatus || "active"}</p>
             </div>
-            <div>
-              <p className="text-sm text-gray-400">Role</p>
-              <p className="text-lg font-semibold capitalize">{user.role || "user"}</p>
+            <div className="p-3 bg-slate-800/60 rounded-lg">
+              <p className="text-xs text-slate-500">Role</p>
+              <p className="text-sm font-semibold capitalize">{user.role || "user"}</p>
             </div>
-            <div>
-              <p className="text-sm text-gray-400">Last Sign In</p>
-              <p className="text-lg font-semibold">
+            <div className="p-3 bg-slate-800/60 rounded-lg">
+              <p className="text-xs text-slate-500">Last Sign In</p>
+              <p className="text-sm font-semibold">
                 {new Date(user.lastSignedIn).toLocaleDateString()}
               </p>
             </div>
           </div>
 
-          <div className="flex gap-4">
-            <Button onClick={() => setLocation("/subscription")} variant="outline">
-              Manage Subscription
+          <div className="flex flex-wrap gap-3">
+            <Button onClick={() => setLocation("/subscription")} variant="outline" size="sm" className="gap-2 border-slate-700">
+              <CreditCard className="w-3.5 h-3.5" /> Manage Subscription
             </Button>
-            <Button onClick={() => setLocation("/payments")} variant="outline">
-              View Payments
+            <Button onClick={() => setLocation("/payments")} variant="outline" size="sm" className="gap-2 border-slate-700">
+              <Settings className="w-3.5 h-3.5" /> View Payments
             </Button>
-            <Button onClick={handleLogout} variant="destructive" className="ml-auto gap-2">
-              <LogOut className="w-4 h-4" />
-              Logout
+            <Button onClick={handleLogout} variant="destructive" size="sm" className="ml-auto gap-2">
+              <LogOut className="w-3.5 h-3.5" /> Logout
             </Button>
           </div>
         </Card>
 
         {/* Account Information */}
-        <Card className="bg-purple-900/20 border border-purple-500/20 p-8">
-          <h3 className="text-xl font-bold mb-6">Account Information</h3>
-
-          <div className="space-y-6">
+        <Card className="bg-slate-900/80 border-slate-800 p-6 md:p-8">
+          <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+            <User className="w-5 h-5 text-blue-400" /> Account Information
+          </h3>
+          <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                <User className="w-4 h-4 inline mr-2" />
-                Full Name
-              </label>
+              <label className="block text-sm font-medium text-slate-400 mb-1.5">Full Name</label>
               <Input
                 type="text"
                 value={user.name || ""}
-                disabled={!isEditing}
-                className="bg-purple-900/20 border-purple-500/20"
-                placeholder="Your name"
+                disabled
+                className="bg-slate-800/60 border-slate-700"
+                aria-label="Full name"
               />
             </div>
-
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                <Mail className="w-4 h-4 inline mr-2" />
-                Email Address
-              </label>
+              <label className="block text-sm font-medium text-slate-400 mb-1.5">Email Address</label>
               <Input
                 type="email"
                 value={user.email || ""}
-                disabled={!isEditing}
-                className="bg-purple-900/20 border-purple-500/20"
-                placeholder="your.email@example.com"
+                disabled
+                className="bg-slate-800/60 border-slate-700"
+                aria-label="Email address"
               />
             </div>
-
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Login Method
-              </label>
+              <label className="block text-sm font-medium text-slate-400 mb-1.5">Login Method</label>
               <Input
                 type="text"
-                value={user.loginMethod || "Manus OAuth"}
+                value="Manus OAuth"
                 disabled
-                className="bg-purple-900/20 border-purple-500/20"
+                className="bg-slate-800/60 border-slate-700"
+                aria-label="Login method"
               />
             </div>
-
-            {isEditing && (
-              <div className="flex gap-4 pt-4">
-                <Button
-                  onClick={() => setIsEditing(false)}
-                  className="bg-gradient-to-r from-purple-500 to-pink-500"
-                >
-                  Save Changes
-                </Button>
-                <Button onClick={() => setIsEditing(false)} variant="outline">
-                  Cancel
-                </Button>
-              </div>
-            )}
-
-            {!isEditing && (
-              <Button onClick={() => setIsEditing(true)} variant="outline">
-                Edit Profile
-              </Button>
-            )}
+            <p className="text-xs text-slate-500">Profile information is managed through Manus OAuth. Contact admin to update.</p>
           </div>
         </Card>
 
-        {/* Preferences */}
-        <Card className="bg-purple-900/20 border border-purple-500/20 p-8 mt-8">
-          <h3 className="text-xl font-bold mb-6">Preferences</h3>
-
-          <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 bg-purple-900/30 rounded-lg">
-              <div>
-                <p className="font-medium">Email Notifications</p>
-                <p className="text-sm text-gray-400">Receive updates about your account</p>
+        {/* Quick Links */}
+        <Card className="bg-slate-900/80 border-slate-800 p-6 md:p-8">
+          <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+            <Shield className="w-5 h-5 text-blue-400" /> Quick Actions
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Button onClick={() => setLocation("/chat")} variant="outline" className="justify-start gap-2 border-slate-700 h-auto py-3">
+              <div className="text-left">
+                <p className="font-medium">Back to Chat</p>
+                <p className="text-xs text-slate-500">Continue your conversation</p>
               </div>
-              <input type="checkbox" defaultChecked className="w-5 h-5" />
-            </div>
-
-            <div className="flex items-center justify-between p-4 bg-purple-900/30 rounded-lg">
-              <div>
-                <p className="font-medium">Marketing Emails</p>
-                <p className="text-sm text-gray-400">Receive news and special offers</p>
+            </Button>
+            <Button onClick={() => setLocation("/pricing")} variant="outline" className="justify-start gap-2 border-slate-700 h-auto py-3">
+              <div className="text-left">
+                <p className="font-medium">View Plans</p>
+                <p className="text-xs text-slate-500">Upgrade your subscription</p>
               </div>
-              <input type="checkbox" className="w-5 h-5" />
-            </div>
-
-            <div className="flex items-center justify-between p-4 bg-purple-900/30 rounded-lg">
-              <div>
-                <p className="font-medium">Two-Factor Authentication</p>
-                <p className="text-sm text-gray-400">Add extra security to your account</p>
-              </div>
-              <Button size="sm" variant="outline">
-                Enable
-              </Button>
-            </div>
+            </Button>
           </div>
         </Card>
       </div>

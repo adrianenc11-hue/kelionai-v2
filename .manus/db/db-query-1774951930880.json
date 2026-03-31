@@ -1,0 +1,9 @@
+{
+  "query": "CREATE TABLE IF NOT EXISTS user_cloned_voices (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  user_id INT NOT NULL,\n  voice_id VARCHAR(255) NOT NULL,\n  voice_name VARCHAR(255) NOT NULL,\n  is_active TINYINT(1) DEFAULT 1,\n  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,\n  INDEX idx_user_active (user_id, is_active)\n);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3an7njbW5nGGpyR.root --database fTDgTXExTnteU8v7gTpoiu --execute CREATE TABLE IF NOT EXISTS user_cloned_voices (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  user_id INT NOT NULL,\n  voice_id VARCHAR(255) NOT NULL,\n  voice_name VARCHAR(255) NOT NULL,\n  is_active TINYINT(1) DEFAULT 1,\n  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,\n  INDEX idx_user_active (user_id, is_active)\n);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 337
+}

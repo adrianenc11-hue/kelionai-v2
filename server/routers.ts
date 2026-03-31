@@ -6,6 +6,7 @@ import { chatRouter } from "./routers/chat";
 import { subscriptionRouter } from "./routers/subscription";
 import { adminRouter } from "./routers/admin";
 import { voiceRouter } from "./routers/voice";
+import { contactRouter } from "./routers/contact";
 
 export const appRouter = router({
   // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
@@ -25,6 +26,7 @@ export const appRouter = router({
   subscription: subscriptionRouter,
   admin: adminRouter,
   voice: voiceRouter,
+  contact: contactRouter,
 });
 
 export type AppRouter = typeof appRouter;
