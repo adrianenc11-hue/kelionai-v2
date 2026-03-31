@@ -664,12 +664,12 @@ export default function Chat() {
           </div>
         </div>
 
-        {/* RIGHT: Avatar (top) + Chat messages (bottom) */}
-        <div className="w-[55%] min-w-[400px] max-w-[700px] shrink-0 flex flex-col" style={{
+        {/* RIGHT: Avatar FULL HEIGHT with chat overlay at bottom */}
+        <div className="w-[55%] min-w-[400px] max-w-[700px] shrink-0 flex flex-col relative" style={{
           borderLeft: "1px solid rgba(255,255,255,0.05)",
         }}>
-          {/* Avatar area */}
-          <div className="relative flex-1 min-h-[55%] overflow-hidden" style={{
+          {/* Avatar area - FULL HEIGHT of right panel */}
+          <div className="absolute inset-0 overflow-hidden" style={{
             backgroundImage: `url(${CITY_BOKEH_BG})`,
             backgroundSize: "cover",
             backgroundPosition: "center",
@@ -690,10 +690,9 @@ export default function Chat() {
             </div>
           </div>
 
-          {/* Chat messages - BELOW avatar */}
-          <div className="h-[35%] min-h-[150px] overflow-y-auto px-3 py-2 space-y-2" style={{
-            background: "rgba(0,0,0,0.4)",
-            borderTop: "1px solid rgba(255,255,255,0.05)",
+          {/* Chat messages - OVERLAY at bottom of avatar */}
+          <div className="absolute bottom-0 left-0 right-0 max-h-[40%] overflow-y-auto px-3 py-2 space-y-2 z-20" style={{
+            background: "linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.4) 70%, transparent 100%)",
           }}>
             {messages.length === 0 && !isLoading && (
               <div className="flex items-center justify-center h-full">
