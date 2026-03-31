@@ -138,24 +138,6 @@ export default function Chat() {
         </div>
 
         <div className="flex items-center gap-4">
-          {/* Avatar Selector */}
-          <div className="flex gap-2">
-            <Button
-              onClick={() => setSelectedAvatar("kelion")}
-              variant={selectedAvatar === "kelion" ? "default" : "outline"}
-              className="px-4"
-            >
-              Kelion
-            </Button>
-            <Button
-              onClick={() => setSelectedAvatar("kira")}
-              variant={selectedAvatar === "kira" ? "default" : "outline"}
-              className="px-4"
-            >
-              Kira
-            </Button>
-          </div>
-
           {/* AI Provider Selector */}
           <select
             value={selectedAI}
@@ -320,9 +302,25 @@ export default function Chat() {
           {/* Background effect */}
           <div className="absolute inset-0 bg-gradient-to-t from-blue-900/20 via-transparent to-transparent pointer-events-none" />
 
-          {/* Avatar name */}
-          <div className="absolute top-6 left-6 text-lg font-semibold text-blue-400 z-10">
-            {selectedAvatar.charAt(0).toUpperCase() + selectedAvatar.slice(1)}
+          {/* Avatar selector buttons - left and right of head */}
+          <div className="absolute top-4 left-0 right-0 flex items-center justify-between px-4 z-10">
+            <Button
+              onClick={() => setSelectedAvatar("kelion")}
+              variant={selectedAvatar === "kelion" ? "default" : "outline"}
+              className="px-4 text-sm"
+            >
+              Kelion
+            </Button>
+            <div className="text-lg font-semibold text-blue-400">
+              {selectedAvatar.charAt(0).toUpperCase() + selectedAvatar.slice(1)}
+            </div>
+            <Button
+              onClick={() => setSelectedAvatar("kira")}
+              variant={selectedAvatar === "kira" ? "default" : "outline"}
+              className="px-4 text-sm"
+            >
+              Kira
+            </Button>
           </div>
 
           {/* Hidden Camera Feed - Connected to AGI Brain */}

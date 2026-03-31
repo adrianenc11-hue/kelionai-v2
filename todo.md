@@ -115,3 +115,10 @@
 
 ## UI Fixes
 - [ ] Mouth control bar: hidden by default, appears on click on "Gură" button, controls avatar mouth opening
+
+## Bug Fixes - Laptop/Desktop
+- [ ] Fix app not working when downloaded - ensure it works as web app in browser
+- [ ] Fix conversation history persistence and display
+- [ ] Ensure all features work on laptop/desktop browser
+- [ ] Fix any broken API calls or routing issues
+- [x] Move Kelion/Kira buttons from header to avatar panel - Kelion left of head, Kira right of head
