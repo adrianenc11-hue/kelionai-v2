@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
-import { Loader2, Send, Mic, MicOff, Camera, CameraOff, LogOut, User, CreditCard, X } from "lucide-react";
+import { Loader2, Send, Mic, MicOff, Camera, CameraOff, LogOut, User, CreditCard, X, History } from "lucide-react";
 import { Streamdown } from "streamdown";
 import { useRoute, useLocation } from "wouter";
 import Avatar3D from "@/components/Avatar3D";
@@ -33,6 +33,7 @@ export default function Chat() {
   const [activeConversationId, setActiveConversationId] = useState<number | null>(conversationId);
   const [monitorContent, setMonitorContent] = useState<{ type: string; data: string; title?: string } | null>(null);
   const [mouthOpen, setMouthOpen] = useState(0);
+  const [showHistory, setShowHistory] = useState(false);
 
   // MIC state - REAL recording
   const [isRecording, setIsRecording] = useState(false);
@@ -61,6 +62,10 @@ export default function Chat() {
   const { data: conversationData } = trpc.chat.getConversation.useQuery(
     { conversationId: conversationIdForQuery },
     { enabled: !!activeConversationId }
+  );
+  const { data: conversationsList } = trpc.chat.listConversations.useQuery(
+    undefined,
+    { enabled: showHistory }
   );
 
   // tRPC mutations
@@ -486,7 +491,7 @@ export default function Chat() {
   };
 
   return (
-    <div className="w-full h-screen flex flex-col overflow-hidden" style={{ background: "#0c0e1a" }}>
+    <div className="w-full h-screen flex flex-col overflow-hidden relative" style={{ background: "#0c0e1a" }}>
       <audio ref={audioRef} className="hidden" crossOrigin="anonymous" />
       <canvas ref={canvasRef} className="hidden" />
 
@@ -534,6 +539,14 @@ export default function Chat() {
           >
             New Chat
           </button>
+          <button
+            onClick={() => setShowHistory(!showHistory)}
+            className="px-3 py-1.5 rounded-full text-xs text-slate-400 hover:text-cyan-400 transition-colors flex items-center gap-1"
+            style={{ border: "1px solid rgba(255,255,255,0.1)" }}
+          >
+            <History className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">History</span>
+          </button>
 
           {user ? (
             <>
@@ -558,6 +571,37 @@ export default function Chat() {
           )}
         </div>
       </header>
+
+      {/* ===== HISTORY DRAWER ===== */}
+      {showHistory && (
+        <div className="absolute inset-0 z-40 flex" style={{ top: '48px' }}>
+          <div className="w-72 h-full overflow-y-auto py-3 px-2" style={{ background: '#0f1120', borderRight: '1px solid rgba(255,255,255,0.08)' }}>
+            <div className="flex items-center justify-between px-2 mb-3">
+              <span className="text-xs text-cyan-400 font-semibold uppercase tracking-wider">Chat History</span>
+              <button onClick={() => setShowHistory(false)} className="text-xs text-slate-500 hover:text-white"><X className="w-4 h-4" /></button>
+            </div>
+            {conversationsList && conversationsList.length > 0 ? conversationsList.map((conv: any) => (
+              <button
+                key={conv.id}
+                onClick={() => { navigate(`/chat/${conv.id}`); setShowHistory(false); }}
+                className={`w-full text-left px-3 py-2.5 rounded-lg mb-1 text-xs transition-colors ${
+                  activeConversationId === conv.id ? 'text-cyan-300' : 'text-slate-400 hover:text-white'
+                }`}
+                style={{
+                  background: activeConversationId === conv.id ? 'rgba(8,145,178,0.15)' : 'transparent',
+                  border: activeConversationId === conv.id ? '1px solid rgba(8,145,178,0.2)' : '1px solid transparent',
+                }}
+              >
+                <div className="font-medium truncate">{conv.title || 'Untitled'}</div>
+                <div className="text-[10px] text-slate-600 mt-0.5">{new Date(conv.createdAt).toLocaleDateString()}</div>
+              </button>
+            )) : (
+              <p className="text-xs text-slate-600 px-3">No conversations yet</p>
+            )}
+          </div>
+          <div className="flex-1" onClick={() => setShowHistory(false)} />
+        </div>
+      )}
 
       {/* ===== MAIN CONTENT ===== */}
       <div className="flex-1 flex overflow-hidden">

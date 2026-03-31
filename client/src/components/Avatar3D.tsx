@@ -92,7 +92,7 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
     if (!containerRef.current) return;
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x1a1a2e);
+    scene.background = null; // transparent to show city bokeh behind
     sceneRef.current = scene;
 
     const camera = new THREE.PerspectiveCamera(
@@ -101,7 +101,7 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
       0.1,
       100
     );
-    camera.position.set(0, 0.0, 2.8);
+    camera.position.set(0, 0.12, 2.0);
     cameraRef.current = camera;
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -140,8 +140,8 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
         const size = box.getSize(new THREE.Vector3());
         model.position.sub(center);
         const maxDim = Math.max(size.x, size.y, size.z);
-        if (maxDim > 0) model.scale.setScalar(1.2 / maxDim);
-        model.position.y = -0.6;
+        if (maxDim > 0) model.scale.setScalar(1.4 / maxDim);
+        model.position.y = -0.35;
 
         model.castShadow = true;
         model.receiveShadow = true;
@@ -260,7 +260,7 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
   return (
     <div
       ref={containerRef}
-      className="w-full h-full rounded-lg overflow-hidden bg-gradient-to-b from-purple-900 to-black"
+      className="w-full h-full rounded-lg overflow-hidden"
       style={{ minHeight: "400px" }}
     >
       {isLoading && (

@@ -214,3 +214,9 @@
 
 ## Railway Build Fix
 - [ ] Fix pnpm install --frozen-lockfile failure on Railway
+
+## UI Fixes - User Reported
+- [ ] Fix avatar head cut off - adjust camera position
+- [ ] Remove message cursor/sidebar from chat, add only a "Chat History" button
+- [ ] Fix Railway build (pnpm lockfile + Dockerfile)
+- [ ] Switch database from MySQL to PostgreSQL (Supabase)
