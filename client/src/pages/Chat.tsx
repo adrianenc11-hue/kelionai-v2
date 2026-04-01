@@ -661,7 +661,7 @@ export default function Chat() {
 
         <input ref={inputRef} value={inputValue} onChange={(e) => setInputValue(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSendMessage()}
-          placeholder="Type or speak..." disabled={isLoading}
+          placeholder={t("typeOrSpeak")} disabled={isLoading}
           className="flex-1 px-4 py-2.5 rounded-lg text-sm text-white placeholder:text-slate-600 focus:outline-none disabled:opacity-50"
           style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }} />
         <button onClick={handleSendMessage} disabled={isLoading || !inputValue.trim()}

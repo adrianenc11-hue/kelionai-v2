@@ -1,15 +1,8 @@
-import { exec } from "child_process";
-import { promisify } from "util";
-import { writeFile, readFile, unlink } from "fs/promises";
-import { tmpdir } from "os";
-import { join } from "path";
-
 /**
  * Code Execution Engine
- * Safely executes code in sandboxed environment
+ * SECURITY: All execution disabled — returns simulated output only.
+ * To re-enable, deploy a sandboxed executor (Docker/WASM).
  */
-
-const execAsync = promisify(exec);
 
 export interface ExecutionResult {
   success: boolean;
@@ -85,39 +78,17 @@ export class CodeExecutor {
   }
 
   /**
-   * Execute Python code
+   * Execute Python code — DISABLED for security (no sandbox)
    */
   private async executePython(code: string): Promise<{ stdout: string; stderr: string }> {
-    const filename = join(tmpdir(), `kelion-${Date.now()}.py`);
-
-    try {
-      await writeFile(filename, code);
-      const { stdout, stderr } = await execAsync(`python3 "${filename}"`, {
-        timeout: this.maxExecutionTime,
-        maxBuffer: 10 * 1024 * 1024, // 10MB
-      });
-      return { stdout, stderr };
-    } finally {
-      await unlink(filename).catch(() => {});
-    }
+    return { stdout: `[Code execution disabled for security] Python code received (${code.length} chars). Deploy a sandboxed executor to enable.`, stderr: "" };
   }
 
   /**
-   * Execute JavaScript code
+   * Execute JavaScript code — DISABLED for security (no sandbox)
    */
   private async executeJavaScript(code: string): Promise<{ stdout: string; stderr: string }> {
-    const filename = join(tmpdir(), `kelion-${Date.now()}.js`);
-
-    try {
-      await writeFile(filename, code);
-      const { stdout, stderr } = await execAsync(`node "${filename}"`, {
-        timeout: this.maxExecutionTime,
-        maxBuffer: 10 * 1024 * 1024,
-      });
-      return { stdout, stderr };
-    } finally {
-      await unlink(filename).catch(() => {});
-    }
+    return { stdout: `[Code execution disabled for security] JavaScript code received (${code.length} chars). Deploy a sandboxed executor to enable.`, stderr: "" };
   }
 
   /**
@@ -133,33 +104,10 @@ export class CodeExecutor {
   }
 
   /**
-   * Execute Bash commands (limited)
+   * Execute Bash commands — DISABLED for security (no sandbox)
    */
   private async executeBash(code: string): Promise<{ stdout: string; stderr: string }> {
-    // Only allow safe commands
-    const unsafePatterns = [
-      "rm -rf",
-      "sudo",
-      "chmod",
-      "chown",
-      "dd",
-      "mkfs",
-      "mount",
-      "umount",
-    ];
-
-    for (const pattern of unsafePatterns) {
-      if (code.includes(pattern)) {
-        throw new Error(`Unsafe command detected: ${pattern}`);
-      }
-    }
-
-    const { stdout, stderr } = await execAsync(code, {
-      timeout: this.maxExecutionTime,
-      maxBuffer: 10 * 1024 * 1024,
-    });
-
-    return { stdout, stderr };
+    return { stdout: `[Code execution disabled for security] Bash code received (${code.length} chars). Deploy a sandboxed executor to enable.`, stderr: "" };
   }
 
   /**

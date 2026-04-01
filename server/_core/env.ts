@@ -14,6 +14,6 @@ export const ENV = {
   elevenLabsApiKey: process.env.ELEVENLABS_API_KEY ?? "",
   elevenLabsVoiceKelion: process.env.ELEVENLABS_VOICE_KELION ?? "VR6AewLTigWG4xSOukaG",
   elevenLabsVoiceKira: process.env.ELEVENLABS_VOICE_KIRA ?? "EXAVITQu4vr4xnSDxMaL",
-  // OpenAI for GPT-5.4 vision + Whisper STT
+  // OpenAI for GPT-4.1 chat/vision + Whisper STT
   openaiApiKey: process.env.OPENAI_API_KEY ?? "",
 };

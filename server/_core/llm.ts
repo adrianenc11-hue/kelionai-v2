@@ -242,7 +242,7 @@ const getModelName = () => {
   if (ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0) {
     return "gemini-2.5-flash"; // Manus Forge
   }
-  return "gpt-4o"; // OpenAI direct
+  return "gpt-4.1"; // OpenAI direct — primary chat model
 };
 
 const normalizeResponseFormat = ({

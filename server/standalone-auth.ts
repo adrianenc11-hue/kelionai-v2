@@ -15,7 +15,10 @@ import type { User } from "../drizzle/schema";
 const SALT_ROUNDS = 12;
 
 function getJwtSecret() {
-  const secret = process.env.JWT_SECRET || "kelionai-default-secret-change-me";
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error("FATAL: JWT_SECRET environment variable is not set. Server cannot start securely.");
+  }
   return new TextEncoder().encode(secret);
 }
 

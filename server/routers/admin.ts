@@ -48,37 +48,38 @@ export const adminRouter = router({
     }
 
     try {
-      const allUsers = await db.select().from(users);
-      const allConversations = await db.select().from(conversations);
-      const allMessages = await db.select().from(messages);
+      const { sql: sqlTag } = await import("drizzle-orm");
 
-      const totalUsers = allUsers.length;
-      const activeUsers = allUsers.filter((u: any) => {
-        const lastSignedIn = new Date(u.lastSignedIn);
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        return lastSignedIn > thirtyDaysAgo;
-      }).length;
+      const [counts] = await db.execute(sqlTag`
+        SELECT
+          (SELECT COUNT(*) FROM users) as total_users,
+          (SELECT COUNT(*) FROM users WHERE last_signed_in > NOW() - INTERVAL '30 days') as active_users,
+          (SELECT COUNT(*) FROM users WHERE subscription_tier != 'free') as paid_users,
+          (SELECT COUNT(*) FROM conversations) as total_conversations,
+          (SELECT COUNT(*) FROM messages) as total_messages,
+          (SELECT COUNT(*) FROM users WHERE subscription_tier = 'free') as tier_free,
+          (SELECT COUNT(*) FROM users WHERE subscription_tier = 'pro') as tier_pro,
+          (SELECT COUNT(*) FROM users WHERE subscription_tier = 'enterprise') as tier_enterprise
+      `) as any;
 
-      const paidUsers = allUsers.filter((u: any) => u.subscriptionTier !== "free").length;
-      const totalConversations = allConversations.length;
-      const totalMessages = allMessages.length;
-
-      const usersByTier = {
-        free: allUsers.filter((u: any) => u.subscriptionTier === "free").length,
-        pro: allUsers.filter((u: any) => u.subscriptionTier === "pro").length,
-        enterprise: allUsers.filter((u: any) => u.subscriptionTier === "enterprise").length,
-      };
+      const c = counts || {};
+      const totalUsers = Number(c.total_users) || 0;
+      const totalConversations = Number(c.total_conversations) || 0;
+      const totalMessages = Number(c.total_messages) || 0;
 
       return {
         totalUsers,
-        activeUsers,
-        paidUsers,
+        activeUsers: Number(c.active_users) || 0,
+        paidUsers: Number(c.paid_users) || 0,
         totalConversations,
         totalMessages,
-        usersByTier,
-        averageConversationsPerUser: totalConversations / totalUsers || 0,
-        averageMessagesPerConversation: totalMessages / totalConversations || 0,
+        usersByTier: {
+          free: Number(c.tier_free) || 0,
+          pro: Number(c.tier_pro) || 0,
+          enterprise: Number(c.tier_enterprise) || 0,
+        },
+        averageConversationsPerUser: totalUsers > 0 ? totalConversations / totalUsers : 0,
+        averageMessagesPerConversation: totalConversations > 0 ? totalMessages / totalConversations : 0,
       };
     } catch (error) {
       console.error("[Admin] Failed to get analytics:", error);
@@ -110,17 +111,24 @@ export const adminRouter = router({
     }
 
     try {
-      const allUsers = await db.select().from(users);
+      const { sql: sqlTag } = await import("drizzle-orm");
 
+      const [counts] = await db.execute(sqlTag`
+        SELECT
+          (SELECT COUNT(*) FROM users WHERE subscription_tier = 'free') as tier_free,
+          (SELECT COUNT(*) FROM users WHERE subscription_tier = 'pro') as tier_pro,
+          (SELECT COUNT(*) FROM users WHERE subscription_tier = 'enterprise') as tier_enterprise
+      `) as any;
+
+      const c = counts || {};
       const subscriptionTiers = {
-        free: allUsers.filter((u: any) => u.subscriptionTier === "free").length,
-        pro: allUsers.filter((u: any) => u.subscriptionTier === "pro").length,
-        enterprise: allUsers.filter((u: any) => u.subscriptionTier === "enterprise").length,
+        free: Number(c.tier_free) || 0,
+        pro: Number(c.tier_pro) || 0,
+        enterprise: Number(c.tier_enterprise) || 0,
       };
 
-      // Placeholder pricing - would be fetched from Stripe in production
-      const estimatedMRR =
-        subscriptionTiers.pro * 29 + subscriptionTiers.enterprise * 99;
+      // Actual pricing: Pro €9.99, Premium/Enterprise €19.99
+      const estimatedMRR = subscriptionTiers.pro * 9.99 + subscriptionTiers.enterprise * 19.99;
 
       return {
         subscriptionTiers,

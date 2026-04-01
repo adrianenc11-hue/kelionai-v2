@@ -5,6 +5,7 @@ import { InsertUser, users, conversations, messages, subscriptionPlans, userUsag
 import { ENV } from './_core/env';
 
 let _db: any = null;
+let _client: ReturnType<typeof postgres> | null = null;
 
 // Supabase PostgreSQL connection - override any built-in MySQL DATABASE_URL
 const SUPABASE_DATABASE_URL = process.env.SUPABASE_DATABASE_URL || "";
@@ -17,18 +18,39 @@ export async function getDb() {
       return null;
     }
     try {
-      const client = postgres(url, {
+      _client = postgres(url, {
         ssl: 'require',
         max: 10,
+        idle_timeout: 20,
+        connect_timeout: 10,
       });
-      _db = drizzle(client);
+      _db = drizzle(_client);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
+      _client = null;
     }
   }
   return _db;
 }
+
+/** Graceful shutdown — close all DB connections */
+export async function closeDb() {
+  if (_client) {
+    try {
+      await _client.end();
+      console.log("[Database] Connections closed gracefully");
+    } catch (e) {
+      console.error("[Database] Error closing connections:", e);
+    }
+    _client = null;
+    _db = null;
+  }
+}
+
+// Register shutdown handlers
+process.on("SIGTERM", async () => { await closeDb(); process.exit(0); });
+process.on("SIGINT", async () => { await closeDb(); process.exit(0); });
 
 export async function upsertUser(user: InsertUser): Promise<void> {
   if (!user.openId) throw new Error("User openId is required for upsert");
@@ -89,7 +111,7 @@ export async function createConversation(userId: number, title: string) {
   if (!db) throw new Error("Database not available");
   try {
     // PostgreSQL: use .returning() instead of .$returningId()
-    const result = await db.insert(conversations).values({ userId, title, primaryAiModel: "gpt-4" }).returning();
+    const result = await db.insert(conversations).values({ userId, title, primaryAiModel: "gpt-4.1" }).returning();
     return result[0];
   } catch (error) { console.error("[Database] Failed to create conversation:", error); throw error; }
 }
@@ -233,18 +255,18 @@ export async function applyReferralBonus(referralId: number) {
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
       const sub = await stripe.subscriptions.retrieve(sender[0].stripeSubscriptionId) as any;
       if (sub && sub.current_period_end) {
-        const newEnd = sub.current_period_end + (5 * 24 * 60 * 60);
+        const newEnd = sub.current_period_end + (7 * 24 * 60 * 60);
         await stripe.subscriptions.update(sender[0].stripeSubscriptionId, {
           trial_end: newEnd,
           proration_behavior: 'none',
         } as any);
-        console.log(`[Referral] Extended subscription for user ${sender[0].id} by 5 days via Stripe`);
+        console.log(`[Referral] Extended subscription for user ${sender[0].id} by 7 days via Stripe`);
       }
     } catch (stripeErr) {
       console.error(`[Referral] Stripe extension failed, tracking locally:`, stripeErr);
     }
     await db.update(referralCodes).set({ bonusApplied: true }).where(eq(referralCodes.id, referralId));
-    console.log(`[Referral] Bonus +5 days applied for user ${referral[0].senderUserId}`);
+    console.log(`[Referral] Bonus +7 days applied for user ${referral[0].senderUserId}`);
   } else if (sender.length) {
     await db.update(referralCodes).set({ bonusApplied: true }).where(eq(referralCodes.id, referralId));
     console.log(`[Referral] Bonus tracked for free user ${referral[0].senderUserId} (will apply on subscription)`);

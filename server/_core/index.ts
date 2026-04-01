@@ -2,6 +2,7 @@
 import express from "express";
 import { createServer } from "http";
 import net from "net";
+import rateLimit from "express-rate-limit";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
@@ -52,10 +53,17 @@ async function startServer() {
     next();
   });
 
-  // CORS configuration
+  // CORS configuration - whitelist allowed origins
+  const ALLOWED_ORIGINS = new Set([
+    "https://kelionai.app",
+    "https://www.kelionai.app",
+    "https://kelionai-v2-production.up.railway.app",
+    ...(process.env.NODE_ENV === "development" ? ["http://localhost:3000", "http://localhost:5173"] : []),
+  ]);
+
   app.use((req, res, next) => {
     const origin = req.headers.origin;
-    if (origin) {
+    if (origin && ALLOWED_ORIGINS.has(origin)) {
       res.setHeader("Access-Control-Allow-Origin", origin);
       res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
       res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
@@ -82,6 +90,35 @@ async function startServer() {
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
+  // Rate limiting
+  const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 20, // max 20 login/register attempts per 15 min
+    message: { error: "Too many authentication attempts. Please try again later." },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  const apiLimiter = rateLimit({
+    windowMs: 60 * 1000, // 1 minute
+    max: 60, // max 60 API requests per minute
+    message: { error: "Too many requests. Please slow down." },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  const chatLimiter = rateLimit({
+    windowMs: 60 * 1000, // 1 minute
+    max: 15, // max 15 chat messages per minute
+    message: { error: "Too many messages. Please wait a moment." },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  app.use("/api/auth/", authLimiter);
+  app.use("/api/chat/stream", chatLimiter);
+  app.use("/api/trpc", apiLimiter);
+
   // Auth routes
   if (isStandalone) {
     console.log("[Auth] Running in STANDALONE mode (email/password)");
@@ -93,9 +130,29 @@ async function startServer() {
     registerOAuthRoutes(app);
   }
 
-  // Database diagnostic & migration endpoint
+  // Database diagnostic & migration endpoint (admin-only via secret token or session)
   app.get("/api/migrate", async (req, res) => {
     try {
+      // Auth: require MIGRATE_SECRET token or admin session
+      const migrateSecret = process.env.MIGRATE_SECRET;
+      const providedSecret = req.query.secret as string;
+      let isAuthorized = false;
+
+      if (migrateSecret && providedSecret === migrateSecret) {
+        isAuthorized = true;
+      } else {
+        try {
+          const { authenticateRequestStandalone } = await import("../standalone-auth");
+          const user = await authenticateRequestStandalone(req);
+          if (user.role === "admin") isAuthorized = true;
+        } catch {}
+      }
+
+      if (!isAuthorized) {
+        res.status(403).json({ error: "Forbidden: admin access or MIGRATE_SECRET required" });
+        return;
+      }
+
       const { getDb } = await import("../db");
       const { sql: sqlTag } = await import("drizzle-orm");
       const db = await getDb();
@@ -142,25 +199,14 @@ async function startServer() {
   app.post("/api/profile/avatar", async (req, res) => {
     try {
       const { updateUserProfilePicture } = await import("../db");
-      const { jwtVerify } = await import("jose");
-      const cookieName = "app_session_id";
-      const cookies = req.headers.cookie?.split(";").reduce((acc: any, c: string) => {
-        const [k, v] = c.trim().split("=");
-        acc[k] = v;
-        return acc;
-      }, {} as Record<string, string>) || {};
-      const token = cookies[cookieName];
-      if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
-      const secret = new TextEncoder().encode(process.env.JWT_SECRET || "dev-secret");
-      const { payload } = await jwtVerify(token, secret);
-      const userId = (payload as any).userId || (payload as any).id;
-      if (!userId) { res.status(401).json({ error: "Invalid token" }); return; }
+      const { authenticateRequestStandalone } = await import("../standalone-auth");
+      const user = await authenticateRequestStandalone(req);
       const { avatarUrl } = req.body;
       if (!avatarUrl) { res.status(400).json({ error: "avatarUrl required" }); return; }
-      await updateUserProfilePicture(userId, avatarUrl);
+      await updateUserProfilePicture(user.id, avatarUrl);
       res.json({ success: true });
     } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      res.status(401).json({ error: err.message || "Not authenticated" });
     }
   });
 

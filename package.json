@@ -63,6 +63,7 @@
     "drizzle-orm": "^0.44.6",
     "embla-carousel-react": "^8.6.0",
     "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
     "framer-motion": "^12.23.22",
     "i18next": "^26.0.3",
     "i18next-browser-languagedetector": "^8.2.1",
@@ -81,6 +82,7 @@
     "react-resizable-panels": "^3.0.6",
     "recharts": "^2.15.2",
     "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3",
     "sonner": "^2.0.7",
     "streamdown": "^1.4.0",
     "stripe": "^21.0.1",
@@ -90,6 +92,7 @@
     "three": "^0.183.2",
     "vaul": "^1.1.2",
     "wouter": "^3.3.5",
+    "ws": "^8.18.0",
     "zod": "^4.1.12"
   },
   "devDependencies": {
@@ -102,6 +105,7 @@
     "@types/react": "^19.2.1",
     "@types/react-dom": "^19.2.1",
     "@types/three": "^0.183.1",
+    "@types/ws": "^8.5.14",
     "@vitejs/plugin-react": "^5.0.4",
     "add": "^2.0.6",
     "autoprefixer": "^10.4.20",

@@ -11,6 +11,7 @@ import { referralRouter } from "./routers/referral";
 import { refundRouter } from "./routers/refund";
 import { userChatRouter } from "./routers/userChat";
 import { voiceLibraryRouter } from "./routers/voiceLibrary";
+import { gdprRouter } from "./routers/gdpr";
 import { getTrialStatus, updateUserLanguage } from "./db";
 import { z } from "zod";
 
@@ -37,6 +38,7 @@ export const appRouter = router({
   refund: refundRouter,
   userChat: userChatRouter,
   voiceLibrary: voiceLibraryRouter,
+  gdpr: gdprRouter,
 
   trial: router({
     getStatus: protectedProcedure.query(async ({ ctx }) => {

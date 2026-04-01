@@ -22,7 +22,7 @@ function getApiKey() {
 
 function getModelName() {
   if (ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0) return "gemini-2.5-flash";
-  return "gpt-4o";
+  return "gpt-4.1";
 }
 
 router.post("/api/chat/stream", async (req: Request, res: Response) => {
@@ -35,7 +35,7 @@ router.post("/api/chat/stream", async (req: Request, res: Response) => {
       return;
     }
 
-    const { message, conversationId: inputConvId, avatar = "kelion", imageUrl } = req.body;
+    const { message, conversationId: inputConvId, avatar = "kelion", imageUrl, withTts = false } = req.body;
     if (!message) {
       res.status(400).json({ error: "Message required" });
       return;
@@ -168,15 +168,16 @@ router.post("/api/chat/stream", async (req: Request, res: Response) => {
     // Store AI response
     await createMessage(conversationId, "assistant", fullContent, "brain-v4");
 
-    // Generate TTS audio
+    // Generate TTS audio only if requested (saves ElevenLabs credits)
     let audioUrl: string | undefined;
-    try {
-      // Use short version for TTS (first 500 chars)
-      const ttsText = fullContent.slice(0, 500);
-      const ttsResult = await generateSpeech({ text: ttsText, avatar: character });
-      audioUrl = ttsResult.audioUrl;
-    } catch (e) {
-      console.error("[Streaming] TTS failed:", e);
+    if (withTts) {
+      try {
+        const ttsText = fullContent.slice(0, 500);
+        const ttsResult = await generateSpeech({ text: ttsText, avatar: character });
+        audioUrl = ttsResult.audioUrl;
+      } catch (e) {
+        console.error("[Streaming] TTS failed:", e);
+      }
     }
 
     // Send final event with audio
