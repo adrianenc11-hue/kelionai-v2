@@ -63,6 +63,7 @@ function Router() {
         <Route path={"/pricing"} component={Pricing} />
         <Route path={"/contact"} component={Contact} />
         <Route path={"/login"} component={Login} />
+        <Route path={"/register"} component={Login} />
 
         {/* Protected routes - require authentication */}
         <Route path={"/chat"}>

@@ -342,3 +342,6 @@
 - [x] Verify Avatar (Kelion/Kira) visible with city bokeh background
 - [x] Update schema-trial.test.ts for PostgreSQL snake_case column names
 - [x] All 115 tests passing (8 test files)
+
+## Bugs Found During Full User Flow Test
+- [ ] /register returns 404 on kelionai.app (Railway) - route not working in production
