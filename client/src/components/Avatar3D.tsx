@@ -92,7 +92,17 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
     if (!containerRef.current) return;
 
     const scene = new THREE.Scene();
-    scene.background = null; // transparent to show city bokeh behind
+    // Dark gradient background
+    const bgCanvas = document.createElement('canvas');
+    bgCanvas.width = 512;
+    bgCanvas.height = 512;
+    const bgCtx = bgCanvas.getContext('2d')!;
+    const gradient = bgCtx.createLinearGradient(0, 0, 0, 512);
+    gradient.addColorStop(0, '#0f172a');
+    gradient.addColorStop(1, '#020617');
+    bgCtx.fillStyle = gradient;
+    bgCtx.fillRect(0, 0, 512, 512);
+    scene.background = new THREE.CanvasTexture(bgCanvas);
     sceneRef.current = scene;
 
     const camera = new THREE.PerspectiveCamera(
@@ -102,8 +112,9 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
       100
     );
     // Bust view: camera positioned to show head + shoulders + chest
-    camera.position.set(0, 1.5, 2.4);
-    camera.lookAt(0, 1.35, 0);
+    // Default position, will be overridden after model loads
+    camera.position.set(0, 1.4, 2.8);
+    camera.lookAt(0, 1.3, 0);
     cameraRef.current = camera;
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -146,11 +157,15 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
         model.position.z = -center.z;
         model.position.y = -box.min.y; // feet at y=0
 
-        // Camera: centered on model, bust view
+        // Camera: show full upper body with head clearly visible
         const modelHeight = size.y;
-        const chestY = modelHeight * 0.72; // ~72% up = chest/neck
-        camera.position.set(0, chestY, 2.2);
-        camera.lookAt(0, chestY - 0.1, 0);
+        const headTop = modelHeight; // top of head
+        const waistY = modelHeight * 0.45; // waist level
+        const centerY = (headTop + waistY) / 2; // center between head top and waist
+        // Position camera to frame from waist to above head
+        camera.position.set(0, centerY, 2.5);
+        camera.lookAt(0, centerY, 0);
+        camera.fov = 28; // tighter FOV for portrait framing
         camera.updateProjectionMatrix();
 
         model.castShadow = true;

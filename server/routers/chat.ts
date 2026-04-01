@@ -10,6 +10,7 @@ import {
   updateUserUsage,
   getTrialStatus,
   incrementDailyUsage,
+  deleteConversationMessages,
 } from "../db";
 import { processBrainMessage, processVoiceCloningStep, BrainMessage } from "../brain-v4";
 import { CharacterName } from "../characters";
@@ -152,6 +153,7 @@ export const chatRouter = router({
       if (!conversation || conversation.userId !== ctx.user.id) {
         throw new Error("Conversation not found or access denied");
       }
+      await deleteConversationMessages(input.conversationId);
       return { success: true };
     }),
 });

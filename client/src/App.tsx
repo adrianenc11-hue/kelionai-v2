@@ -18,6 +18,7 @@ const SubscriptionManagement = lazy(() => import("./pages/SubscriptionManagement
 const Profile = lazy(() => import("./pages/Profile"));
 const Contact = lazy(() => import("./pages/Contact"));
 const Login = lazy(() => import("./pages/Login"));
+const SubscriptionSuccess = lazy(() => import("./pages/SubscriptionSuccess"));
 
 function PageLoader() {
   return (
@@ -72,6 +73,9 @@ function Router() {
         </Route>
         <Route path={"/payments"}>
           <ProtectedRoute component={PaymentHistory} />
+        </Route>
+        <Route path={"/subscription/success"}>
+          <ProtectedRoute component={SubscriptionSuccess} />
         </Route>
         <Route path={"/subscription"}>
           <ProtectedRoute component={SubscriptionManagement} />

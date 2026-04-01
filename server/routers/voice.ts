@@ -2,12 +2,25 @@ import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
 import { transcribeAudio } from "../_core/voiceTranscription";
 import { generateSpeech, cloneVoice, getElevenLabsUsage, deleteClonedVoice } from "../elevenlabs";
-import { getUserUsage, updateUserUsage, getDb } from "../db";
+import { getUserUsage, updateUserUsage, getDb, getTrialStatus, incrementDailyUsage } from "../db";
 import { sql } from "drizzle-orm";
 import { storagePut } from "../storage";
 
 function randomSuffix() {
   return Math.random().toString(36).substring(2, 10);
+}
+
+/** Check if user can use features (trial + paid logic) */
+async function checkAccess(userId: number, userRole?: string, subscriptionTier?: string) {
+  // Admin always has access
+  if (userRole === 'admin') return;
+  // Paid users always have access
+  if (subscriptionTier && subscriptionTier !== 'free') return;
+  // Free users - check trial
+  const trial = await getTrialStatus(userId);
+  if (!trial.canUse) {
+    throw new Error(trial.reason || "Trial expired or daily limit reached. Upgrade to continue.");
+  }
 }
 
 export const voiceRouter = router({
@@ -17,6 +30,7 @@ export const voiceRouter = router({
   uploadAudio: protectedProcedure
     .input(z.object({ audioBase64: z.string(), mimeType: z.string().default("audio/webm") }))
     .mutation(async ({ ctx, input }) => {
+      await checkAccess(ctx.user.id, ctx.user.role, ctx.user.subscriptionTier);
       const buffer = Buffer.from(input.audioBase64, "base64");
       const ext = input.mimeType.includes("wav") ? "wav" : input.mimeType.includes("mp3") ? "mp3" : "webm";
       const key = `audio/${ctx.user.id}-${Date.now()}-${randomSuffix()}.${ext}`;
@@ -30,12 +44,14 @@ export const voiceRouter = router({
   uploadImage: protectedProcedure
     .input(z.object({ imageBase64: z.string(), mimeType: z.string().default("image/jpeg") }))
     .mutation(async ({ ctx, input }) => {
+      await checkAccess(ctx.user.id, ctx.user.role, ctx.user.subscriptionTier);
       const buffer = Buffer.from(input.imageBase64, "base64");
       const ext = input.mimeType.includes("png") ? "png" : "jpg";
       const key = `images/${ctx.user.id}-${Date.now()}-${randomSuffix()}.${ext}`;
       const { url } = await storagePut(key, buffer, input.mimeType);
       return { imageUrl: url };
     }),
+
   /**
    * Transcribe audio file to text using Whisper API
    */
@@ -47,22 +63,20 @@ export const voiceRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const usage = await getUserUsage(ctx.user.id);
-      const tier = ctx.user.subscriptionTier || "free";
-      const limits: Record<string, number> = { free: 10, pro: 100, enterprise: 1000 };
-      const voiceMinutesUsed = usage?.voiceMinutesThisMonth || 0;
-
-      if (voiceMinutesUsed >= limits[tier]) {
-        throw new Error(`Voice usage limit reached for ${tier} tier`);
-      }
+      await checkAccess(ctx.user.id, ctx.user.role, ctx.user.subscriptionTier);
 
       const result = await transcribeAudio({
         audioUrl: input.audioUrl,
         language: input.language,
       });
 
-      const newVoiceMinutes = voiceMinutesUsed + 1;
-      await updateUserUsage(ctx.user.id, usage?.messagesThisMonth || 0, newVoiceMinutes);
+      // Track daily usage (1 minute per transcription)
+      await incrementDailyUsage(ctx.user.id, 1, 0);
+
+      // Also update legacy monthly usage
+      const usage = await getUserUsage(ctx.user.id);
+      const voiceMinutesUsed = usage?.voiceMinutesThisMonth || 0;
+      await updateUserUsage(ctx.user.id, usage?.messagesThisMonth || 0, voiceMinutesUsed + 1);
 
       const transcriptionResult = result as any;
       return {
@@ -86,14 +100,7 @@ export const voiceRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const usage = await getUserUsage(ctx.user.id);
-      const tier = ctx.user.subscriptionTier || "free";
-      const limits: Record<string, number> = { free: 10, pro: 100, enterprise: 1000 };
-      const voiceMinutesUsed = usage?.voiceMinutesThisMonth || 0;
-
-      if (voiceMinutesUsed >= limits[tier]) {
-        throw new Error(`Voice usage limit reached for ${tier} tier`);
-      }
+      await checkAccess(ctx.user.id, ctx.user.role, ctx.user.subscriptionTier);
 
       // Check if user has a cloned voice
       let customVoiceId: string | undefined;
@@ -119,19 +126,20 @@ export const voiceRouter = router({
         language: input.language,
       });
 
-      // Update usage
+      // Track daily usage
       const estimatedMinutes = Math.max(1, Math.ceil(duration / 60));
-      const newVoiceMinutes = voiceMinutesUsed + estimatedMinutes;
-      await updateUserUsage(ctx.user.id, usage?.messagesThisMonth || 0, newVoiceMinutes);
+      await incrementDailyUsage(ctx.user.id, estimatedMinutes, 0);
+
+      // Also update legacy monthly usage
+      const usage = await getUserUsage(ctx.user.id);
+      const voiceMinutesUsed = usage?.voiceMinutesThisMonth || 0;
+      await updateUserUsage(ctx.user.id, usage?.messagesThisMonth || 0, voiceMinutesUsed + estimatedMinutes);
 
       return { audioUrl, duration, avatar: input.avatar };
     }),
 
   /**
    * Clone user's voice - Step-by-step procedure from chat
-   * Step 1: Upload recording
-   * Step 2: Process with ElevenLabs
-   * Step 3: Save voice ID per user
    */
   cloneVoice: protectedProcedure
     .input(
@@ -141,31 +149,26 @@ export const voiceRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // Check if ElevenLabs supports cloning
+      await checkAccess(ctx.user.id, ctx.user.role, ctx.user.subscriptionTier);
+
       const elUsage = await getElevenLabsUsage();
       if (!elUsage.canClone) {
         throw new Error("Voice cloning is not available on the current ElevenLabs plan");
       }
 
-      // Convert base64 to buffer
       const audioBuffer = Buffer.from(input.audioBase64, "base64");
 
-      // Clone voice with ElevenLabs
       const { voiceId, name } = await cloneVoice({
         audioBuffer,
         name: `${input.voiceName} - ${ctx.user.name || ctx.user.id}`,
         description: `Cloned voice for user ${ctx.user.name || ctx.user.id} on KelionAI`,
       });
 
-      // Save to database
       const db = await getDb();
       if (db) {
-        // Deactivate previous cloned voices
         await db.execute(
           sql`UPDATE user_cloned_voices SET is_active = false WHERE user_id = ${ctx.user.id}`
         );
-
-        // Insert new cloned voice
         await db.execute(
           sql`INSERT INTO user_cloned_voices (user_id, voice_id, voice_name, is_active, created_at)
               VALUES (${ctx.user.id}, ${voiceId}, ${name}, true, NOW())`
@@ -214,9 +217,7 @@ export const voiceRouter = router({
     );
     const result = rows as any;
     if (result?.[0]?.voice_id) {
-      // Delete from ElevenLabs
       await deleteClonedVoice(result[0].voice_id);
-      // Deactivate in DB
       await db.execute(
         sql`UPDATE user_cloned_voices SET is_active = false WHERE user_id = ${ctx.user.id}`
       );
@@ -229,23 +230,20 @@ export const voiceRouter = router({
    * Get voice usage statistics
    */
   getVoiceUsage: protectedProcedure.query(async ({ ctx }) => {
-    const usage = await getUserUsage(ctx.user.id);
-    const tier = ctx.user.subscriptionTier || "free";
-    const limits: Record<string, number> = { free: 10, pro: 100, enterprise: 1000 };
-    const voiceMinutesUsed = usage?.voiceMinutesThisMonth || 0;
-    const voiceMinutesLimit = limits[tier];
+    const trial = await getTrialStatus(ctx.user.id);
 
-    // Also get ElevenLabs usage
     let elevenLabsUsage = { characterCount: 0, characterLimit: 0, canClone: false };
     try {
       elevenLabsUsage = await getElevenLabsUsage();
     } catch (_) { /* ignore */ }
 
     return {
-      used: voiceMinutesUsed,
-      limit: voiceMinutesLimit,
-      remaining: Math.max(0, voiceMinutesLimit - voiceMinutesUsed),
-      percentage: (voiceMinutesUsed / voiceMinutesLimit) * 100,
+      used: trial.dailyMinutesUsed,
+      limit: trial.dailyMinutesLimit,
+      remaining: Math.max(0, trial.dailyMinutesLimit - trial.dailyMinutesUsed),
+      percentage: trial.dailyMinutesLimit > 0 ? (trial.dailyMinutesUsed / trial.dailyMinutesLimit) * 100 : 0,
+      trialDaysLeft: trial.trialDaysLeft,
+      canUse: trial.canUse,
       elevenLabs: elevenLabsUsage,
     };
   }),
