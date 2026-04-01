@@ -127,7 +127,8 @@ export function registerStandaloneAuthRoutes(app: Express) {
       res.json({ success: true, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
     } catch (error) {
       console.error("[Auth] Register failed:", error);
-      res.status(500).json({ error: "Registration failed" });
+      const errMsg = error instanceof Error ? error.message : String(error);
+      res.status(500).json({ error: "Registration failed", detail: errMsg });
     }
   });
   

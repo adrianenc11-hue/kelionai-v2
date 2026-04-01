@@ -92,17 +92,8 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
     if (!containerRef.current) return;
 
     const scene = new THREE.Scene();
-    // Dark gradient background
-    const bgCanvas = document.createElement('canvas');
-    bgCanvas.width = 512;
-    bgCanvas.height = 512;
-    const bgCtx = bgCanvas.getContext('2d')!;
-    const gradient = bgCtx.createLinearGradient(0, 0, 0, 512);
-    gradient.addColorStop(0, '#0f172a');
-    gradient.addColorStop(1, '#020617');
-    bgCtx.fillStyle = gradient;
-    bgCtx.fillRect(0, 0, 512, 512);
-    scene.background = new THREE.CanvasTexture(bgCanvas);
+    // Transparent background - let CSS background show through
+    scene.background = null;
     sceneRef.current = scene;
 
     const camera = new THREE.PerspectiveCamera(
@@ -118,6 +109,7 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
     cameraRef.current = camera;
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setClearColor(0x000000, 0); // Fully transparent
     renderer.setSize(containerRef.current.clientWidth, containerRef.current.clientHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 3));
     renderer.outputColorSpace = THREE.SRGBColorSpace;

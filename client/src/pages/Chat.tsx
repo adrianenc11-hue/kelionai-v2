@@ -513,29 +513,6 @@ export default function Chat() {
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setSelectedAvatar("kelion")}
-            className="px-4 py-1.5 rounded-full text-sm font-medium transition-all"
-            style={{
-              background: selectedAvatar === "kelion" ? "#0891b2" : "transparent",
-              color: selectedAvatar === "kelion" ? "#fff" : "#64748b",
-              border: selectedAvatar === "kelion" ? "none" : "1px solid rgba(255,255,255,0.1)",
-            }}
-          >
-            Kelion
-          </button>
-          <button
-            onClick={() => setSelectedAvatar("kira")}
-            className="px-4 py-1.5 rounded-full text-sm font-medium transition-all"
-            style={{
-              background: selectedAvatar === "kira" ? "#db2777" : "transparent",
-              color: selectedAvatar === "kira" ? "#fff" : "#64748b",
-              border: selectedAvatar === "kira" ? "none" : "1px solid rgba(255,255,255,0.1)",
-            }}
-          >
-            Kira
-          </button>
-
-          <button
             onClick={handleNewChat}
             className="px-3 py-1.5 rounded-full text-xs text-slate-400 hover:text-cyan-400 transition-colors"
             style={{ border: "1px solid rgba(255,255,255,0.1)" }}
@@ -678,12 +655,45 @@ export default function Chat() {
             backgroundPosition: "center",
             zIndex: 0,
           }} />
-          {/* Avatar name */}
-          <div className="absolute top-3 left-4" style={{ zIndex: 10 }}>
+          {/* Avatar name - centered at top */}
+          <div className="absolute top-3 left-0 right-0 flex justify-center" style={{ zIndex: 10 }}>
             <span className="text-cyan-400 font-semibold text-base" style={{ textShadow: "0 1px 8px rgba(0,0,0,0.8)" }}>
               {selectedAvatar === "kelion" ? "Kelion" : "Kira"}
             </span>
           </div>
+          {/* Character selector buttons - LEFT and RIGHT sides */}
+          <button
+            onClick={() => setSelectedAvatar("kelion")}
+            className="absolute left-3 top-1/2 -translate-y-1/2 px-3 py-2 rounded-lg text-sm font-medium transition-all"
+            style={{
+              background: selectedAvatar === "kelion" ? "rgba(8,145,178,0.8)" : "rgba(0,0,0,0.4)",
+              color: selectedAvatar === "kelion" ? "#fff" : "rgba(255,255,255,0.5)",
+              border: selectedAvatar === "kelion" ? "2px solid #0891b2" : "1px solid rgba(255,255,255,0.15)",
+              backdropFilter: "blur(8px)",
+              zIndex: 15,
+              textShadow: "0 1px 4px rgba(0,0,0,0.8)",
+              writingMode: "vertical-rl",
+              textOrientation: "mixed",
+            }}
+          >
+            Kelion
+          </button>
+          <button
+            onClick={() => setSelectedAvatar("kira")}
+            className="absolute right-3 top-1/2 -translate-y-1/2 px-3 py-2 rounded-lg text-sm font-medium transition-all"
+            style={{
+              background: selectedAvatar === "kira" ? "rgba(219,39,119,0.8)" : "rgba(0,0,0,0.4)",
+              color: selectedAvatar === "kira" ? "#fff" : "rgba(255,255,255,0.5)",
+              border: selectedAvatar === "kira" ? "2px solid #db2777" : "1px solid rgba(255,255,255,0.15)",
+              backdropFilter: "blur(8px)",
+              zIndex: 15,
+              textShadow: "0 1px 4px rgba(0,0,0,0.8)",
+              writingMode: "vertical-rl",
+              textOrientation: "mixed",
+            }}
+          >
+            Kira
+          </button>
           {/* Avatar 3D - full size */}
           <div className="absolute inset-0" style={{ zIndex: 1 }}>
             <Avatar3D

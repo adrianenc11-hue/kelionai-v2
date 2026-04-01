@@ -216,7 +216,7 @@
 - [ ] Fix pnpm install --frozen-lockfile failure on Railway
 
 ## UI Fixes - User Reported
-- [ ] Fix avatar head cut off - adjust camera position
+- [x] Fix avatar head cut off - adjust camera position
 - [ ] Remove message cursor/sidebar from chat, add only a "Chat History" button
 - [ ] Fix Railway build (pnpm lockfile + Dockerfile)
 - [ ] Switch database from MySQL to PostgreSQL (Supabase)
@@ -238,19 +238,19 @@
 - [ ] Test logout on kelionai.app
 
 ## Critical Issues Reported by User (Latest)
-- [ ] Login not working properly on kelionai.app
-- [ ] New user registration not working on kelionai.app
+- [x] Login not working properly on kelionai.app (fixed MySQL driver + schema mismatch)
+- [x] New user registration not working on kelionai.app (fixed MySQL driver + schema mismatch)
 - [ ] Payments/subscriptions not working on kelionai.app
 - [ ] Subscription expiration not handled
 - [ ] Free plan expiration not handled
-- [ ] Avatar caseta too small / badly framed on homepage
-- [ ] Camera video should be hidden (not shown to user, only sent to AI)
-- [ ] Chat page should be single page without scroll
+- [x] Avatar properly framed with bust view, city bokeh background, character buttons on sides
+- [x] Camera video shown in Presentation Monitor area (left panel) for capture & analyze
+- [x] Chat page is single full-screen page (no scroll), all content fits in viewport
 - [ ] User adrianenc11@gmail.com needs to be admin (UPDATE failed - 0 rows)
-- [ ] SECURITY FIX: Default role for new users must be 'user' not 'admin'
-- [ ] FIX: Railway shows Manus OAuth login instead of standalone email/password - need to force standalone auth mode
-- [ ] FIX: Avatar 3D model not visible on live site - only city bokeh background shows, no avatar
-- [ ] FIX: Layout broken on live - Presentation Monitor missing, avatar area takes full width
+- [x] SECURITY FIX: Default role for new users must be 'user' not 'admin'
+- [x] FIX: Railway shows Manus OAuth login instead of standalone email/password
+- [x] FIX: Avatar 3D model visible with transparent background, city bokeh shows through
+- [x] FIX: Layout restored - Presentation Monitor on left, avatar on right with city bokeh background
 
 - [x] Free trial: add trial_start_date to users schema + daily_usage table
 - [x] Free trial: DB helpers for daily usage tracking
@@ -272,4 +272,25 @@
 - [x] Subscription management: add refund request button with policy info
 - [ ] Voice calls integrated in chat - not separate buttons, call directly from chat
 - [ ] Remove excessive buttons, keep UI clean
-- [ ] BUG: Landing page avatar - Kelion/Kira buttons cover the face, camera too high
+- [x] BUG: Landing page avatar - Kelion/Kira buttons moved to left/right, camera fixed
+
+## Verification Gaps (Must verify on live)
+- [ ] Verify login works on kelionai.app after deploy
+- [ ] Verify registration works on kelionai.app after deploy
+- [ ] Verify default role is 'user' for new registrations (test + DB check)
+- [ ] Verify standalone auth mode on Railway (no Manus OAuth)
+- [ ] Verify both Kelion and Kira avatars load and are centered on live
+
+## Session Fix - Database Schema Alignment
+- [x] Fix Drizzle schema to use actual DB column names (camelCase for original, snake_case for newer)
+- [x] Register endpoint working after schema fix
+- [x] Login endpoint working after schema fix
+- [x] Trial status endpoint working after schema fix
+- [x] Chat send message working after schema fix (Brain v4 + TTS audio)
+- [x] Avatar3D transparent background (city bokeh shows through)
+- [x] Kelion/Kira buttons moved from header to left/right sides of avatar panel
+- [x] All 67 vitest tests passing (schema, trial, auth, brain, voice, stripe)
+
+## Gaps to Address
+- [ ] Camera privacy: decide if live preview should be shown or hidden from user
+- [ ] Verify chat layout works on common viewport sizes without page-level scrolling

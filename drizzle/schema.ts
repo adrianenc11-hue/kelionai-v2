@@ -1,6 +1,11 @@
 import { int, mysqlTable, text, timestamp, varchar, boolean, decimal, json, serial, mysqlEnum, datetime, tinyint } from "drizzle-orm/mysql-core";
 import { relations } from "drizzle-orm";
 
+// NOTE: The production DB has mixed naming conventions:
+// - Original columns use camelCase (openId, passwordHash, etc.)
+// - Newer columns use snake_case (trial_start_date, billing_cycle, etc.)
+// The Drizzle column name strings MUST match the actual DB column names exactly.
+
 export const users = mysqlTable("users", {
   id: serial("id").primaryKey(),
   openId: varchar("openId", { length: 64 }).notNull().unique(),
@@ -59,19 +64,21 @@ export const messages = mysqlTable("messages", {
 export type Message = typeof messages.$inferSelect;
 export type InsertMessage = typeof messages.$inferInsert;
 
-export const subscriptionPlans = mysqlTable("subscriptionPlans", {
+export const subscriptionPlans = mysqlTable("subscription_plans", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 100 }).notNull(),
   tier: mysqlEnum("tier", ["free", "pro", "enterprise"]).notNull(),
-  stripePriceId: varchar("stripePriceId", { length: 255 }).notNull(),
-  monthlyPrice: decimal("monthlyPrice", { precision: 10, scale: 2 }),
-  yearlyPrice: decimal("yearlyPrice", { precision: 10, scale: 2 }),
-  messagesPerMonth: int("messagesPerMonth"),
-  voiceMinutesPerMonth: int("voiceMinutesPerMonth"),
+  stripePriceId: varchar("stripe_price_id", { length: 255 }),
+  monthlyPrice: decimal("monthly_price", { precision: 10, scale: 2 }),
+  yearlyPrice: decimal("yearly_price", { precision: 10, scale: 2 }),
+  messagesPerMonth: int("messages_per_month"),
+  voiceMinutesPerMonth: int("voice_minutes_per_month"),
   features: json("features"),
-  isActive: boolean("isActive").default(true),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+  messageLimit: int("message_limit"),
+  voiceMinutes: int("voice_minutes"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export type SubscriptionPlan = typeof subscriptionPlans.$inferSelect;
@@ -174,6 +181,20 @@ export const payments = mysqlTable("payments", {
 });
 
 export type Payment = typeof payments.$inferSelect;
+
+export const contactMessages = mysqlTable("contact_messages", {
+  id: serial("id").primaryKey(),
+  userId: int("user_id"),
+  name: varchar("name", { length: 255 }).notNull(),
+  email: varchar("email", { length: 320 }).notNull(),
+  subject: varchar("subject", { length: 500 }),
+  message: text("message").notNull(),
+  aiResponse: text("ai_response"),
+  status: varchar("status", { length: 20 }).default("new"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type ContactMessage = typeof contactMessages.$inferSelect;
 
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
