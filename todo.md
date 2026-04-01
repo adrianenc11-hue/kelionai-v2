@@ -346,3 +346,9 @@
 ## Bugs Found During Full User Flow Test
 - [x] /register returns 404 on kelionai.app (Railway) - fixed, route added to App.tsx
 - [x] Replace manual language button with automatic browser language detection (navigator.language)
+
+## Bugs from kelionai.app (User Screenshot 01/04/2026)
+- [ ] Fix "I'm experiencing a temporary issue" error on chat (AI not responding)
+- [ ] Fix "Voice error: invalid_format, Invalid URL" on TTS
+- [ ] Fix Camera capture giving error
+- [ ] Fix missing Romanian translation for "Ask for a map, image, weather, search, or code"

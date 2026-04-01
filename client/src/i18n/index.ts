@@ -26,6 +26,9 @@ import sv from './locales/sv.json';
 import th from './locales/th.json';
 import vi from './locales/vi.json';
 
+// Clear any old cached language preference so navigator always wins
+try { localStorage.removeItem('i18nextLng'); } catch (_) {}
+
 i18n
   .use(LanguageDetector)
   .use(initReactI18next)
@@ -61,9 +64,8 @@ i18n
       escapeValue: false,
     },
     detection: {
-      order: ['navigator', 'localStorage'],
-      caches: ['localStorage'],
-      lookupLocalStorage: 'i18nextLng',
+      order: ['navigator'],
+      caches: [],
     },
   });
 

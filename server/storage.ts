@@ -1,7 +1,7 @@
 /**
  * Storage helpers - supports both Manus proxy and standalone S3
  * When running standalone (Railway), uses AWS S3 directly if configured,
- * otherwise falls back to local file storage with public URL serving
+ * otherwise falls back to local file storage with absolute URL serving
  */
 import { ENV } from './_core/env';
 import path from 'path';
@@ -78,6 +78,26 @@ function ensureLocalStorageDir() {
   }
 }
 
+/**
+ * Get the base URL for the server (Railway, local dev, etc.)
+ * Used to construct absolute URLs for local file storage
+ */
+function getServerBaseUrl(): string {
+  // Railway provides RAILWAY_PUBLIC_DOMAIN
+  const railwayDomain = process.env.RAILWAY_PUBLIC_DOMAIN;
+  if (railwayDomain) {
+    return `https://${railwayDomain}`;
+  }
+  // Custom domain
+  const customDomain = process.env.DOMAIN;
+  if (customDomain) {
+    return customDomain.startsWith('http') ? customDomain : `https://${customDomain}`;
+  }
+  // Fallback to PORT-based localhost
+  const port = process.env.PORT || '3000';
+  return `http://localhost:${port}`;
+}
+
 export async function storagePut(
   relKey: string,
   data: Buffer | Uint8Array | string,
@@ -133,7 +153,7 @@ export async function storagePut(
     return { key, url };
   }
   
-  // Fallback: local file storage
+  // Fallback: local file storage with ABSOLUTE URLs
   ensureLocalStorageDir();
   const key = normalizeKey(relKey);
   const filePath = path.join(LOCAL_STORAGE_DIR, key);
@@ -145,8 +165,9 @@ export async function storagePut(
   const buffer = typeof data === 'string' ? Buffer.from(data) : Buffer.from(data);
   fs.writeFileSync(filePath, buffer);
   
-  // Return a URL that the Express server will serve
-  const url = `/uploads/${key}`;
+  // Return ABSOLUTE URL so server-side fetch works too
+  const baseUrl = getServerBaseUrl();
+  const url = `${baseUrl}/uploads/${key}`;
   return { key, url };
 }
 
@@ -173,10 +194,11 @@ export async function storageGet(relKey: string): Promise<{ key: string; url: st
     };
   }
   
-  // Fallback: local
+  // Fallback: local with absolute URL
   const key = normalizeKey(relKey);
+  const baseUrl = getServerBaseUrl();
   return {
     key,
-    url: `/uploads/${key}`,
+    url: `${baseUrl}/uploads/${key}`,
   };
 }

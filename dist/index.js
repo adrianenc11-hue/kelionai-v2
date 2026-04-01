@@ -1659,6 +1659,18 @@ function ensureLocalStorageDir() {
     fs.mkdirSync(LOCAL_STORAGE_DIR, { recursive: true });
   }
 }
+function getServerBaseUrl() {
+  const railwayDomain = process.env.RAILWAY_PUBLIC_DOMAIN;
+  if (railwayDomain) {
+    return `https://${railwayDomain}`;
+  }
+  const customDomain = process.env.DOMAIN;
+  if (customDomain) {
+    return customDomain.startsWith("http") ? customDomain : `https://${customDomain}`;
+  }
+  const port = process.env.PORT || "3000";
+  return `http://localhost:${port}`;
+}
 async function storagePut(relKey, data, contentType = "application/octet-stream") {
   const manusConfig = getManusStorageConfig();
   if (manusConfig) {
@@ -1709,7 +1721,8 @@ async function storagePut(relKey, data, contentType = "application/octet-stream"
   }
   const buffer = typeof data === "string" ? Buffer.from(data) : Buffer.from(data);
   fs.writeFileSync(filePath, buffer);
-  const url = `/uploads/${key}`;
+  const baseUrl = getServerBaseUrl();
+  const url = `${baseUrl}/uploads/${key}`;
   return { key, url };
 }
 
@@ -1752,10 +1765,21 @@ async function generateSpeech(params) {
     throw new Error(`ElevenLabs TTS failed: ${response.status}`);
   }
   const audioBuffer = Buffer.from(new Uint8Array(await response.arrayBuffer()));
-  const timestamp2 = Date.now();
-  const randomSuffix2 = Math.random().toString(36).slice(2, 8);
-  const fileKey = `tts/${avatar}-${timestamp2}-${randomSuffix2}.mp3`;
-  const { url } = await storagePut(fileKey, audioBuffer, "audio/mpeg");
+  let url;
+  try {
+    const timestamp2 = Date.now();
+    const randomSuffix2 = Math.random().toString(36).slice(2, 8);
+    const fileKey = `tts/${avatar}-${timestamp2}-${randomSuffix2}.mp3`;
+    const result = await storagePut(fileKey, audioBuffer, "audio/mpeg");
+    if (result.url && !result.url.includes("localhost")) {
+      url = result.url;
+    } else {
+      url = `data:audio/mpeg;base64,${audioBuffer.toString("base64")}`;
+    }
+  } catch (e) {
+    console.warn("[ElevenLabs] Storage failed, using base64 fallback:", e);
+    url = `data:audio/mpeg;base64,${audioBuffer.toString("base64")}`;
+  }
   const estimatedDuration = Math.ceil(text2.length / 750 * 60);
   return { audioUrl: url, duration: estimatedDuration };
 }
@@ -2029,8 +2053,8 @@ Provide a natural response based on these results. If data says [VERIFIED], pres
       finalContent = choice.message?.content || "I couldn't generate a response.";
     }
   } catch (error) {
-    console.error("[Brain v4] Error:", error);
-    finalContent = "I'm experiencing a temporary issue. Please try again.";
+    console.error("[Brain v4] Error:", error?.message || error);
+    finalContent = `I'm experiencing a temporary issue: ${error?.message || "Unknown error"}. Please try again.`;
     confidence = "low";
   }
   let audioUrl;
@@ -2547,31 +2571,36 @@ async function transcribeAudio(options) {
     }
     let audioBuffer;
     let mimeType;
-    try {
-      const response2 = await fetch(options.audioUrl);
-      if (!response2.ok) {
+    if (options.audioBuffer) {
+      audioBuffer = options.audioBuffer;
+      mimeType = options.audioMimeType || "audio/webm";
+    } else {
+      try {
+        const response2 = await fetch(options.audioUrl);
+        if (!response2.ok) {
+          return {
+            error: "Failed to download audio file",
+            code: "INVALID_FORMAT",
+            details: `HTTP ${response2.status}: ${response2.statusText}`
+          };
+        }
+        audioBuffer = Buffer.from(await response2.arrayBuffer());
+        mimeType = response2.headers.get("content-type") || "audio/mpeg";
+        const sizeMB = audioBuffer.length / (1024 * 1024);
+        if (sizeMB > 16) {
+          return {
+            error: "Audio file exceeds maximum size limit",
+            code: "FILE_TOO_LARGE",
+            details: `File size is ${sizeMB.toFixed(2)}MB, maximum allowed is 16MB`
+          };
+        }
+      } catch (error) {
         return {
-          error: "Failed to download audio file",
-          code: "INVALID_FORMAT",
-          details: `HTTP ${response2.status}: ${response2.statusText}`
+          error: "Failed to fetch audio file",
+          code: "SERVICE_ERROR",
+          details: error instanceof Error ? error.message : "Unknown error"
         };
       }
-      audioBuffer = Buffer.from(await response2.arrayBuffer());
-      mimeType = response2.headers.get("content-type") || "audio/mpeg";
-      const sizeMB = audioBuffer.length / (1024 * 1024);
-      if (sizeMB > 16) {
-        return {
-          error: "Audio file exceeds maximum size limit",
-          code: "FILE_TOO_LARGE",
-          details: `File size is ${sizeMB.toFixed(2)}MB, maximum allowed is 16MB`
-        };
-      }
-    } catch (error) {
-      return {
-        error: "Failed to fetch audio file",
-        code: "SERVICE_ERROR",
-        details: error instanceof Error ? error.message : "Unknown error"
-      };
     }
     const formData = new FormData();
     const filename = `audio.${getFileExtension(mimeType)}`;
@@ -2699,24 +2728,34 @@ var voiceRouter = router({
    */
   transcribeAudio: protectedProcedure.input(
     z5.object({
-      audioUrl: z5.string().url(),
+      audioUrl: z5.string().optional(),
+      audioBase64: z5.string().optional(),
+      mimeType: z5.string().optional(),
       language: z5.string().optional()
     })
   ).mutation(async ({ ctx, input }) => {
     await checkAccess(ctx.user.id, ctx.user.role, ctx.user.subscriptionTier);
-    const result = await transcribeAudio({
-      audioUrl: input.audioUrl,
+    const transcribeOpts = {
+      audioUrl: input.audioUrl || "",
       language: input.language
-    });
+    };
+    if (input.audioBase64) {
+      transcribeOpts.audioBuffer = Buffer.from(input.audioBase64, "base64");
+      transcribeOpts.audioMimeType = input.mimeType || "audio/webm";
+    }
+    const result = await transcribeAudio(transcribeOpts);
+    if ("error" in result) {
+      console.error("[Voice] Transcription error:", result);
+      throw new Error(result.error + (result.details ? `: ${result.details}` : ""));
+    }
     await incrementDailyUsage(ctx.user.id, 1, 0);
     const usage = await getUserUsage(ctx.user.id);
     const voiceMinutesUsed = usage?.voiceMinutesThisMonth || 0;
     await updateUserUsage(ctx.user.id, usage?.messagesThisMonth || 0, voiceMinutesUsed + 1);
-    const transcriptionResult = result;
     return {
-      text: transcriptionResult.text || "",
-      language: transcriptionResult.language || "en",
-      duration: transcriptionResult.duration || 0
+      text: result.text || "",
+      language: result.language || "en",
+      duration: result.duration || 0
     };
   }),
   /**

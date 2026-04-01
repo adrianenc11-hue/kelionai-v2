@@ -64,11 +64,25 @@ export async function generateSpeech(params: {
   // Get audio buffer
   const audioBuffer = Buffer.from(new Uint8Array(await response.arrayBuffer()));
 
-  // Upload to S3
-  const timestamp = Date.now();
-  const randomSuffix = Math.random().toString(36).slice(2, 8);
-  const fileKey = `tts/${avatar}-${timestamp}-${randomSuffix}.mp3`;
-  const { url } = await storagePut(fileKey, audioBuffer, "audio/mpeg");
+  // Try S3/Manus storage first, fallback to base64 data URL
+  let url: string;
+  try {
+    const timestamp = Date.now();
+    const randomSuffix = Math.random().toString(36).slice(2, 8);
+    const fileKey = `tts/${avatar}-${timestamp}-${randomSuffix}.mp3`;
+    const result = await storagePut(fileKey, audioBuffer, "audio/mpeg");
+    // Verify the URL is not a localhost URL (broken on Railway)
+    if (result.url && !result.url.includes('localhost')) {
+      url = result.url;
+    } else {
+      // Fallback to base64 data URL
+      url = `data:audio/mpeg;base64,${audioBuffer.toString('base64')}`;
+    }
+  } catch (e) {
+    // Storage failed, use base64 data URL as fallback
+    console.warn('[ElevenLabs] Storage failed, using base64 fallback:', e);
+    url = `data:audio/mpeg;base64,${audioBuffer.toString('base64')}`;
+  }
 
   // Estimate duration (rough: ~150 words/min, ~5 chars/word)
   const estimatedDuration = Math.ceil((text.length / 750) * 60);

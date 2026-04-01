@@ -249,9 +249,9 @@ export async function processBrainMessage(params: {
     } else {
       finalContent = (choice.message?.content as string) || "I couldn't generate a response.";
     }
-  } catch (error) {
-    console.error("[Brain v4] Error:", error);
-    finalContent = "I'm experiencing a temporary issue. Please try again.";
+  } catch (error: any) {
+    console.error("[Brain v4] Error:", error?.message || error);
+    finalContent = `I'm experiencing a temporary issue: ${error?.message || 'Unknown error'}. Please try again.`;
     confidence = "low";
   }
 

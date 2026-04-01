@@ -58,17 +58,34 @@ export const voiceRouter = router({
   transcribeAudio: protectedProcedure
     .input(
       z.object({
-        audioUrl: z.string().url(),
+        audioUrl: z.string().optional(),
+        audioBase64: z.string().optional(),
+        mimeType: z.string().optional(),
         language: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       await checkAccess(ctx.user.id, ctx.user.role, ctx.user.subscriptionTier);
 
-      const result = await transcribeAudio({
-        audioUrl: input.audioUrl,
+      // Support both direct buffer and URL-based transcription
+      const transcribeOpts: any = {
+        audioUrl: input.audioUrl || '',
         language: input.language,
-      });
+      };
+      
+      // If base64 audio is provided, convert to buffer and pass directly
+      if (input.audioBase64) {
+        transcribeOpts.audioBuffer = Buffer.from(input.audioBase64, 'base64');
+        transcribeOpts.audioMimeType = input.mimeType || 'audio/webm';
+      }
+      
+      const result = await transcribeAudio(transcribeOpts);
+
+      // Check if transcription returned an error
+      if ('error' in result) {
+        console.error('[Voice] Transcription error:', result);
+        throw new Error(result.error + (result.details ? `: ${result.details}` : ''));
+      }
 
       // Track daily usage (1 minute per transcription)
       await incrementDailyUsage(ctx.user.id, 1, 0);
@@ -78,11 +95,10 @@ export const voiceRouter = router({
       const voiceMinutesUsed = usage?.voiceMinutesThisMonth || 0;
       await updateUserUsage(ctx.user.id, usage?.messagesThisMonth || 0, voiceMinutesUsed + 1);
 
-      const transcriptionResult = result as any;
       return {
-        text: transcriptionResult.text || "",
-        language: transcriptionResult.language || "en",
-        duration: transcriptionResult.duration || 0,
+        text: result.text || "",
+        language: result.language || "en",
+        duration: result.duration || 0,
       };
     }),
 

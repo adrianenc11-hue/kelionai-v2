@@ -268,9 +268,9 @@ export default function Chat() {
         const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
         if (audioBlob.size < 100) return; // too small, ignore
 
-        // Pipeline: upload → transcribe → send to brain
+        // Pipeline: transcribe → send to brain (direct base64, no S3 upload needed)
         setIsLoading(true);
-        setLoadingStep("Uploading audio...");
+        setLoadingStep(t('chat.thinking'));
         try {
           // Convert blob to base64
           const reader = new FileReader();
@@ -283,17 +283,11 @@ export default function Chat() {
           reader.readAsDataURL(audioBlob);
           const audioBase64 = await base64Promise;
 
-          // Step 1: Upload to S3
-          setLoadingStep("Uploading audio...");
-          const { audioUrl } = await uploadAudioMutation.mutateAsync({
+          // Step 1: Transcribe directly with base64 audio (no S3 upload needed)
+          setLoadingStep(t('chat.thinking'));
+          const { text, language } = await transcribeAudioMutation.mutateAsync({
             audioBase64,
             mimeType: "audio/webm",
-          });
-
-          // Step 2: Transcribe with Whisper
-          setLoadingStep("Transcribing speech...");
-          const { text, language } = await transcribeAudioMutation.mutateAsync({
-            audioUrl,
           });
 
           if (!text || text.trim().length === 0) {
@@ -302,7 +296,7 @@ export default function Chat() {
             setMessages((prev) => [...prev, {
               id: Date.now(),
               role: "system",
-              content: "Could not understand audio. Please try again.",
+              content: t('common.error'),
               createdAt: new Date(),
             }]);
             return;
@@ -317,14 +311,78 @@ export default function Chat() {
           };
           setMessages((prev) => [...prev, userMsg]);
 
-          // Step 4: Send to Brain
-          setLoadingStep("Thinking...");
-          setTimeout(() => setLoadingStep("Processing..."), 1500);
-          await sendMessageMutation.mutateAsync({
-            conversationId: activeConversationId || undefined,
-            message: text,
-            avatar: selectedAvatar,
+          // Step 4: Send to Brain via streaming (same as text chat)
+          setLoadingStep(t('chat.thinking'));
+          setStreamingText("");
+          const streamResponse = await fetch("/api/chat/stream", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              message: text,
+              conversationId: activeConversationId || undefined,
+              avatar: selectedAvatar,
+            }),
           });
+
+          if (!streamResponse.ok || !streamResponse.body) {
+            throw new Error("Stream failed");
+          }
+
+          const streamReader = streamResponse.body.getReader();
+          const streamDecoder = new TextDecoder();
+          let streamBuffer = "";
+          let voiceFullContent = "";
+          let voiceConvId = activeConversationId;
+
+          setLoadingStep("");
+
+          while (true) {
+            const { done: streamDone, value: streamValue } = await streamReader.read();
+            if (streamDone) break;
+            streamBuffer += streamDecoder.decode(streamValue, { stream: true });
+            const streamLines = streamBuffer.split("\n");
+            streamBuffer = streamLines.pop() || "";
+
+            for (const sLine of streamLines) {
+              if (!sLine.startsWith("data: ")) continue;
+              try {
+                const sParsed = JSON.parse(sLine.slice(6));
+                if (sParsed.type === "meta" && sParsed.conversationId) {
+                  voiceConvId = sParsed.conversationId;
+                  if (!activeConversationId) {
+                    setActiveConversationId(voiceConvId);
+                    navigate(`/chat/${voiceConvId}`);
+                  }
+                } else if (sParsed.type === "token") {
+                  voiceFullContent += sParsed.content;
+                  setStreamingText(voiceFullContent);
+                } else if (sParsed.type === "done") {
+                  const aiMsg: Message = {
+                    id: Date.now(),
+                    role: "assistant",
+                    content: voiceFullContent,
+                    createdAt: new Date(),
+                    audioUrl: sParsed.audioUrl,
+                  };
+                  setMessages((prev) => [...prev, aiMsg]);
+                  setStreamingText("");
+                  // Auto-play audio response
+                  if (sParsed.audioUrl && audioRef.current) {
+                    audioRef.current.src = sParsed.audioUrl;
+                    audioRef.current.play().catch(() => {});
+                  }
+                  utils.chat.listConversations.invalidate();
+                } else if (sParsed.type === "error") {
+                  throw new Error(sParsed.error);
+                }
+              } catch (parseErr: any) {
+                if (sLine.slice(6).trim() && sLine.slice(6).trim() !== '[DONE]') {
+                  console.warn('[Voice] SSE parse issue:', parseErr?.message);
+                }
+              }
+            }
+          }
         } catch (err: any) {
           setIsLoading(false);
           setLoadingStep("");
@@ -347,7 +405,7 @@ export default function Chat() {
         setRecordingTime((prev) => prev + 1);
       }, 1000);
     } catch (err: any) {
-      alert("Microphone access denied. Please allow microphone in your browser settings.");
+      alert(t('common.error'));
     }
   }, [activeConversationId, selectedAvatar, uploadAudioMutation, transcribeAudioMutation, sendMessageMutation]);
 
@@ -395,7 +453,7 @@ export default function Chat() {
         }
       }, 100);
     } catch (err: any) {
-      alert("Camera access denied. Please allow camera in your browser settings.");
+      alert(t('common.error'));
     }
   }, []);
 
@@ -434,7 +492,7 @@ export default function Chat() {
 
     // Pipeline: upload → send to brain with vision
     setIsLoading(true);
-    setLoadingStep("Uploading image...");
+    setLoadingStep(t('chat.thinking'));
     try {
       // Step 1: Upload to S3
       const { imageUrl } = await uploadImageMutation.mutateAsync({
@@ -451,17 +509,81 @@ export default function Chat() {
       };
       setMessages((prev) => [...prev, userMsg]);
 
-      // Step 3: Send to Brain with imageUrl for GPT vision
-      setLoadingStep("Analyzing image with AI vision...");
+      // Step 3: Send to Brain with imageUrl for GPT vision via streaming
+      setLoadingStep(t('chat.thinking'));
       const question = inputValue.trim() || "Describe what you see in detail. If there are any dangers or important things, mention them first.";
       setInputValue("");
+      setStreamingText("");
 
-      await sendMessageMutation.mutateAsync({
-        conversationId: activeConversationId || undefined,
-        message: question,
-        avatar: selectedAvatar,
-        imageUrl: imageUrl,
+      const camStreamResponse = await fetch("/api/chat/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          message: question,
+          conversationId: activeConversationId || undefined,
+          avatar: selectedAvatar,
+          imageUrl: imageUrl,
+        }),
       });
+
+      if (!camStreamResponse.ok || !camStreamResponse.body) {
+        throw new Error("Stream failed");
+      }
+
+      const camReader = camStreamResponse.body.getReader();
+      const camDecoder = new TextDecoder();
+      let camBuffer = "";
+      let camFullContent = "";
+      let camConvId = activeConversationId;
+
+      setLoadingStep("");
+
+      while (true) {
+        const { done: camDone, value: camValue } = await camReader.read();
+        if (camDone) break;
+        camBuffer += camDecoder.decode(camValue, { stream: true });
+        const camLines = camBuffer.split("\n");
+        camBuffer = camLines.pop() || "";
+
+        for (const cLine of camLines) {
+          if (!cLine.startsWith("data: ")) continue;
+          try {
+            const cParsed = JSON.parse(cLine.slice(6));
+            if (cParsed.type === "meta" && cParsed.conversationId) {
+              camConvId = cParsed.conversationId;
+              if (!activeConversationId) {
+                setActiveConversationId(camConvId);
+                navigate(`/chat/${camConvId}`);
+              }
+            } else if (cParsed.type === "token") {
+              camFullContent += cParsed.content;
+              setStreamingText(camFullContent);
+            } else if (cParsed.type === "done") {
+              const aiMsg: Message = {
+                id: Date.now(),
+                role: "assistant",
+                content: camFullContent,
+                createdAt: new Date(),
+                audioUrl: cParsed.audioUrl,
+              };
+              setMessages((prev) => [...prev, aiMsg]);
+              setStreamingText("");
+              if (cParsed.audioUrl && audioRef.current) {
+                audioRef.current.src = cParsed.audioUrl;
+                audioRef.current.play().catch(() => {});
+              }
+              utils.chat.listConversations.invalidate();
+            } else if (cParsed.type === "error") {
+              throw new Error(cParsed.error);
+            }
+          } catch (camParseErr: any) {
+            if (cLine.slice(6).trim() && cLine.slice(6).trim() !== '[DONE]') {
+              console.warn('[Camera] SSE parse issue:', camParseErr?.message);
+            }
+          }
+        }
+      }
     } catch (err: any) {
       setIsLoading(false);
       setLoadingStep("");
@@ -488,7 +610,7 @@ export default function Chat() {
     const userMsg: Message = { id: Date.now(), role: "user", content: inputValue, createdAt: new Date() };
     setMessages((prev) => [...prev, userMsg]);
     setIsLoading(true);
-    setLoadingStep("Thinking...");
+    setLoadingStep(t('chat.thinking'));
     const msgText = inputValue;
     setInputValue("");
     setStreamingText("");
@@ -564,8 +686,11 @@ export default function Chat() {
             } else if (parsed.type === "error") {
               throw new Error(parsed.error);
             }
-          } catch (e) {
-            // skip malformed chunks
+          } catch (e: any) {
+            // Only skip truly malformed JSON, don't swallow processing errors
+            if (line.slice(6).trim() && line.slice(6).trim() !== '[DONE]') {
+              console.warn('[Chat] SSE parse issue:', e?.message, 'line:', line.slice(0, 100));
+            }
           }
         }
       }
@@ -736,7 +861,7 @@ export default function Chat() {
                   <span className="text-lg opacity-50">🎯</span>
                 </div>
                 <p className="text-sm text-slate-500 mb-1">{t('chat.presentationMonitor')}</p>
-                <p className="text-xs text-slate-700">Ask for a map, image, weather, search, or code</p>
+                <p className="text-xs text-slate-700">{t('chat.monitorHint')}</p>
               </div>
             )}
           </div>
