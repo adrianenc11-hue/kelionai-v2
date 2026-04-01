@@ -1,4 +1,4 @@
-import "dotenv/config";
+﻿import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
 import net from "net";
@@ -9,6 +9,7 @@ import { serveStatic, setupVite } from "./vite";
 import { handleStripeWebhook } from "./stripe-webhook";
 import streamingRouter from "../streaming";
 import { initSentry } from "../sentry";
+import { WebSocketServer } from "../websocket-server";
 
 initSentry();
 
@@ -31,12 +32,16 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
   throw new Error(`No available port found starting from ${startPort}`);
 }
 
-// Always use standalone auth (email/password)
 const isStandalone = true;
 
 async function startServer() {
   const app = express();
   const server = createServer(app);
+
+  // Initializeaza WebSocket Server
+  const wsServer = new WebSocketServer(server);
+  console.log("[WebSocket] Server initialized");
+
   // Security headers
   app.use((_req, res, next) => {
     res.setHeader("X-Content-Type-Options", "nosniff");
@@ -72,13 +77,12 @@ async function startServer() {
     next();
   });
 
-  // Stripe webhook - MUST be before express.json() for signature verification
+  // Stripe webhook
   app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), handleStripeWebhook);
-  // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
-  // Auth routes - standalone or Manus OAuth
+  // Auth routes
   if (isStandalone) {
     console.log("[Auth] Running in STANDALONE mode (email/password)");
     const { registerStandaloneAuthRoutes } = await import("../standalone-auth");
@@ -89,7 +93,7 @@ async function startServer() {
     registerOAuthRoutes(app);
   }
 
-  // Database diagnostic & migration endpoint (PostgreSQL)
+  // Database diagnostic & migration endpoint
   app.get("/api/migrate", async (req, res) => {
     try {
       const { getDb } = await import("../db");
@@ -97,24 +101,21 @@ async function startServer() {
       const db = await getDb();
       if (!db) { res.status(500).json({ error: "No DB" }); return; }
       const results: string[] = [];
-      
-      // Test connection
+
       try {
         const testResult = await db.execute(sqlTag.raw("SELECT current_database(), version()"));
         results.push(`Connected to PostgreSQL: ${JSON.stringify(testResult[0])}`);
       } catch (e: any) {
         results.push(`Connection test failed: ${e.message}`);
       }
-      
-      // Make adrianenc11@gmail.com admin
+
       try {
         await db.execute(sqlTag.raw("UPDATE users SET role = 'admin' WHERE email = 'adrianenc11@gmail.com'"));
         results.push("OK: set admin role for adrianenc11@gmail.com");
       } catch (e: any) {
         results.push(`Admin role: ${e.message}`);
       }
-      
-      // Insert default subscription plans if not exist
+
       try {
         await db.execute(sqlTag.raw(`
           INSERT INTO subscription_plans (name, tier, monthly_price, yearly_price, features, message_limit, voice_minutes)
@@ -130,7 +131,7 @@ async function startServer() {
       } catch (e: any) {
         results.push(`Subscription plans: ${e.message}`);
       }
-      
+
       res.json({ success: true, results });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -171,11 +172,10 @@ async function startServer() {
       createContext,
     })
   );
-  // Serve uploaded files (local storage fallback for standalone)
+
   app.use('/uploads', express.static('uploads'));
   app.use(streamingRouter);
 
-  // development mode uses Vite, production mode uses static files
   if (process.env.NODE_ENV === "development") {
     await setupVite(app, server);
   } else {
