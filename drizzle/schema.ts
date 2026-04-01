@@ -30,6 +30,7 @@ export const users = pgTable("users", {
   referralBonusDays: integer("referral_bonus_days").default(0),
   accountClosed: boolean("account_closed").default(false),
   accountClosedAt: timestamp("account_closed_at"),
+  sessionVersion: integer("session_version").default(1).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   lastSignedIn: timestamp("last_signed_in").defaultNow().notNull(),

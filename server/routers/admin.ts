@@ -2,7 +2,7 @@ import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { users, conversations, messages } from "../../drizzle/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 import { getBrainDiagnostics } from "../brain-v4";
 
 /**
@@ -200,4 +200,26 @@ export const adminRouter = router({
         throw error;
       }
     }),
+
+  /**
+   * Invalidate all active sessions by incrementing sessionVersion for every user.
+   * Existing JWTs will no longer match the stored version and will be rejected.
+   */
+  invalidateAllSessions: adminProcedure.mutation(async () => {
+    const db = await getDb();
+    if (!db) {
+      throw new Error("Database not available");
+    }
+
+    try {
+      await db
+        .update(users)
+        .set({ sessionVersion: sql`${users.sessionVersion} + 1` });
+
+      return { success: true };
+    } catch (error) {
+      console.error("[Admin] Failed to invalidate all sessions:", error);
+      throw error;
+    }
+  }),
 });

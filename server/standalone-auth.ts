@@ -19,13 +19,14 @@ function getJwtSecret() {
   return new TextEncoder().encode(secret);
 }
 
-async function createSessionToken(user: { id: number; openId: string; name: string | null }): Promise<string> {
+async function createSessionToken(user: { id: number; openId: string; name: string | null; sessionVersion: number }): Promise<string> {
   const secretKey = getJwtSecret();
   return new SignJWT({
     openId: user.openId,
     appId: "kelionai",
     name: user.name || "",
     userId: user.id,
+    sessionVersion: user.sessionVersion,
   })
     .setProtectedHeader({ alg: "HS256", typ: "JWT" })
     .setExpirationTime(Math.floor((Date.now() + ONE_YEAR_MS) / 1000))
@@ -34,14 +35,19 @@ async function createSessionToken(user: { id: number; openId: string; name: stri
 
 export async function verifySessionStandalone(
   cookieValue: string | undefined | null
-): Promise<{ openId: string; appId: string; name: string } | null> {
+): Promise<{ openId: string; appId: string; name: string; sessionVersion: number } | null> {
   if (!cookieValue) return null;
   try {
     const secretKey = getJwtSecret();
     const { payload } = await jwtVerify(cookieValue, secretKey, { algorithms: ["HS256"] });
-    const { openId, appId, name } = payload as Record<string, unknown>;
+    const { openId, appId, name, sessionVersion } = payload as Record<string, unknown>;
     if (typeof openId !== "string" || !openId) return null;
-    return { openId, appId: (appId as string) || "kelionai", name: (name as string) || "" };
+    return {
+      openId,
+      appId: (appId as string) || "kelionai",
+      name: (name as string) || "",
+      sessionVersion: typeof sessionVersion === "number" ? sessionVersion : 1,
+    };
   } catch {
     return null;
   }
@@ -63,6 +69,9 @@ export async function authenticateRequestStandalone(req: Request): Promise<User>
   
   const user = await db.getUserByOpenId(session.openId);
   if (!user) throw new Error("User not found");
+
+  const userSessionVersion = user.sessionVersion ?? 1;
+  if (session.sessionVersion !== userSessionVersion) throw new Error("Session invalidated");
   
   return user;
 }

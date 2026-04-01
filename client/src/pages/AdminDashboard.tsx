@@ -2,9 +2,21 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, Users, MessageSquare, TrendingUp, Activity, ArrowLeft } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Loader2, Users, MessageSquare, TrendingUp, Activity, ArrowLeft, ShieldOff } from "lucide-react";
 import { useLocation } from "wouter";
 import { useState, useEffect } from "react";
+import { toast } from "sonner";
 
 export default function AdminDashboard() {
   const { user, isAuthenticated } = useAuth();
@@ -25,6 +37,15 @@ export default function AdminDashboard() {
   const { data: users, isLoading: usersLoading } = trpc.admin.getAllUsers.useQuery();
   const { data: health, isLoading: healthLoading } = trpc.admin.getSystemHealth.useQuery();
   const { data: revenue, isLoading: revenueLoading } = trpc.admin.getRevenueAnalytics.useQuery();
+
+  const invalidateAllSessions = trpc.admin.invalidateAllSessions.useMutation({
+    onSuccess: () => {
+      toast.success("All sessions have been invalidated. Users will need to log in again.");
+    },
+    onError: (error: { message: string }) => {
+      toast.error(`Failed to invalidate sessions: ${error.message}`);
+    },
+  });
 
   const isLoading = analyticsLoading || usersLoading || healthLoading || revenueLoading;
 
@@ -228,6 +249,46 @@ export default function AdminDashboard() {
                   </span>
                 </div>
               </div>
+            </Card>
+
+            <Card className="bg-red-900/20 border border-red-500/30 p-6">
+              <h3 className="text-xl font-bold mb-2 text-red-300">Danger Zone</h3>
+              <p className="text-gray-400 text-sm mb-4">
+                Invalidate all active user sessions. Every logged-in user will be signed out immediately and will need to log in again.
+              </p>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="destructive"
+                    className="flex items-center gap-2"
+                    disabled={invalidateAllSessions.isPending}
+                  >
+                    {invalidateAllSessions.isPending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <ShieldOff className="w-4 h-4" />
+                    )}
+                    Stop All Sessions
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Stop All Sessions</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will immediately sign out every logged-in user. All active sessions will be invalidated and users will need to log in again. This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      onClick={() => invalidateAllSessions.mutate()}
+                    >
+                      Stop All Sessions
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </Card>
           </div>
         )}
