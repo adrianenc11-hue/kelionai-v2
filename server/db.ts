@@ -1,23 +1,27 @@
 import { eq, desc, asc, and, sql } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
-import mysql from "mysql2/promise";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 import { InsertUser, users, conversations, messages, subscriptionPlans, userUsage, dailyUsage, referralCodes, refundRequests } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: any = null;
 
+// Supabase PostgreSQL connection - override any built-in MySQL DATABASE_URL
+const SUPABASE_DATABASE_URL = process.env.SUPABASE_DATABASE_URL || "";
+
 export async function getDb() {
   if (!_db) {
-    const url = process.env.DATABASE_URL || "";
-    if (!url) return null;
+    const url = SUPABASE_DATABASE_URL || process.env.DATABASE_URL || "";
+    if (!url || url.startsWith('mysql://')) {
+      console.warn('[Database] No PostgreSQL URL configured. Set SUPABASE_DATABASE_URL.');
+      return null;
+    }
     try {
-      const pool = mysql.createPool({
-        uri: url,
-        ssl: { rejectUnauthorized: true },
-        waitForConnections: true,
-        connectionLimit: 10,
+      const client = postgres(url, {
+        ssl: 'require',
+        max: 10,
       });
-      _db = drizzle(pool);
+      _db = drizzle(client);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
@@ -48,7 +52,11 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     else if (user.openId === ENV.ownerOpenId || user.openId === 'email_adrianenc11@gmail.com' || user.email === 'adrianenc11@gmail.com') { values.role = 'admin'; updateSet.role = 'admin'; }
     if (!values.lastSignedIn) values.lastSignedIn = new Date();
     if (Object.keys(updateSet).length === 0) updateSet.lastSignedIn = new Date();
-    await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
+    // PostgreSQL upsert: ON CONFLICT (open_id) DO UPDATE
+    await db.insert(users).values(values).onConflictDoUpdate({
+      target: users.openId,
+      set: updateSet,
+    });
   } catch (error) { console.error("[Database] Failed to upsert user:", error); throw error; }
 }
 
@@ -80,10 +88,9 @@ export async function createConversation(userId: number, title: string) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   try {
-    const result = await db.insert(conversations).values({ userId, title, primaryAiModel: "gpt-4" }).$returningId();
-    const id = result[0].id;
-    const conv = await db.select().from(conversations).where(eq(conversations.id, id)).limit(1);
-    return conv[0];
+    // PostgreSQL: use .returning() instead of .$returningId()
+    const result = await db.insert(conversations).values({ userId, title, primaryAiModel: "gpt-4" }).returning();
+    return result[0];
   } catch (error) { console.error("[Database] Failed to create conversation:", error); throw error; }
 }
 
@@ -99,10 +106,9 @@ export async function createMessage(conversationId: number, role: "user" | "assi
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   try {
-    const result = await db.insert(messages).values({ conversationId, role, content, aiModel }).$returningId();
-    const id = result[0].id;
-    const msg = await db.select().from(messages).where(eq(messages.id, id)).limit(1);
-    return msg[0];
+    // PostgreSQL: use .returning() instead of .$returningId()
+    const result = await db.insert(messages).values({ conversationId, role, content, aiModel }).returning();
+    return result[0];
   } catch (error) { console.error("[Database] Failed to create message:", error); throw error; }
 }
 
@@ -159,6 +165,13 @@ export async function updateUserProfilePicture(userId: number, avatarUrl: string
   return { success: true };
 }
 
+export async function updateUserLanguage(userId: number, language: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(users).set({ language }).where(eq(users.id, userId));
+  return { success: true };
+}
+
 export async function updateUserUsage(userId: number, messagesThisMonth: number, voiceMinutesThisMonth: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -185,13 +198,12 @@ export async function createReferralCode(senderUserId: number, recipientEmail: s
   const code = generateReferralCode();
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + 7);
-  await db.insert(referralCodes).values({
+  const result = await db.insert(referralCodes).values({
     code,
     senderUserId,
     recipientEmail,
     expiresAt,
-  });
-  const result = await db.select().from(referralCodes).where(eq(referralCodes.code, code)).limit(1);
+  }).returning();
   return result[0];
 }
 
@@ -250,7 +262,7 @@ export async function getUserReferrals(userId: number) {
 export async function createRefundRequest(userId: number, stripeSubId: string | null, billingCycle: string, subStartDate: Date | null, monthsElapsed: number, refundAmount: string | null, reason?: string) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  await db.insert(refundRequests).values({
+  const result = await db.insert(refundRequests).values({
     userId,
     stripeSubscriptionId: stripeSubId,
     billingCycle,
@@ -262,8 +274,7 @@ export async function createRefundRequest(userId: number, stripeSubId: string | 
     adminNote: billingCycle === 'monthly' 
       ? 'Monthly subscriptions are non-refundable.' 
       : (monthsElapsed >= 3 ? 'Refund not available after 3 completed months.' : null),
-  });
-  const result = await db.select().from(refundRequests).where(eq(refundRequests.userId, userId)).orderBy(desc(refundRequests.createdAt)).limit(1);
+  }).returning();
   return result[0];
 }
 

@@ -9,7 +9,8 @@ import { voiceRouter } from "./routers/voice";
 import { contactRouter } from "./routers/contact";
 import { referralRouter } from "./routers/referral";
 import { refundRouter } from "./routers/refund";
-import { getTrialStatus } from "./db";
+import { getTrialStatus, updateUserLanguage } from "./db";
+import { z } from "zod";
 
 export const appRouter = router({
   // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
@@ -37,6 +38,15 @@ export const appRouter = router({
     getStatus: protectedProcedure.query(async ({ ctx }) => {
       return await getTrialStatus(ctx.user.id);
     }),
+  }),
+
+  profile: router({
+    updateLanguage: protectedProcedure
+      .input(z.object({ language: z.string().min(2).max(10) }))
+      .mutation(async ({ ctx, input }) => {
+        await updateUserLanguage(ctx.user.id, input.language);
+        return { success: true };
+      }),
   }),
 });
 

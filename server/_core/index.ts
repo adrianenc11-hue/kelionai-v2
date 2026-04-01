@@ -86,7 +86,7 @@ async function startServer() {
     registerOAuthRoutes(app);
   }
 
-  // Database diagnostic & migration endpoint
+  // Database diagnostic & migration endpoint (PostgreSQL)
   app.get("/api/migrate", async (req, res) => {
     try {
       const { getDb } = await import("../db");
@@ -94,121 +94,40 @@ async function startServer() {
       const db = await getDb();
       if (!db) { res.status(500).json({ error: "No DB" }); return; }
       const results: string[] = [];
-      const run = async (rawSql: string, label: string) => {
-        try { await db.execute(sqlTag.raw(rawSql)); results.push(`OK: ${label}`); } catch (e: any) {
-          const msg = e?.message || String(e);
-          if (msg.includes('Duplicate') || msg.includes('ER_DUP_FIELDNAME') || msg.includes('already exists') || msg.includes("Can't DROP") || msg.includes('check that column')) results.push(`SKIP: ${label}`);
-          else results.push(`FAIL: ${label} - ${msg}`);
-        }
-      };
-      // First, describe the users table to see what columns exist
-      try {
-        const [cols] = await db.execute(sqlTag.raw("SHOW COLUMNS FROM users"));
-        results.push(`EXISTING COLUMNS: ${JSON.stringify(cols)}`);
-      } catch (e: any) { results.push(`DESCRIBE FAIL: ${e.message}`); }
       
-      // STEP 1: Drop duplicate snake_case columns (keep original camelCase)
-      const duplicateSnakeCols = ['open_id', 'password_hash', 'login_method', 'avatar_url', 'stripe_customer_id', 'stripe_subscription_id', 'subscription_tier', 'subscription_status', 'created_at', 'updated_at', 'last_signed_in'];
-      for (const col of duplicateSnakeCols) {
-        await run(`ALTER TABLE users DROP COLUMN \`${col}\``, `DROP duplicate ${col}`);
+      // Test connection
+      try {
+        const testResult = await db.execute(sqlTag.raw("SELECT current_database(), version()"));
+        results.push(`Connected to PostgreSQL: ${JSON.stringify(testResult[0])}`);
+      } catch (e: any) {
+        results.push(`Connection test failed: ${e.message}`);
       }
       
-      // STEP 2: Add missing columns that only exist in snake_case (new columns)
-      await run("ALTER TABLE users ADD COLUMN trial_start_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP", "users.trial_start_date");
-      await run("ALTER TABLE users ADD COLUMN trial_expired TINYINT(1) DEFAULT 0", "users.trial_expired");
-      await run("ALTER TABLE users ADD COLUMN subscription_start_date TIMESTAMP NULL", "users.subscription_start_date");
-      await run("ALTER TABLE users ADD COLUMN billing_cycle VARCHAR(10) DEFAULT 'monthly'", "users.billing_cycle");
-      await run("ALTER TABLE users ADD COLUMN referral_bonus_days INT DEFAULT 0", "users.referral_bonus_days");
-      await run("ALTER TABLE users ADD COLUMN account_closed TINYINT(1) DEFAULT 0", "users.account_closed");
-      await run("ALTER TABLE users ADD COLUMN account_closed_at TIMESTAMP NULL", "users.account_closed_at");
+      // Make adrianenc11@gmail.com admin
+      try {
+        await db.execute(sqlTag.raw("UPDATE users SET role = 'admin' WHERE email = 'adrianenc11@gmail.com'"));
+        results.push("OK: set admin role for adrianenc11@gmail.com");
+      } catch (e: any) {
+        results.push(`Admin role: ${e.message}`);
+      }
       
-      // STEP 3: Make adrianenc11@gmail.com admin
-      await run("UPDATE users SET role = 'admin' WHERE email = 'adrianenc11@gmail.com'", "set admin role");
-      // Create tables with snake_case column names
-      await run(`CREATE TABLE IF NOT EXISTS daily_usage (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        user_id INT NOT NULL,
-        date VARCHAR(10) NOT NULL,
-        minutes_used INT DEFAULT 0 NOT NULL,
-        messages_count INT DEFAULT 0 NOT NULL,
-        last_activity_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        UNIQUE KEY unique_user_date (user_id, date)
-      )`, "daily_usage table");
-      await run(`CREATE TABLE IF NOT EXISTS referral_codes (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        code VARCHAR(20) NOT NULL UNIQUE,
-        sender_user_id INT NOT NULL,
-        recipient_email VARCHAR(320) NOT NULL,
-        expires_at TIMESTAMP NOT NULL,
-        used_by INT NULL,
-        used_at TIMESTAMP NULL,
-        bonus_applied TINYINT(1) DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
-      )`, "referral_codes table");
-      await run(`CREATE TABLE IF NOT EXISTS refund_requests (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        user_id INT NOT NULL,
-        stripe_subscription_id VARCHAR(255),
-        billing_cycle VARCHAR(10) NOT NULL,
-        subscription_start_date TIMESTAMP NULL,
-        months_elapsed INT DEFAULT 0,
-        refund_amount DECIMAL(10,2),
-        status VARCHAR(20) DEFAULT 'pending' NOT NULL,
-        reason TEXT,
-        admin_note TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        resolved_at TIMESTAMP NULL
-      )`, "refund_requests table");
-      await run(`CREATE TABLE IF NOT EXISTS contact_messages (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        user_id INT,
-        name VARCHAR(255) NOT NULL,
-        email VARCHAR(320) NOT NULL,
-        subject VARCHAR(500),
-        message TEXT NOT NULL,
-        ai_response TEXT,
-        status VARCHAR(20) DEFAULT 'new',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
-      )`, "contact_messages table");
-      await run(`CREATE TABLE IF NOT EXISTS subscription_plans (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        name VARCHAR(100) NOT NULL,
-        tier ENUM('free','pro','enterprise') NOT NULL,
-        stripe_price_id VARCHAR(255),
-        monthly_price DECIMAL(10,2),
-        yearly_price DECIMAL(10,2),
-        messages_per_month INT,
-        voice_minutes_per_month INT,
-        features JSON,
-        message_limit INT,
-        voice_minutes INT,
-        is_active TINYINT(1) DEFAULT 1,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
-      )`, "subscription_plans table");
-      await run(`CREATE TABLE IF NOT EXISTS user_cloned_voices (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        user_id INT NOT NULL,
-        voice_id VARCHAR(255) NOT NULL,
-        voice_name VARCHAR(255) NOT NULL,
-        is_active TINYINT(1) DEFAULT 1,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      )`, "user_cloned_voices table");
-      await run(`CREATE TABLE IF NOT EXISTS payments (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        user_id INT NOT NULL,
-        stripe_payment_id VARCHAR(255),
-        amount DECIMAL(10,2) NOT NULL,
-        currency VARCHAR(10) DEFAULT 'eur',
-        status VARCHAR(30) DEFAULT 'pending',
-        description TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
-      )`, "payments table");
-      // Insert subscription plans
-      await run(`INSERT IGNORE INTO subscription_plans (name, tier, monthly_price, yearly_price, features, message_limit, voice_minutes) VALUES
-        ('Pro', 'pro', 9.99, 99.90, '{"features": ["All features", "500 messages/month", "60 voice minutes"]}', 500, 60),
-        ('Enterprise', 'enterprise', 29.99, 299.90, '{"features": ["Unlimited everything", "Priority support"]}', 999999, 999999)`, "subscription plans");
+      // Insert default subscription plans if not exist
+      try {
+        await db.execute(sqlTag.raw(`
+          INSERT INTO subscription_plans (name, tier, monthly_price, yearly_price, features, message_limit, voice_minutes)
+          SELECT 'Pro', 'pro', 9.99, 99.90, '{"features": ["All features", "500 messages/month", "60 voice minutes"]}', 500, 60
+          WHERE NOT EXISTS (SELECT 1 FROM subscription_plans WHERE tier = 'pro')
+        `));
+        await db.execute(sqlTag.raw(`
+          INSERT INTO subscription_plans (name, tier, monthly_price, yearly_price, features, message_limit, voice_minutes)
+          SELECT 'Enterprise', 'enterprise', 29.99, 299.90, '{"features": ["Unlimited everything", "Priority support"]}', 999999, 999999
+          WHERE NOT EXISTS (SELECT 1 FROM subscription_plans WHERE tier = 'enterprise')
+        `));
+        results.push("OK: subscription plans");
+      } catch (e: any) {
+        results.push(`Subscription plans: ${e.message}`);
+      }
+      
       res.json({ success: true, results });
     } catch (error: any) {
       res.status(500).json({ error: error.message });

@@ -1,21 +1,20 @@
 import { describe, it, expect } from "vitest";
 import { users, dailyUsage, referralCodes, refundRequests, contactMessages, subscriptionPlans, userClonedVoices, payments, conversations, messages } from "../drizzle/schema";
 
-describe("Drizzle Schema - Column Names", () => {
-  it("users table has correct camelCase column names matching production DB", () => {
-    // Original columns are camelCase in the production DB
+describe("Drizzle Schema - Column Names (PostgreSQL snake_case)", () => {
+  it("users table has correct snake_case column names for PostgreSQL", () => {
     const cols = users as any;
-    expect(cols.openId.name).toBe("openId");
-    expect(cols.passwordHash.name).toBe("passwordHash");
-    expect(cols.loginMethod.name).toBe("loginMethod");
-    expect(cols.avatarUrl.name).toBe("avatarUrl");
-    expect(cols.stripeCustomerId.name).toBe("stripeCustomerId");
-    expect(cols.stripeSubscriptionId.name).toBe("stripeSubscriptionId");
-    expect(cols.subscriptionTier.name).toBe("subscriptionTier");
-    expect(cols.subscriptionStatus.name).toBe("subscriptionStatus");
-    expect(cols.createdAt.name).toBe("createdAt");
-    expect(cols.updatedAt.name).toBe("updatedAt");
-    expect(cols.lastSignedIn.name).toBe("lastSignedIn");
+    expect(cols.openId.name).toBe("open_id");
+    expect(cols.passwordHash.name).toBe("password_hash");
+    expect(cols.loginMethod.name).toBe("login_method");
+    expect(cols.avatarUrl.name).toBe("avatar_url");
+    expect(cols.stripeCustomerId.name).toBe("stripe_customer_id");
+    expect(cols.stripeSubscriptionId.name).toBe("stripe_subscription_id");
+    expect(cols.subscriptionTier.name).toBe("subscription_tier");
+    expect(cols.subscriptionStatus.name).toBe("subscription_status");
+    expect(cols.createdAt.name).toBe("created_at");
+    expect(cols.updatedAt.name).toBe("updated_at");
+    expect(cols.lastSignedIn.name).toBe("last_signed_in");
   });
 
   it("users table has correct snake_case column names for newer columns", () => {
@@ -74,25 +73,24 @@ describe("Drizzle Schema - Column Names", () => {
     expect(cols.reason.name).toBe("reason");
   });
 
-  it("conversations table has camelCase column names", () => {
+  it("conversations table has snake_case column names", () => {
     const cols = conversations as any;
-    expect(cols.userId.name).toBe("userId");
+    expect(cols.userId.name).toBe("user_id");
     expect(cols.title.name).toBe("title");
-    expect(cols.createdAt.name).toBe("createdAt");
+    expect(cols.createdAt.name).toBe("created_at");
   });
 
-  it("messages table has camelCase column names", () => {
+  it("messages table has snake_case column names", () => {
     const cols = messages as any;
-    expect(cols.conversationId.name).toBe("conversationId");
+    expect(cols.conversationId.name).toBe("conversation_id");
     expect(cols.role.name).toBe("role");
     expect(cols.content.name).toBe("content");
-    expect(cols.aiModel.name).toBe("aiModel");
+    expect(cols.aiModel.name).toBe("ai_model");
   });
 });
 
 describe("Trial System Logic", () => {
   it("TrialStatus interface has all required fields", () => {
-    // This verifies the type structure exists by importing
     const mockTrialStatus = {
       isTrialUser: true,
       trialExpired: false,
@@ -110,7 +108,7 @@ describe("Trial System Logic", () => {
 
   it("trial should expire after 7 days", () => {
     const trialStart = new Date();
-    trialStart.setDate(trialStart.getDate() - 8); // 8 days ago
+    trialStart.setDate(trialStart.getDate() - 8);
     const now = new Date();
     const diffMs = now.getTime() - trialStart.getTime();
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
@@ -120,7 +118,7 @@ describe("Trial System Logic", () => {
 
   it("trial should have days left within 7 days", () => {
     const trialStart = new Date();
-    trialStart.setDate(trialStart.getDate() - 3); // 3 days ago
+    trialStart.setDate(trialStart.getDate() - 3);
     const now = new Date();
     const diffMs = now.getTime() - trialStart.getTime();
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));

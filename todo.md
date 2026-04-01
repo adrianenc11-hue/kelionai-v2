@@ -50,7 +50,7 @@
 - [x] Build user registration and login pages (Manus OAuth)
 - [x] Implement user profile management page (/profile)
 - [x] Create password change functionality (via Manus OAuth, admin reset)
-- [ ] Add profile picture upload to S3
+- [x] Add profile picture upload to S3 (voice.uploadImage + /api/profile/avatar)
 - [x] Implement logout functionality
 - [x] Build protected routes for authenticated users (chat, profile, admin)
 
@@ -75,7 +75,7 @@
 - [x] Set up i18n framework (react-i18next)
 - [x] Create translation files for 24 languages
 - [x] Implement language selector in UI (LanguageSelector component in header)
-- [ ] Add language preference to user profile
+- [x] Add language preference to user profile (profile.updateLanguage mutation + LanguageSelector saves to DB)
 - [x] Wire all hardcoded UI strings to t() translation keys across all pages (Home, Chat, Login, Profile, Pricing, Contact)
 
 ## Phase 10: Responsive Design & Mobile
@@ -219,7 +219,7 @@
 - [x] Fix avatar head cut off - adjust camera position
 - [x] Chat has History button in header, clean UI without cursor/sidebar
 - [ ] Fix Railway build (pnpm lockfile + Dockerfile)
-- [ ] Switch database from MySQL to PostgreSQL (Supabase)
+- [x] Switch database from MySQL to PostgreSQL (Supabase)
 
 ## Critical Fix - Railway Production (kelionai.app)
 - [ ] Fix "Database not available" error on Railway - app cannot connect to database
@@ -270,7 +270,7 @@
 - [x] Payment confirmation flow: Stripe webhook confirms payment, update user status
 - [x] Pricing page: add annual/monthly toggle + referral code input field
 - [x] Subscription management: add refund request button with policy info
-- [ ] Voice calls integrated in chat - not separate buttons, call directly from chat
+- [x] Voice calls integrated in chat - MIC push-to-talk → S3 → Whisper → Brain → TTS → avatar speaks, all in chat flow
 - [x] Removed excessive buttons (Plan, Logout from header), clean UI
 - [x] BUG: Landing page avatar - Kelion/Kira buttons moved to left/right, camera fixed
 
@@ -318,3 +318,27 @@
 
 ## i18n - All Major Languages
 - [x] Add all major world languages (24 languages) to i18n translations
+
+## Supabase PostgreSQL Migration
+- [ ] Switch from MySQL to Supabase PostgreSQL
+- [ ] Update drizzle schema from mysql to pg dialect
+- [ ] Update all db.ts queries for PostgreSQL
+- [ ] Update drizzle config for PostgreSQL
+- [ ] Test all features on PostgreSQL
+
+## Supabase PostgreSQL Migration
+- [x] Connect to Supabase PostgreSQL (verified connection, PostgreSQL 17.6)
+- [x] Update db.ts from MySQL to PostgreSQL (onDuplicateKeyUpdate → onConflictDoUpdate, $returningId → .returning())
+- [x] Update schema.ts to full snake_case for PostgreSQL
+- [x] Create missing tables on Supabase (daily_usage)
+- [x] Add missing columns to existing tables (messages.intent, subscription_plans.message_limit/voice_minutes)
+- [x] Set SUPABASE_DATABASE_URL environment variable
+- [x] Set admin password hash for adrianenc11@gmail.com
+- [x] Insert default subscription plans (Pro, Enterprise)
+- [x] Run /api/migrate endpoint successfully
+- [x] Test login: POST /api/auth/login 200 OK
+- [x] Test chat: POST /api/chat/stream 200 OK (AI responds correctly)
+- [x] Verify Presentation Monitor visible on chat page
+- [x] Verify Avatar (Kelion/Kira) visible with city bokeh background
+- [x] Update schema-trial.test.ts for PostgreSQL snake_case column names
+- [x] All 115 tests passing (8 test files)
