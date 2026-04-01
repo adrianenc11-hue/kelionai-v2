@@ -1,18 +1,23 @@
-import { eq, desc, asc, and } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
+import { eq, desc, asc, and, sql } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/mysql2";
+import mysql from "mysql2/promise";
 import { InsertUser, users, conversations, messages, subscriptionPlans, userUsage, dailyUsage, referralCodes, refundRequests } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
-let _db: ReturnType<typeof drizzle> | null = null;
+let _db: any = null;
 
 export async function getDb() {
   if (!_db) {
     const url = process.env.DATABASE_URL || "";
     if (!url) return null;
     try {
-      const client = postgres(url, { ssl: { rejectUnauthorized: false } });
-      _db = drizzle(client);
+      const pool = mysql.createPool({
+        uri: url,
+        ssl: { rejectUnauthorized: true },
+        waitForConnections: true,
+        connectionLimit: 10,
+      });
+      _db = drizzle(pool);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
@@ -43,7 +48,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     else if (user.openId === ENV.ownerOpenId) { values.role = 'admin'; updateSet.role = 'admin'; }
     if (!values.lastSignedIn) values.lastSignedIn = new Date();
     if (Object.keys(updateSet).length === 0) updateSet.lastSignedIn = new Date();
-    await db.insert(users).values(values).onConflictDoUpdate({ target: users.openId, set: updateSet });
+    await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
   } catch (error) { console.error("[Database] Failed to upsert user:", error); throw error; }
 }
 
@@ -75,8 +80,10 @@ export async function createConversation(userId: number, title: string) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   try {
-    const result = await db.insert(conversations).values({ userId, title, primaryAiModel: "gpt-4" }).returning();
-    return result[0];
+    const result = await db.insert(conversations).values({ userId, title, primaryAiModel: "gpt-4" }).$returningId();
+    const id = result[0].id;
+    const conv = await db.select().from(conversations).where(eq(conversations.id, id)).limit(1);
+    return conv[0];
   } catch (error) { console.error("[Database] Failed to create conversation:", error); throw error; }
 }
 
@@ -92,8 +99,10 @@ export async function createMessage(conversationId: number, role: "user" | "assi
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   try {
-    const result = await db.insert(messages).values({ conversationId, role, content, aiModel }).returning();
-    return result[0];
+    const result = await db.insert(messages).values({ conversationId, role, content, aiModel }).$returningId();
+    const id = result[0].id;
+    const msg = await db.select().from(messages).where(eq(messages.id, id)).limit(1);
+    return msg[0];
   } catch (error) { console.error("[Database] Failed to create message:", error); throw error; }
 }
 
@@ -175,13 +184,14 @@ export async function createReferralCode(senderUserId: number, recipientEmail: s
   if (!db) throw new Error("Database not available");
   const code = generateReferralCode();
   const expiresAt = new Date();
-  expiresAt.setDate(expiresAt.getDate() + 7); // Valid 1 week
-  const result = await db.insert(referralCodes).values({
+  expiresAt.setDate(expiresAt.getDate() + 7);
+  await db.insert(referralCodes).values({
     code,
     senderUserId,
     recipientEmail,
     expiresAt,
-  }).returning();
+  });
+  const result = await db.select().from(referralCodes).where(eq(referralCodes.code, code)).limit(1);
   return result[0];
 }
 
@@ -204,16 +214,14 @@ export async function applyReferralBonus(referralId: number) {
   const referral = await db.select().from(referralCodes).where(eq(referralCodes.id, referralId)).limit(1);
   if (!referral.length || referral[0].bonusApplied) return;
   
-  // Give sender +5 days bonus
   const sender = await db.select().from(users).where(eq(users.id, referral[0].senderUserId)).limit(1);
   if (sender.length && sender[0].stripeSubscriptionId) {
     try {
-      // Extend Stripe subscription by 5 days
       const Stripe = (await import('stripe')).default;
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
       const sub = await stripe.subscriptions.retrieve(sender[0].stripeSubscriptionId) as any;
       if (sub && sub.current_period_end) {
-        const newEnd = sub.current_period_end + (5 * 24 * 60 * 60); // +5 days in seconds
+        const newEnd = sub.current_period_end + (5 * 24 * 60 * 60);
         await stripe.subscriptions.update(sender[0].stripeSubscriptionId, {
           trial_end: newEnd,
           proration_behavior: 'none',
@@ -226,7 +234,6 @@ export async function applyReferralBonus(referralId: number) {
     await db.update(referralCodes).set({ bonusApplied: true }).where(eq(referralCodes.id, referralId));
     console.log(`[Referral] Bonus +5 days applied for user ${referral[0].senderUserId}`);
   } else if (sender.length) {
-    // Free user referrer - just mark bonus, they'll get it when they subscribe
     await db.update(referralCodes).set({ bonusApplied: true }).where(eq(referralCodes.id, referralId));
     console.log(`[Referral] Bonus tracked for free user ${referral[0].senderUserId} (will apply on subscription)`);
   }
@@ -243,7 +250,7 @@ export async function getUserReferrals(userId: number) {
 export async function createRefundRequest(userId: number, stripeSubId: string | null, billingCycle: string, subStartDate: Date | null, monthsElapsed: number, refundAmount: string | null, reason?: string) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(refundRequests).values({
+  await db.insert(refundRequests).values({
     userId,
     stripeSubscriptionId: stripeSubId,
     billingCycle,
@@ -255,7 +262,8 @@ export async function createRefundRequest(userId: number, stripeSubId: string | 
     adminNote: billingCycle === 'monthly' 
       ? 'Monthly subscriptions are non-refundable.' 
       : (monthsElapsed >= 3 ? 'Refund not available after 3 completed months.' : null),
-  }).returning();
+  });
+  const result = await db.select().from(refundRequests).where(eq(refundRequests.userId, userId)).orderBy(desc(refundRequests.createdAt)).limit(1);
   return result[0];
 }
 
@@ -284,7 +292,7 @@ export async function updateRefundStatus(refundId: number, status: string, admin
 // ============ TRIAL & DAILY USAGE ============
 
 function getTodayDate(): string {
-  return new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  return new Date().toISOString().slice(0, 10);
 }
 
 export async function getDailyUsage(userId: number, date?: string) {
@@ -337,29 +345,24 @@ export async function getTrialStatus(userId: number): Promise<TrialStatus> {
 
   const user = userResult[0];
 
-  // Paid users (pro/enterprise) have no limits
   if (user.subscriptionTier !== 'free') {
     return { isTrialUser: false, trialExpired: false, trialDaysLeft: 999, dailyMinutesUsed: 0, dailyMinutesLimit: 999, dailyMessagesCount: 0, canUse: true };
   }
 
-  // Admin has no limits
   if (user.role === 'admin') {
     return { isTrialUser: false, trialExpired: false, trialDaysLeft: 999, dailyMinutesUsed: 0, dailyMinutesLimit: 999, dailyMessagesCount: 0, canUse: true };
   }
 
-  // Free user - check trial
   const trialStart = user.trialStartDate || user.createdAt;
   const now = new Date();
   const diffMs = now.getTime() - trialStart.getTime();
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
   const trialDaysLeft = Math.max(0, 7 - diffDays);
 
-  // Trial expired after 7 days
   if (trialDaysLeft <= 0) {
     return { isTrialUser: true, trialExpired: true, trialDaysLeft: 0, dailyMinutesUsed: 0, dailyMinutesLimit: 10, dailyMessagesCount: 0, canUse: false, reason: "Trial expired. Upgrade to continue." };
   }
 
-  // Check daily usage
   const todayUsage = await getDailyUsage(userId);
   const minutesUsed = todayUsage?.minutesUsed || 0;
   const messagesCount = todayUsage?.messagesCount || 0;
@@ -379,8 +382,8 @@ export async function closeUserAccount(userId: number) {
   await db.update(users).set({
     accountClosed: true,
     accountClosedAt: new Date(),
-    subscriptionTier: "free" as any,
-    subscriptionStatus: "cancelled" as any,
+    subscriptionTier: "free",
+    subscriptionStatus: "cancelled",
     stripeSubscriptionId: null,
   }).where(eq(users.id, userId));
   console.log(`[Account] User ${userId} account closed after refund`);

@@ -76,7 +76,7 @@ export const chatRouter = router({
 
       // Get conversation history for Brain v4
       const dbMessages = await getMessagesByConversationId(conversationId);
-      const history: BrainMessage[] = dbMessages.map((m) => ({
+      const history: BrainMessage[] = dbMessages.map((m: any) => ({
         role: m.role as "user" | "assistant" | "system",
         content: m.content || "",
       }));

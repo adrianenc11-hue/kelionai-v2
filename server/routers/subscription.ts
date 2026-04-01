@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { protectedProcedure, router } from "../_core/trpc";
+import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { getSubscriptionPlans } from "../db";
 import Stripe from "stripe";
 
@@ -14,7 +14,7 @@ export const subscriptionRouter = router({
   /**
    * Get all available subscription plans
    */
-  getPlans: protectedProcedure.query(async () => {
+  getPlans: publicProcedure.query(async () => {
     return await getSubscriptionPlans();
   }),
 

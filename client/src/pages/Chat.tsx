@@ -145,7 +145,7 @@ export default function Chat() {
   // Load conversation messages from query
   useEffect(() => {
     if (conversationData?.messages && activeConversationId) {
-      setMessages(conversationData.messages.map((m) => ({
+      setMessages(conversationData.messages.map((m: any) => ({
         ...m,
         createdAt: new Date(m.createdAt),
       })));

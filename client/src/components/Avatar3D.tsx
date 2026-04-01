@@ -286,7 +286,7 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
     <div
       ref={containerRef}
       className="w-full h-full rounded-lg overflow-hidden"
-      style={{ minHeight: "400px" }}
+      style={{ minHeight: "100%" }}
     >
       {isLoading && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-10">

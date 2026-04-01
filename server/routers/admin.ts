@@ -27,7 +27,7 @@ export const adminRouter = router({
 
     try {
       const allUsers = await db.select().from(users).orderBy(desc(users.createdAt));
-      return allUsers.map((u) => ({
+      return allUsers.map((u: any) => ({
         ...u,
         stripeCustomerId: u.stripeCustomerId ? "***" : null,
         stripeSubscriptionId: u.stripeSubscriptionId ? "***" : null,
@@ -53,21 +53,21 @@ export const adminRouter = router({
       const allMessages = await db.select().from(messages);
 
       const totalUsers = allUsers.length;
-      const activeUsers = allUsers.filter((u) => {
+      const activeUsers = allUsers.filter((u: any) => {
         const lastSignedIn = new Date(u.lastSignedIn);
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         return lastSignedIn > thirtyDaysAgo;
       }).length;
 
-      const paidUsers = allUsers.filter((u) => u.subscriptionTier !== "free").length;
+      const paidUsers = allUsers.filter((u: any) => u.subscriptionTier !== "free").length;
       const totalConversations = allConversations.length;
       const totalMessages = allMessages.length;
 
       const usersByTier = {
-        free: allUsers.filter((u) => u.subscriptionTier === "free").length,
-        pro: allUsers.filter((u) => u.subscriptionTier === "pro").length,
-        enterprise: allUsers.filter((u) => u.subscriptionTier === "enterprise").length,
+        free: allUsers.filter((u: any) => u.subscriptionTier === "free").length,
+        pro: allUsers.filter((u: any) => u.subscriptionTier === "pro").length,
+        enterprise: allUsers.filter((u: any) => u.subscriptionTier === "enterprise").length,
       };
 
       return {
@@ -113,9 +113,9 @@ export const adminRouter = router({
       const allUsers = await db.select().from(users);
 
       const subscriptionTiers = {
-        free: allUsers.filter((u) => u.subscriptionTier === "free").length,
-        pro: allUsers.filter((u) => u.subscriptionTier === "pro").length,
-        enterprise: allUsers.filter((u) => u.subscriptionTier === "enterprise").length,
+        free: allUsers.filter((u: any) => u.subscriptionTier === "free").length,
+        pro: allUsers.filter((u: any) => u.subscriptionTier === "pro").length,
+        enterprise: allUsers.filter((u: any) => u.subscriptionTier === "enterprise").length,
       };
 
       // Placeholder pricing - would be fetched from Stripe in production

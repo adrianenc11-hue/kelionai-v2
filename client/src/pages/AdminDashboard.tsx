@@ -155,7 +155,7 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-purple-500/20">
-                  {users?.slice(0, 10).map((u) => (
+                  {users?.slice(0, 10).map((u: any) => (
                     <tr key={u.id} className="hover:bg-purple-900/20 transition-colors">
                       <td className="px-6 py-4 text-sm font-medium">{u.name || "Unknown"}</td>
                       <td className="px-6 py-4 text-sm text-gray-300">{u.email || "—"}</td>
