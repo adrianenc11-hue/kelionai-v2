@@ -5,9 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { useTranslation } from 'react-i18next';
 
 export default function Login() {
   const [, navigate] = useLocation();
+  const { t } = useTranslation();
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
@@ -33,18 +35,18 @@ export default function Login() {
       const data = await res.json();
 
       if (!res.ok) {
-        toast.error(data.error || "Something went wrong");
+        toast.error(data.error || t('common.error'));
         return;
       }
 
-      toast.success(isLogin ? "Welcome back!" : "Account created!");
+      toast.success(isLogin ? t('auth.welcomeBack') + "!" : t('auth.createAccount') + "!");
 
       // Redirect to chat
       navigate("/chat");
       // Force reload to update auth state
       window.location.href = "/chat";
     } catch (err) {
-      toast.error("Network error. Please try again.");
+      toast.error(t('common.error'));
     } finally {
       setLoading(false);
     }
@@ -55,12 +57,12 @@ export default function Login() {
       <Card className="w-full max-w-md bg-gray-800/80 border-gray-700 backdrop-blur-sm">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold text-white">
-            {isLogin ? "Welcome Back" : "Create Account"}
+            {isLogin ? t('auth.welcomeBack') : t('auth.createAccount')}
           </CardTitle>
           <CardDescription className="text-gray-400">
             {isLogin
-              ? "Sign in to your KelionAI account"
-              : "Join KelionAI - Your AI Assistant"}
+              ? t('auth.signInSubtitle')
+              : t('auth.createAccountSubtitle')}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -68,12 +70,12 @@ export default function Login() {
             {!isLogin && (
               <div className="space-y-2">
                 <Label htmlFor="name" className="text-gray-300">
-                  Name
+                  {t('auth.name')}
                 </Label>
                 <Input
                   id="name"
                   type="text"
-                  placeholder="Your name"
+                  placeholder={t('auth.name')}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="bg-gray-700/50 border-gray-600 text-white placeholder:text-gray-500"
@@ -83,7 +85,7 @@ export default function Login() {
 
             <div className="space-y-2">
               <Label htmlFor="email" className="text-gray-300">
-                Email
+                {t('auth.email')}
               </Label>
               <Input
                 id="email"
@@ -98,7 +100,7 @@ export default function Login() {
 
             <div className="space-y-2">
               <Label htmlFor="password" className="text-gray-300">
-                Password
+                {t('auth.password')}
               </Label>
               <Input
                 id="password"
@@ -118,10 +120,10 @@ export default function Login() {
               className="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-semibold"
             >
               {loading
-                ? "Please wait..."
+                ? t('common.loading')
                 : isLogin
-                ? "Sign In"
-                : "Create Account"}
+                ? t('auth.signIn')
+                : t('auth.register')}
             </Button>
           </form>
 
@@ -132,8 +134,8 @@ export default function Login() {
               className="text-cyan-400 hover:text-cyan-300 text-sm"
             >
               {isLogin
-                ? "Don't have an account? Sign up"
-                : "Already have an account? Sign in"}
+                ? t('auth.noAccount')
+                : t('auth.hasAccount')}
             </button>
           </div>
 
@@ -143,7 +145,7 @@ export default function Login() {
               onClick={() => navigate("/")}
               className="text-gray-500 hover:text-gray-400 text-sm"
             >
-              ← Back to home
+              ← {t('auth.backToHome')}
             </button>
           </div>
         </CardContent>

@@ -7,6 +7,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { handleStripeWebhook } from "./stripe-webhook";
+import streamingRouter from "../streaming";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -214,6 +215,32 @@ async function startServer() {
     }
   });
 
+  // Profile avatar update endpoint
+  app.post("/api/profile/avatar", async (req, res) => {
+    try {
+      const { updateUserProfilePicture } = await import("../db");
+      const { jwtVerify } = await import("jose");
+      const cookieName = "app_session_id";
+      const cookies = req.headers.cookie?.split(";").reduce((acc: any, c: string) => {
+        const [k, v] = c.trim().split("=");
+        acc[k] = v;
+        return acc;
+      }, {} as Record<string, string>) || {};
+      const token = cookies[cookieName];
+      if (!token) { res.status(401).json({ error: "Not authenticated" }); return; }
+      const secret = new TextEncoder().encode(process.env.JWT_SECRET || "dev-secret");
+      const { payload } = await jwtVerify(token, secret);
+      const userId = (payload as any).userId || (payload as any).id;
+      if (!userId) { res.status(401).json({ error: "Invalid token" }); return; }
+      const { avatarUrl } = req.body;
+      if (!avatarUrl) { res.status(400).json({ error: "avatarUrl required" }); return; }
+      await updateUserProfilePicture(userId, avatarUrl);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // tRPC API
   app.use(
     "/api/trpc",
@@ -224,6 +251,7 @@ async function startServer() {
   );
   // Serve uploaded files (local storage fallback for standalone)
   app.use('/uploads', express.static('uploads'));
+  app.use(streamingRouter);
 
   // development mode uses Vite, production mode uses static files
   if (process.env.NODE_ENV === "development") {

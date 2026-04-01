@@ -11,6 +11,9 @@ import {
   getTrialStatus,
   incrementDailyUsage,
   deleteConversationMessages,
+  updateMessage,
+  deleteMessage,
+  getMessageById,
 } from "../db";
 import { processBrainMessage, processVoiceCloningStep, BrainMessage } from "../brain-v4";
 import { CharacterName } from "../characters";
@@ -154,6 +157,34 @@ export const chatRouter = router({
         throw new Error("Conversation not found or access denied");
       }
       await deleteConversationMessages(input.conversationId);
+      return { success: true };
+    }),
+
+  editMessage: protectedProcedure
+    .input(z.object({ messageId: z.number(), content: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      const msg = await getMessageById(input.messageId);
+      if (!msg) throw new Error("Message not found");
+      const conversation = await getConversationById(msg.conversationId);
+      if (!conversation || conversation.userId !== ctx.user.id) {
+        throw new Error("Access denied");
+      }
+      if (msg.role !== "user") throw new Error("Can only edit your own messages");
+      await updateMessage(input.messageId, input.content);
+      return { success: true };
+    }),
+
+  deleteMessage: protectedProcedure
+    .input(z.object({ messageId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const msg = await getMessageById(input.messageId);
+      if (!msg) throw new Error("Message not found");
+      const conversation = await getConversationById(msg.conversationId);
+      if (!conversation || conversation.userId !== ctx.user.id) {
+        throw new Error("Access denied");
+      }
+      if (msg.role !== "user") throw new Error("Can only delete your own messages");
+      await deleteMessage(input.messageId);
       return { success: true };
     }),
 });

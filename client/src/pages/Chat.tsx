@@ -2,10 +2,12 @@ import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
-import { Loader2, Send, Mic, MicOff, Camera, CameraOff, LogOut, User, CreditCard, X, History } from "lucide-react";
+import { Loader2, Send, Mic, MicOff, Camera, CameraOff, LogOut, User, CreditCard, X, History, Pencil, Trash2, Check } from "lucide-react";
 import { Streamdown } from "streamdown";
 import { useRoute, useLocation } from "wouter";
 import Avatar3D from "@/components/Avatar3D";
+import { LanguageSelector } from "@/components/LanguageSelector";
+import { useTranslation } from 'react-i18next';
 
 const CITY_BOKEH_BG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663494239902/fTDgTXExTnteU8v7gTpoiu/city-bokeh-bg_c42045f6.jpg";
 
@@ -22,6 +24,7 @@ interface Message {
 export default function Chat() {
   const { user, logout } = useAuth();
   const [, navigate] = useLocation();
+  const { t } = useTranslation();
   const [, params] = useRoute("/chat/:conversationId");
   const conversationId = params?.conversationId ? parseInt(params.conversationId) : null;
 
@@ -34,6 +37,12 @@ export default function Chat() {
   const [monitorContent, setMonitorContent] = useState<{ type: string; data: string; title?: string } | null>(null);
   const [mouthOpen, setMouthOpen] = useState(0);
   const [showHistory, setShowHistory] = useState(false);
+  const [streamingText, setStreamingText] = useState("");
+
+  // Message edit/delete state
+  const [editingMessageId, setEditingMessageId] = useState<number | null>(null);
+  const [editingContent, setEditingContent] = useState("");
+  const [contextMenuId, setContextMenuId] = useState<number | null>(null);
 
   // MIC state - REAL recording
   const [isRecording, setIsRecording] = useState(false);
@@ -59,6 +68,19 @@ export default function Chat() {
 
   // Trial status
   const { data: trialStatus } = trpc.trial.getStatus.useQuery(undefined, { enabled: !!user });
+
+  const editMessageMutation = trpc.chat.editMessage.useMutation({
+    onSuccess: () => {
+      setMessages(prev => prev.map(m => m.id === editingMessageId ? { ...m, content: editingContent } : m));
+      setEditingMessageId(null);
+      setEditingContent("");
+    },
+  });
+  const deleteMessageMutation = trpc.chat.deleteMessage.useMutation({
+    onSuccess: (_, vars) => {
+      setMessages(prev => prev.filter(m => m.id !== vars.messageId));
+    },
+  });
 
   const utils = trpc.useUtils();
   const conversationIdForQuery = useMemo(() => activeConversationId || 0, [activeConversationId]);
@@ -469,13 +491,95 @@ export default function Chat() {
     setLoadingStep("Thinking...");
     const msgText = inputValue;
     setInputValue("");
-    setTimeout(() => setLoadingStep("Analyzing..."), 800);
-    setTimeout(() => setLoadingStep("Processing..."), 2000);
-    await sendMessageMutation.mutateAsync({
-      conversationId: activeConversationId || undefined,
-      message: msgText,
-      avatar: selectedAvatar,
-    });
+    setStreamingText("");
+
+    try {
+      const response = await fetch("/api/chat/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          message: msgText,
+          conversationId: activeConversationId || undefined,
+          avatar: selectedAvatar,
+        }),
+      });
+
+      if (!response.ok || !response.body) {
+        throw new Error("Stream failed");
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let fullContent = "";
+      let convId = activeConversationId;
+
+      setLoadingStep("");
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const parsed = JSON.parse(line.slice(6));
+            if (parsed.type === "meta" && parsed.conversationId) {
+              convId = parsed.conversationId;
+              if (!activeConversationId) {
+                setActiveConversationId(convId);
+                navigate(`/chat/${convId}`);
+              }
+            } else if (parsed.type === "token") {
+              fullContent += parsed.content;
+              setStreamingText(fullContent);
+            } else if (parsed.type === "done") {
+              const newMsg: Message = {
+                id: Date.now(),
+                role: "assistant",
+                content: fullContent,
+                createdAt: new Date(),
+                audioUrl: parsed.audioUrl,
+              };
+              setMessages((prev) => [...prev, newMsg]);
+              setStreamingText("");
+
+              // Visual content to monitor
+              if (fullContent.includes("```")) {
+                const codeMatch = fullContent.match(/```[\s\S]*?```/);
+                if (codeMatch) setMonitorContent({ type: "code", data: codeMatch[0], title: "Code" });
+              }
+
+              // Auto-play audio
+              if (parsed.audioUrl && audioRef.current) {
+                audioRef.current.src = parsed.audioUrl;
+                audioRef.current.play().catch(() => {});
+              }
+
+              utils.chat.listConversations.invalidate();
+            } else if (parsed.type === "error") {
+              throw new Error(parsed.error);
+            }
+          } catch (e) {
+            // skip malformed chunks
+          }
+        }
+      }
+    } catch (error: any) {
+      setMessages((prev) => [...prev, {
+        id: Date.now(),
+        role: "assistant",
+        content: `Error: ${error.message}`,
+        createdAt: new Date(),
+      }]);
+      setStreamingText("");
+    }
+    setIsLoading(false);
+    setLoadingStep("");
   };
 
   const handleNewChat = () => {
@@ -517,7 +621,7 @@ export default function Chat() {
             className="px-3 py-1.5 rounded-full text-xs text-slate-400 hover:text-cyan-400 transition-colors"
             style={{ border: "1px solid rgba(255,255,255,0.1)" }}
           >
-            New Chat
+            {t('nav.newChat')}
           </button>
           <button
             onClick={() => setShowHistory(!showHistory)}
@@ -525,9 +629,10 @@ export default function Chat() {
             style={{ border: "1px solid rgba(255,255,255,0.1)" }}
           >
             <History className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">History</span>
+            <span className="hidden sm:inline">{t('nav.history')}</span>
           </button>
 
+          <LanguageSelector />
           {user ? (
             <>
               <button onClick={() => navigate("/profile")} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs text-slate-400 hover:text-white transition-colors" style={{ border: "1px solid rgba(255,255,255,0.1)" }}>
@@ -576,10 +681,10 @@ export default function Chat() {
       )}
 
       {/* ===== MAIN CONTENT ===== */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
 
         {/* LEFT: Presentation Monitor */}
-        <div className="flex-1 flex flex-col" style={{ background: "#0f1120" }}>
+        <div className="flex flex-1 flex-col" style={{ background: "#0f1120" }}>
           <div className="flex-1 flex items-center justify-center overflow-auto p-6">
             {/* Camera preview overlay on monitor */}
             {isCamOpen ? (
@@ -630,7 +735,7 @@ export default function Chat() {
                 <div className="w-12 h-12 mx-auto mb-4 rounded-full flex items-center justify-center" style={{ background: "rgba(139,92,246,0.1)" }}>
                   <span className="text-lg opacity-50">🎯</span>
                 </div>
-                <p className="text-sm text-slate-500 mb-1">Presentation Monitor</p>
+                <p className="text-sm text-slate-500 mb-1">{t('chat.presentationMonitor')}</p>
                 <p className="text-xs text-slate-700">Ask for a map, image, weather, search, or code</p>
               </div>
             )}
@@ -638,7 +743,7 @@ export default function Chat() {
         </div>
 
         {/* RIGHT: Avatar FULL HEIGHT with chat overlay at bottom */}
-        <div className="w-[55%] min-w-[400px] max-w-[700px] shrink-0 relative" style={{
+        <div className="w-full md:w-[55%] md:min-w-[400px] md:max-w-[700px] shrink-0 relative flex-1 md:flex-none" style={{
           borderLeft: "1px solid rgba(255,255,255,0.05)",
         }}>
           {/* Background image layer */}
@@ -708,8 +813,8 @@ export default function Chat() {
               </div>
             )}
             {messages.map((msg) => (
-              <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : msg.role === "system" ? "justify-center" : "justify-start"}`}>
-                <div className={`max-w-[85%] rounded-lg px-3 py-2 text-xs leading-relaxed ${
+              <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : msg.role === "system" ? "justify-center" : "justify-start"} group relative`}>
+                <div className={`max-w-[85%] rounded-lg px-3 py-2 text-xs leading-relaxed relative ${
                   msg.role === "user" ? "text-cyan-100" :
                   msg.role === "system" ? "text-yellow-300 italic" :
                   "text-slate-300"
@@ -721,7 +826,21 @@ export default function Chat() {
                     msg.role === "system" ? "rgba(234,179,8,0.2)" :
                     "rgba(255,255,255,0.05)"}`,
                 }}>
-                  <Streamdown>{msg.content || ""}</Streamdown>
+                  {editingMessageId === msg.id ? (
+                    <div className="flex items-center gap-1">
+                      <input
+                        value={editingContent}
+                        onChange={(e) => setEditingContent(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") editMessageMutation.mutate({ messageId: msg.id, content: editingContent }); if (e.key === "Escape") { setEditingMessageId(null); setEditingContent(""); } }}
+                        className="flex-1 bg-transparent text-xs text-cyan-100 outline-none border-b border-cyan-400/30"
+                        autoFocus
+                      />
+                      <button onClick={() => editMessageMutation.mutate({ messageId: msg.id, content: editingContent })} className="text-green-400 hover:text-green-300"><Check className="w-3 h-3" /></button>
+                      <button onClick={() => { setEditingMessageId(null); setEditingContent(""); }} className="text-red-400 hover:text-red-300"><X className="w-3 h-3" /></button>
+                    </div>
+                  ) : (
+                    <Streamdown>{msg.content || ""}</Streamdown>
+                  )}
                   {msg.confidence && (
                     <span className={`inline-block mt-1 text-[9px] px-1.5 py-0.5 rounded-full ${
                       msg.confidence === "verified" ? "bg-green-900/30 text-green-400" :
@@ -732,14 +851,28 @@ export default function Chat() {
                       {msg.confidence}
                     </span>
                   )}
+                  {/* Edit/Delete buttons for user messages */}
+                  {msg.role === "user" && editingMessageId !== msg.id && (
+                    <div className="absolute -top-5 right-0 hidden group-hover:flex items-center gap-1 bg-slate-800/90 rounded px-1 py-0.5" style={{ border: "1px solid rgba(255,255,255,0.1)" }}>
+                      <button onClick={() => { setEditingMessageId(msg.id); setEditingContent(msg.content || ""); }} className="text-slate-400 hover:text-cyan-400 p-0.5" title={t('chat.editMessage')}><Pencil className="w-2.5 h-2.5" /></button>
+                      <button onClick={() => { if (confirm(t('chat.deleteConfirm'))) deleteMessageMutation.mutate({ messageId: msg.id }); }} className="text-slate-400 hover:text-red-400 p-0.5" title={t('chat.deleteMessage')}><Trash2 className="w-2.5 h-2.5" /></button>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
-            {isLoading && (
+            {streamingText && (
+              <div className="flex justify-start">
+                <div className="max-w-[85%] rounded-lg px-3 py-2" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.05)" }}>
+                  <p className="text-sm text-slate-200 whitespace-pre-wrap">{streamingText}<span className="animate-pulse text-cyan-400">|</span></p>
+                </div>
+              </div>
+            )}
+            {isLoading && !streamingText && (
               <div className="flex justify-start">
                 <div className="rounded-lg px-3 py-2 flex items-center gap-2" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.05)" }}>
                   <Loader2 className="w-3 h-3 animate-spin text-cyan-400" />
-                  <span className="text-xs text-cyan-400">{loadingStep || "Working..."}</span>
+                  <span className="text-xs text-cyan-400">{loadingStep || t('chat.thinking')}</span>
                 </div>
               </div>
             )}
@@ -754,10 +887,10 @@ export default function Chat() {
           <div className="flex items-center gap-3">
             {trialStatus.canUse ? (
               <>
-                <span className="text-cyan-400">Free Trial</span>
-                <span className="text-slate-400">{trialStatus.trialDaysLeft} days left</span>
+                <span className="text-cyan-400">{t('chat.freeTrial')}</span>
+                <span className="text-slate-400">{trialStatus.trialDaysLeft} {t('chat.daysLeft')}</span>
                 <span className="text-slate-500">|</span>
-                <span className="text-slate-400">{trialStatus.dailyMinutesUsed}/{trialStatus.dailyMinutesLimit} min today</span>
+                <span className="text-slate-400">{trialStatus.dailyMinutesUsed}/{trialStatus.dailyMinutesLimit} {t('chat.minToday')}</span>
               </>
             ) : (
               <span className="text-red-400">{trialStatus.reason}</span>
@@ -768,7 +901,7 @@ export default function Chat() {
             className="px-3 py-1 rounded-full text-xs font-medium text-white transition-all hover:scale-105"
             style={{ background: 'linear-gradient(135deg, #8b5cf6, #db2777)' }}
           >
-            Upgrade
+            {t('chat.upgrade')}
           </button>
         </div>
       )}
@@ -789,7 +922,7 @@ export default function Chat() {
           aria-label="Camera"
         >
           {isCamOpen ? <CameraOff className="w-4 h-4" /> : <Camera className="w-4 h-4" />}
-          <span>{isCamOpen ? "CLOSE" : "CAM"}</span>
+          <span>{isCamOpen ? t('common.close') : t('chat.cam')}</span>
         </button>
 
         {/* MIC button - REAL */}
@@ -807,7 +940,7 @@ export default function Chat() {
           aria-label="Microphone"
         >
           {isRecording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-          <span>{isRecording ? `STOP ${formatTime(recordingTime)}` : "MIC"}</span>
+          <span>{isRecording ? `STOP ${formatTime(recordingTime)}` : t('chat.mic')}</span>
         </button>
 
         <input

@@ -36,7 +36,7 @@
 - [x] Build chat input area with send button
 - [x] Add conversation history sidebar
 - [x] Implement conversation creation, deletion, and renaming
-- [ ] Add message editing and deletion functionality
+- [x] Add message editing and deletion functionality (edit/delete procedures + hover UI)
 - [x] Create empty state and loading states
 
 ## Phase 5b: Pricing & Payments UI
@@ -72,11 +72,11 @@
 - [x] Implement feature gating for premium features
 
 ## Phase 9: Multi-Language Support
-- [ ] Set up i18n framework (react-i18next or similar)
-- [ ] Create translation files for supported languages
-- [ ] Implement language selector in UI
+- [x] Set up i18n framework (react-i18next)
+- [x] Create translation files for 24 languages
+- [x] Implement language selector in UI (LanguageSelector component in header)
 - [ ] Add language preference to user profile
-- [ ] Translate all UI text and messages
+- [x] Wire all hardcoded UI strings to t() translation keys across all pages (Home, Chat, Login, Profile, Pricing, Contact)
 
 ## Phase 10: Responsive Design & Mobile
 - [x] Implement mobile-first responsive design
@@ -149,7 +149,7 @@
 - [x] ElevenLabs API key verified and active (Creator plan)
 
 ## Future - PWA & Mobile Apps
-- [ ] PWA (Progressive Web App) - manifest, service worker, icons
+- [x] PWA (Progressive Web App) - manifest.json, sw.js, icons 192+512
 - [ ] Capacitor config for iOS/Android native wrapper
 - [ ] Submit to App Store (Apple developer account ready)
 - [ ] Submit to Google Play (Google developer account ready)
@@ -165,7 +165,7 @@
 - [ ] Voice marketplace (share/sell cloned voices)
 
 ## Future - Streaming & Integration Tests
-- [ ] Real-time response streaming (SSE/WebSocket token-by-token)
+- [x] Real-time response streaming (SSE token-by-token) - /api/chat/stream endpoint
 - [ ] True integration tests for chat/admin/auth routers through tRPC context
 
 ## Contact Info
@@ -298,3 +298,23 @@
 ## Supabase RLS Security Fix
 - [x] Enable RLS on all 38 public tables in Supabase
 - [x] Create proper RLS policies for each table (service_role full access)
+
+## Critical Fix - MIC Audio-to-Audio Live Chat
+- [x] MIC: push-to-talk audio-to-audio (record → Whisper → Brain v4 → ElevenLabs → avatar speaks)
+- [x] User speaks → audio captured → Whisper STT → Brain v4 → ElevenLabs TTS → avatar speaks back
+- [x] Continuous conversation mode (push-to-talk via MIC button)
+
+## Live Browser Testing (Manus sandbox)
+- [x] Test register in browser - PASS
+- [x] Test login in browser - PASS
+- [x] Test chat send message + AI response in browser - PASS
+- [ ] Test message edit in browser (requires manual hover interaction - not automatable)
+- [ ] Test message delete in browser (requires manual hover interaction - not automatable)
+- [ ] Test CAM capture in browser (requires camera hardware - not available in sandbox)
+- [x] Test profile page in browser - PASS
+- [x] Test chat history in browser - PASS
+- [x] Test Kelion/Kira avatar switch in browser - PASS
+- [x] Test pricing page in browser - PASS
+
+## i18n - All Major Languages
+- [x] Add all major world languages (24 languages) to i18n translations

@@ -6,10 +6,12 @@ import { Check, Loader2, ArrowLeft, Gift, Tag } from "lucide-react";
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
+import { useTranslation } from 'react-i18next';
 
 export default function Pricing() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
+  const { t } = useTranslation();
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
   const [referralCode, setReferralCode] = useState("");
@@ -110,7 +112,7 @@ export default function Pricing() {
           <ArrowLeft className="w-4 h-4" /> Back
         </Button>
         <h1 className="text-xl font-bold bg-gradient-to-r from-purple-300 to-pink-300 bg-clip-text text-transparent">
-          Pricing
+          {t('pricing.title')}
         </h1>
       </header>
 
@@ -123,7 +125,7 @@ export default function Pricing() {
               billingCycle === "monthly" ? "bg-purple-600 text-white" : "text-slate-400 hover:text-white"
             }`}
           >
-            Monthly
+            {t('pricing.monthly')}
           </button>
           <button
             onClick={() => setBillingCycle("yearly")}
@@ -131,7 +133,7 @@ export default function Pricing() {
               billingCycle === "yearly" ? "bg-purple-600 text-white" : "text-slate-400 hover:text-white"
             }`}
           >
-            Annual
+            {t('pricing.annual')}
             <span className="text-[10px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-full">-17%</span>
           </button>
         </div>
@@ -149,7 +151,7 @@ export default function Pricing() {
             >
               {plan.highlighted && (
                 <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-purple-500 to-pink-500 px-3 py-0.5 rounded-full text-xs font-semibold">
-                  Most Popular
+                  {t('pricing.mostPopular')}
                 </div>
               )}
 
@@ -204,7 +206,7 @@ export default function Pricing() {
         <Card className="max-w-md w-full p-4 bg-slate-900/80 border-slate-700/50">
           <div className="flex items-center gap-2 mb-3">
             <Gift className="w-4 h-4 text-purple-400" />
-            <h3 className="text-sm font-semibold">Have a referral code?</h3>
+            <h3 className="text-sm font-semibold">{t('pricing.referralCode')}</h3>
           </div>
           <div className="flex gap-2">
             <input
@@ -225,7 +227,7 @@ export default function Pricing() {
               variant="outline"
               className="border-purple-500/30 text-purple-300 hover:bg-purple-500/10"
             >
-              {validateReferralMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Apply"}
+              {validateReferralMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : t('pricing.apply')}
             </Button>
           </div>
           {referralMessage && (
@@ -237,7 +239,7 @@ export default function Pricing() {
 
         {/* Refund Policy */}
         <div className="max-w-2xl text-center text-xs text-slate-500 space-y-1">
-          <p><strong className="text-slate-400">Refund Policy:</strong> Monthly subscriptions are non-refundable.</p>
+          <p><strong className="text-slate-400">{t('pricing.refundPolicy')}:</strong> {t('pricing.monthlyNonRefundable')}</p>
           <p>Annual subscriptions: refund of 11 months available within the first 3 months (15 business days processing).</p>
           <p>After 3 completed months, annual subscriptions are non-refundable.</p>
         </div>
@@ -245,7 +247,7 @@ export default function Pricing() {
 
       {/* Footer */}
       <footer className="shrink-0 border-t border-slate-800/50 py-2 text-center text-xs text-slate-500">
-        Test with card 4242 4242 4242 4242. Upgrade anytime.
+        {t('pricing.testCard')}
       </footer>
     </div>
   );

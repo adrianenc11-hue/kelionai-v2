@@ -7,9 +7,11 @@ import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { toast } from "sonner";
+import { useTranslation } from 'react-i18next';
 
 export default function Contact() {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [, setLocation] = useLocation();
   const [name, setName] = useState(user?.name || "");
   const [email, setEmail] = useState(user?.email || "");
@@ -24,7 +26,7 @@ export default function Contact() {
       if (data.aiResponse) {
         setAiResponse(data.aiResponse);
       }
-      toast.success("Message sent successfully!");
+      toast.success(t('contact.success'));
     },
     onError: (error: { message: string }) => {
       toast.error(`Failed to send: ${error.message}`);
@@ -48,7 +50,7 @@ export default function Contact() {
           <ArrowLeft className="w-4 h-4" /> Back
         </Button>
         <div>
-          <h1 className="text-xl font-bold">Contact Us</h1>
+          <h1 className="text-xl font-bold">{t('contact.title')}</h1>
           <p className="text-slate-500 text-xs">We'd love to hear from you</p>
         </div>
       </header>
@@ -61,11 +63,11 @@ export default function Contact() {
               <form onSubmit={handleSubmit} className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1" htmlFor="contact-name">Name</label>
+                    <label className="block text-xs font-medium text-slate-400 mb-1" htmlFor="contact-name">{t('contact.name')}</label>
                     <Input id="contact-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" className="bg-slate-800/60 border-slate-700 h-9 text-sm" required />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1" htmlFor="contact-email">Email</label>
+                    <label className="block text-xs font-medium text-slate-400 mb-1" htmlFor="contact-email">{t('contact.email')}</label>
                     <Input id="contact-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="your@email.com" className="bg-slate-800/60 border-slate-700 h-9 text-sm" required />
                   </div>
                 </div>
@@ -76,7 +78,7 @@ export default function Contact() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1" htmlFor="contact-message">Message</label>
+                  <label className="block text-xs font-medium text-slate-400 mb-1" htmlFor="contact-message">{t('contact.message')}</label>
                   <textarea
                     id="contact-message"
                     value={message}
@@ -89,9 +91,9 @@ export default function Contact() {
 
                 <Button type="submit" disabled={sendContactMutation.isPending} className="w-full bg-blue-600 hover:bg-blue-700 gap-2" size="sm">
                   {sendContactMutation.isPending ? (
-                    <><Loader2 className="w-4 h-4 animate-spin" /> Sending...</>
+                    <><Loader2 className="w-4 h-4 animate-spin" /> {t('contact.sending')}</>
                   ) : (
-                    <><Send className="w-4 h-4" /> Send Message</>
+                    <><Send className="w-4 h-4" /> {t('contact.send')}</>
                   )}
                 </Button>
               </form>
