@@ -8,6 +8,9 @@ import App from "./App";
 import { getLoginUrl } from "./const";
 import "./index.css";
 import "./i18n";
+import { initSentry } from "@/lib/sentry";
+
+initSentry();
 
 const queryClient = new QueryClient();
 

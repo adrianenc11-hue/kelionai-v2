@@ -119,6 +119,30 @@
   }
   body {
     @apply bg-background text-foreground;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+  /* Mobile touch optimizations */
+  button, a, input, select, textarea {
+    touch-action: manipulation;
+    -webkit-touch-callout: none;
+  }
+  /* Prevent iOS zoom on input focus */
+  @media (max-width: 768px) {
+    input, select, textarea {
+      font-size: 16px !important;
+    }
+  }
+  /* Prevent overscroll bounce on mobile */
+  html, body {
+    overscroll-behavior: none;
+  }
+  /* Safe area insets for notched devices */
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
   }
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]),

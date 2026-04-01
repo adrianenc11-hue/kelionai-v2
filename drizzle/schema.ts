@@ -233,3 +233,67 @@ export const dailyUsageRelations = relations(dailyUsage, ({ one }) => ({
     references: [users.id],
   }),
 }));
+
+// User-to-user chat enums
+export const chatRoomTypeEnum = pgEnum("chat_room_type", ["direct", "group"]);
+
+// User-to-user chat rooms
+export const userChatRooms = pgTable("user_chat_rooms", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(),
+  type: chatRoomTypeEnum("type").default("direct").notNull(),
+  createdBy: integer("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Chat room participants
+export const userChatParticipants = pgTable("user_chat_participants", {
+  id: serial("id").primaryKey(),
+  roomId: integer("room_id").notNull(),
+  userId: integer("user_id").notNull(),
+  joinedAt: timestamp("joined_at").defaultNow().notNull(),
+});
+
+// User-to-user chat messages
+export const userChatMessages = pgTable("user_chat_messages", {
+  id: serial("id").primaryKey(),
+  roomId: integer("room_id").notNull(),
+  senderId: integer("sender_id").notNull(),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Voice library - save multiple cloned voices per user
+export const voiceLibrary = pgTable("voice_library", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  name: varchar("name", { length: 100 }).notNull(),
+  voiceId: varchar("voice_id", { length: 255 }).notNull(),
+  provider: varchar("provider", { length: 50 }).default("elevenlabs").notNull(),
+  sampleUrl: text("sample_url"),
+  isDefault: boolean("is_default").default(false),
+  isPublic: boolean("is_public").default(false),
+  quality: varchar("quality", { length: 20 }).default("standard"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Relations for user chat
+export const userChatRoomsRelations = relations(userChatRooms, ({ many }) => ({
+  participants: many(userChatParticipants),
+  messages: many(userChatMessages),
+}));
+
+export const userChatParticipantsRelations = relations(userChatParticipants, ({ one }) => ({
+  room: one(userChatRooms, { fields: [userChatParticipants.roomId], references: [userChatRooms.id] }),
+  user: one(users, { fields: [userChatParticipants.userId], references: [users.id] }),
+}));
+
+export const userChatMessagesRelations = relations(userChatMessages, ({ one }) => ({
+  room: one(userChatRooms, { fields: [userChatMessages.roomId], references: [userChatRooms.id] }),
+  sender: one(users, { fields: [userChatMessages.senderId], references: [users.id] }),
+}));
+
+export const voiceLibraryRelations = relations(voiceLibrary, ({ one }) => ({
+  user: one(users, { fields: [voiceLibrary.userId], references: [users.id] }),
+}));

@@ -9,6 +9,8 @@ import { voiceRouter } from "./routers/voice";
 import { contactRouter } from "./routers/contact";
 import { referralRouter } from "./routers/referral";
 import { refundRouter } from "./routers/refund";
+import { userChatRouter } from "./routers/userChat";
+import { voiceLibraryRouter } from "./routers/voiceLibrary";
 import { getTrialStatus, updateUserLanguage } from "./db";
 import { z } from "zod";
 
@@ -33,6 +35,8 @@ export const appRouter = router({
   contact: contactRouter,
   referral: referralRouter,
   refund: refundRouter,
+  userChat: userChatRouter,
+  voiceLibrary: voiceLibraryRouter,
 
   trial: router({
     getStatus: protectedProcedure.query(async ({ ctx }) => {
