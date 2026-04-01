@@ -344,4 +344,5 @@
 - [x] All 115 tests passing (8 test files)
 
 ## Bugs Found During Full User Flow Test
-- [ ] /register returns 404 on kelionai.app (Railway) - route not working in production
+- [x] /register returns 404 on kelionai.app (Railway) - fixed, route added to App.tsx
+- [x] Replace manual language button with automatic browser language detection (navigator.language)

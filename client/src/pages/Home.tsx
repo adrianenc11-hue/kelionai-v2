@@ -5,7 +5,7 @@ import { Loader2, ArrowRight } from "lucide-react";
 import { getLoginUrl } from "@/const";
 import { useLocation } from "wouter";
 import Avatar3D from "@/components/Avatar3D";
-import { LanguageSelector } from "@/components/LanguageSelector";
+
 import { useTranslation } from 'react-i18next';
 
 export default function Home() {
@@ -54,7 +54,7 @@ export default function Home() {
             <Button onClick={() => setLocation("/pricing")} variant="ghost" size="sm" className="text-slate-400 hover:text-white">
               {t('nav.pricing')}
             </Button>
-            <LanguageSelector />
+
             <Button onClick={() => { const url = getLoginUrl(); if (url && url !== '#') window.location.href = url; }} className="bg-blue-600 hover:bg-blue-700">
               {t('nav.signIn')}
             </Button>

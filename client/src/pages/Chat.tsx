@@ -6,7 +6,7 @@ import { Loader2, Send, Mic, MicOff, Camera, CameraOff, LogOut, User, CreditCard
 import { Streamdown } from "streamdown";
 import { useRoute, useLocation } from "wouter";
 import Avatar3D from "@/components/Avatar3D";
-import { LanguageSelector } from "@/components/LanguageSelector";
+
 import { useTranslation } from 'react-i18next';
 
 const CITY_BOKEH_BG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663494239902/fTDgTXExTnteU8v7gTpoiu/city-bokeh-bg_c42045f6.jpg";
@@ -632,7 +632,7 @@ export default function Chat() {
             <span className="hidden sm:inline">{t('nav.history')}</span>
           </button>
 
-          <LanguageSelector />
+
           {user ? (
             <>
               <button onClick={() => navigate("/profile")} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs text-slate-400 hover:text-white transition-colors" style={{ border: "1px solid rgba(255,255,255,0.1)" }}>
