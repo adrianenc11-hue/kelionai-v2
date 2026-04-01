@@ -1,3 +1,4 @@
 node_modules/
 .manus-logs/
 static-assets/
+.github/
