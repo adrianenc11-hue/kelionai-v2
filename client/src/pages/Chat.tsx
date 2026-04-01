@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo, useCallback } from "react";
+﻿import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
@@ -246,189 +246,179 @@ export default function Chat() {
     };
   }, [camStream]);
 
-  // ========== REAL MIC FUNCTIONS ==========
-  const startRecording = useCallback(async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      // Find best supported MIME type
-      let mimeType = "";
-      for (const type of ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg", ""]) {
-        if (type === "" || MediaRecorder.isTypeSupported(type)) {
-          mimeType = type;
-          break;
-        }
-      }
-      const mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
-      audioChunksRef.current = [];
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) audioChunksRef.current.push(e.data);
-      };
-      mediaRecorder.onstop = async () => {
-        stream.getTracks().forEach((t) => t.stop());
-        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
-        if (audioBlob.size < 100) return; // too small, ignore
+    // ========== LIVE VOICE CHAT ==========
+  const [isLiveVoice, setIsLiveVoice] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const liveMediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const liveStreamRef = useRef<MediaStream | null>(null);
+  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const liveAudioChunksRef = useRef<Blob[]>([]);
+  const isLiveVoiceRef = useRef(false);
 
-        // Pipeline: transcribe → send to brain (direct base64, no S3 upload needed)
-        setIsLoading(true);
-        setLoadingStep(t('chat.thinking'));
-        try {
-          // Convert blob to base64
-          const reader = new FileReader();
-          const base64Promise = new Promise<string>((resolve) => {
-            reader.onloadend = () => {
-              const base64 = (reader.result as string).split(",")[1];
-              resolve(base64);
-            };
-          });
-          reader.readAsDataURL(audioBlob);
-          const audioBase64 = await base64Promise;
-
-          // Step 1: Transcribe directly with base64 audio (no S3 upload needed)
-          setLoadingStep(t('chat.thinking'));
-          const { text, language } = await transcribeAudioMutation.mutateAsync({
-            audioBase64,
-            mimeType: "audio/webm",
-          });
-
-          if (!text || text.trim().length === 0) {
-            setIsLoading(false);
-            setLoadingStep("");
-            setMessages((prev) => [...prev, {
-              id: Date.now(),
-              role: "system",
-              content: t('common.error'),
-              createdAt: new Date(),
-            }]);
-            return;
-          }
-
-          // Step 3: Show transcribed text as user message
-          const userMsg: Message = {
-            id: Date.now(),
-            role: "user",
-            content: `🎤 ${text}`,
-            createdAt: new Date(),
-          };
-          setMessages((prev) => [...prev, userMsg]);
-
-          // Step 4: Send to Brain via streaming (same as text chat)
-          setLoadingStep(t('chat.thinking'));
-          setStreamingText("");
-          const streamResponse = await fetch("/api/chat/stream", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({
-              message: text,
-              conversationId: activeConversationId || undefined,
-              avatar: selectedAvatar,
-            }),
-          });
-
-          if (!streamResponse.ok || !streamResponse.body) {
-            throw new Error("Stream failed");
-          }
-
-          const streamReader = streamResponse.body.getReader();
-          const streamDecoder = new TextDecoder();
-          let streamBuffer = "";
-          let voiceFullContent = "";
-          let voiceConvId = activeConversationId;
-
-          setLoadingStep("");
-
-          while (true) {
-            const { done: streamDone, value: streamValue } = await streamReader.read();
-            if (streamDone) break;
-            streamBuffer += streamDecoder.decode(streamValue, { stream: true });
-            const streamLines = streamBuffer.split("\n");
-            streamBuffer = streamLines.pop() || "";
-
-            for (const sLine of streamLines) {
-              if (!sLine.startsWith("data: ")) continue;
-              try {
-                const sParsed = JSON.parse(sLine.slice(6));
-                if (sParsed.type === "meta" && sParsed.conversationId) {
-                  voiceConvId = sParsed.conversationId;
-                  if (!activeConversationId) {
-                    setActiveConversationId(voiceConvId);
-                    navigate(`/chat/${voiceConvId}`);
-                  }
-                } else if (sParsed.type === "token") {
-                  voiceFullContent += sParsed.content;
-                  setStreamingText(voiceFullContent);
-                } else if (sParsed.type === "done") {
-                  const aiMsg: Message = {
-                    id: Date.now(),
-                    role: "assistant",
-                    content: voiceFullContent,
-                    createdAt: new Date(),
-                    audioUrl: sParsed.audioUrl,
-                  };
-                  setMessages((prev) => [...prev, aiMsg]);
-                  setStreamingText("");
-                  // Auto-play audio response
-                  if (sParsed.audioUrl && audioRef.current) {
-                    audioRef.current.src = sParsed.audioUrl;
-                    audioRef.current.play().catch(() => {});
-                  }
-                  utils.chat.listConversations.invalidate();
-                } else if (sParsed.type === "error") {
-                  throw new Error(sParsed.error);
-                }
-              } catch (parseErr: any) {
-                if (sLine.slice(6).trim() && sLine.slice(6).trim() !== '[DONE]') {
-                  console.warn('[Voice] SSE parse issue:', parseErr?.message);
-                }
-              }
-            }
-          }
-        } catch (err: any) {
-          setIsLoading(false);
-          setLoadingStep("");
-          setMessages((prev) => [...prev, {
-            id: Date.now(),
-            role: "assistant",
-            content: `Voice error: ${err.message}`,
-            createdAt: new Date(),
-          }]);
-        }
-      };
-
-      mediaRecorder.start(250); // collect chunks every 250ms
-      mediaRecorderRef.current = mediaRecorder;
-      setIsRecording(true);
-      setRecordingTime(0);
-
-      // Timer
-      recordingTimerRef.current = setInterval(() => {
-        setRecordingTime((prev) => prev + 1);
-      }, 1000);
-    } catch (err: any) {
-      alert(t('common.error'));
+  const stopLiveVoice = useCallback(() => {
+    isLiveVoiceRef.current = false;
+    setIsLiveVoice(false);
+    setIsListening(false);
+    setIsSpeaking(false);
+    if (liveMediaRecorderRef.current && liveMediaRecorderRef.current.state !== "inactive") {
+      liveMediaRecorderRef.current.stop();
     }
-  }, [activeConversationId, selectedAvatar, uploadAudioMutation, transcribeAudioMutation, sendMessageMutation]);
-
-  const stopRecording = useCallback(() => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-      mediaRecorderRef.current.stop();
+    if (liveStreamRef.current) {
+      liveStreamRef.current.getTracks().forEach(t => t.stop());
+      liveStreamRef.current = null;
     }
-    setIsRecording(false);
-    if (recordingTimerRef.current) {
-      clearInterval(recordingTimerRef.current);
-      recordingTimerRef.current = null;
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
     }
   }, []);
 
-  const handleMicClick = useCallback(() => {
-    if (isRecording) {
-      stopRecording();
-    } else {
-      startRecording();
-    }
-  }, [isRecording, startRecording, stopRecording]);
+  const processLiveAudio = useCallback(async (audioBlob: Blob) => {
+    if (!isLiveVoiceRef.current || audioBlob.size < 500) return;
+    setIsListening(false);
+    setIsLoading(true);
+    setLoadingStep("Transcribing...");
+    try {
+      const reader = new FileReader();
+      const base64 = await new Promise<string>((resolve) => {
+        reader.onloadend = () => resolve((reader.result as string).split(",")[1]);
+        reader.readAsDataURL(audioBlob);
+      });
 
-  // ========== REAL CAM FUNCTIONS ==========
+      const { text } = await transcribeAudioMutation.mutateAsync({
+        audioBase64: base64,
+        mimeType: "audio/webm",
+      });
+
+      if (!text || text.trim().length === 0) {
+        setIsLoading(false);
+        if (isLiveVoiceRef.current) startListening();
+        return;
+      }
+
+      setMessages(prev => [...prev, {
+        id: Date.now(), role: "user", content: `🎤 ${text}`, createdAt: new Date(),
+      }]);
+
+      setLoadingStep("Thinking...");
+      const response = await fetch("/api/chat/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          message: text,
+          conversationId: activeConversationId || undefined,
+          avatar: selectedAvatar,
+        }),
+      });
+
+      if (!response.ok || !response.body) throw new Error("Stream failed");
+
+      const streamReader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let fullContent = "";
+
+      setLoadingStep("");
+
+      while (true) {
+        const { done, value } = await streamReader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const parsed = JSON.parse(line.slice(6));
+            if (parsed.type === "meta" && parsed.conversationId && !activeConversationId) {
+              setActiveConversationId(parsed.conversationId);
+              navigate(`/chat/${parsed.conversationId}`);
+            } else if (parsed.type === "token") {
+              fullContent += parsed.content;
+              setStreamingText(fullContent);
+            } else if (parsed.type === "done") {
+              setMessages(prev => [...prev, {
+                id: Date.now(), role: "assistant", content: fullContent,
+                createdAt: new Date(), audioUrl: parsed.audioUrl,
+              }]);
+              setStreamingText("");
+              if (parsed.audioUrl && audioRef.current) {
+                setIsSpeaking(true);
+                audioRef.current.src = parsed.audioUrl;
+                audioRef.current.onended = () => {
+                  setIsSpeaking(false);
+                  if (isLiveVoiceRef.current) startListening();
+                };
+                audioRef.current.play().catch(() => {
+                  setIsSpeaking(false);
+                  if (isLiveVoiceRef.current) startListening();
+                });
+              } else {
+                if (isLiveVoiceRef.current) startListening();
+              }
+              utils.chat.listConversations.invalidate();
+            }
+          } catch {}
+        }
+      }
+    } catch (err: any) {
+      setMessages(prev => [...prev, {
+        id: Date.now(), role: "assistant", content: `Voice error: ${err.message}`, createdAt: new Date(),
+      }]);
+      if (isLiveVoiceRef.current) startListening();
+    }
+    setIsLoading(false);
+    setLoadingStep("");
+  }, [activeConversationId, selectedAvatar, transcribeAudioMutation, navigate, utils]);
+
+  const startListening = useCallback(async () => {
+    if (!isLiveVoiceRef.current) return;
+    try {
+      const stream = liveStreamRef.current || await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (!liveStreamRef.current) liveStreamRef.current = stream;
+
+      let mimeType = "";
+      for (const type of ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", ""]) {
+        if (type === "" || MediaRecorder.isTypeSupported(type)) { mimeType = type; break; }
+      }
+
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      liveAudioChunksRef.current = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) liveAudioChunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = () => {
+        const blob = new Blob(liveAudioChunksRef.current, { type: "audio/webm" });
+        processLiveAudio(blob);
+      };
+
+      recorder.start(250);
+      liveMediaRecorderRef.current = recorder;
+      setIsListening(true);
+
+      // Auto-stop after 8 seconds of recording
+      silenceTimerRef.current = setTimeout(() => {
+        if (recorder.state !== "inactive") recorder.stop();
+        setIsListening(false);
+      }, 8000);
+    } catch (err) {
+      stopLiveVoice();
+    }
+  }, [processLiveAudio, stopLiveVoice]);
+
+  const handleMicClick = useCallback(async () => {
+    if (isLiveVoice) {
+      stopLiveVoice();
+    } else {
+      isLiveVoiceRef.current = true;
+      setIsLiveVoice(true);
+      await startListening();
+    }
+  }, [isLiveVoice, startListening, stopLiveVoice]);// ========== REAL CAM FUNCTIONS ==========
   const openCamera = useCallback(async () => {
     try {
       let stream: MediaStream;
@@ -490,7 +480,7 @@ export default function Chat() {
     // Close camera after capture
     closeCamera();
 
-    // Pipeline: upload → send to brain with vision
+    // Pipeline: upload â†’ send to brain with vision
     setIsLoading(true);
     setLoadingStep(t('chat.thinking'));
     try {
@@ -504,7 +494,7 @@ export default function Chat() {
       const userMsg: Message = {
         id: Date.now(),
         role: "user",
-        content: `📷 [Camera capture sent for analysis]`,
+        content: `ðŸ“· [Camera capture sent for analysis]`,
         createdAt: new Date(),
       };
       setMessages((prev) => [...prev, userMsg]);
@@ -858,7 +848,7 @@ export default function Chat() {
             ) : (
               <div className="text-center">
                 <div className="w-12 h-12 mx-auto mb-4 rounded-full flex items-center justify-center" style={{ background: "rgba(139,92,246,0.1)" }}>
-                  <span className="text-lg opacity-50">🎯</span>
+                  <span className="text-lg opacity-50">ðŸŽ¯</span>
                 </div>
                 <p className="text-sm text-slate-500 mb-1">{t('chat.presentationMonitor')}</p>
                 <p className="text-xs text-slate-700">{t('chat.monitorHint')}</p>
@@ -1101,3 +1091,6 @@ export default function Chat() {
     </div>
   );
 }
+
+
+
