@@ -534,14 +534,6 @@ export default function Chat() {
                 <User className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">{user.name?.split(" ")[0]}</span>
               </button>
-              <button onClick={() => navigate("/subscription")} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs text-slate-400 hover:text-white transition-colors" style={{ border: "1px solid rgba(255,255,255,0.1)" }}>
-                <CreditCard className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Plan</span>
-              </button>
-              <button onClick={handleLogout} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs text-slate-400 hover:text-red-400 transition-colors" style={{ border: "1px solid rgba(255,255,255,0.1)" }}>
-                <LogOut className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Logout</span>
-              </button>
             </>
           ) : (
             <a href={getLoginUrl() || "#"} className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm text-white transition-colors" style={{ background: "#4f46e5" }}>
@@ -591,34 +583,35 @@ export default function Chat() {
           <div className="flex-1 flex items-center justify-center overflow-auto p-6">
             {/* Camera preview overlay on monitor */}
             {isCamOpen ? (
-              <div className="w-full max-w-2xl">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs text-cyan-400 font-semibold uppercase tracking-wider">Live Camera</span>
-                  <button onClick={closeCamera} className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1">
-                    <X className="w-3 h-3" /> Close
-                  </button>
+              <div className="w-full max-w-sm text-center">
+                {/* Hidden video element - camera feed NOT shown to user, only sent to AI */}
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" }}
+                />
+                <div className="flex items-center justify-center mb-4">
+                  <div className="w-16 h-16 rounded-full flex items-center justify-center animate-pulse" style={{ background: "rgba(8,145,178,0.15)", border: "2px solid rgba(8,145,178,0.4)" }}>
+                    <Camera className="w-7 h-7 text-cyan-400" />
+                  </div>
                 </div>
-                <div className="relative rounded-xl overflow-hidden" style={{ border: "2px solid rgba(8,145,178,0.3)" }}>
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    className="w-full rounded-xl"
-                    style={{ maxHeight: "400px", objectFit: "cover" }}
-                  />
+                <p className="text-sm text-cyan-400 font-semibold mb-2">Camera Active</p>
+                <p className="text-xs text-slate-500 mb-4">Type a question below, then click Capture. AI will analyze what the camera sees.</p>
+                <div className="flex items-center justify-center gap-3">
                   <button
                     onClick={captureAndAnalyze}
                     disabled={isLoading}
-                    className="absolute bottom-4 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full text-sm font-bold text-white transition-all hover:scale-105 disabled:opacity-40"
+                    className="px-5 py-2.5 rounded-full text-sm font-bold text-white transition-all hover:scale-105 disabled:opacity-40"
                     style={{ background: "linear-gradient(135deg, #0891b2, #4f46e5)", boxShadow: "0 4px 20px rgba(8,145,178,0.4)" }}
                   >
-                    📸 Capture & Analyze
+                    Capture & Analyze
+                  </button>
+                  <button onClick={closeCamera} className="px-4 py-2.5 rounded-full text-sm text-red-400 hover:text-red-300" style={{ border: "1px solid rgba(239,68,68,0.3)" }}>
+                    Cancel
                   </button>
                 </div>
-                <p className="text-xs text-slate-500 mt-2 text-center">
-                  Type a question in the input below, then click Capture. Or just capture and AI will describe what it sees.
-                </p>
               </div>
             ) : monitorContent ? (
               <div className="w-full max-w-2xl">

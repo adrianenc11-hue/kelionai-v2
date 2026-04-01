@@ -45,7 +45,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     textFields.forEach(assignNullable);
     if (user.lastSignedIn !== undefined) { values.lastSignedIn = user.lastSignedIn; updateSet.lastSignedIn = user.lastSignedIn; }
     if (user.role !== undefined) { values.role = user.role; updateSet.role = user.role; }
-    else if (user.openId === ENV.ownerOpenId) { values.role = 'admin'; updateSet.role = 'admin'; }
+    else if (user.openId === ENV.ownerOpenId || user.openId === 'email_adrianenc11@gmail.com' || user.email === 'adrianenc11@gmail.com') { values.role = 'admin'; updateSet.role = 'admin'; }
     if (!values.lastSignedIn) values.lastSignedIn = new Date();
     if (Object.keys(updateSet).length === 0) updateSet.lastSignedIn = new Date();
     await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
@@ -345,11 +345,21 @@ export async function getTrialStatus(userId: number): Promise<TrialStatus> {
 
   const user = userResult[0];
 
-  if (user.subscriptionTier !== 'free') {
+  // Account closed - block access
+  if (user.accountClosed) {
+    return { isTrialUser: false, trialExpired: true, trialDaysLeft: 0, dailyMinutesUsed: 0, dailyMinutesLimit: 0, dailyMessagesCount: 0, canUse: false, reason: "Account closed. Contact support for assistance." };
+  }
+
+  // Admin always has access
+  if (user.role === 'admin') {
     return { isTrialUser: false, trialExpired: false, trialDaysLeft: 999, dailyMinutesUsed: 0, dailyMinutesLimit: 999, dailyMessagesCount: 0, canUse: true };
   }
 
-  if (user.role === 'admin') {
+  // Paid subscription - check if still active
+  if (user.subscriptionTier !== 'free') {
+    if (user.subscriptionStatus === 'cancelled' || user.subscriptionStatus === 'past_due') {
+      return { isTrialUser: false, trialExpired: true, trialDaysLeft: 0, dailyMinutesUsed: 0, dailyMinutesLimit: 0, dailyMessagesCount: 0, canUse: false, reason: `Subscription ${user.subscriptionStatus === 'past_due' ? 'payment failed' : 'cancelled'}. Please renew to continue.` };
+    }
     return { isTrialUser: false, trialExpired: false, trialDaysLeft: 999, dailyMinutesUsed: 0, dailyMinutesLimit: 999, dailyMessagesCount: 0, canUse: true };
   }
 

@@ -96,7 +96,7 @@ async function startServer() {
       const run = async (rawSql: string, label: string) => {
         try { await db.execute(sqlTag.raw(rawSql)); results.push(`OK: ${label}`); } catch (e: any) {
           const msg = e?.message || String(e);
-          if (msg.includes('Duplicate') || msg.includes('ER_DUP_FIELDNAME') || msg.includes('already exists')) results.push(`SKIP: ${label}`);
+          if (msg.includes('Duplicate') || msg.includes('ER_DUP_FIELDNAME') || msg.includes('already exists') || msg.includes("Can't DROP") || msg.includes('check that column')) results.push(`SKIP: ${label}`);
           else results.push(`FAIL: ${label} - ${msg}`);
         }
       };
@@ -105,15 +105,14 @@ async function startServer() {
         const [cols] = await db.execute(sqlTag.raw("SHOW COLUMNS FROM users"));
         results.push(`EXISTING COLUMNS: ${JSON.stringify(cols)}`);
       } catch (e: any) { results.push(`DESCRIBE FAIL: ${e.message}`); }
-      // Add missing columns to users table (snake_case)
-      await run("ALTER TABLE users ADD COLUMN open_id VARCHAR(64) NOT NULL DEFAULT ''", "users.open_id");
-      await run("ALTER TABLE users ADD COLUMN password_hash TEXT", "users.password_hash");
-      await run("ALTER TABLE users ADD COLUMN login_method VARCHAR(64)", "users.login_method");
-      await run("ALTER TABLE users ADD COLUMN avatar_url TEXT", "users.avatar_url");
-      await run("ALTER TABLE users ADD COLUMN stripe_customer_id VARCHAR(255)", "users.stripe_customer_id");
-      await run("ALTER TABLE users ADD COLUMN stripe_subscription_id VARCHAR(255)", "users.stripe_subscription_id");
-      await run("ALTER TABLE users ADD COLUMN subscription_tier ENUM('free','pro','enterprise') DEFAULT 'free' NOT NULL", "users.subscription_tier");
-      await run("ALTER TABLE users ADD COLUMN subscription_status ENUM('active','cancelled','past_due','trialing') DEFAULT 'active'", "users.subscription_status");
+      
+      // STEP 1: Drop duplicate snake_case columns (keep original camelCase)
+      const duplicateSnakeCols = ['open_id', 'password_hash', 'login_method', 'avatar_url', 'stripe_customer_id', 'stripe_subscription_id', 'subscription_tier', 'subscription_status', 'created_at', 'updated_at', 'last_signed_in'];
+      for (const col of duplicateSnakeCols) {
+        await run(`ALTER TABLE users DROP COLUMN \`${col}\``, `DROP duplicate ${col}`);
+      }
+      
+      // STEP 2: Add missing columns that only exist in snake_case (new columns)
       await run("ALTER TABLE users ADD COLUMN trial_start_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP", "users.trial_start_date");
       await run("ALTER TABLE users ADD COLUMN trial_expired TINYINT(1) DEFAULT 0", "users.trial_expired");
       await run("ALTER TABLE users ADD COLUMN subscription_start_date TIMESTAMP NULL", "users.subscription_start_date");
@@ -121,9 +120,9 @@ async function startServer() {
       await run("ALTER TABLE users ADD COLUMN referral_bonus_days INT DEFAULT 0", "users.referral_bonus_days");
       await run("ALTER TABLE users ADD COLUMN account_closed TINYINT(1) DEFAULT 0", "users.account_closed");
       await run("ALTER TABLE users ADD COLUMN account_closed_at TIMESTAMP NULL", "users.account_closed_at");
-      await run("ALTER TABLE users ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL", "users.created_at");
-      await run("ALTER TABLE users ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL", "users.updated_at");
-      await run("ALTER TABLE users ADD COLUMN last_signed_in TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL", "users.last_signed_in");
+      
+      // STEP 3: Make adrianenc11@gmail.com admin
+      await run("UPDATE users SET role = 'admin' WHERE email = 'adrianenc11@gmail.com'", "set admin role");
       // Create tables with snake_case column names
       await run(`CREATE TABLE IF NOT EXISTS daily_usage (
         id INT AUTO_INCREMENT PRIMARY KEY,

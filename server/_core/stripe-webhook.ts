@@ -43,7 +43,7 @@ export async function handleStripeWebhook(req: Request, res: Response) {
           const subscriptionId = session.subscription as string;
           const billingCycle = session.metadata?.billingCycle || "monthly";
 
-          // Update user with Stripe IDs + billing info
+          // Update user with Stripe IDs + billing info + subscription start date
           await db
             .update(users)
             .set({
@@ -51,6 +51,8 @@ export async function handleStripeWebhook(req: Request, res: Response) {
               stripeSubscriptionId: subscriptionId,
               subscriptionTier: (session.metadata?.planId || "pro") as "free" | "pro" | "enterprise",
               subscriptionStatus: "active",
+              subscriptionStartDate: new Date(),
+              billingCycle: billingCycle as string,
               trialExpired: true, // No longer on trial
             })
             .where(eq(users.id, userId));
@@ -87,13 +89,27 @@ export async function handleStripeWebhook(req: Request, res: Response) {
           .limit(1);
 
         if (userRecord.length > 0) {
-          const status = subscription.status === "active" ? "active" : "cancelled";
+          // Map Stripe status to our enum: active, cancelled, past_due, trialing
+          let status: "active" | "cancelled" | "past_due" | "trialing" = "cancelled";
+          if (subscription.status === "active") status = "active";
+          else if (subscription.status === "past_due") status = "past_due";
+          else if (subscription.status === "trialing") status = "trialing";
+          else status = "cancelled"; // incomplete, incomplete_expired, canceled, unpaid
+          
+          const updateData: Record<string, unknown> = { subscriptionStatus: status };
+          
+          // If subscription is fully cancelled/expired, downgrade to free
+          if (["canceled", "unpaid", "incomplete_expired"].includes(subscription.status)) {
+            updateData.subscriptionTier = "free";
+            updateData.stripeSubscriptionId = null;
+          }
+          
           await db
             .update(users)
-            .set({ subscriptionStatus: status })
+            .set(updateData)
             .where(eq(users.id, userRecord[0].id));
 
-          console.log("[Stripe Webhook] User subscription status updated:", userRecord[0].id);
+          console.log(`[Stripe Webhook] User ${userRecord[0].id} subscription status: ${subscription.status} -> ${status}`);
         }
         break;
       }

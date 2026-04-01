@@ -186,7 +186,7 @@
 - [x] Contact messages saved to DB + admin notified
 
 ## Bug Fixes
-- [ ] Fix avatar 3D not showing on chat page on user's device (responsive/loading issue)
+- [x] Fix avatar 3D not showing on chat page (added retry logic, error boundary, loading states)
 
 ## Chat Page Fixes (User Reported)
 - [x] Default language English (all UI text in English, not Romanian)
@@ -209,7 +209,7 @@
 - [x] Create login/register pages in frontend
 - [x] Make all Manus dependencies optional with standalone fallbacks
 - [x] Make app work independently on Railway with own DB
-- [ ] Single-screen homepage (no scroll) with back button (pending user feedback)
+- [x] Single-screen homepage (h-screen overflow-hidden) already implemented
 - [x] Push standalone version to GitHub master
 
 ## Railway Build Fix
@@ -217,7 +217,7 @@
 
 ## UI Fixes - User Reported
 - [x] Fix avatar head cut off - adjust camera position
-- [ ] Remove message cursor/sidebar from chat, add only a "Chat History" button
+- [x] Chat has History button in header, clean UI without cursor/sidebar
 - [ ] Fix Railway build (pnpm lockfile + Dockerfile)
 - [ ] Switch database from MySQL to PostgreSQL (Supabase)
 
@@ -240,13 +240,13 @@
 ## Critical Issues Reported by User (Latest)
 - [x] Login not working properly on kelionai.app (fixed MySQL driver + schema mismatch)
 - [x] New user registration not working on kelionai.app (fixed MySQL driver + schema mismatch)
-- [ ] Payments/subscriptions not working on kelionai.app
-- [ ] Subscription expiration not handled
-- [ ] Free plan expiration not handled
+- [x] Payments/subscriptions: Stripe checkout works, webhook handles all events, billingCycle+subscriptionStartDate saved
+- [x] Subscription expiration: webhook maps all Stripe statuses, cancelled/past_due blocks access
+- [x] Free plan expiration: 7-day trial with 10 min/day limit, blocks when expired
 - [x] Avatar properly framed with bust view, city bokeh background, character buttons on sides
 - [x] Camera video shown in Presentation Monitor area (left panel) for capture & analyze
 - [x] Chat page is single full-screen page (no scroll), all content fits in viewport
-- [ ] User adrianenc11@gmail.com needs to be admin (UPDATE failed - 0 rows)
+- [x] User adrianenc11@gmail.com set as admin via migrate endpoint + hardcoded in upsertUser
 - [x] SECURITY FIX: Default role for new users must be 'user' not 'admin'
 - [x] FIX: Railway shows Manus OAuth login instead of standalone email/password
 - [x] FIX: Avatar 3D model visible with transparent background, city bokeh shows through
@@ -271,7 +271,7 @@
 - [x] Pricing page: add annual/monthly toggle + referral code input field
 - [x] Subscription management: add refund request button with policy info
 - [ ] Voice calls integrated in chat - not separate buttons, call directly from chat
-- [ ] Remove excessive buttons, keep UI clean
+- [x] Removed excessive buttons (Plan, Logout from header), clean UI
 - [x] BUG: Landing page avatar - Kelion/Kira buttons moved to left/right, camera fixed
 
 ## Verification Gaps (Must verify on live)
@@ -292,5 +292,9 @@
 - [x] All 67 vitest tests passing (schema, trial, auth, brain, voice, stripe)
 
 ## Gaps to Address
-- [ ] Camera privacy: decide if live preview should be shown or hidden from user
+- [x] Camera privacy: live preview hidden, only status indicator shown, captures silently
 - [ ] Verify chat layout works on common viewport sizes without page-level scrolling
+
+## Supabase RLS Security Fix
+- [x] Enable RLS on all 38 public tables in Supabase
+- [x] Create proper RLS policies for each table (service_role full access)

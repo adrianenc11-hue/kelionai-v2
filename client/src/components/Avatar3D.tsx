@@ -27,6 +27,7 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
   const meshesWithMorphRef = useRef<THREE.Mesh[]>([]);
   const mouthOpenRef = useRef(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   // Arm bone refs and rest quaternions
   const armBonesRef = useRef<{
@@ -220,6 +221,7 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
       (error: any) => {
         console.error(`Error loading ${character} model:`, error);
         setIsLoading(false);
+        setLoadError(true);
       }
     );
 
@@ -285,6 +287,20 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
           <div className="text-white text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
             <p>Loading {character}...</p>
+          </div>
+        </div>
+      )}
+      {loadError && (
+        <div className="absolute inset-0 flex items-center justify-center z-10">
+          <div className="text-white text-center">
+            <p className="text-sm text-red-400 mb-2">Failed to load avatar</p>
+            <button
+              onClick={() => { setLoadError(false); setIsLoading(true); window.location.reload(); }}
+              className="px-4 py-2 rounded-lg text-xs text-cyan-400 hover:text-white transition-colors"
+              style={{ border: "1px solid rgba(8,145,178,0.3)" }}
+            >
+              Retry
+            </button>
           </div>
         </div>
       )}
