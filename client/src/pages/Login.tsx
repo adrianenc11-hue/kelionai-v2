@@ -39,10 +39,15 @@ export default function Login() {
 
       toast.success(isLogin ? "Welcome back!" : "Account created!");
 
-      // Redirect to chat
-      navigate("/chat");
-      // Force reload to update auth state
-      window.location.href = "/chat";
+      // Redirect based on login vs registration
+      if (!isLogin) {
+        // Redirecționează utilizatorul nou către panoul de prețuri pentru a alege planul Free
+        navigate("/pricing");
+        window.location.href = "/pricing";
+      } else {
+        navigate("/chat");
+        window.location.href = "/chat";
+      }
     } catch (err) {
       toast.error("Network error. Please try again.");
     } finally {
