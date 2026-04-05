@@ -34,10 +34,19 @@ function PageLoader() {
  * Auth guard component - redirects to home if not authenticated
  */
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, user } = useAuth();
 
   if (loading) return <PageLoader />;
   if (!isAuthenticated) return <Redirect to="/login" />;
+
+  // Testează automat dacă perioada de abonament este depășită (valabil la cei cu plan)
+  if (user && (user.subscriptionStatus === "cancelled" || user.subscriptionStatus === "past_due")) {
+    const isPricingPage = window.location.pathname === "/pricing";
+    if (!isPricingPage) {
+      return <Redirect to="/pricing" />;
+    }
+  }
+
   return <Component />;
 }
 

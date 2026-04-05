@@ -33,6 +33,13 @@ export default function Login() {
       const data = await res.json();
 
       if (!res.ok) {
+        // Dacă utilizatorul a încercat să se înregistreze dar email-ul există deja
+        // îl trecem automat în panoul de Login
+        if (!isLogin && data.error === "An account with this email already exists") {
+          setIsLogin(true);
+          toast.info("Acest cont există deja. Te rugăm să îți introduci parola pentru a te autentifica!");
+          return;
+        }
         toast.error(data.error || "Something went wrong");
         return;
       }
