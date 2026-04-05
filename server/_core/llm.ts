@@ -230,7 +230,7 @@ const getApiKey = () => {
  * Get the model name
  */
 const getModelName = () => {
-  return "gpt-4o";
+  return "gpt5.4 pro";
 };
 
 const normalizeResponseFormat = ({
@@ -309,7 +309,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     payload.tool_choice = normalizedToolChoice;
   }
 
-  payload.max_tokens = 4096;
+  payload.max_tokens = 32768;
   
 
 
