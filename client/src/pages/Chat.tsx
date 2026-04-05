@@ -35,12 +35,13 @@ export default function Chat() {
   const [mouthOpen, setMouthOpen] = useState(0);
   const [showHistory, setShowHistory] = useState(false);
 
-  // MIC state - REAL recording
   const [isRecording, setIsRecording] = useState(false);
+  const [isLiveMode, setIsLiveMode] = useState(false); // Live Voice Chat mode
   const [recordingTime, setRecordingTime] = useState(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // CAM state - REAL camera
   const [isCamOpen, setIsCamOpen] = useState(false);
@@ -186,9 +187,9 @@ export default function Chat() {
       let sum = 0;
       for (let i = 2; i < 40; i++) sum += dataArray[i];
       const avg = sum / 38;
-      const normalized = Math.max(0, (avg - 30) / 120);
-      const clamped = Math.min(1, normalized * 1.8);
-      setMouthOpen((prev) => prev * 0.3 + clamped * 0.7);
+      const normalized = Math.max(0, (avg - 45) / 100);
+      const clamped = Math.min(0.4, normalized * 0.5);
+      setMouthOpen((prev) => prev * 0.7 + clamped * 0.3);
       animFrame = requestAnimationFrame(animateMouth);
     };
 
@@ -241,93 +242,70 @@ export default function Chat() {
       mediaRecorder.onstop = async () => {
         stream.getTracks().forEach((t) => t.stop());
         const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
-        if (audioBlob.size < 100) return; // too small, ignore
+        if (audioBlob.size < 100) {
+          if (isLiveMode) startRecording(); // Restart if empty and in live mode
+          return;
+        }
 
-        // Pipeline: upload → transcribe → send to brain
         setIsLoading(true);
-        setLoadingStep("Uploading audio...");
+        setLoadingStep("Voice Thinking...");
         try {
-          // Convert blob to base64
           const reader = new FileReader();
           const base64Promise = new Promise<string>((resolve) => {
-            reader.onloadend = () => {
-              const base64 = (reader.result as string).split(",")[1];
-              resolve(base64);
-            };
+            reader.onloadend = () => resolve((reader.result as string).split(",")[1]);
           });
           reader.readAsDataURL(audioBlob);
           const audioBase64 = await base64Promise;
 
-          // Step 1: Upload to S3
-          setLoadingStep("Uploading audio...");
-          const { audioUrl } = await uploadAudioMutation.mutateAsync({
-            audioBase64,
-            mimeType: "audio/webm",
-          });
+          const { audioUrl } = await uploadAudioMutation.mutateAsync({ audioBase64, mimeType: "audio/webm" });
+          const { text } = await transcribeAudioMutation.mutateAsync({ audioUrl });
 
-          // Step 2: Transcribe with Whisper
-          setLoadingStep("Transcribing speech...");
-          const { text, language } = await transcribeAudioMutation.mutateAsync({
-            audioUrl,
-          });
-
-          if (!text || text.trim().length === 0) {
-            setIsLoading(false);
-            setLoadingStep("");
-            setMessages((prev) => [...prev, {
-              id: Date.now(),
-              role: "system",
-              content: "Could not understand audio. Please try again.",
-              createdAt: new Date(),
-            }]);
-            return;
+          if (text && text.trim().length > 0) {
+            setMessages((prev) => [...prev, { id: Date.now(), role: "user", content: `🎤 ${text}`, createdAt: new Date() }]);
+            await sendMessageMutation.mutateAsync({
+              conversationId: activeConversationId || undefined,
+              message: text,
+              avatar: selectedAvatar,
+            });
           }
-
-          // Step 3: Show transcribed text as user message
-          const userMsg: Message = {
-            id: Date.now(),
-            role: "user",
-            content: `🎤 ${text}`,
-            createdAt: new Date(),
-          };
-          setMessages((prev) => [...prev, userMsg]);
-
-          // Step 4: Send to Brain
-          setLoadingStep("Thinking...");
-          setTimeout(() => setLoadingStep("Processing..."), 1500);
-          await sendMessageMutation.mutateAsync({
-            conversationId: activeConversationId || undefined,
-            message: text,
-            avatar: selectedAvatar,
-          });
         } catch (err: any) {
+          console.error("Live voice error:", err);
+        } finally {
           setIsLoading(false);
           setLoadingStep("");
-          setMessages((prev) => [...prev, {
-            id: Date.now(),
-            role: "assistant",
-            content: `Voice error: ${err.message}`,
-            createdAt: new Date(),
-          }]);
+          // AUTO RESTART in LIVE mode
+          if (isLiveMode) {
+            setTimeout(() => startRecording(), 300);
+          }
         }
       };
 
-      mediaRecorder.start(250); // collect chunks every 250ms
+      mediaRecorder.start(250);
       mediaRecorderRef.current = mediaRecorder;
       setIsRecording(true);
       setRecordingTime(0);
 
-      // Timer
+      // Silence detection for auto-send in live mode
+      if (isLiveMode) {
+        // We rely on the user stopping or we could add real VAD here.
+        // For now, let's keep it manual stop or a longer timer.
+      }
+
       recordingTimerRef.current = setInterval(() => {
         setRecordingTime((prev) => prev + 1);
       }, 1000);
     } catch (err: any) {
-      alert("Microphone access denied. Please allow microphone in your browser settings.");
+      setIsLiveMode(false);
+      alert("Microphone access denied.");
     }
-  }, [activeConversationId, selectedAvatar, uploadAudioMutation, transcribeAudioMutation, sendMessageMutation]);
+  }, [activeConversationId, selectedAvatar, uploadAudioMutation, transcribeAudioMutation, sendMessageMutation, isLiveMode]);
 
-  const stopRecording = useCallback(() => {
+
+  const stopRecording = useCallback((shouldProcess = true) => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      if (!shouldProcess) {
+        mediaRecorderRef.current.ondataavailable = null;
+      }
       mediaRecorderRef.current.stop();
     }
     setIsRecording(false);
@@ -335,119 +313,132 @@ export default function Chat() {
       clearInterval(recordingTimerRef.current);
       recordingTimerRef.current = null;
     }
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
   }, []);
 
   const handleMicClick = useCallback(() => {
-    if (isRecording) {
+    if (isRecording || isLiveMode) {
+      setIsLiveMode(false);
       stopRecording();
     } else {
+      setIsLiveMode(true);
       startRecording();
     }
-  }, [isRecording, startRecording, stopRecording]);
+  }, [isRecording, isLiveMode, startRecording, stopRecording]);
 
-  // ========== REAL CAM FUNCTIONS ==========
+
+  // ========== CAM: Silent capture - no preview on screen ==========
   const openCamera = useCallback(async () => {
     try {
       let stream: MediaStream;
       try {
-        // Try back camera first (mobile)
         stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: true,
         });
       } catch {
-        // Fallback to any camera (front/desktop)
         stream = await navigator.mediaDevices.getUserMedia({
           video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: true,
         });
       }
       setCamStream(stream);
       setIsCamOpen(true);
-      // Attach to video element after state update
-      setTimeout(() => {
+      // Attach video to hidden element, then capture immediately
+      setTimeout(async () => {
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          videoRef.current.play().catch(() => {});
+          await videoRef.current.play().catch(() => {});
+          // Wait for camera to stabilize
+          setTimeout(() => captureAndSendSilently(stream), 800);
         }
       }, 100);
-    } catch (err: any) {
+    } catch {
       alert("Camera access denied. Please allow camera in your browser settings.");
     }
   }, []);
 
-  const closeCamera = useCallback(() => {
-    if (camStream) {
-      camStream.getTracks().forEach((t) => t.stop());
-      setCamStream(null);
-    }
-    setIsCamOpen(false);
-  }, [camStream]);
-
-  const captureAndAnalyze = useCallback(async () => {
+  const captureAndSendSilently = useCallback(async (stream: MediaStream) => {
     if (!videoRef.current || !canvasRef.current) return;
+    
+    // Start audio recording for the prompt
+    const audioRecorder = new MediaRecorder(stream);
+    const audioChunks: Blob[] = [];
+    audioRecorder.ondataavailable = (e) => audioChunks.push(e.data);
+    audioRecorder.start();
 
     const video = videoRef.current;
-    // Wait for video to be ready if not yet
-    if (video.readyState < 2) {
-      await new Promise<void>((resolve) => {
-        video.addEventListener("loadeddata", () => resolve(), { once: true });
-        setTimeout(resolve, 2000); // timeout fallback
-      });
-    }
     const canvas = canvasRef.current;
+    
+    // Capture image
     canvas.width = video.videoWidth || 1280;
     canvas.height = video.videoHeight || 720;
     const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.drawImage(video, 0, 0);
+    if (ctx) ctx.drawImage(video, 0, 0);
+    const imageBase64 = canvas.toDataURL("image/jpeg", 0.8).split(",")[1];
 
-    // Convert to base64 JPEG
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
-    const imageBase64 = dataUrl.split(",")[1];
+    // Wait 1.5s for audio prompt
+    setLoadingStep("Listening for prompt...");
+    await new Promise(r => setTimeout(r, 1500));
+    
+    audioRecorder.stop();
+    audioRecorder.onstop = async () => {
+      stream.getTracks().forEach((t) => t.stop());
+      setCamStream(null);
+      setIsCamOpen(false);
 
-    // Close camera after capture
-    closeCamera();
+      const audioBlob = new Blob(audioChunks, { type: "audio/webm" });
+      setIsLoading(true);
+      setLoadingStep("Processing Vision...");
 
-    // Pipeline: upload → send to brain with vision
-    setIsLoading(true);
-    setLoadingStep("Uploading image...");
-    try {
-      // Step 1: Upload to S3
-      const { imageUrl } = await uploadImageMutation.mutateAsync({
-        imageBase64,
-        mimeType: "image/jpeg",
-      });
+      try {
+        // Step 1: Upload Image
+        const { imageUrl } = await uploadImageMutation.mutateAsync({ imageBase64, mimeType: "image/jpeg" });
+        
+        // Step 2: Transcribe Audio (if any)
+        const reader = new FileReader();
+        const base64Promise = new Promise<string>((resolve) => {
+          reader.onloadend = () => resolve((reader.result as string).split(",")[1]);
+        });
+        reader.readAsDataURL(audioBlob);
+        const audioBase64 = await base64Promise;
+        
+        const { audioUrl } = await uploadAudioMutation.mutateAsync({ audioBase64, mimeType: "audio/webm" });
+        const { text } = await transcribeAudioMutation.mutateAsync({ audioUrl });
 
-      // Step 2: Show capture as user message
-      const userMsg: Message = {
-        id: Date.now(),
-        role: "user",
-        content: `📷 [Camera capture sent for analysis]`,
-        createdAt: new Date(),
-      };
-      setMessages((prev) => [...prev, userMsg]);
+        const promptText = text || inputValue || "Analyze this.";
+        setInputValue("");
 
-      // Step 3: Send to Brain with imageUrl for GPT vision
-      setLoadingStep("Analyzing image with AI vision...");
-      const question = inputValue.trim() || "Describe what you see in detail. If there are any dangers or important things, mention them first.";
-      setInputValue("");
+        setMessages((prev) => [...prev, { 
+          id: Date.now(), 
+          role: "user", 
+          content: `📷 [Vision + Voice]: ${promptText}`, 
+          createdAt: new Date() 
+        }]);
 
-      await sendMessageMutation.mutateAsync({
-        conversationId: activeConversationId || undefined,
-        message: question,
-        avatar: selectedAvatar,
-        imageUrl: imageUrl,
-      });
-    } catch (err: any) {
-      setIsLoading(false);
-      setLoadingStep("");
-      setMessages((prev) => [...prev, {
-        id: Date.now(),
-        role: "assistant",
-        content: `Camera error: ${err.message}`,
-        createdAt: new Date(),
-      }]);
-    }
-  }, [activeConversationId, selectedAvatar, inputValue, closeCamera, uploadImageMutation, sendMessageMutation]);
+        await sendMessageMutation.mutateAsync({
+          conversationId: activeConversationId || undefined,
+          message: promptText,
+          avatar: selectedAvatar,
+          imageUrl: imageUrl,
+        });
+      } catch (err: any) {
+        setIsLoading(false);
+        setLoadingStep("");
+        setMessages((prev) => [...prev, { id: Date.now(), role: "assistant", content: `Error: ${err.message}`, createdAt: new Date() }]);
+      }
+    };
+  }, [activeConversationId, selectedAvatar, inputValue, uploadImageMutation, uploadAudioMutation, transcribeAudioMutation, sendMessageMutation]);
+
+
+  const closeCamera = useCallback(() => {
+    if (camStream) camStream.getTracks().forEach((t) => t.stop());
+    setCamStream(null);
+    setIsCamOpen(false);
+  }, [camStream]);
 
   const handleCamClick = useCallback(() => {
     if (isCamOpen) {
@@ -456,6 +447,7 @@ export default function Chat() {
       openCamera();
     }
   }, [isCamOpen, openCamera, closeCamera]);
+
 
   // ========== SEND TEXT MESSAGE ==========
   const handleSendMessage = async () => {
@@ -606,38 +598,12 @@ export default function Chat() {
         {/* LEFT: Presentation Monitor */}
         <div className="flex-1 flex flex-col" style={{ background: "#0f1120" }}>
           <div className="flex-1 flex items-center justify-center overflow-auto p-6">
-            {/* Camera preview overlay on monitor */}
-            {isCamOpen ? (
-              <div className="w-full max-w-2xl">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs text-cyan-400 font-semibold uppercase tracking-wider">Live Camera</span>
-                  <button onClick={closeCamera} className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1">
-                    <X className="w-3 h-3" /> Close
-                  </button>
-                </div>
-                <div className="relative rounded-xl overflow-hidden" style={{ border: "2px solid rgba(8,145,178,0.3)" }}>
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    className="w-full rounded-xl"
-                    style={{ maxHeight: "400px", objectFit: "cover" }}
-                  />
-                  <button
-                    onClick={captureAndAnalyze}
-                    disabled={isLoading}
-                    className="absolute bottom-4 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full text-sm font-bold text-white transition-all hover:scale-105 disabled:opacity-40"
-                    style={{ background: "linear-gradient(135deg, #0891b2, #4f46e5)", boxShadow: "0 4px 20px rgba(8,145,178,0.4)" }}
-                  >
-                    📸 Capture & Analyze
-                  </button>
-                </div>
-                <p className="text-xs text-slate-500 mt-2 text-center">
-                  Type a question in the input below, then click Capture. Or just capture and AI will describe what it sees.
-                </p>
-              </div>
-            ) : monitorContent ? (
+            {/* Camera: hidden elements used for silent capture */}
+            <div className="hidden">
+              <video ref={videoRef} autoPlay playsInline muted />
+            </div>
+
+            {monitorContent ? (
               <div className="w-full max-w-2xl">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-xs text-cyan-400 font-semibold uppercase tracking-wider">{monitorContent.title}</span>
@@ -649,6 +615,14 @@ export default function Chat() {
                   </div>
                 </div>
               </div>
+            ) : isCamOpen ? (
+              <div className="text-center animate-pulse">
+                <div className="w-16 h-16 mx-auto mb-4 bg-cyan-900/30 rounded-full flex items-center justify-center border border-cyan-500/30">
+                  <Camera className="w-6 h-6 text-cyan-400" />
+                </div>
+                <p className="text-sm text-cyan-400 font-medium">Silent Camera Active</p>
+                <p className="text-xs text-slate-600 mt-1">Capturing frame for AI analysis...</p>
+              </div>
             ) : (
               <div className="text-center">
                 <div className="w-12 h-12 mx-auto mb-4 rounded-full flex items-center justify-center" style={{ background: "rgba(139,92,246,0.1)" }}>
@@ -658,6 +632,7 @@ export default function Chat() {
                 <p className="text-xs text-slate-700">Ask for a map, image, weather, search, or code</p>
               </div>
             )}
+
           </div>
         </div>
 
@@ -756,23 +731,37 @@ export default function Chat() {
           <span>{isCamOpen ? "CLOSE" : "CAM"}</span>
         </button>
 
-        {/* MIC button - REAL */}
+        {/* MIC button - LIVE VOICE MODE */}
         <button
           onClick={handleMicClick}
-          disabled={isLoading && !isRecording}
-          className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs transition-colors ${
-            isRecording ? "text-red-300" : "text-slate-400 hover:text-cyan-400"
+          disabled={isLoading && !isRecording && !isLiveMode}
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs transition-all ${
+            isLiveMode || isRecording ? "text-cyan-400 font-bold" : "text-slate-400 hover:text-cyan-400"
           }`}
           style={{
-            border: isRecording ? "1px solid rgba(239,68,68,0.4)" : "1px solid rgba(255,255,255,0.1)",
-            background: isRecording ? "rgba(239,68,68,0.15)" : "transparent",
-            animation: isRecording ? "pulse 1.5s ease-in-out infinite" : "none",
+            border: isLiveMode || isRecording ? "1px solid rgba(8,145,178,0.5)" : "1px solid rgba(255,255,255,0.1)",
+            background: isLiveMode || isRecording ? "rgba(8,145,178,0.1)" : "transparent",
+            boxShadow: isLiveMode || isRecording ? "0 0 10px rgba(8,145,178,0.2)" : "none",
           }}
           aria-label="Microphone"
         >
-          {isRecording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-          <span>{isRecording ? `STOP ${formatTime(recordingTime)}` : "MIC"}</span>
+          {isLiveMode || isRecording ? (
+            <div className="flex items-center gap-1.5">
+              <div className="flex gap-0.5">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="w-1 bg-cyan-400 rounded-full animate-bounce" style={{ height: i*4+'px', animationDelay: i*0.1+'s' }} />
+                ))}
+              </div>
+              <span className="animate-pulse">{isLiveMode ? "LIVE CHAT" : formatTime(recordingTime)}</span>
+            </div>
+          ) : (
+            <>
+              <Mic className="w-4 h-4" />
+              <span>LIVE CHAT</span>
+            </>
+          )}
         </button>
+
 
         <input
           ref={inputRef}
