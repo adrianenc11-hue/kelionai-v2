@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,10 @@ import { toast } from "sonner";
 
 export default function Login() {
   const [, navigate] = useLocation();
-  const [isLogin, setIsLogin] = useState(true);
+  // Dacă URL-ul are ?mode=register sau ?plan=free, deschidem direct formularul de Register
+  const searchParams = new URLSearchParams(window.location.search);
+  const initialIsLogin = searchParams.get("mode") !== "register" && searchParams.get("plan") !== "free";
+  const [isLogin, setIsLogin] = useState(initialIsLogin);
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -48,11 +51,9 @@ export default function Login() {
 
       // Redirect based on login vs registration
       if (!isLogin) {
-        // Redirecționează utilizatorul nou către panoul de prețuri pentru a alege planul Free
-        navigate("/pricing");
-        window.location.href = "/pricing";
+        // Utilizator nou → direct în chat (planul free e activat implicit la register)
+        window.location.href = "/chat";
       } else {
-        navigate("/chat");
         window.location.href = "/chat";
       }
     } catch (err) {

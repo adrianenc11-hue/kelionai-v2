@@ -51,7 +51,7 @@ export default function Home() {
             <Button onClick={() => setLocation("/pricing")} variant="ghost" size="sm" className="text-slate-400 hover:text-white">
               Pricing
             </Button>
-            <Button onClick={() => { const url = getLoginUrl(); if (url && url !== '#') window.location.href = url; }} className="bg-blue-600 hover:bg-blue-700">
+            <Button onClick={() => { window.location.href = "/login"; }} className="bg-blue-600 hover:bg-blue-700">
               Sign In
             </Button>
           </div>
@@ -77,17 +77,17 @@ export default function Home() {
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
               <Button
-                onClick={() => { window.location.href = "/pricing"; }}
+                onClick={() => { window.location.href = "/login?plan=free"; }}
                 size="lg"
                 className="bg-blue-600 hover:bg-blue-700 text-base px-6 py-5 gap-2"
               >
                 Get Started Free <ArrowRight className="w-5 h-5" />
               </Button>
               <Button
-                onClick={() => setLocation("/pricing")}
+                onClick={() => { window.location.href = "/pricing"; }}
                 size="lg"
                 variant="outline"
-                className="border-slate-700 text-base px-6 py-5"
+                className="border-slate-700 text-slate-300 hover:text-white text-base px-6 py-5"
               >
                 View Plans
               </Button>
