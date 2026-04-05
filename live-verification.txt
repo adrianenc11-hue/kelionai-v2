@@ -1,0 +1,9 @@
+Live site verification 2026-03-31:
+- Homepage loads correctly at kelionai-ftdgtxex.manus.space
+- Avatar 3D (Kelion) renders with city bokeh background
+- Navigation: Contact, Pricing, Sign In buttons visible
+- Sign In redirects to Manus OAuth (Facebook, Google, Microsoft, Apple)
+- Features section: Voice First, Vision for Everyone, Adaptive Intelligence, Honest AI, Multi-Language, Voice Cloning
+- /chat route redirects to homepage (requires login first) - this is expected behavior
+- All text in English
+- Get Started Free and View Plans buttons visible
