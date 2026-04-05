@@ -2,13 +2,15 @@ import { z } from "zod";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { getSubscriptionPlans } from "../db";
 import Stripe from "stripe";
+import { TRPCError } from "@trpc/server";
+import { ENV } from "../_core/env";
 
 type StripeSubscription = Stripe.Subscription & {
   current_period_end?: number;
   cancel_at_period_end?: boolean;
 };
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "");
+const stripe = ENV.stripeSecretKey ? new Stripe(ENV.stripeSecretKey) : null;
 
 export const subscriptionRouter = router({
   /**
@@ -29,6 +31,7 @@ export const subscriptionRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      if (!stripe) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Stripe is not configured" });
       try {
         // Get or create Stripe customer
         let customerId = ctx.user.stripeCustomerId;
@@ -58,8 +61,8 @@ export const subscriptionRouter = router({
               quantity: 1,
             },
           ],
-          success_url: `${ctx.req.headers.origin || "https://kelionai.app"}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
-          cancel_url: `${ctx.req.headers.origin || "https://kelionai.app"}/subscription/cancel`,
+          success_url: `${ctx.req.headers.origin || ENV.frontendUrl}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `${ctx.req.headers.origin || ENV.frontendUrl}/subscription/cancel`,
           client_reference_id: ctx.user.id.toString(),
           metadata: {
             userId: ctx.user.id.toString(),
@@ -82,6 +85,7 @@ export const subscriptionRouter = router({
    * Get current subscription status
    */
   getSubscriptionStatus: protectedProcedure.query(async ({ ctx }) => {
+    if (!stripe) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Stripe is not configured" });
     try {
       if (!ctx.user.stripeSubscriptionId) {
         return {
@@ -113,6 +117,7 @@ export const subscriptionRouter = router({
    * Cancel current subscription
    */
   cancelSubscription: protectedProcedure.mutation(async ({ ctx }) => {
+    if (!stripe) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Stripe is not configured" });
     try {
       if (!ctx.user.stripeSubscriptionId) {
         throw new Error("No active subscription");
@@ -137,6 +142,7 @@ export const subscriptionRouter = router({
    * Get payment history
    */
   getPaymentHistory: protectedProcedure.query(async ({ ctx }) => {
+    if (!stripe) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Stripe is not configured" });
     try {
       if (!ctx.user.stripeCustomerId) {
         return [];

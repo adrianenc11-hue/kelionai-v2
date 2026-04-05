@@ -1,11 +1,17 @@
-import { useState, useRef, useEffect, useMemo, useCallback } from "react";
+﻿import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
-import { Loader2, Send, Mic, MicOff, Camera, CameraOff, LogOut, User, CreditCard, X, History } from "lucide-react";
+import { Loader2, Send, Mic, MicOff, Camera, CameraOff, LogOut, User, X, History, Monitor, Brain, Sun, Moon } from "lucide-react";
 import { Streamdown } from "streamdown";
 import { useRoute, useLocation } from "wouter";
 import Avatar3D from "@/components/Avatar3D";
+import MemoryPanel from "@/components/MemoryPanel";
+import MonitorPanel, { MonitorItem } from "@/components/MonitorPanel";
+import { useTranslation } from "react-i18next";
+import { useTheme } from "@/contexts/ThemeContext";
+import PermissionsGate from "@/components/PermissionsGate";
+import { useLocation as useUserLocation } from "@/hooks/useLocation";
 
 const CITY_BOKEH_BG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663494239902/fTDgTXExTnteU8v7gTpoiu/city-bokeh-bg_c42045f6.jpg";
 
@@ -24,26 +30,38 @@ export default function Chat() {
   const [, navigate] = useLocation();
   const [, params] = useRoute("/chat/:conversationId");
   const conversationId = params?.conversationId ? parseInt(params.conversationId) : null;
+  const { t } = useTranslation();
+  const { theme, toggleTheme } = useTheme();
+  const userLocation = useUserLocation();
 
   const [messages, setMessages] = useState<Message[]>([]);
+  const lastMessage = messages.filter((m: any) => m.role !== "system").at(-1);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState("");
   const [selectedAvatar, setSelectedAvatar] = useState<"kelion" | "kira">("kelion");
   const [activeConversationId, setActiveConversationId] = useState<number | null>(conversationId);
-  const [monitorContent, setMonitorContent] = useState<{ type: string; data: string; title?: string } | null>(null);
   const [mouthOpen, setMouthOpen] = useState(0);
   const [showHistory, setShowHistory] = useState(false);
 
+  // New state for Monitor + Memory panels
+  const [showMemory, setShowMemory] = useState(false);
+  const [showMonitor, setShowMonitor] = useState(true);
+  const [monitorItems, setMonitorItems] = useState<MonitorItem[]>([]);
+  const [activeThinking, setActiveThinking] = useState<string | null>(null);
+
   const [isRecording, setIsRecording] = useState(false);
-  const [isLiveMode, setIsLiveMode] = useState(false); // Live Voice Chat mode
+  const [isLiveMode, setIsLiveMode] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const audioAnalyserRef = useRef<AnalyserNode | null>(null);
+  const micStreamRef = useRef<MediaStream | null>(null);
+  const vadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // CAM state - REAL camera
+  // CAM state - silent capture
   const [isCamOpen, setIsCamOpen] = useState(false);
   const [camStream, setCamStream] = useState<MediaStream | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -51,7 +69,6 @@ export default function Chat() {
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Audio analyser for mouth amplitude
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -73,6 +90,46 @@ export default function Chat() {
   const uploadAudioMutation = trpc.voice.uploadAudio.useMutation();
   const transcribeAudioMutation = trpc.voice.transcribeAudio.useMutation();
   const uploadImageMutation = trpc.voice.uploadImage.useMutation();
+  const liveAudioMutation = trpc.voice.liveAudio.useMutation();
+  const generateImageMutation = trpc.media.generateImage.useMutation();
+  const generateVideoMutation = trpc.media.generateVideo.useMutation();
+
+  // Parse AI response content and add to monitor items
+  const parseAndAddMonitorItem = useCallback((msg: string, toolsUsed?: string[]) => {
+    const id = `${Date.now()}-${Math.random()}`;
+    const timestamp = new Date();
+
+    const codeMatch = msg.match(/```(?:\w+\n)?([\s\S]*?)```/);
+    if (codeMatch) {
+      setMonitorItems((prev) => [...prev, {
+        id, type: "code", title: t("monitor.code"), content: codeMatch[1].trim(), timestamp,
+      }]);
+      return;
+    }
+    if (toolsUsed?.includes("get_weather") || msg.includes("[VERIFIED] Weather") || msg.toLowerCase().includes("weather")) {
+      setMonitorItems((prev) => [...prev, {
+        id, type: "weather", title: t("monitor.weather"), content: msg.slice(0, 500), timestamp,
+      }]);
+      return;
+    }
+    if (toolsUsed?.includes("search_web") || msg.includes("Related:") || msg.toLowerCase().includes("wikipedia")) {
+      setMonitorItems((prev) => [...prev, {
+        id, type: "search", title: t("monitor.search"), content: msg.slice(0, 500), timestamp,
+      }]);
+      return;
+    }
+    if (toolsUsed?.includes("analyze_image") || msg.includes("[VISION]")) {
+      setMonitorItems((prev) => [...prev, {
+        id, type: "vision", title: t("monitor.vision"), content: msg.slice(0, 500), timestamp,
+      }]);
+      return;
+    }
+    if (msg.includes("[CALCULATED]") || /^\s*[\d\s\+\-\*\/\(\)=]+$/.test(msg.slice(0, 100))) {
+      setMonitorItems((prev) => [...prev, {
+        id, type: "math", title: t("monitor.math"), content: msg.slice(0, 500), timestamp,
+      }]);
+    }
+  }, [t]);
 
   const sendMessageMutation = trpc.chat.sendMessage.useMutation({
     onSuccess: (data) => {
@@ -92,20 +149,12 @@ export default function Chat() {
       setMessages((prev) => [...prev, newMsg]);
       setIsLoading(false);
       setLoadingStep("");
+      setActiveThinking(null);
 
-      // Visual content goes to monitor
+      // Parse message for monitor
       const msg = data.message || "";
-      if (msg.includes("```") || (data.toolsUsed && data.toolsUsed.some((t: string) => ["search_web", "get_weather", "execute_code", "analyze_image"].includes(t)))) {
-        const codeMatch = msg.match(/```[\s\S]*?```/);
-        if (codeMatch) {
-          setMonitorContent({ type: "code", data: codeMatch[0], title: "Code" });
-        } else if (data.toolsUsed?.includes("get_weather")) {
-          setMonitorContent({ type: "weather", data: msg, title: "Weather" });
-        } else if (data.toolsUsed?.includes("search_web")) {
-          setMonitorContent({ type: "search", data: msg, title: "Search Results" });
-        } else if (data.toolsUsed?.includes("analyze_image")) {
-          setMonitorContent({ type: "vision", data: msg, title: "Vision Analysis" });
-        }
+      if (msg.includes("```") || (data.toolsUsed && data.toolsUsed.length > 0)) {
+        parseAndAddMonitorItem(msg, data.toolsUsed);
       }
 
       // Auto-play audio
@@ -125,16 +174,15 @@ export default function Chat() {
       }]);
       setIsLoading(false);
       setLoadingStep("");
+      setActiveThinking(null);
     },
   });
 
-  // Clear chat when switching conversations - MUST run before data load
+  // Clear chat when switching conversations
   useEffect(() => {
-    // Always sync activeConversationId with URL param
     setMessages([]);
-    setMonitorContent(null);
+    setMonitorItems([]);
     setActiveConversationId(conversationId);
-    // Invalidate old query cache so stale data doesn't repopulate
     if (conversationId) {
       utils.chat.getConversation.invalidate({ conversationId });
     }
@@ -150,10 +198,15 @@ export default function Chat() {
     }
   }, [conversationData, activeConversationId]);
 
-  // Auto-scroll chat
+
+  // Update activeThinking when isLoading changes
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isLoading]);
+    if (isLoading) {
+      setActiveThinking(loadingStep || t("chat.thinking"));
+    } else {
+      setActiveThinking(null);
+    }
+  }, [isLoading, loadingStep, t]);
 
   // Mouth amplitude from audio analyser
   useEffect(() => {
@@ -222,11 +275,55 @@ export default function Chat() {
     };
   }, [camStream]);
 
+  // ========== VAD: Simple volume-based detection ==========
+  const startVAD = useCallback((stream: MediaStream, onSilence: () => void) => {
+    try {
+      const ctx = new AudioContext();
+      const src = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 512;
+      src.connect(analyser);
+      audioAnalyserRef.current = analyser;
+
+      const SILENCE_THRESHOLD = 10;
+      const SILENCE_DURATION = 1500;
+
+      const check = () => {
+        const data = new Uint8Array(analyser.frequencyBinCount);
+        analyser.getByteFrequencyData(data);
+        const avg = data.reduce((a, b) => a + b, 0) / data.length;
+
+        if (avg < SILENCE_THRESHOLD) {
+          if (!vadTimerRef.current) {
+            vadTimerRef.current = setTimeout(() => {
+              onSilence();
+            }, SILENCE_DURATION);
+          }
+        } else {
+          if (vadTimerRef.current) {
+            clearTimeout(vadTimerRef.current);
+            vadTimerRef.current = null;
+          }
+        }
+      };
+
+      const interval = setInterval(check, 100);
+      micStreamRef.current = stream;
+      return () => {
+        clearInterval(interval);
+        ctx.close().catch(() => {});
+        if (vadTimerRef.current) clearTimeout(vadTimerRef.current);
+        vadTimerRef.current = null;
+      };
+    } catch {
+      return () => {};
+    }
+  }, []);
+
   // ========== REAL MIC FUNCTIONS ==========
   const startRecording = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      // Find best supported MIME type
       let mimeType = "";
       for (const type of ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg", ""]) {
         if (type === "" || MediaRecorder.isTypeSupported(type)) {
@@ -243,12 +340,12 @@ export default function Chat() {
         stream.getTracks().forEach((t) => t.stop());
         const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
         if (audioBlob.size < 100) {
-          if (isLiveMode) startRecording(); // Restart if empty and in live mode
+          if (isLiveMode) startRecording();
           return;
         }
 
         setIsLoading(true);
-        setLoadingStep("Voice Thinking...");
+        setLoadingStep(t("chat.thinking"));
         try {
           const reader = new FileReader();
           const base64Promise = new Promise<string>((resolve) => {
@@ -257,15 +354,17 @@ export default function Chat() {
           reader.readAsDataURL(audioBlob);
           const audioBase64 = await base64Promise;
 
-          const { audioUrl } = await uploadAudioMutation.mutateAsync({ audioBase64, mimeType: "audio/webm" });
-          const { text } = await transcribeAudioMutation.mutateAsync({ audioUrl });
+          const { text } = await liveAudioMutation.mutateAsync({ audioBase64, mimeType: "audio/webm" });
 
           if (text && text.trim().length > 0) {
-            setMessages((prev) => [...prev, { id: Date.now(), role: "user", content: `🎤 ${text}`, createdAt: new Date() }]);
+            setMessages((prev) => [...prev, { id: Date.now(), role: "user", content: `ðŸŽ¤ ${text}`, createdAt: new Date() }]);
+            const voiceHistoryForApi = messages.filter((m: any) => m.role !== "system").slice(-20).map((m: any) => ({ role: m.role as "user" | "assistant", content: m.content || "" }));
             await sendMessageMutation.mutateAsync({
               conversationId: activeConversationId || undefined,
               message: text,
               avatar: selectedAvatar,
+              history: voiceHistoryForApi,
+              location: userLocation ? { lat: userLocation.lat, lon: userLocation.lon, city: userLocation.city } : undefined,
             });
           }
         } catch (err: any) {
@@ -273,23 +372,29 @@ export default function Chat() {
         } finally {
           setIsLoading(false);
           setLoadingStep("");
-          // AUTO RESTART in LIVE mode
           if (isLiveMode) {
             setTimeout(() => startRecording(), 300);
           }
         }
       };
 
+      // Start VAD for auto-stop
+      const stopVAD = startVAD(stream, () => {
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+          mediaRecorderRef.current.stop();
+          setIsRecording(false);
+          if (recordingTimerRef.current) {
+            clearInterval(recordingTimerRef.current);
+            recordingTimerRef.current = null;
+          }
+        }
+        stopVAD();
+      });
+
       mediaRecorder.start(250);
       mediaRecorderRef.current = mediaRecorder;
       setIsRecording(true);
       setRecordingTime(0);
-
-      // Silence detection for auto-send in live mode
-      if (isLiveMode) {
-        // We rely on the user stopping or we could add real VAD here.
-        // For now, let's keep it manual stop or a longer timer.
-      }
 
       recordingTimerRef.current = setInterval(() => {
         setRecordingTime((prev) => prev + 1);
@@ -298,8 +403,7 @@ export default function Chat() {
       setIsLiveMode(false);
       alert("Microphone access denied.");
     }
-  }, [activeConversationId, selectedAvatar, uploadAudioMutation, transcribeAudioMutation, sendMessageMutation, isLiveMode]);
-
+  }, [activeConversationId, selectedAvatar, uploadAudioMutation, transcribeAudioMutation, sendMessageMutation, isLiveMode, startVAD, t]);
 
   const stopRecording = useCallback((shouldProcess = true) => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
@@ -317,6 +421,10 @@ export default function Chat() {
       clearTimeout(silenceTimerRef.current);
       silenceTimerRef.current = null;
     }
+    if (vadTimerRef.current) {
+      clearTimeout(vadTimerRef.current);
+      vadTimerRef.current = null;
+    }
   }, []);
 
   const handleMicClick = useCallback(() => {
@@ -329,8 +437,19 @@ export default function Chat() {
     }
   }, [isRecording, isLiveMode, startRecording, stopRecording]);
 
+  // ========== Silent frame capture helper ==========
+  const captureFrame = useCallback((): string | null => {
+    if (!videoRef.current || !canvasRef.current) return null;
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    canvas.width = video.videoWidth || 1280;
+    canvas.height = video.videoHeight || 720;
+    const ctx = canvas.getContext("2d");
+    if (ctx) ctx.drawImage(video, 0, 0);
+    return canvas.toDataURL("image/jpeg", 0.8).split(",")[1];
+  }, []);
 
-  // ========== CAM: Silent capture - no preview on screen ==========
+  // ========== CAM: Silent capture ==========
   const openCamera = useCallback(async () => {
     try {
       let stream: MediaStream;
@@ -347,12 +466,10 @@ export default function Chat() {
       }
       setCamStream(stream);
       setIsCamOpen(true);
-      // Attach video to hidden element, then capture immediately
       setTimeout(async () => {
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           await videoRef.current.play().catch(() => {});
-          // Wait for camera to stabilize
           setTimeout(() => captureAndSendSilently(stream), 800);
         }
       }, 100);
@@ -363,27 +480,18 @@ export default function Chat() {
 
   const captureAndSendSilently = useCallback(async (stream: MediaStream) => {
     if (!videoRef.current || !canvasRef.current) return;
-    
-    // Start audio recording for the prompt
+
     const audioRecorder = new MediaRecorder(stream);
     const audioChunks: Blob[] = [];
     audioRecorder.ondataavailable = (e) => audioChunks.push(e.data);
     audioRecorder.start();
 
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    
-    // Capture image
-    canvas.width = video.videoWidth || 1280;
-    canvas.height = video.videoHeight || 720;
-    const ctx = canvas.getContext("2d");
-    if (ctx) ctx.drawImage(video, 0, 0);
-    const imageBase64 = canvas.toDataURL("image/jpeg", 0.8).split(",")[1];
+    const imageBase64 = captureFrame();
+    if (!imageBase64) return;
 
-    // Wait 1.5s for audio prompt
     setLoadingStep("Listening for prompt...");
     await new Promise(r => setTimeout(r, 1500));
-    
+
     audioRecorder.stop();
     audioRecorder.onstop = async () => {
       stream.getTracks().forEach((t) => t.stop());
@@ -392,31 +500,29 @@ export default function Chat() {
 
       const audioBlob = new Blob(audioChunks, { type: "audio/webm" });
       setIsLoading(true);
-      setLoadingStep("Processing Vision...");
+      setLoadingStep(t("chat.analyzing"));
 
       try {
-        // Step 1: Upload Image
         const { imageUrl } = await uploadImageMutation.mutateAsync({ imageBase64, mimeType: "image/jpeg" });
-        
-        // Step 2: Transcribe Audio (if any)
+
         const reader = new FileReader();
         const base64Promise = new Promise<string>((resolve) => {
           reader.onloadend = () => resolve((reader.result as string).split(",")[1]);
         });
         reader.readAsDataURL(audioBlob);
         const audioBase64 = await base64Promise;
-        
+
         const { audioUrl } = await uploadAudioMutation.mutateAsync({ audioBase64, mimeType: "audio/webm" });
         const { text } = await transcribeAudioMutation.mutateAsync({ audioUrl });
 
         const promptText = text || inputValue || "Analyze this.";
         setInputValue("");
 
-        setMessages((prev) => [...prev, { 
-          id: Date.now(), 
-          role: "user", 
-          content: `📷 [Vision + Voice]: ${promptText}`, 
-          createdAt: new Date() 
+        setMessages((prev) => [...prev, {
+          id: Date.now(),
+          role: "user",
+          content: `ðŸ“· [Vision + Voice]: ${promptText}`,
+          createdAt: new Date()
         }]);
 
         await sendMessageMutation.mutateAsync({
@@ -431,8 +537,7 @@ export default function Chat() {
         setMessages((prev) => [...prev, { id: Date.now(), role: "assistant", content: `Error: ${err.message}`, createdAt: new Date() }]);
       }
     };
-  }, [activeConversationId, selectedAvatar, inputValue, uploadImageMutation, uploadAudioMutation, transcribeAudioMutation, sendMessageMutation]);
-
+  }, [activeConversationId, selectedAvatar, inputValue, uploadImageMutation, uploadAudioMutation, transcribeAudioMutation, sendMessageMutation, captureFrame, t]);
 
   const closeCamera = useCallback(() => {
     if (camStream) camStream.getTracks().forEach((t) => t.stop());
@@ -448,28 +553,72 @@ export default function Chat() {
     }
   }, [isCamOpen, openCamera, closeCamera]);
 
-
   // ========== SEND TEXT MESSAGE ==========
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isLoading) return;
     const userMsg: Message = { id: Date.now(), role: "user", content: inputValue, createdAt: new Date() };
     setMessages((prev) => [...prev, userMsg]);
     setIsLoading(true);
-    setLoadingStep("Thinking...");
+    setLoadingStep(t("chat.thinking"));
     const msgText = inputValue;
     setInputValue("");
-    setTimeout(() => setLoadingStep("Analyzing..."), 800);
-    setTimeout(() => setLoadingStep("Processing..."), 2000);
+    const msgLower = msgText.toLowerCase();
+    const isSearchQuery = /\b(search|find|look up|what is|who is|when|where|news|weather|price|stock|score|latest|current|today|yesterday|recent|update|caut|gaseste|stir|vreme|pret|cine e|ce e|unde|cand|actual|azi|ieri)\b/i.test(msgText);
+    setTimeout(() => setLoadingStep(isSearchQuery ? "🔍 Searching real-time data..." : "Analyzing..."), 800);
+    setTimeout(() => setLoadingStep(isSearchQuery ? "📡 Updating with real info..." : "Processing..."), 2500);
+    // Detectie generare imagine/video
+    const isImageGen = /\b(generate|create|make|draw|design)\s+(an?\s+)?(image|picture|photo|illustration|artwork)\b/i.test(msgText);
+    const isVideoGen = /\b(generate|create|make)\s+(a\s+)?(video|animation|clip)\b/i.test(msgText);
+
+    if (isImageGen) {
+      try {
+        setLoadingStep("🎨 Generating image with Imagen 3...");
+        const result = await generateImageMutation.mutateAsync({ prompt: msgText });
+        setMessages((prev) => [...prev, {
+          id: Date.now(), role: "assistant",
+          content: `Here is your generated image:\n\n![Generated Image](${result.imageUrl})`,
+          createdAt: new Date(),
+        }]);
+        setMonitorItems((prev) => [...prev, {
+          id: `img-${Date.now()}`, type: "vision", title: "Generated Image",
+          content: result.imageUrl, timestamp: new Date(),
+        }]);
+        setIsLoading(false); setLoadingStep(""); return;
+      } catch (err: any) {
+        setMessages((prev) => [...prev, { id: Date.now(), role: "assistant", content: `Image generation failed: ${err.message}`, createdAt: new Date() }]);
+        setIsLoading(false); setLoadingStep(""); return;
+      }
+    }
+
+    if (isVideoGen) {
+      try {
+        setLoadingStep("🎬 Generating video with Veo 2 (this takes ~60s)...");
+        const result = await generateVideoMutation.mutateAsync({ prompt: msgText });
+        setMessages((prev) => [...prev, {
+          id: Date.now(), role: "assistant",
+          content: `Here is your generated video:\n\n[Watch Video](${result.videoUrl})`,
+          createdAt: new Date(),
+        }]);
+        setIsLoading(false); setLoadingStep(""); return;
+      } catch (err: any) {
+        setMessages((prev) => [...prev, { id: Date.now(), role: "assistant", content: `Video generation failed: ${err.message}`, createdAt: new Date() }]);
+        setIsLoading(false); setLoadingStep(""); return;
+      }
+    }
+
+    const historyForApi = messages.filter((m: any) => m.role !== "system").slice(-20).map((m: any) => ({ role: m.role as "user" | "assistant", content: m.content || "" }));
     await sendMessageMutation.mutateAsync({
       conversationId: activeConversationId || undefined,
       message: msgText,
       avatar: selectedAvatar,
+      history: historyForApi,
+      location: userLocation ? { lat: userLocation.lat, lon: userLocation.lon, city: userLocation.city } : undefined,
     });
   };
 
   const handleNewChat = () => {
     setMessages([]);
-    setMonitorContent(null);
+    setMonitorItems([]);
     setActiveConversationId(null);
     navigate("/chat");
   };
@@ -483,8 +632,11 @@ export default function Chat() {
   };
 
   return (
+    <PermissionsGate>
     <div className="w-full h-screen flex flex-col overflow-hidden relative" style={{ background: "#0c0e1a" }}>
       <audio ref={audioRef} className="hidden" crossOrigin="anonymous" />
+      {/* Hidden camera elements for silent capture */}
+      <video ref={videoRef} className="hidden" autoPlay muted playsInline />
       <canvas ref={canvasRef} className="hidden" />
 
       {/* ===== TOP BAR ===== */}
@@ -529,7 +681,7 @@ export default function Chat() {
             className="px-3 py-1.5 rounded-full text-xs text-slate-400 hover:text-cyan-400 transition-colors"
             style={{ border: "1px solid rgba(255,255,255,0.1)" }}
           >
-            New Chat
+            {t("chat.newChat")}
           </button>
           <button
             onClick={() => setShowHistory(!showHistory)}
@@ -539,6 +691,35 @@ export default function Chat() {
             <History className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">History</span>
           </button>
+
+          {/* Monitor toggle */}
+          <button
+            onClick={() => setShowMonitor(!showMonitor)}
+            className={`p-2 rounded-lg transition-colors ${showMonitor ? "text-blue-400 bg-blue-400/10" : "text-slate-400 hover:text-blue-400"}`}
+            title="Toggle Monitor"
+          >
+            <Monitor className="w-4 h-4" />
+          </button>
+
+          {/* Memory toggle */}
+          <button
+            onClick={() => setShowMemory(!showMemory)}
+            className={`p-2 rounded-lg transition-colors ${showMemory ? "text-purple-400 bg-purple-400/10" : "text-slate-400 hover:text-purple-400"}`}
+            title="Toggle Memory"
+          >
+            <Brain className="w-4 h-4" />
+          </button>
+
+          {/* Theme toggle */}
+          {toggleTheme && (
+            <button
+              onClick={toggleTheme}
+              className="p-2 rounded-lg text-slate-400 hover:text-yellow-400 transition-colors"
+              title="Toggle Theme"
+            >
+              {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
+          )}
 
           {user ? (
             <>
@@ -593,128 +774,74 @@ export default function Chat() {
       )}
 
       {/* ===== MAIN CONTENT ===== */}
-      <div className="flex-1 flex overflow-hidden">
-
-        {/* LEFT: Presentation Monitor */}
-        <div className="flex-1 flex flex-col" style={{ background: "#0f1120" }}>
-          <div className="flex-1 flex items-center justify-center overflow-auto p-6">
-            {/* Camera: hidden elements used for silent capture */}
-            <div className="hidden">
-              <video ref={videoRef} autoPlay playsInline muted />
-            </div>
-
-            {monitorContent ? (
-              <div className="w-full max-w-2xl">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs text-cyan-400 font-semibold uppercase tracking-wider">{monitorContent.title}</span>
-                  <button onClick={() => setMonitorContent(null)} className="text-[10px] text-slate-600 hover:text-slate-400">Clear</button>
-                </div>
-                <div className="rounded-xl p-5" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
-                  <div className="text-sm text-slate-200 leading-relaxed">
-                    <Streamdown>{monitorContent.data}</Streamdown>
-                  </div>
-                </div>
-              </div>
-            ) : isCamOpen ? (
-              <div className="text-center animate-pulse">
-                <div className="w-16 h-16 mx-auto mb-4 bg-cyan-900/30 rounded-full flex items-center justify-center border border-cyan-500/30">
-                  <Camera className="w-6 h-6 text-cyan-400" />
-                </div>
-                <p className="text-sm text-cyan-400 font-medium">Silent Camera Active</p>
-                <p className="text-xs text-slate-600 mt-1">Capturing frame for AI analysis...</p>
-              </div>
-            ) : (
-              <div className="text-center">
-                <div className="w-12 h-12 mx-auto mb-4 rounded-full flex items-center justify-center" style={{ background: "rgba(139,92,246,0.1)" }}>
-                  <span className="text-lg opacity-50">🎯</span>
-                </div>
-                <p className="text-sm text-slate-500 mb-1">Presentation Monitor</p>
-                <p className="text-xs text-slate-700">Ask for a map, image, weather, search, or code</p>
-              </div>
-            )}
-
+      <div className="flex flex-1 overflow-hidden">
+        {/* LEFT: Monitor Panel 60% */}
+        {showMonitor && (
+          <div className="flex-[6] shrink-0 min-w-0 overflow-hidden">
+            <MonitorPanel items={monitorItems} isVisible={showMonitor} activeThinking={isLoading ? activeThinking : null} />
           </div>
-        </div>
-
-        {/* RIGHT: Avatar FULL HEIGHT with chat overlay at bottom */}
-        <div className="w-[55%] min-w-[400px] max-w-[700px] shrink-0 flex flex-col relative" style={{
-          borderLeft: "1px solid rgba(255,255,255,0.05)",
-        }}>
-          {/* Avatar area - FULL HEIGHT of right panel */}
-          <div className="absolute inset-0 overflow-hidden" style={{
-            backgroundImage: `url(${CITY_BOKEH_BG})`,
-            backgroundSize: "cover",
-            backgroundPosition: "center",
+        )}
+        {/* RIGHT: Avatar 40% + Chat 1 linie */}
+        <div className="flex-[4] flex flex-col min-w-0 overflow-hidden" style={{ borderLeft: "1px solid rgba(255,255,255,0.05)" }}>
+          <div className="flex-1 relative overflow-hidden">
+            <div className="absolute inset-0 overflow-hidden" style={{
+              backgroundImage: `url(${CITY_BOKEH_BG})`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+            }}>
+              <div className="absolute top-3 left-4 z-10">
+                <span className="text-cyan-400 font-semibold text-base" style={{ textShadow: "0 1px 8px rgba(0,0,0,0.8)" }}>
+                  {selectedAvatar === "kelion" ? "Kelion" : "Kira"}
+                </span>
+              </div>
+              {isCamOpen && (
+                <div className="absolute top-3 right-4 z-10 flex items-center gap-2 bg-cyan-900/30 border border-cyan-500/30 rounded-full px-3 py-1">
+                  <Camera className="w-3.5 h-3.5 text-cyan-400" />
+                  <span className="text-xs text-cyan-400">Capturing...</span>
+                </div>
+              )}
+              <div className="w-full h-full">
+                <Avatar3D
+                  character={selectedAvatar}
+                  isAnimating={isLoading}
+                  emotion={isLoading ? "thinking" : "neutral"}
+                  mouthOpen={mouthOpen}
+                />
+                <style>{`.avatar-container canvas { background: transparent !important; }`}</style>
+              </div>
+            </div>
+          </div>
+          <div className="h-10 px-3 flex items-center shrink-0 gap-2" style={{
+            background: "rgba(0,0,0,0.6)",
+            borderTop: "1px solid rgba(255,255,255,0.06)",
           }}>
-            <div className="absolute top-3 left-4 z-10">
-              <span className="text-cyan-400 font-semibold text-base" style={{ textShadow: "0 1px 8px rgba(0,0,0,0.8)" }}>
-                {selectedAvatar === "kelion" ? "Kelion" : "Kira"}
+            {isLoading ? (
+              <>
+                {loadingStep?.startsWith("🔍") || loadingStep?.startsWith("📡") ? (
+                  <svg className="w-3 h-3 shrink-0 text-yellow-400 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                ) : (
+                  <Loader2 className="w-3 h-3 animate-spin text-cyan-400 shrink-0" />
+                )}
+                <span className={`text-xs animate-pulse truncate ${loadingStep?.startsWith("🔍") || loadingStep?.startsWith("📡") ? "text-yellow-400" : "text-cyan-400"}`}>{activeThinking || loadingStep || "Working..."}</span>
+              </>
+            ) : lastMessage ? (
+              <span className="text-xs text-slate-300 truncate">
+                <span className="opacity-50">{lastMessage.role === "user" ? "You: " : (selectedAvatar === "kelion" ? "Kelion: " : "Kira: ")}</span>
+                {lastMessage.content}
               </span>
-            </div>
-            <div className="w-full h-full">
-              <Avatar3D
-                character={selectedAvatar}
-                isAnimating={isLoading}
-                emotion={isLoading ? "thinking" : "neutral"}
-                mouthOpen={mouthOpen}
-              />
-              <style>{`.avatar-container canvas { background: transparent !important; }`}</style>
-            </div>
-          </div>
-
-          {/* Chat messages - OVERLAY at bottom of avatar */}
-          <div className="absolute bottom-0 left-0 right-0 max-h-[40%] overflow-y-auto px-3 py-2 space-y-2 z-20" style={{
-            background: "linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.4) 70%, transparent 100%)",
-          }}>
-            {messages.length === 0 && !isLoading && (
-              <div className="flex items-center justify-center h-full">
-                <p className="text-xs text-slate-600 italic">Start a conversation...</p>
-              </div>
+            ) : (
+              <span className="text-xs text-slate-600 italic">Start a conversation...</span>
             )}
-            {messages.map((msg) => (
-              <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : msg.role === "system" ? "justify-center" : "justify-start"}`}>
-                <div className={`max-w-[85%] rounded-lg px-3 py-2 text-xs leading-relaxed ${
-                  msg.role === "user" ? "text-cyan-100" :
-                  msg.role === "system" ? "text-yellow-300 italic" :
-                  "text-slate-300"
-                }`} style={{
-                  background: msg.role === "user" ? "rgba(8,145,178,0.15)" :
-                    msg.role === "system" ? "rgba(234,179,8,0.1)" :
-                    "rgba(255,255,255,0.04)",
-                  border: `1px solid ${msg.role === "user" ? "rgba(8,145,178,0.2)" :
-                    msg.role === "system" ? "rgba(234,179,8,0.2)" :
-                    "rgba(255,255,255,0.05)"}`,
-                }}>
-                  <Streamdown>{msg.content || ""}</Streamdown>
-                  {msg.confidence && (
-                    <span className={`inline-block mt-1 text-[9px] px-1.5 py-0.5 rounded-full ${
-                      msg.confidence === "verified" ? "bg-green-900/30 text-green-400" :
-                      msg.confidence === "high" ? "bg-blue-900/30 text-blue-400" :
-                      msg.confidence === "medium" ? "bg-yellow-900/30 text-yellow-400" :
-                      "bg-red-900/30 text-red-400"
-                    }`}>
-                      {msg.confidence}
-                    </span>
-                  )}
-                </div>
-              </div>
-            ))}
-            {isLoading && (
-              <div className="flex justify-start">
-                <div className="rounded-lg px-3 py-2 flex items-center gap-2" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.05)" }}>
-                  <Loader2 className="w-3 h-3 animate-spin text-cyan-400" />
-                  <span className="text-xs text-cyan-400">{loadingStep || "Working..."}</span>
-                </div>
-              </div>
-            )}
-            <div ref={chatEndRef} />
           </div>
         </div>
       </div>
 
+      {/* Memory Panel â€” overlay */}
+      <MemoryPanel isOpen={showMemory} onClose={() => setShowMemory(false)} />
+
       {/* ===== BOTTOM BAR: CAM | MIC | Input | SEND ===== */}
       <div className="px-4 py-2.5 shrink-0 flex items-center gap-2" style={{ background: "#0c0e1a", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-        {/* CAM button - REAL */}
+        {/* CAM button - silent capture */}
         <button
           onClick={handleCamClick}
           disabled={isLoading}
@@ -725,7 +852,7 @@ export default function Chat() {
             border: isCamOpen ? "1px solid rgba(8,145,178,0.4)" : "1px solid rgba(255,255,255,0.1)",
             background: isCamOpen ? "rgba(8,145,178,0.15)" : "transparent",
           }}
-          aria-label="Camera"
+          aria-label={isCamOpen ? t("chat.cameraOff") : t("chat.cameraOn")}
         >
           {isCamOpen ? <CameraOff className="w-4 h-4" /> : <Camera className="w-4 h-4" />}
           <span>{isCamOpen ? "CLOSE" : "CAM"}</span>
@@ -743,7 +870,7 @@ export default function Chat() {
             background: isLiveMode || isRecording ? "rgba(8,145,178,0.1)" : "transparent",
             boxShadow: isLiveMode || isRecording ? "0 0 10px rgba(8,145,178,0.2)" : "none",
           }}
-          aria-label="Microphone"
+          aria-label={isLiveMode || isRecording ? t("chat.voiceOff") : t("chat.voiceOn")}
         >
           {isLiveMode || isRecording ? (
             <div className="flex items-center gap-1.5">
@@ -762,13 +889,12 @@ export default function Chat() {
           )}
         </button>
 
-
         <input
           ref={inputRef}
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSendMessage()}
-          placeholder="Type or speak..."
+          placeholder={t("chat.placeholder")}
           disabled={isLoading}
           className="flex-1 px-4 py-2.5 rounded-lg text-sm text-white placeholder:text-slate-600 focus:outline-none disabled:opacity-50"
           style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}
@@ -779,14 +905,13 @@ export default function Chat() {
           disabled={isLoading || !inputValue.trim()}
           className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white transition-all disabled:opacity-40"
           style={{ background: "#4f46e5" }}
-          aria-label="Send message"
+          aria-label={t("chat.send")}
         >
           {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-          <span>SEND</span>
+          <span>{t("chat.send")}</span>
         </button>
       </div>
 
-      {/* Recording pulse animation */}
       <style>{`
         @keyframes pulse {
           0%, 100% { opacity: 1; }
@@ -794,5 +919,8 @@ export default function Chat() {
         }
       `}</style>
     </div>
+    </PermissionsGate>
   );
 }
+
+

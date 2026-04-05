@@ -1,0 +1,11 @@
+{
+  "nav": { "contact": "Kontakt", "pricing": "Preise", "signIn": "Anmelden" },
+  "home": { "title": "KI Die Jeden Versteht", "subtitle": "Lernen Sie Kelion und Kira kennen — KI-Assistenten für alle.", "cta": "Kostenlos Starten", "online": "ist online" },
+  "chat": { "placeholder": "Nachricht eingeben...", "send": "Senden", "thinking": "Ich denke nach...", "searching": "Im Web suchen...", "weather": "Wetter abrufen...", "analyzing": "Bild analysieren...", "generating": "Code generieren...", "newChat": "Neuer Chat", "deleteChat": "Löschen", "voiceOn": "Stimme Ein", "voiceOff": "Stimme Aus", "cameraOn": "Kamera Ein", "cameraOff": "Kamera Aus" },
+  "memory": { "title": "Gedächtnis", "subtitle": "Was die KI über Sie weiß", "empty": "Noch keine Erinnerungen. Fangen Sie an zu chatten!", "clear": "Alles löschen", "delete": "Löschen" },
+  "monitor": { "title": "KI-Arbeitsbereich", "empty": "Ergebnisse erscheinen hier", "search": "Websuche", "weather": "Wetter", "code": "Generierter Code", "vision": "Bildanalyse", "math": "Berechnung", "translation": "Übersetzung" },
+  "auth": { "login": "Anmelden", "register": "Konto Erstellen", "email": "E-Mail", "password": "Passwort", "name": "Name", "loginBtn": "Anmelden", "registerBtn": "Konto Erstellen", "switchToRegister": "Kein Konto? Registrieren", "switchToLogin": "Bereits ein Konto? Anmelden", "back": "← Zurück zur Startseite", "welcome": "Willkommen zurück!", "created": "Konto erstellt!", "error": "Etwas ist schiefgelaufen" },
+  "subscription": { "current": "Aktueller Plan", "upgrade": "Upgrade", "cancel": "Abonnement Kündigen", "free": "Kostenlos", "pro": "Pro", "enterprise": "Unternehmen" },
+  "errors": { "limitReached": "Nachrichtenlimit erreicht. Bitte upgraden Sie Ihren Plan.", "voiceLimit": "Sprachminutenlimit erreicht.", "networkError": "Netzwerkfehler. Bitte versuchen Sie es erneut.", "notConfigured": "Dienst nicht konfiguriert." },
+  "settings": { "theme": "Design", "dark": "Dunkel", "light": "Hell", "language": "Sprache", "avatar": "Avatar", "kelion": "Kelion", "kira": "Kira" }
+}

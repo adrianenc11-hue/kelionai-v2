@@ -51,7 +51,7 @@ export default function Home() {
             <Button onClick={() => setLocation("/pricing")} variant="ghost" size="sm" className="text-slate-400 hover:text-white">
               Pricing
             </Button>
-            <Button onClick={() => { window.location.href = "/login"; }} className="bg-blue-600 hover:bg-blue-700">
+            <Button onClick={() => { setLocation("/login"); }} className="bg-blue-600 hover:bg-blue-700">
               Sign In
             </Button>
           </div>
@@ -77,7 +77,7 @@ export default function Home() {
             </p>
             <div className="flex justify-center lg:justify-start">
               <Button
-                onClick={() => { window.location.href = "/login?plan=free"; }}
+                onClick={() => { setLocation("/login?plan=free"); }}
                 size="lg"
                 className="bg-blue-600 hover:bg-blue-700 text-base px-6 py-5 gap-2"
               >

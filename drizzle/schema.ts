@@ -34,7 +34,7 @@ export const conversations = pgTable("conversations", {
   userId: integer("user_id").notNull(),
   title: text("title"),
   description: text("description"),
-  primaryAiModel: varchar("primary_ai_model", { length: 50 }).default("gpt-4"),
+  primaryAiModel: varchar("primary_ai_model", { length: 50 }).default("gpt-5.4-pro"),
   isArchived: boolean("is_archived").default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -61,7 +61,7 @@ export const subscriptionPlans = pgTable("subscription_plans", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 100 }).notNull(),
   tier: subscriptionTierEnum("tier").notNull(),
-  stripePriceId: varchar("stripe_price_id", { length: 255 }).notNull(),
+  stripePriceId: varchar("stripe_price_id", { length: 255 }),
   monthlyPrice: numeric("monthly_price", { precision: 10, scale: 2 }),
   yearlyPrice: numeric("yearly_price", { precision: 10, scale: 2 }),
   messagesPerMonth: integer("messages_per_month"),
@@ -103,6 +103,49 @@ export const aiProviders = pgTable("ai_providers", {
 export type AiProvider = typeof aiProviders.$inferSelect;
 export type InsertAiProvider = typeof aiProviders.$inferInsert;
 
+// User Memories
+export const userMemories = pgTable("user_memories", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  key: varchar("key", { length: 255 }).notNull(),
+  value: text("value").notNull(),
+  importance: integer("importance").default(1),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+export type UserMemory = typeof userMemories.$inferSelect;
+
+// User Learning Profiles
+export const userLearningProfiles = pgTable("user_learning_profiles", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().unique(),
+  detectedLevel: varchar("detected_level", { length: 50 }).default("casual"),
+  preferredLanguage: varchar("preferred_language", { length: 10 }).default("en"),
+  preferredAvatar: varchar("preferred_avatar", { length: 10 }).default("kelion"),
+  interactionCount: integer("interaction_count").default(0),
+  voiceInteractionCount: integer("voice_interaction_count").default(0),
+  topics: json("topics").$type<string[]>().default([]),
+  learningScore: integer("learning_score").default(0),
+  lastUpdated: timestamp("last_updated").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type UserLearningProfile = typeof userLearningProfiles.$inferSelect;
+
+// User Preferences
+export const userPreferences = pgTable("user_preferences", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().unique(),
+  theme: varchar("theme", { length: 10 }).default("dark"),
+  language: varchar("language", { length: 10 }).default("en"),
+  selectedAvatar: varchar("selected_avatar", { length: 10 }).default("kelion"),
+  voiceEnabled: boolean("voice_enabled").default(true),
+  cameraEnabled: boolean("camera_enabled").default(false),
+  streamingEnabled: boolean("streaming_enabled").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+export type UserPreference = typeof userPreferences.$inferSelect;
+
 export const usersRelations = relations(users, ({ many }) => ({
   conversations: many(conversations),
   usage: many(userUsage),
@@ -129,3 +172,4 @@ export const userUsageRelations = relations(userUsage, ({ one }) => ({
     references: [users.id],
   }),
 }));
+

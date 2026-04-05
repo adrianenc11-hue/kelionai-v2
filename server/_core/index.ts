@@ -86,6 +86,10 @@ async function startServer() {
   }
 
   // tRPC API
+  app.get("/api/health", (_req, res) => {
+    res.json({ ok: true, ts: Date.now(), env: process.env.NODE_ENV });
+  });
+
   app.use(
     "/api/trpc",
     createExpressMiddleware({

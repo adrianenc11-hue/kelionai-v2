@@ -1,0 +1,11 @@
+{
+  "nav": { "contact": "Contacto", "pricing": "Precios", "signIn": "Iniciar Sesión" },
+  "home": { "title": "IA Que Entiende a Todos", "subtitle": "Conoce a Kelion y Kira — asistentes de IA diseñados para todos.", "cta": "Empieza Gratis", "online": "está en línea" },
+  "chat": { "placeholder": "Escribe un mensaje...", "send": "Enviar", "thinking": "Pensando...", "searching": "Buscando en la web...", "weather": "Comprobando el tiempo...", "analyzing": "Analizando imagen...", "generating": "Generando código...", "newChat": "Nuevo Chat", "deleteChat": "Eliminar", "voiceOn": "Voz Activada", "voiceOff": "Voz Desactivada", "cameraOn": "Cámara Activada", "cameraOff": "Cámara Desactivada" },
+  "memory": { "title": "Memoria", "subtitle": "Lo que la IA sabe sobre ti", "empty": "Sin recuerdos todavía. ¡Empieza a chatear!", "clear": "Borrar todo", "delete": "Eliminar" },
+  "monitor": { "title": "Espacio de Trabajo IA", "empty": "Los resultados aparecerán aquí", "search": "Búsqueda Web", "weather": "Tiempo", "code": "Código Generado", "vision": "Análisis de Imagen", "math": "Cálculo", "translation": "Traducción" },
+  "auth": { "login": "Iniciar Sesión", "register": "Crear Cuenta", "email": "Correo", "password": "Contraseña", "name": "Nombre", "loginBtn": "Iniciar Sesión", "registerBtn": "Crear Cuenta", "switchToRegister": "¿No tienes cuenta? Regístrate", "switchToLogin": "¿Ya tienes cuenta? Inicia sesión", "back": "← Volver al inicio", "welcome": "¡Bienvenido de vuelta!", "created": "¡Cuenta creada!", "error": "Algo salió mal" },
+  "subscription": { "current": "Plan Actual", "upgrade": "Mejorar", "cancel": "Cancelar Suscripción", "free": "Gratis", "pro": "Pro", "enterprise": "Empresarial" },
+  "errors": { "limitReached": "Límite de mensajes alcanzado. Por favor, mejora tu plan.", "voiceLimit": "Límite de minutos de voz alcanzado.", "networkError": "Error de red. Inténtalo de nuevo.", "notConfigured": "Servicio no configurado." },
+  "settings": { "theme": "Tema", "dark": "Oscuro", "light": "Claro", "language": "Idioma", "avatar": "Avatar", "kelion": "Kelion", "kira": "Kira" }
+}

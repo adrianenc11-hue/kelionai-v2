@@ -6,6 +6,7 @@ import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import App from "./App";
 import { getLoginUrl } from "./const";
+import "./i18n/index"; // must be before App
 import "./index.css";
 
 const queryClient = new QueryClient();

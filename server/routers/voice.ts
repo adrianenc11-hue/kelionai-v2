@@ -1,8 +1,8 @@
-import { z } from "zod";
+﻿import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
-import { transcribeAudio } from "../_core/voiceTranscription";
+import { transcribeAudio, transcribeAudioBase64 } from "../_core/voiceTranscription";
 import { generateSpeech, cloneVoice, getElevenLabsUsage, deleteClonedVoice } from "../elevenlabs";
-import { getUserUsage, updateUserUsage, getDb } from "../db";
+import { getUserUsage, updateUserUsage, getDb, getSubscriptionPlans } from "../db";
 import { sql } from "drizzle-orm";
 import { storagePut } from "../storage";
 
@@ -42,17 +42,19 @@ export const voiceRouter = router({
   transcribeAudio: protectedProcedure
     .input(
       z.object({
-        audioUrl: z.string().url(),
+        audioUrl: z.string(),
         language: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       const usage = await getUserUsage(ctx.user.id);
       const tier = ctx.user.subscriptionTier || "free";
-      const limits: Record<string, number> = { free: 10, pro: 100, enterprise: 1000 };
+      const plans = await getSubscriptionPlans();
+      const userPlan = plans.find(p => p.tier === tier);
+      const voiceLimit = userPlan?.voiceMinutesPerMonth ?? 10;
       const voiceMinutesUsed = usage?.voiceMinutesThisMonth || 0;
 
-      if (voiceMinutesUsed >= limits[tier]) {
+      if (voiceMinutesUsed >= voiceLimit) {
         throw new Error(`Voice usage limit reached for ${tier} tier`);
       }
 
@@ -88,10 +90,12 @@ export const voiceRouter = router({
     .mutation(async ({ ctx, input }) => {
       const usage = await getUserUsage(ctx.user.id);
       const tier = ctx.user.subscriptionTier || "free";
-      const limits: Record<string, number> = { free: 10, pro: 100, enterprise: 1000 };
+      const plans = await getSubscriptionPlans();
+      const userPlan = plans.find(p => p.tier === tier);
+      const voiceLimit = userPlan?.voiceMinutesPerMonth ?? 10;
       const voiceMinutesUsed = usage?.voiceMinutesThisMonth || 0;
 
-      if (voiceMinutesUsed >= limits[tier]) {
+      if (voiceMinutesUsed >= voiceLimit) {
         throw new Error(`Voice usage limit reached for ${tier} tier`);
       }
 
@@ -231,9 +235,10 @@ export const voiceRouter = router({
   getVoiceUsage: protectedProcedure.query(async ({ ctx }) => {
     const usage = await getUserUsage(ctx.user.id);
     const tier = ctx.user.subscriptionTier || "free";
-    const limits: Record<string, number> = { free: 10, pro: 100, enterprise: 1000 };
+    const plans = await getSubscriptionPlans();
+    const userPlan = plans.find(p => p.tier === tier);
+    const voiceMinutesLimit = userPlan?.voiceMinutesPerMonth ?? 10;
     const voiceMinutesUsed = usage?.voiceMinutesThisMonth || 0;
-    const voiceMinutesLimit = limits[tier];
 
     // Also get ElevenLabs usage
     let elevenLabsUsage = { characterCount: 0, characterLimit: 0, canClone: false };
@@ -249,4 +254,32 @@ export const voiceRouter = router({
       elevenLabs: elevenLabsUsage,
     };
   }),
+
+  /**
+   * Native audio transcription — direct base64, no upload (Gemini, ~0.3s)
+   */
+  liveAudio: protectedProcedure
+    .input(z.object({
+      audioBase64: z.string(),
+      mimeType: z.string().default("audio/webm"),
+      language: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const usage = await getUserUsage(ctx.user.id);
+      const tier = ctx.user.subscriptionTier || "free";
+      const plans = await getSubscriptionPlans();
+      const userPlan = plans.find(p => p.tier === tier);
+      const voiceLimit = userPlan?.voiceMinutesPerMonth ?? 10;
+      const voiceMinutesUsed = usage?.voiceMinutesThisMonth || 0;
+      if (voiceMinutesUsed >= voiceLimit) throw new Error("Voice usage limit reached");
+
+      const { text, duration } = await transcribeAudioBase64(input.audioBase64, input.mimeType, input.language);
+      const newVoiceMinutes = voiceMinutesUsed + Math.max(1, Math.ceil(duration / 60));
+      setTimeout(async () => {
+        await updateUserUsage(ctx.user.id, usage?.messagesThisMonth || 0, newVoiceMinutes);
+      }, 0);
+
+      return { text, duration };
+    }),
 });
+

@@ -7,6 +7,9 @@ import { subscriptionRouter } from "./routers/subscription";
 import { adminRouter } from "./routers/admin";
 import { voiceRouter } from "./routers/voice";
 import { contactRouter } from "./routers/contact";
+import { memoryRouter } from "./routers/memory";
+import { learningRouter } from "./routers/learning";
+import { mediaRouter } from "./routers/media";
 
 export const appRouter = router({
   // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
@@ -27,6 +30,9 @@ export const appRouter = router({
   admin: adminRouter,
   voice: voiceRouter,
   contact: contactRouter,
+  memory: memoryRouter,
+  learning: learningRouter,
+  media: mediaRouter,
 });
 
 export type AppRouter = typeof appRouter;

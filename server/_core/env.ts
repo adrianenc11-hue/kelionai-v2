@@ -1,19 +1,54 @@
+﻿function required(key: string): string {
+  const val = process.env[key];
+  if (!val) throw new Error(`[ENV] Missing required environment variable: ${key}`);
+  return val;
+}
+
+function optional(key: string, fallback = ""): string {
+  return process.env[key] ?? fallback;
+}
+
 export const ENV = {
-  appId: process.env.VITE_APP_ID ?? "",
-  cookieSecret: process.env.JWT_SECRET ?? "",
-  databaseUrl: process.env.DATABASE_URL ?? "",
-  supabaseUrl: process.env.SUPABASE_URL ?? "",
-  supabaseAnonKey: process.env.SUPABASE_ANON_KEY ?? "",
-  supabaseServiceKey: process.env.SUPABASE_SERVICE_KEY ?? "",
-  oAuthServerUrl: process.env.OAUTH_SERVER_URL ?? "",
-  ownerOpenId: process.env.OWNER_OPEN_ID ?? "",
+  jwtSecret: required("JWT_SECRET"),
+
+  databaseUrl: optional("DATABASE_URL"),
+  supabaseUrl: optional("SUPABASE_URL"),
+  supabaseAnonKey: optional("SUPABASE_ANON_KEY"),
+  supabaseServiceKey: optional("SUPABASE_SERVICE_KEY"),
+
+  // Google Gemini
+  geminiApiKey: optional("GEMINI_API_KEY"),
+  geminiFlashModel: optional("GEMINI_FLASH_MODEL", "gemini-2.5-flash"),
+  geminiProModel: optional("GEMINI_PRO_MODEL", "gemini-2.5-pro"),
+  geminiNativeAudioModel: optional("GEMINI_NATIVE_AUDIO_MODEL", "gemini-2.5-flash-native-audio-preview-12-2025"),
+
+  // OpenAI (backup video only)
+  openaiApiKey: optional("OPENAI_API_KEY"),
+  openaiModel: optional("OPENAI_MODEL", "gpt-5.4"),
+  openaiBaseUrl: optional("OPENAI_BASE_URL", "https://api.openai.com/v1"),
+
+  // ElevenLabs (voice cloning only)
+  elevenLabsApiKey: optional("ELEVENLABS_API_KEY"),
+  elevenLabsVoiceKelion: optional("ELEVENLABS_VOICE_KELION", "VR6AewLTigWG4xSOukaG"),
+  elevenLabsVoiceKira: optional("ELEVENLABS_VOICE_KIRA", "EXAVITQu4vr4xnSDxMaL"),
+
+  // Stripe
+  stripeSecretKey: optional("STRIPE_SECRET_KEY"),
+  stripeWebhookSecret: optional("STRIPE_WEBHOOK_SECRET"),
+
+  // Frontend
+  frontendUrl: optional("FRONTEND_URL", process.env.NODE_ENV === "production" ? "" : "http://localhost:5173"),
+
+  // Supabase Storage
+  supabaseStorageBucket: optional("SUPABASE_STORAGE_BUCKET", "kelionai-uploads"),
+
+  // Legacy
+  forgeApiUrl: optional("BUILT_IN_FORGE_API_URL"),
+  forgeApiKey: optional("BUILT_IN_FORGE_API_KEY"),
+  appId: optional("VITE_APP_ID"),
+  ownerOpenId: optional("OWNER_OPEN_ID"),
+  oAuthServerUrl: optional("OAUTH_SERVER_URL"),
+
   isProduction: process.env.NODE_ENV === "production",
-  forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
-  forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
-  // ElevenLabs TTS & Voice Cloning
-  elevenLabsApiKey: process.env.ELEVENLABS_API_KEY ?? "",
-  elevenLabsVoiceKelion: process.env.ELEVENLABS_VOICE_KELION ?? "VR6AewLTigWG4xSOukaG",
-  elevenLabsVoiceKira: process.env.ELEVENLABS_VOICE_KIRA ?? "EXAVITQu4vr4xnSDxMaL",
-  // OpenAI for GPT-5.4 vision + Whisper STT
-  openaiApiKey: process.env.OPENAI_API_KEY ?? "",
+  nodeEnv: optional("NODE_ENV", "development"),
 };

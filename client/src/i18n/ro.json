@@ -1,0 +1,11 @@
+{
+  "nav": { "contact": "Contact", "pricing": "Prețuri", "signIn": "Autentificare" },
+  "home": { "title": "AI Care Înțelege Pe Toată Lumea", "subtitle": "Cunoaște-i pe Kelion și Kira — asistenți AI pentru toată lumea.", "cta": "Începe Gratuit", "online": "este online" },
+  "chat": { "placeholder": "Scrie un mesaj...", "send": "Trimite", "thinking": "Mă gândesc...", "searching": "Caut pe web...", "weather": "Verific vremea...", "analyzing": "Analizez imaginea...", "generating": "Generez cod...", "newChat": "Chat Nou", "deleteChat": "Șterge", "voiceOn": "Voce Activă", "voiceOff": "Voce Inactivă", "cameraOn": "Cameră Activă", "cameraOff": "Cameră Inactivă" },
+  "memory": { "title": "Memorie", "subtitle": "Ce știe AI-ul despre tine", "empty": "Nicio amintire încă. Începe să vorbești!", "clear": "Șterge tot", "delete": "Șterge" },
+  "monitor": { "title": "Spațiu de Lucru AI", "empty": "Rezultatele vor apărea aici", "search": "Căutare Web", "weather": "Vreme", "code": "Cod Generat", "vision": "Analiză Imagine", "math": "Calcul", "translation": "Traducere" },
+  "auth": { "login": "Autentificare", "register": "Creare Cont", "email": "Email", "password": "Parolă", "name": "Nume", "loginBtn": "Autentifică-te", "registerBtn": "Creează Cont", "switchToRegister": "Nu ai cont? Înregistrează-te", "switchToLogin": "Ai deja cont? Autentifică-te", "back": "← Înapoi acasă", "welcome": "Bine ai revenit!", "created": "Cont creat!", "error": "Ceva nu a mers bine" },
+  "subscription": { "current": "Plan Curent", "upgrade": "Upgrade", "cancel": "Anulează Abonamentul", "free": "Gratuit", "pro": "Pro", "enterprise": "Enterprise" },
+  "errors": { "limitReached": "Limita de mesaje atinsă. Fă upgrade la planul tău.", "voiceLimit": "Limita de minute voce atinsă.", "networkError": "Eroare de rețea. Încearcă din nou.", "notConfigured": "Serviciu neconfigurat." },
+  "settings": { "theme": "Temă", "dark": "Întunecat", "light": "Luminos", "language": "Limbă", "avatar": "Avatar", "kelion": "Kelion", "kira": "Kira" }
+}

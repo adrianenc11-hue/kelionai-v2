@@ -49,13 +49,8 @@ export default function Login() {
 
       toast.success(isLogin ? "Welcome back!" : "Account created!");
 
-      // Redirect based on login vs registration
-      if (!isLogin) {
-        // Utilizator nou → direct în chat (planul free e activat implicit la register)
-        window.location.href = "/chat";
-      } else {
-        window.location.href = "/chat";
-      }
+      // Redirect to chat after login or registration
+      navigate("/chat");
     } catch (err) {
       toast.error("Network error. Please try again.");
     } finally {

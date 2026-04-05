@@ -11,11 +11,12 @@ import * as db from "./db";
 import { eq } from "drizzle-orm";
 import { users } from "../drizzle/schema";
 import type { User } from "../drizzle/schema";
+import { ENV } from "./_core/env";
 
 const SALT_ROUNDS = 12;
 
 function getJwtSecret() {
-  const secret = process.env.JWT_SECRET || "kelionai-default-secret-change-me";
+  const secret = ENV.jwtSecret; // required — server nu porneste fara JWT_SECRET
   return new TextEncoder().encode(secret);
 }
 

@@ -5,11 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Loader2, AlertCircle, CheckCircle, ArrowLeft } from "lucide-react";
 import { useLocation } from "wouter";
 import { useState, useEffect } from "react";
+import { toast } from "sonner";
 
 export default function SubscriptionManagement() {
   const { user, isAuthenticated, loading } = useAuth();
   const [, setLocation] = useLocation();
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const utils = trpc.useUtils();
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
@@ -24,6 +26,11 @@ export default function SubscriptionManagement() {
   const cancelMutation = trpc.subscription.cancelSubscription.useMutation({
     onSuccess: () => {
       setShowCancelConfirm(false);
+      utils.subscription.getSubscriptionStatus.invalidate();
+      toast.success("Subscription cancelled successfully.");
+    },
+    onError: (err) => {
+      toast.error(err.message);
     },
   });
 
@@ -32,6 +39,23 @@ export default function SubscriptionManagement() {
       if (data.url) window.open(data.url, "_blank");
     },
   });
+
+  const { data: plans } = trpc.subscription.getPlans.useQuery();
+
+  const defaultPlans = [
+    { name: "free", title: "Free", price: "$0", features: ["20 msg/mo", "Basic support"] },
+    { name: "pro", title: "Pro", price: "$29/mo", features: ["200 msg/mo", "Priority support", "100 min voice"] },
+    { name: "enterprise", title: "Enterprise", price: "$99/mo", features: ["Unlimited", "Dedicated support", "1000 min voice"] },
+  ];
+
+  const displayPlans = plans
+    ? (plans as unknown as Array<{ tier: string; name?: string; monthlyPrice?: string | null; features?: unknown }>).map((p) => ({
+        name: p.tier,
+        title: p.tier.charAt(0).toUpperCase() + p.tier.slice(1),
+        price: p.monthlyPrice ? `$${p.monthlyPrice}/mo` : "$0",
+        features: Array.isArray(p.features) ? p.features as string[] : [],
+      }))
+    : defaultPlans;
 
   if (subscriptionLoading || loading) {
     return (
@@ -111,11 +135,7 @@ export default function SubscriptionManagement() {
 
           {/* Plan Comparison - compact */}
           <div className="grid grid-cols-3 gap-3">
-            {[
-              { name: "free", title: "Free", price: "$0", features: ["20 msg/mo", "Basic support"] },
-              { name: "pro", title: "Pro", price: "$29/mo", features: ["200 msg/mo", "Priority support", "100 min voice"] },
-              { name: "enterprise", title: "Enterprise", price: "$99/mo", features: ["Unlimited", "Dedicated support", "1000 min voice"] },
-            ].map((plan) => (
+            {displayPlans.map((plan) => (
               <Card key={plan.name} className={`p-3 border ${currentTier === plan.name ? "border-blue-500 bg-blue-900/20" : "border-slate-800 bg-slate-900/50"}`}>
                 <h4 className="text-sm font-bold mb-1">{plan.title}</h4>
                 <p className="text-lg font-bold mb-2">{plan.price}</p>

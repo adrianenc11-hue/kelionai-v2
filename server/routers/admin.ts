@@ -118,9 +118,13 @@ export const adminRouter = router({
         enterprise: allUsers.filter((u) => u.subscriptionTier === "enterprise").length,
       };
 
-      // Placeholder pricing - would be fetched from Stripe in production
-      const estimatedMRR =
-        subscriptionTiers.pro * 29 + subscriptionTiers.enterprise * 99;
+      // Fetch real pricing from DB plans
+      const allPlans = await (await import("../db")).getSubscriptionPlans();
+      const proPlan = allPlans.find(p => p.tier === "pro");
+      const enterprisePlan = allPlans.find(p => p.tier === "enterprise");
+      const proPrice = Number(proPlan?.monthlyPrice || 0);
+      const enterprisePrice = Number(enterprisePlan?.monthlyPrice || 0);
+      const estimatedMRR = subscriptionTiers.pro * proPrice + subscriptionTiers.enterprise * enterprisePrice;
 
       return {
         subscriptionTiers,

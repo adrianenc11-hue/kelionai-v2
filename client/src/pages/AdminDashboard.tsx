@@ -4,17 +4,20 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2, Users, MessageSquare, TrendingUp, Activity, ArrowLeft } from "lucide-react";
 import { useLocation } from "wouter";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function AdminDashboard() {
   const { user, isAuthenticated } = useAuth();
   const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState<"overview" | "users" | "health">("overview");
 
-  if (!isAuthenticated || user?.role !== "admin") {
-    setLocation("/");
-    return null;
-  }
+  useEffect(() => {
+    if (!isAuthenticated || user?.role !== "admin") {
+      setLocation("/");
+    }
+  }, [isAuthenticated, user, setLocation]);
+
+  if (!isAuthenticated || user?.role !== "admin") return null;
 
   const { data: analytics, isLoading: analyticsLoading } = trpc.admin.getUserAnalytics.useQuery();
   const { data: users, isLoading: usersLoading } = trpc.admin.getAllUsers.useQuery();

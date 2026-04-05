@@ -44,8 +44,8 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
   }, [mouthOpen]);
 
   const modelUrls: Record<string, string> = {
-    kelion: "https://d2xsxph8kpxj0f.cloudfront.net/310519663494239902/fTDgTXExTnteU8v7gTpoiu/kelion-rpm_e27cb94d.glb",
-    kira: "https://d2xsxph8kpxj0f.cloudfront.net/310519663494239902/fTDgTXExTnteU8v7gTpoiu/kira-rpm_54d82b66.glb",
+    kelion: import.meta.env.VITE_AVATAR_KELION_URL || "https://d2xsxph8kpxj0f.cloudfront.net/310519663494239902/fTDgTXExTnteU8v7gTpoiu/kelion-rpm_e27cb94d.glb",
+    kira: import.meta.env.VITE_AVATAR_KIRA_URL || "https://d2xsxph8kpxj0f.cloudfront.net/310519663494239902/fTDgTXExTnteU8v7gTpoiu/kira-rpm_54d82b66.glb",
   };
 
   // Apply relaxed pose
@@ -246,7 +246,7 @@ const Avatar3D: React.FC<Avatar3DProps> = ({
       }
       renderer.dispose();
     };
-  }, [character, onReady, applyRelaxedPose, applyMouthMorph]);
+  }, [character, applyRelaxedPose, applyMouthMorph]); // onReady excluded - stable ref not needed
 
   // Apply emotion-based transformations
   useEffect(() => {

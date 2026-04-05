@@ -1,14 +1,14 @@
 import { eq, desc, asc } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { InsertUser, users, conversations, messages, subscriptionPlans, userUsage } from "../drizzle/schema";
+import { InsertUser, users, conversations, messages, subscriptionPlans, userUsage, userMemories, userLearningProfiles, userPreferences } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
 export async function getDb() {
   if (!_db) {
-    const url = process.env.DATABASE_URL || "";
+    const url = ENV.databaseUrl;
     if (!url) return null;
     try {
       const client = postgres(url, { ssl: { rejectUnauthorized: false } });
@@ -75,7 +75,7 @@ export async function createConversation(userId: number, title: string) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   try {
-    const result = await db.insert(conversations).values({ userId, title, primaryAiModel: "gpt-4" }).returning();
+    const result = await db.insert(conversations).values({ userId, title, primaryAiModel: ENV.openaiModel }).returning();
     return result[0];
   } catch (error) { console.error("[Database] Failed to create conversation:", error); throw error; }
 }
@@ -158,5 +158,73 @@ export async function updateUserUsage(userId: number, messagesThisMonth: number,
     await db.update(userUsage).set({ messagesThisMonth, voiceMinutesThisMonth }).where(eq(userUsage.userId, userId));
   } else {
     await db.insert(userUsage).values({ userId, messagesThisMonth, voiceMinutesThisMonth });
+  }
+}
+
+// MEMORIES
+export async function getUserMemories(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(userMemories).where(eq(userMemories.userId, userId)).orderBy(desc(userMemories.updatedAt));
+}
+
+export async function saveUserMemory(userId: number, key: string, value: string, importance = 1) {
+  const db = await getDb();
+  if (!db) return;
+  const existing = await db.select().from(userMemories).where(eq(userMemories.userId, userId)).then(rows => rows.find(r => r.key === key));
+  if (existing) {
+    await db.update(userMemories).set({ value, importance, updatedAt: new Date() }).where(eq(userMemories.id, existing.id));
+  } else {
+    await db.insert(userMemories).values({ userId, key, value, importance });
+  }
+}
+
+export async function deleteUserMemory(memoryId: number, userId: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(userMemories).where(eq(userMemories.id, memoryId));
+}
+
+export async function clearUserMemories(userId: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(userMemories).where(eq(userMemories.userId, userId));
+}
+
+// LEARNING PROFILES
+export async function getUserLearningProfile(userId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(userLearningProfiles).where(eq(userLearningProfiles.userId, userId)).limit(1);
+  return result[0] || null;
+}
+
+export async function upsertUserLearningProfile(userId: number, data: Partial<typeof userLearningProfiles.$inferInsert>) {
+  const db = await getDb();
+  if (!db) return;
+  const existing = await getUserLearningProfile(userId);
+  if (existing) {
+    await db.update(userLearningProfiles).set({ ...data, lastUpdated: new Date() }).where(eq(userLearningProfiles.userId, userId));
+  } else {
+    await db.insert(userLearningProfiles).values({ userId, ...data });
+  }
+}
+
+// PREFERENCES
+export async function getUserPreferences(userId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(userPreferences).where(eq(userPreferences.userId, userId)).limit(1);
+  return result[0] || null;
+}
+
+export async function upsertUserPreferences(userId: number, data: Partial<typeof userPreferences.$inferInsert>) {
+  const db = await getDb();
+  if (!db) return;
+  const existing = await getUserPreferences(userId);
+  if (existing) {
+    await db.update(userPreferences).set({ ...data, updatedAt: new Date() }).where(eq(userPreferences.userId, userId));
+  } else {
+    await db.insert(userPreferences).values({ userId, ...data });
   }
 }

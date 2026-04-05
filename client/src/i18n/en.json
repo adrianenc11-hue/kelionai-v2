@@ -1,0 +1,11 @@
+{
+  "nav": { "contact": "Contact", "pricing": "Pricing", "signIn": "Sign In" },
+  "home": { "title": "AI That Understands Everyone", "subtitle": "Meet Kelion and Kira — AI assistants designed for everyone.", "cta": "Get Started Free", "online": "is online" },
+  "chat": { "placeholder": "Type a message...", "send": "Send", "thinking": "Thinking...", "searching": "Searching web...", "weather": "Checking weather...", "analyzing": "Analyzing image...", "generating": "Generating code...", "newChat": "New Chat", "deleteChat": "Delete", "voiceOn": "Voice On", "voiceOff": "Voice Off", "cameraOn": "Camera On", "cameraOff": "Camera Off" },
+  "memory": { "title": "Memory", "subtitle": "What AI knows about you", "empty": "No memories yet. Start chatting!", "clear": "Clear all", "delete": "Delete" },
+  "monitor": { "title": "AI Workspace", "empty": "Results will appear here", "search": "Web Search", "weather": "Weather", "code": "Generated Code", "vision": "Image Analysis", "math": "Calculation", "translation": "Translation" },
+  "auth": { "login": "Sign In", "register": "Create Account", "email": "Email", "password": "Password", "name": "Name", "loginBtn": "Sign In", "registerBtn": "Create Account", "switchToRegister": "Don't have an account? Sign up", "switchToLogin": "Already have an account? Sign in", "back": "← Back to home", "welcome": "Welcome back!", "created": "Account created!", "error": "Something went wrong" },
+  "subscription": { "current": "Current Plan", "upgrade": "Upgrade", "cancel": "Cancel Subscription", "free": "Free", "pro": "Pro", "enterprise": "Enterprise" },
+  "errors": { "limitReached": "Message limit reached. Please upgrade your plan.", "voiceLimit": "Voice minutes limit reached.", "networkError": "Network error. Please try again.", "notConfigured": "Service not configured." },
+  "settings": { "theme": "Theme", "dark": "Dark", "light": "Light", "language": "Language", "avatar": "Avatar", "kelion": "Kelion", "kira": "Kira" }
+}

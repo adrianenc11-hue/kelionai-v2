@@ -1,0 +1,11 @@
+{
+  "nav": { "contact": "Contact", "pricing": "Tarifs", "signIn": "Se Connecter" },
+  "home": { "title": "L'IA Qui Comprend Tout le Monde", "subtitle": "Découvrez Kelion et Kira — des assistants IA pour tout le monde.", "cta": "Commencer Gratuitement", "online": "est en ligne" },
+  "chat": { "placeholder": "Tapez un message...", "send": "Envoyer", "thinking": "Je réfléchis...", "searching": "Recherche sur le web...", "weather": "Vérification de la météo...", "analyzing": "Analyse de l'image...", "generating": "Génération du code...", "newChat": "Nouveau Chat", "deleteChat": "Supprimer", "voiceOn": "Voix Activée", "voiceOff": "Voix Désactivée", "cameraOn": "Caméra Activée", "cameraOff": "Caméra Désactivée" },
+  "memory": { "title": "Mémoire", "subtitle": "Ce que l'IA sait sur vous", "empty": "Pas encore de souvenirs. Commencez à chatter!", "clear": "Tout effacer", "delete": "Supprimer" },
+  "monitor": { "title": "Espace de Travail IA", "empty": "Les résultats apparaîtront ici", "search": "Recherche Web", "weather": "Météo", "code": "Code Généré", "vision": "Analyse d'Image", "math": "Calcul", "translation": "Traduction" },
+  "auth": { "login": "Se Connecter", "register": "Créer un Compte", "email": "Email", "password": "Mot de passe", "name": "Nom", "loginBtn": "Se Connecter", "registerBtn": "Créer un Compte", "switchToRegister": "Pas de compte? S'inscrire", "switchToLogin": "Déjà un compte? Se connecter", "back": "← Retour à l'accueil", "welcome": "Bon retour!", "created": "Compte créé!", "error": "Une erreur s'est produite" },
+  "subscription": { "current": "Plan Actuel", "upgrade": "Améliorer", "cancel": "Annuler l'Abonnement", "free": "Gratuit", "pro": "Pro", "enterprise": "Entreprise" },
+  "errors": { "limitReached": "Limite de messages atteinte. Veuillez améliorer votre plan.", "voiceLimit": "Limite de minutes vocales atteinte.", "networkError": "Erreur réseau. Veuillez réessayer.", "notConfigured": "Service non configuré." },
+  "settings": { "theme": "Thème", "dark": "Sombre", "light": "Clair", "language": "Langue", "avatar": "Avatar", "kelion": "Kelion", "kira": "Kira" }
+}

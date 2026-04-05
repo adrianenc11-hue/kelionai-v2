@@ -1,8 +1,9 @@
 import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
 import type { User } from "../../drizzle/schema";
+import { ENV } from "./env";
 
 // Detect if we're running standalone (no Manus OAuth configured)
-const isStandalone = true; // Always use standalone auth (email/password)
+const isStandalone = !ENV.oAuthServerUrl;
 
 export type TrpcContext = {
   req: CreateExpressContextOptions["req"];
