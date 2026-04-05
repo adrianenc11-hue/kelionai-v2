@@ -554,10 +554,7 @@ export default function Chat() {
                 <User className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">{user.name?.split(" ")[0]}</span>
               </button>
-              <button onClick={() => navigate("/subscription")} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs text-slate-400 hover:text-white transition-colors" style={{ border: "1px solid rgba(255,255,255,0.1)" }}>
-                <CreditCard className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Plan</span>
-              </button>
+
               <button onClick={handleLogout} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs text-slate-400 hover:text-red-400 transition-colors" style={{ border: "1px solid rgba(255,255,255,0.1)" }}>
                 <LogOut className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Logout</span>
