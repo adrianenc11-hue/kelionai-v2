@@ -11,13 +11,6 @@ export default function Pricing() {
   const [, setLocation] = useLocation();
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
 
-  // Detectează dacă utilizatorul a expirat (a consumat perioada free sau abonamentul a expirat)
-  const isExpired =
-    user &&
-    (user.subscriptionStatus === "cancelled" ||
-      user.subscriptionStatus === "past_due" ||
-      (user.subscriptionTier === "free" && (user as any).freeTrialExpired === true));
-
   const { data: plans, isLoading } = trpc.subscription.getPlans.useQuery();
   const createCheckoutMutation = trpc.subscription.createCheckoutSession.useMutation({
     onSuccess: (data) => {
@@ -30,9 +23,14 @@ export default function Pricing() {
     },
   });
 
+  // Detectează dacă utilizatorul a expirat (abonamentul a fost anulat sau restanțier)
+  const isExpired =
+    user &&
+    (user.subscriptionStatus === "cancelled" || user.subscriptionStatus === "past_due");
+
   const handleSubscribe = async (planId: string) => {
     if (planId === "free") {
-      // Butonul Free → duce la register dacă nu e autentificat, altfel direct la chat
+      // Butonul Free → register dacă nu e autentificat, altfel direct la chat
       if (!user) {
         window.location.href = "/login?plan=free&mode=register";
       } else {
@@ -62,46 +60,11 @@ export default function Pricing() {
     );
   }
 
-  // Toate planurile disponibile
-  const allPlanTiers = [
-    {
-      id: "free",
-      name: "Free",
-      price: "$0",
-      description: "Testează aplicația",
-      features: ["20 mesaje/lună", "Toate modelele AI", "10 min voce/lună"],
-      cta: user ? "Intră în Chat" : "Încearcă Gratis",
-      highlighted: false,
-      isFreeTier: true,
-    },
-    {
-      id: "pro",
-      name: "Pro",
-      price: "$29",
-      period: "/lună",
-      description: "Pentru utilizatori activi",
-      features: ["200 mesaje/lună", "Prioritate routing", "100 min voce/lună", "Istoric chat", "Avatare personalizate"],
-      cta: "Abonează-te",
-      highlighted: true,
-      isFreeTier: false,
-    },
-    {
-      id: "enterprise",
-      name: "Enterprise",
-      price: "$99",
-      period: "/lună",
-      description: "Utilizatori Power",
-      features: ["Mesaje nelimitate", "Suport dedicat", "1000 min voce/lună", "Acces API", "Integrări custom"],
-      cta: "Contactează Sales",
-      highlighted: false,
-      isFreeTier: false,
-    },
-  ];
-
-  // Dacă utilizatorul a expirat, ascunde planul Free — forțează upgrade
-  const planTiers = isExpired
-    ? allPlanTiers.filter((p) => !p.isFreeTier)
-    : allPlanTiers;
+  // Filtrează planurile: dacă utilizatorul a expirat, ascunde planul Free
+  const visiblePlans = (plans || []).filter((plan) => {
+    if (isExpired && plan.tier === "free") return false;
+    return true;
+  });
 
   return (
     <div className="h-screen overflow-hidden bg-slate-950 text-white flex flex-col">
@@ -120,7 +83,7 @@ export default function Pricing() {
         </h1>
       </header>
 
-      {/* Banner de expirare - vizibil doar dacă perioada free s-a terminat */}
+      {/* Banner expirare */}
       {isExpired && (
         <div className="shrink-0 bg-amber-900/40 border-b border-amber-700/50 px-4 py-3 flex items-center gap-3">
           <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
@@ -132,66 +95,110 @@ export default function Pricing() {
 
       {/* Pricing Cards */}
       <div className="flex-1 flex items-center justify-center px-4 sm:px-6">
-        <div className={`grid gap-5 max-w-5xl w-full ${isExpired ? "md:grid-cols-2 max-w-3xl" : "md:grid-cols-3"}`}>
-          {planTiers.map((plan) => (
-            <Card
-              key={plan.name}
-              className={`relative p-5 flex flex-col ${
-                plan.highlighted
-                  ? "border-2 border-purple-500 bg-purple-900/30 transform md:scale-105"
-                  : "border border-slate-700/50 bg-slate-900/50"
-              }`}
-            >
-              {plan.highlighted && (
-                <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-purple-500 to-pink-500 px-3 py-0.5 rounded-full text-xs font-semibold">
-                  Cel mai popular
-                </div>
-              )}
+        {visiblePlans.length === 0 ? (
+          <div className="text-slate-400 text-center">
+            <p>Nu există planuri disponibile momentan.</p>
+          </div>
+        ) : (
+          <div
+            className={`grid gap-5 max-w-5xl w-full ${
+              visiblePlans.length === 1
+                ? "max-w-sm"
+                : visiblePlans.length === 2
+                ? "md:grid-cols-2 max-w-3xl"
+                : "md:grid-cols-3"
+            }`}
+          >
+            {visiblePlans.map((plan) => {
+              const isHighlighted = plan.tier === "pro";
+              const isFreeTier = plan.tier === "free";
+              const features: string[] = Array.isArray(plan.features)
+                ? (plan.features as string[])
+                : [];
 
-              <h3 className="text-lg font-bold mb-1">{plan.name}</h3>
-              <p className="text-slate-400 text-xs mb-3">{plan.description}</p>
+              return (
+                <Card
+                  key={plan.id}
+                  className={`relative p-5 flex flex-col ${
+                    isHighlighted
+                      ? "border-2 border-purple-500 bg-purple-900/30 transform md:scale-105"
+                      : "border border-slate-700/50 bg-slate-900/50"
+                  }`}
+                >
+                  {isHighlighted && (
+                    <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-purple-500 to-pink-500 px-3 py-0.5 rounded-full text-xs font-semibold">
+                      Cel mai popular
+                    </div>
+                  )}
 
-              <div className="mb-4">
-                <span className="text-3xl font-bold">{plan.price}</span>
-                {plan.period && <span className="text-slate-400 text-sm">{plan.period}</span>}
-              </div>
+                  <h3 className="text-lg font-bold mb-1 capitalize">{plan.name}</h3>
+                  <p className="text-slate-400 text-xs mb-3">
+                    {isFreeTier ? "Testează aplicația" : plan.tier === "enterprise" ? "Utilizatori Power" : "Pentru utilizatori activi"}
+                  </p>
 
-              <Button
-                onClick={() => handleSubscribe(plan.id)}
-                disabled={selectedPlan === plan.id || createCheckoutMutation.isPending}
-                className={`w-full mb-4 ${
-                  plan.highlighted
-                    ? "bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
-                    : plan.isFreeTier
-                    ? "bg-blue-600 hover:bg-blue-700"
-                    : ""
-                }`}
-                size="sm"
-              >
-                {selectedPlan === plan.id && createCheckoutMutation.isPending ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  plan.cta
-                )}
-              </Button>
-
-              <div className="space-y-2 flex-1">
-                {plan.features.map((feature) => (
-                  <div key={feature} className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-green-400 shrink-0" />
-                    <span className="text-slate-300 text-sm">{feature}</span>
+                  <div className="mb-4">
+                    <span className="text-3xl font-bold">
+                      {isFreeTier ? "$0" : `$${Number(plan.monthlyPrice || 0).toFixed(0)}`}
+                    </span>
+                    {!isFreeTier && <span className="text-slate-400 text-sm">/lună</span>}
                   </div>
-                ))}
-              </div>
-            </Card>
-          ))}
-        </div>
+
+                  <Button
+                    onClick={() => handleSubscribe(plan.tier)}
+                    disabled={selectedPlan === plan.tier || createCheckoutMutation.isPending}
+                    className={`w-full mb-4 ${
+                      isHighlighted
+                        ? "bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
+                        : isFreeTier
+                        ? "bg-blue-600 hover:bg-blue-700"
+                        : ""
+                    }`}
+                    size="sm"
+                  >
+                    {selectedPlan === plan.tier && createCheckoutMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : isFreeTier ? (
+                      user ? "Intră în Chat" : "Încearcă Gratis"
+                    ) : (
+                      "Abonează-te"
+                    )}
+                  </Button>
+
+                  <div className="space-y-2 flex-1">
+                    {plan.messagesPerMonth && (
+                      <div className="flex items-center gap-2">
+                        <Check className="w-4 h-4 text-green-400 shrink-0" />
+                        <span className="text-slate-300 text-sm">
+                          {plan.messagesPerMonth === -1 ? "Mesaje nelimitate" : `${plan.messagesPerMonth} mesaje/lună`}
+                        </span>
+                      </div>
+                    )}
+                    {plan.voiceMinutesPerMonth && (
+                      <div className="flex items-center gap-2">
+                        <Check className="w-4 h-4 text-green-400 shrink-0" />
+                        <span className="text-slate-300 text-sm">
+                          {plan.voiceMinutesPerMonth === -1 ? "Voce nelimitată" : `${plan.voiceMinutesPerMonth} min voce/lună`}
+                        </span>
+                      </div>
+                    )}
+                    {features.map((feature: string) => (
+                      <div key={feature} className="flex items-center gap-2">
+                        <Check className="w-4 h-4 text-green-400 shrink-0" />
+                        <span className="text-slate-300 text-sm">{feature}</span>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Footer */}
       <footer className="shrink-0 border-t border-slate-800/50 py-2 text-center text-xs text-slate-500">
         {isExpired
-          ? "Reactivează-ți contul cu un plan plătit. Niciun angajament."
+          ? "Reactivează-ți contul cu un plan plătit."
           : "Gratuit pentru a începe. Nu se cere card. Upgrade oricând."}
       </footer>
     </div>

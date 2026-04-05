@@ -8,6 +8,7 @@ import {
   createMessage,
   getUserUsage,
   updateUserUsage,
+  getSubscriptionPlans,
 } from "../db";
 import { processBrainMessage, processVoiceCloningStep, BrainMessage } from "../brain-v4";
 import { CharacterName } from "../characters";
@@ -62,13 +63,18 @@ export const chatRouter = router({
         throw new Error("Conversation not found or access denied");
       }
 
-      // Check usage limits
+      // Check usage limits - fetch from DB plans
       const usage = await getUserUsage(ctx.user.id);
       const tier = ctx.user.subscriptionTier || "free";
-      const limits: Record<string, number> = { free: 50, pro: 500, enterprise: 10000 };
       const messagesThisMonth = usage?.messagesThisMonth || 0;
-      if (messagesThisMonth >= (limits[tier] || 50)) {
-        throw new Error(`Message limit reached for ${tier} plan. Please upgrade.`);
+
+      // Fetch limit for user's tier from DB
+      const plans = await getSubscriptionPlans();
+      const userPlan = plans.find((p) => p.tier === tier);
+      const messageLimit = userPlan?.messagesPerMonth ?? 20; // default 20 dacă planul nu e în DB
+
+      if (messageLimit !== -1 && messagesThisMonth >= messageLimit) {
+        throw Object.assign(new Error("LIMIT_REACHED"), { code: "LIMIT_REACHED", tier });
       }
 
       // Store user message
