@@ -75,21 +75,13 @@ export default function Home() {
             <p className="text-sm text-slate-400 mb-6 max-w-xl mx-auto lg:mx-0">
               Voice-first. Accessible. Adaptive. They speak your language and match your level.
             </p>
-            <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
+            <div className="flex justify-center lg:justify-start">
               <Button
                 onClick={() => { window.location.href = "/login?plan=free"; }}
                 size="lg"
                 className="bg-blue-600 hover:bg-blue-700 text-base px-6 py-5 gap-2"
               >
                 Get Started Free <ArrowRight className="w-5 h-5" />
-              </Button>
-              <Button
-                onClick={() => { window.location.href = "/pricing"; }}
-                size="lg"
-                variant="outline"
-                className="border-slate-700 text-slate-300 hover:text-white text-base px-6 py-5"
-              >
-                View Plans
               </Button>
             </div>
           </div>
