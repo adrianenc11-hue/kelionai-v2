@@ -77,7 +77,7 @@ export default function Home() {
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
               <Button
-                onClick={() => setLocation("/pricing")}
+                onClick={() => { window.location.href = "/pricing"; }}
                 size="lg"
                 className="bg-blue-600 hover:bg-blue-700 text-base px-6 py-5 gap-2"
               >
