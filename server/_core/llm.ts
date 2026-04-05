@@ -230,7 +230,7 @@ const getApiKey = () => {
  * Get the model name
  */
 const getModelName = () => {
-  return "gpt-5.4-pro";
+  return "gpt-4o";
 };
 
 const normalizeResponseFormat = ({
