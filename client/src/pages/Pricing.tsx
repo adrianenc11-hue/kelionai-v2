@@ -28,6 +28,14 @@ export default function Pricing() {
       setLocation("/login");
       return;
     }
+    
+    // Contul free nu are nevoie de procesator de plată (Stripe Checkout)
+    // Direcționează utilizatorul direct către chat 
+    if (planId === "free") {
+      setLocation("/chat");
+      return;
+    }
+    
     setSelectedPlan(planId);
     await createCheckoutMutation.mutateAsync({
       planId,
