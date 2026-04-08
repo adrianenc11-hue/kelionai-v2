@@ -1,0 +1,38 @@
+{
+  "name": "kelion-voice",
+  "version": "1.0.0",
+  "description": "Voice API service for text-to-speech and audio management",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js",
+    "test": "jest --coverage",
+    "test:watch": "jest --watch"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "coverageDirectory": "coverage",
+    "collectCoverageFrom": [
+      "src/**/*.js"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "branches": 80,
+        "functions": 80,
+        "lines": 80,
+        "statements": 80
+      }
+    }
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "express-validator": "^7.0.1"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "supertest": "^6.3.4"
+  },
+  "engines": {
+    "node": ">=20.x"
+  }
+}
