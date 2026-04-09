@@ -1,5 +1,6 @@
 'use strict';
 
+const path = require('path');
 const express = require('express');
 const session = require('express-session');
 const cors = require('cors');
@@ -75,7 +76,26 @@ app.use('/api/payments', paymentsRouter);
 // Health / readiness probe (useful for Railway)
 app.get('/health', (_req, res) => res.json({ status: 'ok', ts: new Date().toISOString() }));
 
-// 404 catch-all
+// ---------------------------------------------------------------------------
+// Serve frontend static files in production (must come after API routes)
+// ---------------------------------------------------------------------------
+if (process.env.NODE_ENV === 'production') {
+  const distPath = path.join(__dirname, '../../dist');
+  app.use(express.static(distPath));
+
+  // SPA fallback — serve index.html for any non-API GET request
+  app.get('*', (req, res, next) => {
+    if (/^\/(api|auth)(\/|$)/.test(req.path) || req.path === '/health') {
+      return next();
+    }
+    res.sendFile(path.join(distPath, 'index.html'), (err) => {
+      if (err) next(err);
+    });
+  });
+}
+
+// 404 catch-all (reached in development for all unmatched routes, and in
+// production for unmatched API/auth routes or non-GET requests to unknown paths)
 app.use((_req, res) => res.status(404).json({ error: 'Not found' }));
 
 // Global error handler
