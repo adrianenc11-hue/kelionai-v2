@@ -29,6 +29,12 @@ export default function VoiceChat({ avatar, onBack }) {
   const [transcript, setTranscript] = useState('')
   const [voiceLang, setVoiceLang] = useState('en-US')
 
+  // Camera state
+  const [cameraOpen, setCameraOpen] = useState(false)
+  const [facingMode, setFacingMode] = useState('user') // 'user' = față, 'environment' = spate
+  const videoRef  = useRef(null)
+  const streamRef = useRef(null)
+
   // Debug state
   const [showDebug, setShowDebug] = useState(false)
   const [debugConfig, setDebugConfig] = useState({
@@ -45,6 +51,51 @@ export default function VoiceChat({ avatar, onBack }) {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  // Start camera stream
+  const startCamera = useCallback(async (facing) => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop())
+      streamRef.current = null
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: facing, width: { ideal: 320 }, height: { ideal: 240 } },
+        audio: false,
+      })
+      streamRef.current = stream
+      if (videoRef.current) videoRef.current.srcObject = stream
+    } catch (err) {
+      console.error('Camera error:', err)
+      setCameraOpen(false)
+    }
+  }, [])
+
+  const toggleCamera = useCallback(() => {
+    if (cameraOpen) {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop())
+        streamRef.current = null
+      }
+      setCameraOpen(false)
+    } else {
+      setCameraOpen(true)
+      startCamera(facingMode)
+    }
+  }, [cameraOpen, facingMode, startCamera])
+
+  const flipCamera = useCallback(() => {
+    const next = facingMode === 'user' ? 'environment' : 'user'
+    setFacingMode(next)
+    if (cameraOpen) startCamera(next)
+  }, [facingMode, cameraOpen, startCamera])
+
+  // Cleanup camera on unmount
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop())
+    }
+  }, [])
 
 
   const speak = useCallback((text, lang) => {
@@ -213,6 +264,56 @@ export default function VoiceChat({ avatar, onBack }) {
           boneNames={boneNames}
         />
 
+        {/* Camera preview + controls */}
+        <div style={{
+          position: 'absolute', bottom: '30px', left: '20px',
+          display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-start',
+        }}>
+          {cameraOpen && (
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              style={{
+                width: '140px', height: '100px', borderRadius: '12px',
+                objectFit: 'cover', border: `1px solid ${avatar.glow}66`,
+                background: '#000',
+                transform: facingMode === 'user' ? 'scaleX(-1)' : 'none',
+              }}
+            />
+          )}
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <button
+              onClick={toggleCamera}
+              style={{
+                background: cameraOpen
+                  ? 'rgba(220,38,38,0.3)'
+                  : 'rgba(255,255,255,0.1)',
+                border: `1px solid ${cameraOpen ? '#ef4444' : 'rgba(255,255,255,0.2)'}`,
+                color: '#fff', padding: '6px 12px', borderRadius: '16px',
+                cursor: 'pointer', fontSize: '13px', backdropFilter: 'blur(10px)',
+              }}
+            >
+              {cameraOpen ? '📷 Off' : '📷 Camera'}
+            </button>
+            {cameraOpen && (
+              <button
+                onClick={flipCamera}
+                title={facingMode === 'user' ? 'Comută pe spate' : 'Comută pe față'}
+                style={{
+                  background: 'rgba(255,255,255,0.1)',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  color: '#fff', padding: '6px 10px', borderRadius: '16px',
+                  cursor: 'pointer', fontSize: '13px', backdropFilter: 'blur(10px)',
+                }}
+              >
+                🔄 {facingMode === 'user' ? 'Spate' : 'Față'}
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* Avatar name + talking indicator */}
         <div style={{
           position: 'absolute', bottom: '30px', left: '50%',
@@ -286,6 +387,9 @@ export default function VoiceChat({ avatar, onBack }) {
                 color: '#fff',
                 borderBottomRightRadius: msg.role === 'user' ? '4px' : '16px',
                 borderBottomLeftRadius: msg.role === 'assistant' ? '4px' : '16px',
+                wordBreak: 'break-word',
+                whiteSpace: 'pre-wrap',
+                overflowWrap: 'anywhere',
               }}>
                 {msg.content || <span style={{ opacity: 0.5 }}>...</span>}
               </div>

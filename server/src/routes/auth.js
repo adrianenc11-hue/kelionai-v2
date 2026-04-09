@@ -32,7 +32,15 @@ router.get('/google/start', (req, res) => {
   req.session.oauthMode = mode;
 
   const authUrl = buildAuthUrl({ state, codeChallenge, mode });
-  res.redirect(authUrl);
+  // Save session explicitly before redirecting to Google so the
+  // OAuth state & PKCE are persisted even with async session stores.
+  req.session.save((err) => {
+    if (err) {
+      console.error('[auth/start] session save error:', err.message);
+      return res.status(500).json({ error: 'Session error' });
+    }
+    res.redirect(authUrl);
+  });
 });
 
 // ---------------------------------------------------------------------------
