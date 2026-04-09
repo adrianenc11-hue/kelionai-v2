@@ -5,7 +5,7 @@ const fs = require('fs');
 const express = require('express');
 const session = require('express-session');
 const cors = require('cors');
-const helmet = require('helmet');
+
 const cookieParser = require('cookie-parser');
 
 const config = require('./config');
@@ -25,12 +25,8 @@ const paymentsRouter     = require('./routes/payments');
 const app = express();
 
 // ---------------------------------------------------------------------------
-// Security headers
+// Security headers (minimal – no helmet, it blocks React/Three.js)
 // ---------------------------------------------------------------------------
-app.use(helmet({
-  contentSecurityPolicy: false,   // CSP breaks React/Three.js inline scripts & Google OAuth
-  crossOriginEmbedderPolicy: false,
-}));
 
 // ---------------------------------------------------------------------------
 // CORS
