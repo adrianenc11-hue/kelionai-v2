@@ -8,7 +8,7 @@ cmds = [
 ]
 
 [phases.build]
-cmds = ["npm run build"]
+cmds = ["npm run build --force"]
 
 [start]
 cmd = "cd server && npm start"
