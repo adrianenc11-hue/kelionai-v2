@@ -1,18 +1,8 @@
 import { Canvas } from '@react-three/fiber'
-import { OrbitControls, useGLTF, Environment } from '@react-three/drei'
+import { OrbitControls, Environment } from '@react-three/drei'
 import { Suspense, useState, useRef, useEffect, useCallback } from 'react'
 import Nxcode from '@nxcode/sdk'
-
-function AvatarModel({ modelPath, isTalking }) {
-  const { scene } = useGLTF(modelPath)
-  return (
-    <primitive
-      object={scene}
-      scale={1.8}
-      position={[0, -1.8, 0]}
-    />
-  )
-}
+import { AvatarModelDebug, DebugPanel } from './AvatarDebug'
 
 const SYSTEM_PROMPT = {
   kelion: `Ești Kelion, un asistent AI masculin prietenos și inteligent. Răspunzi în română, ești concis și util. Personalitate: calm, profesionist, empatic.`,
@@ -28,6 +18,15 @@ export default function VoiceChat({ avatar, onBack }) {
   const [isTalking, setIsTalking] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [transcript, setTranscript] = useState('')
+
+  // Debug state
+  const [showDebug, setShowDebug] = useState(false)
+  const [debugConfig, setDebugConfig] = useState({
+    scale: 1.8, posX: 0, posY: -1.8, posZ: 0,
+    leftArm: { x: 0, y: 0, z: 0 },
+    rightArm: { x: 0, y: 0, z: 0 },
+  })
+  const [boneNames, setBoneNames] = useState([])
 
   const recognitionRef = useRef(null)
   const chatEndRef = useRef(null)
@@ -136,7 +135,11 @@ export default function VoiceChat({ avatar, onBack }) {
           <pointLight position={[0, 2, 2]} intensity={isTalking ? 2 : 0.5} color={avatar.glow} />
           <Environment preset="city" />
           <Suspense fallback={null}>
-            <AvatarModel modelPath={avatar.model} isTalking={isTalking} />
+            <AvatarModelDebug
+              modelPath={avatar.model}
+              debugConfig={debugConfig}
+              onBonesReady={setBoneNames}
+            />
           </Suspense>
           <OrbitControls
             enableZoom={false}
@@ -158,6 +161,31 @@ export default function VoiceChat({ avatar, onBack }) {
         >
           ← Înapoi
         </button>
+
+        {/* Debug toggle button */}
+        <button
+          onClick={() => setShowDebug(v => !v)}
+          style={{
+            position: 'absolute', top: '20px', right: '20px',
+            background: showDebug
+              ? `linear-gradient(135deg, ${avatar.color}, ${avatar.glow})`
+              : 'rgba(255,255,255,0.1)',
+            border: `1px solid ${showDebug ? avatar.glow : 'rgba(255,255,255,0.2)'}`,
+            color: '#fff', padding: '8px 14px', borderRadius: '20px',
+            cursor: 'pointer', fontSize: '13px', backdropFilter: 'blur(10px)',
+          }}
+        >
+          {showDebug ? '✕ Debug' : '🔧 Debug'}
+        </button>
+
+        {/* Debug Panel */}
+        <DebugPanel
+          visible={showDebug}
+          avatarColor={avatar.color}
+          avatarGlow={avatar.glow}
+          onConfigChange={setDebugConfig}
+          boneNames={boneNames}
+        />
 
         {/* Avatar name + talking indicator */}
         <div style={{
