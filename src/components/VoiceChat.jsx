@@ -32,6 +32,7 @@ export default function VoiceChat({ avatar, onBack }) {
   // Camera state
   const [cameraOpen, setCameraOpen] = useState(false)
   const [facingMode, setFacingMode] = useState('user') // 'user' = față, 'environment' = spate
+  const [hasMultipleCameras, setHasMultipleCameras] = useState(false)
   const videoRef  = useRef(null)
   const streamRef = useRef(null)
 
@@ -52,17 +53,36 @@ export default function VoiceChat({ avatar, onBack }) {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // Start camera stream
+  // Detect if device has multiple cameras (front + back)
+  useEffect(() => {
+    if (!navigator.mediaDevices?.enumerateDevices) return
+    navigator.mediaDevices.enumerateDevices().then(devices => {
+      const videoInputs = devices.filter(d => d.kind === 'videoinput')
+      setHasMultipleCameras(videoInputs.length > 1)
+    }).catch(() => {})
+  }, [])
+
+  // Start camera stream — on laptop try without facingMode constraint first
   const startCamera = useCallback(async (facing) => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(t => t.stop())
       streamRef.current = null
     }
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: facing, width: { ideal: 320 }, height: { ideal: 240 } },
-        audio: false,
-      })
+      // Try with facingMode first (works on mobile)
+      let stream
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: facing, width: { ideal: 320 }, height: { ideal: 240 } },
+          audio: false,
+        })
+      } catch {
+        // Fallback: no facingMode constraint (laptop with single camera)
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: { ideal: 320 }, height: { ideal: 240 } },
+          audio: false,
+        })
+      }
       streamRef.current = stream
       if (videoRef.current) videoRef.current.srcObject = stream
     } catch (err) {
@@ -297,7 +317,7 @@ export default function VoiceChat({ avatar, onBack }) {
             >
               {cameraOpen ? '📷 Off' : '📷 Camera'}
             </button>
-            {cameraOpen && (
+            {cameraOpen && hasMultipleCameras && (
               <button
                 onClick={flipCamera}
                 title={facingMode === 'user' ? 'Comută pe spate' : 'Comută pe față'}
