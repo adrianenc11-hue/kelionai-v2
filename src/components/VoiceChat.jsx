@@ -5,13 +5,13 @@ import Nxcode from '@nxcode/sdk'
 import { AvatarModelDebug, DebugPanel } from './AvatarDebug'
 
 const SYSTEM_PROMPT = {
-  kelion: `Ești Kelion, un asistent AI masculin prietenos și inteligent. Răspunzi în română, ești concis și util. Personalitate: calm, profesionist, empatic.`,
-  kira: `Ești Kira, o asistentă AI feminină prietenoasă și entuziastă. Răspunzi în română, ești caldă și directă. Personalitate: veselă, creativă, plină de energie.`,
+  kelion: `You are Kelion, a friendly and intelligent male AI assistant. Detect the language the user is writing in and always respond in that same language. Be concise and helpful. Personality: calm, professional, empathetic.`,
+  kira: `You are Kira, a friendly and enthusiastic female AI assistant. Detect the language the user is writing in and always respond in that same language. Be warm and direct. Personality: cheerful, creative, energetic.`,
 }
 
 export default function VoiceChat({ avatar, onBack }) {
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: `Bună! Sunt ${avatar.name}. Cu ce te pot ajuta?` }
+    { role: 'assistant', content: `Hi! I'm ${avatar.name}. How can I help you?` }
   ])
   const [inputText, setInputText] = useState('')
   const [isListening, setIsListening] = useState(false)
@@ -36,10 +36,17 @@ export default function VoiceChat({ avatar, onBack }) {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  const speak = useCallback((text) => {
+  // Detectare limba din ultimul mesaj user
+  const detectLang = useCallback((text) => {
+    // Simplu: lasam AI-ul sa detecteze, dar pentru voce folosim 'auto' sau engleza
+    // Browser SpeechRecognition nu are auto, deci folosim ultima limba detectata
+    return 'en-US' // fallback, AI se ocupa de restul
+  }, [])
+
+  const speak = useCallback((text, lang) => {
     synthRef.current.cancel()
     const utter = new SpeechSynthesisUtterance(text)
-    utter.lang = 'ro-RO'
+    utter.lang = lang || 'en-US'
     utter.rate = 1.0
     utter.pitch = avatar.id === 'kira' ? 1.3 : 0.9
     utter.onstart = () => setIsTalking(true)
@@ -76,7 +83,7 @@ export default function VoiceChat({ avatar, onBack }) {
         }
       })
     } catch (err) {
-      const errorMsg = 'Îmi pare rău, a apărut o eroare. Încearcă din nou.'
+      const errorMsg = 'Sorry, an error occurred. Please try again.'
       setMessages(prev => [...prev, { role: 'assistant', content: errorMsg }])
       speak(errorMsg)
     } finally {
@@ -92,13 +99,13 @@ export default function VoiceChat({ avatar, onBack }) {
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
     if (!SpeechRecognition) {
-      alert('Browser-ul tău nu suportă recunoașterea vocii. Folosește Chrome.')
+      alert('Your browser does not support voice recognition. Use Chrome.')
       return
     }
 
     synthRef.current.cancel()
     const recognition = new SpeechRecognition()
-    recognition.lang = 'ro-RO'
+    recognition.lang = 'en-US'
     recognition.continuous = false
     recognition.interimResults = true
 
@@ -142,10 +149,13 @@ export default function VoiceChat({ avatar, onBack }) {
             />
           </Suspense>
           <OrbitControls
-            enableZoom={false}
+            enableZoom={true}
             enablePan={false}
+            minDistance={1}
+            maxDistance={8}
             minPolarAngle={Math.PI / 4}
             maxPolarAngle={Math.PI / 1.8}
+            zoomSpeed={0.8}
           />
         </Canvas>
 
@@ -159,8 +169,19 @@ export default function VoiceChat({ avatar, onBack }) {
             cursor: 'pointer', fontSize: '14px', backdropFilter: 'blur(10px)',
           }}
         >
-          ← Înapoi
+          ← Back
         </button>
+
+        {/* Zoom hint */}
+        <div style={{
+          position: 'absolute', top: '20px', left: '50%', transform: 'translateX(-50%)',
+          background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          color: '#888', padding: '4px 14px', borderRadius: '20px', fontSize: '11px',
+          pointerEvents: 'none',
+        }}>
+          🖱 Scroll = zoom · Drag = rotate
+        </div>
 
         {/* Debug toggle button */}
         <button
@@ -206,7 +227,7 @@ export default function VoiceChat({ avatar, onBack }) {
               }} />
             )}
             <span style={{ color: avatar.glow, fontWeight: '600' }}>{avatar.name}</span>
-            {isTalking && <span style={{ color: '#aaa', fontSize: '12px' }}>vorbește...</span>}
+            {isTalking && <span style={{ color: '#aaa', fontSize: '12px' }}>talking...</span>}
           </div>
         </div>
       </div>
@@ -225,7 +246,8 @@ export default function VoiceChat({ avatar, onBack }) {
             width: '10px', height: '10px', borderRadius: '50%',
             background: avatar.glow, boxShadow: `0 0 8px ${avatar.glow}`,
           }} />
-          <span style={{ fontWeight: '600', color: '#fff' }}>Chat cu {avatar.name}</span>
+          <span style={{ fontWeight: '600', color: '#fff' }}>Chat with {avatar.name}</span>
+          <span style={{ marginLeft: 'auto', fontSize: '11px', color: '#555' }}>🌍 any language</span>
         </div>
 
         {/* Messages */}
@@ -283,7 +305,7 @@ export default function VoiceChat({ avatar, onBack }) {
               boxShadow: isListening ? '0 0 20px rgba(220,38,38,0.5)' : `0 0 20px ${avatar.glow}44`,
             }}
           >
-            {isListening ? '⏹ Oprește' : '🎤 Vorbește'}
+            {isListening ? '⏹ Stop' : '🎤 Speak'}
           </button>
 
           {/* Text input */}
@@ -292,7 +314,7 @@ export default function VoiceChat({ avatar, onBack }) {
               value={inputText}
               onChange={e => setInputText(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Sau scrie aici... (Enter = trimite)"
+              placeholder="Write in any language... (Enter = send)"
               disabled={isLoading || isListening}
               rows={2}
               style={{
