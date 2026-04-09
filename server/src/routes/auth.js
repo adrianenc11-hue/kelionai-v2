@@ -96,7 +96,7 @@ router.get('/google/callback', async (req, res) => {
     return res.redirect(`${config.appBaseUrl}/`);
   } catch (err) {
     console.error('[auth/callback] Error:', err.message);
-    if (req.query.mode === 'mobile') {
+    if (mode === 'mobile') {
       return res.status(500).json({ error: 'Authentication failed' });
     }
     const msg = encodeURIComponent('Authentication failed. Please try again.');
