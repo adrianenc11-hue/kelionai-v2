@@ -8,7 +8,7 @@ cmds = [
 ]
 
 [phases.build]
-cmds = ["rm -rf node_modules/.vite && npm run build"]
+cmds = ["rm -rf node_modules/.cache && npm run build"]
 
 [start]
 cmd = "cd server && npm start"
