@@ -12,7 +12,6 @@
     "server:start": "cd server && npm start"
   },
   "dependencies": {
-    "@nxcode/sdk": "^1.0.14",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.5.0",
     "react": "^19.0.0",
