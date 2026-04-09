@@ -19,7 +19,7 @@ const optional = (name, fallback = '') => process.env[name] || fallback;
 
 module.exports = {
   // Server
-  port: parseInt(optional('PORT', '8080'), 10),
+  port: parseInt(optional('PORT', '3001'), 10),
   nodeEnv: optional('NODE_ENV', 'development'),
   isProduction: optional('NODE_ENV', 'development') === 'production',
 
