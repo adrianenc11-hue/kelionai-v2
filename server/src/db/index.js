@@ -105,6 +105,17 @@ const stmtUpdateSubscription = db.prepare(`
   WHERE id = @id
 `);
 
+const stmtUpdateStripeCustomerId = db.prepare(`
+  UPDATE users
+  SET stripe_customer_id = @stripe_customer_id,
+      updated_at         = datetime('now')
+  WHERE id = @id
+`);
+
+const stmtFindByStripeCustomerId = db.prepare(
+  'SELECT * FROM users WHERE stripe_customer_id = ?'
+);
+
 // Usage logs
 const stmtGetUsageToday = db.prepare(`
   SELECT count FROM usage_logs WHERE user_id = ? AND date = date('now')
@@ -182,6 +193,24 @@ function updateProfile(id, data) {
 }
 
 /**
+ * Update a user's Stripe customer ID.
+ * @param {string} id
+ * @param {string} stripeCustomerId
+ */
+function updateStripeCustomerId(id, stripeCustomerId) {
+  stmtUpdateStripeCustomerId.run({ id, stripe_customer_id: stripeCustomerId });
+}
+
+/**
+ * Find a user by their Stripe customer ID.
+ * @param {string} stripeCustomerId
+ * @returns {object|undefined}
+ */
+function findByStripeCustomerId(stripeCustomerId) {
+  return stmtFindByStripeCustomerId.get(stripeCustomerId);
+}
+
+/**
  * Update a user's subscription.
  * @param {string} id
  * @param {{ subscription_tier: string, subscription_status: string, subscription_expires_at: string|null }} data
@@ -215,4 +244,4 @@ function incrementUsage(userId) {
   stmtIncrementUsage.run(userId);
 }
 
-module.exports = { db, findByGoogleId, findById, findAll, upsertUser, updateProfile, updateSubscription, getUsageToday, incrementUsage };
+module.exports = { db, findByGoogleId, findById, findAll, upsertUser, updateProfile, updateSubscription, updateStripeCustomerId, findByStripeCustomerId, getUsageToday, incrementUsage };

@@ -13,6 +13,7 @@ export default function PricingPage({ onNavigate }) {
   const { user } = useAuth()
   const [plans, setPlans] = useState([])
   const [loading, setLoading] = useState(true)
+  const [checkoutError, setCheckoutError] = useState(null)
 
   useEffect(() => {
     api.get('/api/subscription/plans')
@@ -148,10 +149,17 @@ export default function PricingPage({ onNavigate }) {
                   </ul>
 
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       if (isCurrent) return
                       if (!user) { onNavigate('login'); return }
-                      alert('Plățile Stripe vor fi disponibile în curând!')
+                      if (plan.price === 0) { onNavigate('dashboard'); return }
+                      setCheckoutError(null)
+                      try {
+                        const { url } = await api.post('/api/payments/create-checkout-session', { planId: plan.id })
+                        window.location.href = url
+                      } catch (err) {
+                        setCheckoutError(err.message || 'Could not start checkout. Please try again.')
+                      }
                     }}
                     disabled={isCurrent}
                     style={{
@@ -174,8 +182,19 @@ export default function PricingPage({ onNavigate }) {
           </div>
         )}
 
+        {checkoutError && (
+          <div style={{
+            textAlign: 'center', color: '#f87171', fontSize: '14px',
+            marginBottom: '24px', padding: '12px 20px',
+            background: 'rgba(220,38,38,0.1)', borderRadius: '10px',
+            border: '1px solid rgba(220,38,38,0.3)',
+          }}>
+            {checkoutError}
+          </div>
+        )}
+
         <p style={{ textAlign: 'center', color: '#555', fontSize: '13px', marginTop: '40px' }}>
-          💳 Plățile Stripe vor fi disponibile în curând. Contactează admin pentru upgrade manual.
+          💳 Plăți securizate prin Stripe
         </p>
       </div>
     </div>

@@ -1,13 +1,7 @@
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, Environment } from '@react-three/drei'
 import { Suspense, useState, useRef, useEffect, useCallback } from 'react'
-import Nxcode from '@nxcode/sdk'
 import { AvatarModelDebug, DebugPanel } from './AvatarDebug'
-
-const SYSTEM_PROMPT = {
-  kelion: `You are Kelion, a friendly and intelligent male AI assistant. Detect the language the user is writing in and always respond in that same language. Be concise and helpful. Personality: calm, professional, empathetic.`,
-  kira: `You are Kira, a friendly and enthusiastic female AI assistant. Detect the language the user is writing in and always respond in that same language. Be warm and direct. Personality: cheerful, creative, energetic.`,
-}
 
 export default function VoiceChat({ avatar, onBack }) {
   const [messages, setMessages] = useState([
@@ -66,22 +60,50 @@ export default function VoiceChat({ avatar, onBack }) {
       let assistantText = ''
       setMessages(prev => [...prev, { role: 'assistant', content: '' }])
 
-      await Nxcode.ai.chatStream({
-        messages: [
-          { role: 'user', content: SYSTEM_PROMPT[avatar.id] },
-          ...newMessages,
-        ],
-        model: 'fast',
-        onChunk: (chunk) => {
-          assistantText += chunk.content || ''
-          setMessages(prev => {
-            const updated = [...prev]
-            updated[updated.length - 1] = { role: 'assistant', content: assistantText }
-            return updated
-          })
-          if (chunk.done) speak(assistantText)
-        }
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: newMessages, avatar: avatar.id }),
       })
+
+      if (!response.ok) {
+        throw new Error(`Chat request failed: ${response.status}`)
+      }
+
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        const text = decoder.decode(value, { stream: true })
+        const lines = text.split('\n')
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          const data = line.slice(6).trim()
+          if (data === '[DONE]') {
+            speak(assistantText)
+            break
+          }
+          try {
+            const parsed = JSON.parse(data)
+            if (parsed.error) throw new Error(parsed.error)
+            if (parsed.content) {
+              assistantText += parsed.content
+              setMessages(prev => {
+                const updated = [...prev]
+                updated[updated.length - 1] = { role: 'assistant', content: assistantText }
+                return updated
+              })
+            }
+          } catch (parseErr) {
+            console.warn('Failed to parse SSE chunk:', parseErr)
+          }
+        }
+      }
     } catch (err) {
       const errorMsg = 'Sorry, an error occurred. Please try again.'
       setMessages(prev => [...prev, { role: 'assistant', content: errorMsg }])

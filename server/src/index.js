@@ -13,6 +13,7 @@ const usersRouter        = require('./routes/users');
 const adminRouter        = require('./routes/admin');
 const subscriptionsRouter = require('./routes/subscriptions');
 const paymentsRouter     = require('./routes/payments');
+const chatRouter         = require('./routes/chat');
 
 const app = express();
 
@@ -41,6 +42,9 @@ app.use(
 // ---------------------------------------------------------------------------
 // Body parsers
 // ---------------------------------------------------------------------------
+// Stripe webhook needs the raw body for signature verification — register a
+// raw parser for that route BEFORE the global express.json() middleware.
+app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
@@ -72,6 +76,7 @@ app.use('/api/users', usersRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/subscription', subscriptionsRouter);
 app.use('/api/payments', paymentsRouter);
+app.use('/api/chat', chatRouter);
 
 // Health / readiness probe (useful for Railway)
 app.get('/health', (_req, res) => res.json({ status: 'ok', ts: new Date().toISOString() }));

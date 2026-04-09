@@ -19,6 +19,8 @@
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "node-fetch": "^2.7.0",
+    "openai": "^6.34.0",
+    "stripe": "^22.0.1",
     "uuid": "^9.0.1"
   },
   "devDependencies": {
