@@ -25,22 +25,21 @@ router.get('/google/start', (req, res) => {
   const state = generateState();
   const { codeVerifier, codeChallenge } = generatePKCE();
 
-  // Store OAuth state & PKCE in the server-side session so the callback can
-  // verify them. The session is created here even before the user logs in.
-  req.session.oauthState = state;
-  req.session.oauthCodeVerifier = codeVerifier;
-  req.session.oauthMode = mode;
-
   const authUrl = buildAuthUrl({ state, codeChallenge, mode });
-  // Save session explicitly before redirecting to Google so the
-  // OAuth state & PKCE are persisted even with async session stores.
-  req.session.save((err) => {
-    if (err) {
-      console.error('[auth/start] session save error:', err.message);
-      return res.status(500).json({ error: 'Session error' });
-    }
-    res.redirect(authUrl);
-  });
+
+  // Store OAuth state & PKCE in secure HttpOnly cookies instead of session
+  // to avoid session loss between start and callback (MemoryStore + proxies).
+  const cookieOpts = {
+    httpOnly: true,
+    secure: config.cookie.secure,
+    sameSite: 'lax',
+    maxAge: 10 * 60 * 1000, // 10 minutes
+    path: '/',
+  };
+  res.cookie('oauth_state', state, cookieOpts);
+  res.cookie('oauth_verifier', codeVerifier, cookieOpts);
+  res.cookie('oauth_mode', mode, cookieOpts);
+  res.redirect(authUrl);
 });
 
 // ---------------------------------------------------------------------------
@@ -57,17 +56,21 @@ router.get('/google/callback', async (req, res) => {
     return res.redirect(`${config.appBaseUrl}/?auth_error=${msg}`);
   }
 
+  // Read OAuth state & PKCE from cookies
+  const savedState = req.cookies.oauth_state;
+  const codeVerifier = req.cookies.oauth_verifier;
+  const mode = req.cookies.oauth_mode || 'web';
+
+  // Clear the OAuth cookies immediately
+  res.clearCookie('oauth_state', { path: '/' });
+  res.clearCookie('oauth_verifier', { path: '/' });
+  res.clearCookie('oauth_mode', { path: '/' });
+
   // Validate state to prevent CSRF
-  if (!state || state !== req.session.oauthState) {
+  if (!state || state !== savedState) {
+    console.error('[auth/callback] State mismatch:', { expected: savedState, got: state });
     return res.status(400).json({ error: 'Invalid OAuth state parameter' });
   }
-
-  const { oauthCodeVerifier: codeVerifier, oauthMode: mode } = req.session;
-
-  // Clear the temporary OAuth session keys
-  delete req.session.oauthState;
-  delete req.session.oauthCodeVerifier;
-  delete req.session.oauthMode;
 
   if (!code || !codeVerifier) {
     return res.status(400).json({ error: 'Missing authorization code' });
