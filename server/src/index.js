@@ -1,15 +1,13 @@
 'use strict';
 
 const path = require('path');
+const fs = require('fs');
 const express = require('express');
 const session = require('express-session');
-const BetterSqliteStore = require('better-sqlite3-session-store')(session);
-const Database = require('better-sqlite3');
 const cors = require('cors');
 const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
 
-const fs = require('fs');
 const config = require('./config');
 
 // Ensure data directory exists before anything tries to open a DB file
@@ -58,14 +56,12 @@ app.use(cookieParser());
 // ---------------------------------------------------------------------------
 // Session (used by web clients and transiently during the OAuth flow)
 // ---------------------------------------------------------------------------
-const sessionDb = new Database(path.resolve(config.dbPath));
 app.use(
   session({
     name:   config.session.name,
     secret: config.session.secret,
     resave: false,
     saveUninitialized: false,
-    store: new BetterSqliteStore({ client: sessionDb }),
     cookie: {
       httpOnly: true,
       secure:   config.cookie.secure,
