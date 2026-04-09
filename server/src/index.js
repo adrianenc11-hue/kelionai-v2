@@ -27,7 +27,10 @@ const app = express();
 // ---------------------------------------------------------------------------
 // Security headers
 // ---------------------------------------------------------------------------
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: false,   // CSP breaks React/Three.js inline scripts & Google OAuth
+  crossOriginEmbedderPolicy: false,
+}));
 
 // ---------------------------------------------------------------------------
 // CORS
