@@ -9,6 +9,15 @@ const SYSTEM_PROMPT = {
   kira: `You are Kira, a friendly and enthusiastic female AI assistant. Detect the language the user is writing in and always respond in that same language. Be warm and direct. Personality: cheerful, creative, energetic.`,
 }
 
+const LANGUAGES = [
+  { code: 'en-US', label: '🇺🇸 EN' },
+  { code: 'ro-RO', label: '🇷🇴 RO' },
+  { code: 'fr-FR', label: '🇫🇷 FR' },
+  { code: 'de-DE', label: '🇩🇪 DE' },
+  { code: 'es-ES', label: '🇪🇸 ES' },
+  { code: 'it-IT', label: '🇮🇹 IT' },
+]
+
 export default function VoiceChat({ avatar, onBack }) {
   const [messages, setMessages] = useState([
     { role: 'assistant', content: `Hi! I'm ${avatar.name}. How can I help you?` }
@@ -18,6 +27,7 @@ export default function VoiceChat({ avatar, onBack }) {
   const [isTalking, setIsTalking] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [transcript, setTranscript] = useState('')
+  const [voiceLang, setVoiceLang] = useState('en-US')
 
   // Debug state
   const [showDebug, setShowDebug] = useState(false)
@@ -36,24 +46,18 @@ export default function VoiceChat({ avatar, onBack }) {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // Detectare limba din ultimul mesaj user
-  const detectLang = useCallback((text) => {
-    // Simplu: lasam AI-ul sa detecteze, dar pentru voce folosim 'auto' sau engleza
-    // Browser SpeechRecognition nu are auto, deci folosim ultima limba detectata
-    return 'en-US' // fallback, AI se ocupa de restul
-  }, [])
 
   const speak = useCallback((text, lang) => {
     if (!synthRef.current) return
     synthRef.current.cancel()
     const utter = new SpeechSynthesisUtterance(text)
-    utter.lang = lang || 'en-US'
+    utter.lang = lang || voiceLang
     utter.rate = 1.0
     utter.pitch = avatar.id === 'kira' ? 1.3 : 0.9
     utter.onstart = () => setIsTalking(true)
     utter.onend = () => setIsTalking(false)
     synthRef.current.speak(utter)
-  }, [avatar.id])
+  }, [avatar.id, voiceLang])
 
   const sendMessage = useCallback(async (text) => {
     if (!text.trim()) return
@@ -106,7 +110,7 @@ export default function VoiceChat({ avatar, onBack }) {
 
     synthRef.current?.cancel()
     const recognition = new SpeechRecognition()
-    recognition.lang = 'en-US'
+    recognition.lang = voiceLang
     recognition.continuous = false
     recognition.interimResults = true
 
@@ -124,7 +128,7 @@ export default function VoiceChat({ avatar, onBack }) {
 
     recognitionRef.current = recognition
     recognition.start()
-  }, [isListening, sendMessage])
+  }, [isListening, sendMessage, voiceLang])
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -248,7 +252,19 @@ export default function VoiceChat({ avatar, onBack }) {
             background: avatar.glow, boxShadow: `0 0 8px ${avatar.glow}`,
           }} />
           <span style={{ fontWeight: '600', color: '#fff' }}>Chat with {avatar.name}</span>
-          <span style={{ marginLeft: 'auto', fontSize: '11px', color: '#555' }}>🌍 any language</span>
+          <select
+            value={voiceLang}
+            onChange={e => setVoiceLang(e.target.value)}
+            style={{
+              marginLeft: 'auto', background: 'rgba(255,255,255,0.08)',
+              border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px',
+              color: '#ccc', fontSize: '12px', padding: '3px 6px', cursor: 'pointer',
+            }}
+          >
+            {LANGUAGES.map(l => (
+              <option key={l.code} value={l.code} style={{ background: '#1a1a2e' }}>{l.label}</option>
+            ))}
+          </select>
         </div>
 
         {/* Messages */}
