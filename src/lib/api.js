@@ -1,9 +1,9 @@
-// Detect the API base URL.
-// In production (same origin), use relative URLs so cookies work.
-// In development, use the env var or default to localhost:3001.
-const API_BASE =
-  import.meta.env.VITE_API_BASE_URL ||
-  (import.meta.env.DEV ? 'http://localhost:3001' : '')
+// API base URL.
+// Production: empty string → relative URLs (same origin, cookies work).
+// Development: localhost:3001 (backend dev server).
+const API_BASE = import.meta.env.PROD
+  ? ''
+  : (import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001')
 
 async function apiFetch(path, options = {}) {
   const url = `${API_BASE}${path}`
