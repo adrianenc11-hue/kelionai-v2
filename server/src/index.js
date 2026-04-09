@@ -9,7 +9,15 @@ const cors = require('cors');
 const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
 
+const fs = require('fs');
 const config = require('./config');
+
+// Ensure data directory exists before anything tries to open a DB file
+const dbDir = path.dirname(path.resolve(config.dbPath));
+if (!fs.existsSync(dbDir)) {
+  fs.mkdirSync(dbDir, { recursive: true });
+}
+
 const authRouter         = require('./routes/auth');
 const usersRouter        = require('./routes/users');
 const adminRouter        = require('./routes/admin');
@@ -114,12 +122,17 @@ app.use((err, _req, res, _next) => {
 // ---------------------------------------------------------------------------
 if (require.main === module) {
   const PORT = config.port;
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`[kelion-api] Server listening on 0.0.0.0:${PORT} (${config.nodeEnv})`);
-    console.log(`[kelion-api] process.env.PORT = ${process.env.PORT}`);
-    console.log(`[kelion-api] Google redirect URI: ${config.google.redirectUri}`);
-    console.log(`[kelion-api] CORS origins: ${config.corsOrigins.join(', ')}`);
-  });
+  try {
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`[kelion-api] Server listening on 0.0.0.0:${PORT} (${config.nodeEnv})`);
+      console.log(`[kelion-api] process.env.PORT = ${process.env.PORT}`);
+      console.log(`[kelion-api] Google redirect URI: ${config.google.redirectUri}`);
+      console.log(`[kelion-api] CORS origins: ${config.corsOrigins.join(', ')}`);
+    });
+  } catch (err) {
+    console.error('[kelion-api] FATAL startup error:', err);
+    process.exit(1);
+  }
 }
 
 module.exports = app; // export for testing
