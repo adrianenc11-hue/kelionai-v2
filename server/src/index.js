@@ -7,7 +7,11 @@ const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
 
 const config = require('./config');
-const authRouter = require('./routes/auth');
+const authRouter         = require('./routes/auth');
+const usersRouter        = require('./routes/users');
+const adminRouter        = require('./routes/admin');
+const subscriptionsRouter = require('./routes/subscriptions');
+const paymentsRouter     = require('./routes/payments');
 
 const app = express();
 
@@ -28,7 +32,7 @@ app.use(
       callback(new Error(`CORS: origin '${origin}' is not allowed`));
     },
     credentials: true,   // Required for cookies to be sent cross-origin
-    methods: ['GET', 'POST', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   })
 );
@@ -63,6 +67,10 @@ app.use(
 // Routes
 // ---------------------------------------------------------------------------
 app.use('/auth', authRouter);
+app.use('/api/users', usersRouter);
+app.use('/api/admin', adminRouter);
+app.use('/api/subscription', subscriptionsRouter);
+app.use('/api/payments', paymentsRouter);
 
 // Health / readiness probe (useful for Railway)
 app.get('/health', (_req, res) => res.json({ status: 'ok', ts: new Date().toISOString() }));
