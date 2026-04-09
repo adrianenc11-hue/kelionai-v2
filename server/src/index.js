@@ -114,8 +114,9 @@ app.use((err, _req, res, _next) => {
 // ---------------------------------------------------------------------------
 if (require.main === module) {
   const PORT = config.port;
-  app.listen(PORT, () => {
-    console.log(`[kelion-api] Server listening on port ${PORT} (${config.nodeEnv})`);
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`[kelion-api] Server listening on 0.0.0.0:${PORT} (${config.nodeEnv})`);
+    console.log(`[kelion-api] process.env.PORT = ${process.env.PORT}`);
     console.log(`[kelion-api] Google redirect URI: ${config.google.redirectUri}`);
     console.log(`[kelion-api] CORS origins: ${config.corsOrigins.join(', ')}`);
   });
