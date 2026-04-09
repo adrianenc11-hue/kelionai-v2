@@ -23,18 +23,50 @@ db.pragma('foreign_keys = ON');
 function migrate() {
   db.exec(`
     CREATE TABLE IF NOT EXISTS users (
-      id           TEXT PRIMARY KEY,           -- UUID
-      google_id    TEXT UNIQUE NOT NULL,
-      email        TEXT UNIQUE NOT NULL,
-      name         TEXT NOT NULL,
-      picture      TEXT,
-      created_at   TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
+      id                     TEXT PRIMARY KEY,           -- UUID
+      google_id              TEXT UNIQUE NOT NULL,
+      email                  TEXT UNIQUE NOT NULL,
+      name                   TEXT NOT NULL,
+      picture                TEXT,
+      avatar_url             TEXT,
+      subscription_tier      TEXT NOT NULL DEFAULT 'free',
+      subscription_status    TEXT NOT NULL DEFAULT 'active',
+      subscription_expires_at TEXT,
+      stripe_customer_id     TEXT,
+      created_at             TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at             TEXT NOT NULL DEFAULT (datetime('now')),
+      last_login_at          TEXT
     );
 
     CREATE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id);
     CREATE INDEX IF NOT EXISTS idx_users_email     ON users(email);
+
+    CREATE TABLE IF NOT EXISTS usage_logs (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      date       TEXT NOT NULL,              -- YYYY-MM-DD
+      count      INTEGER NOT NULL DEFAULT 0,
+      UNIQUE(user_id, date)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_usage_logs_user_date ON usage_logs(user_id, date);
   `);
+
+  // Add new columns to existing users table if they don't exist yet (migration safety)
+  const cols = db.pragma('table_info(users)').map((c) => c.name);
+  const additions = [
+    ['avatar_url',              'TEXT'],
+    ['subscription_tier',       "TEXT NOT NULL DEFAULT 'free'"],
+    ['subscription_status',     "TEXT NOT NULL DEFAULT 'active'"],
+    ['subscription_expires_at', 'TEXT'],
+    ['stripe_customer_id',      'TEXT'],
+    ['last_login_at',           'TEXT'],
+  ];
+  for (const [col, def] of additions) {
+    if (!cols.includes(col)) {
+      db.exec(`ALTER TABLE users ADD COLUMN ${col} ${def}`);
+    }
+  }
 }
 
 migrate();
@@ -45,15 +77,43 @@ migrate();
 
 const stmtFindByGoogleId = db.prepare('SELECT * FROM users WHERE google_id = ?');
 const stmtFindById       = db.prepare('SELECT * FROM users WHERE id = ?');
+const stmtFindAll        = db.prepare('SELECT * FROM users ORDER BY created_at DESC');
 
 const stmtUpsert = db.prepare(`
-  INSERT INTO users (id, google_id, email, name, picture, created_at, updated_at)
-  VALUES (@id, @google_id, @email, @name, @picture, datetime('now'), datetime('now'))
+  INSERT INTO users (id, google_id, email, name, picture, created_at, updated_at, last_login_at)
+  VALUES (@id, @google_id, @email, @name, @picture, datetime('now'), datetime('now'), datetime('now'))
   ON CONFLICT(google_id) DO UPDATE SET
-    email      = excluded.email,
-    name       = excluded.name,
-    picture    = excluded.picture,
-    updated_at = datetime('now')
+    email         = excluded.email,
+    name          = excluded.name,
+    picture       = excluded.picture,
+    updated_at    = datetime('now'),
+    last_login_at = datetime('now')
+`);
+
+const stmtUpdateProfile = db.prepare(`
+  UPDATE users
+  SET name = @name, updated_at = datetime('now')
+  WHERE id = @id
+`);
+
+const stmtUpdateSubscription = db.prepare(`
+  UPDATE users
+  SET subscription_tier      = @subscription_tier,
+      subscription_status    = @subscription_status,
+      subscription_expires_at = @subscription_expires_at,
+      updated_at             = datetime('now')
+  WHERE id = @id
+`);
+
+// Usage logs
+const stmtGetUsageToday = db.prepare(`
+  SELECT count FROM usage_logs WHERE user_id = ? AND date = date('now')
+`);
+
+const stmtIncrementUsage = db.prepare(`
+  INSERT INTO usage_logs (user_id, date, count)
+  VALUES (?, date('now'), 1)
+  ON CONFLICT(user_id, date) DO UPDATE SET count = count + 1
 `);
 
 // ---------------------------------------------------------------------------
@@ -76,6 +136,14 @@ function findByGoogleId(googleId) {
  */
 function findById(id) {
   return stmtFindById.get(id);
+}
+
+/**
+ * Return all users ordered by created_at desc.
+ * @returns {object[]}
+ */
+function findAll() {
+  return stmtFindAll.all();
 }
 
 /**
@@ -102,4 +170,49 @@ function upsertUser(profile) {
   return stmtFindByGoogleId.get(profile.googleId);
 }
 
-module.exports = { db, findByGoogleId, findById, upsertUser };
+/**
+ * Update a user's display name.
+ * @param {string} id
+ * @param {{ name: string }} data
+ * @returns {object|undefined}
+ */
+function updateProfile(id, data) {
+  stmtUpdateProfile.run({ id, name: data.name });
+  return stmtFindById.get(id);
+}
+
+/**
+ * Update a user's subscription.
+ * @param {string} id
+ * @param {{ subscription_tier: string, subscription_status: string, subscription_expires_at: string|null }} data
+ * @returns {object|undefined}
+ */
+function updateSubscription(id, data) {
+  stmtUpdateSubscription.run({
+    id,
+    subscription_tier:       data.subscription_tier,
+    subscription_status:     data.subscription_status,
+    subscription_expires_at: data.subscription_expires_at || null,
+  });
+  return stmtFindById.get(id);
+}
+
+/**
+ * Get today's usage count for a user.
+ * @param {string} userId
+ * @returns {number}
+ */
+function getUsageToday(userId) {
+  const row = stmtGetUsageToday.get(userId);
+  return row ? row.count : 0;
+}
+
+/**
+ * Increment today's usage count for a user by 1.
+ * @param {string} userId
+ */
+function incrementUsage(userId) {
+  stmtIncrementUsage.run(userId);
+}
+
+module.exports = { db, findByGoogleId, findById, findAll, upsertUser, updateProfile, updateSubscription, getUsageToday, incrementUsage };
