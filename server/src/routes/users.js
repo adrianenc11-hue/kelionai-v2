@@ -2,7 +2,7 @@
 
 const { Router } = require('express');
 const { requireAuth } = require('../middleware/auth');
-const { getUsageToday } = require('../db');
+const { getUsageToday, updateProfile } = require('../db');
 const { PLANS } = require('../config/plans');
 
 const router = Router();
@@ -43,7 +43,6 @@ router.get('/me', (req, res) => {
 // PUT /api/users/me
 // ---------------------------------------------------------------------------
 router.put('/me', (req, res) => {
-  const { updateProfile } = require('../db');
   const { name } = req.body;
 
   if (!name || typeof name !== 'string' || !name.trim()) {

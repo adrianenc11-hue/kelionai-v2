@@ -13,11 +13,12 @@ export default function PricingPage({ onNavigate }) {
   const { user } = useAuth()
   const [plans, setPlans] = useState([])
   const [loading, setLoading] = useState(true)
+  const [plansError, setPlansError] = useState(null)
 
   useEffect(() => {
     api.get('/api/subscription/plans')
       .then((data) => setPlans(data.plans || []))
-      .catch(() => {})
+      .catch((err) => setPlansError(err.message || 'Nu s-au putut încărca planurile.'))
       .finally(() => setLoading(false))
   }, [])
 
@@ -74,6 +75,10 @@ export default function PricingPage({ onNavigate }) {
 
         {loading ? (
           <div style={{ textAlign: 'center', color: '#666' }}>Se încarcă planurile...</div>
+        ) : plansError ? (
+          <div style={{ textAlign: 'center', color: '#f87171', padding: '32px' }}>
+            {plansError}
+          </div>
         ) : (
           <div style={{
             display: 'grid',

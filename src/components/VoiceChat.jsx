@@ -30,7 +30,7 @@ export default function VoiceChat({ avatar, onBack }) {
 
   const recognitionRef = useRef(null)
   const chatEndRef = useRef(null)
-  const synthRef = useRef(window.speechSynthesis)
+  const synthRef = useRef(typeof window !== 'undefined' ? window.speechSynthesis : null)
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -44,6 +44,7 @@ export default function VoiceChat({ avatar, onBack }) {
   }, [])
 
   const speak = useCallback((text, lang) => {
+    if (!synthRef.current) return
     synthRef.current.cancel()
     const utter = new SpeechSynthesisUtterance(text)
     utter.lang = lang || 'en-US'
@@ -68,7 +69,7 @@ export default function VoiceChat({ avatar, onBack }) {
 
       await Nxcode.ai.chatStream({
         messages: [
-          { role: 'user', content: SYSTEM_PROMPT[avatar.id] },
+          { role: 'system', content: SYSTEM_PROMPT[avatar.id] },
           ...newMessages,
         ],
         model: 'fast',
@@ -103,7 +104,7 @@ export default function VoiceChat({ avatar, onBack }) {
       return
     }
 
-    synthRef.current.cancel()
+    synthRef.current?.cancel()
     const recognition = new SpeechRecognition()
     recognition.lang = 'en-US'
     recognition.continuous = false

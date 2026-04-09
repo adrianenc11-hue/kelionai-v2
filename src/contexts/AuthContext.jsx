@@ -56,10 +56,12 @@ export function AuthProvider({ children }) {
 
   const refreshUser = fetchMe
 
-  const isAdmin = user?.email === 'adrianenc11@gmail.com' ||
-    (Array.isArray(window.__ADMIN_EMAILS__)
-      ? window.__ADMIN_EMAILS__.includes(user?.email)
-      : false)
+  const ADMIN_EMAILS = (
+    typeof window !== 'undefined' && Array.isArray(window.__ADMIN_EMAILS__)
+      ? window.__ADMIN_EMAILS__
+      : ['adrianenc11@gmail.com']
+  )
+  const isAdmin = !!user?.email && ADMIN_EMAILS.includes(user.email)
 
   return (
     <AuthContext.Provider value={{ user, loading, error, setError, login, logout, refreshUser, isAdmin }}>
