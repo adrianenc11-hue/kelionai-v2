@@ -3,6 +3,8 @@
 const path = require('path');
 const express = require('express');
 const session = require('express-session');
+const BetterSqliteStore = require('better-sqlite3-session-store')(session);
+const Database = require('better-sqlite3');
 const cors = require('cors');
 const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
@@ -48,12 +50,14 @@ app.use(cookieParser());
 // ---------------------------------------------------------------------------
 // Session (used by web clients and transiently during the OAuth flow)
 // ---------------------------------------------------------------------------
+const sessionDb = new Database(path.resolve(config.dbPath));
 app.use(
   session({
     name:   config.session.name,
     secret: config.session.secret,
     resave: false,
     saveUninitialized: false,
+    store: new BetterSqliteStore({ client: sessionDb }),
     cookie: {
       httpOnly: true,
       secure:   config.cookie.secure,
