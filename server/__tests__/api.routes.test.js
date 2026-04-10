@@ -9,12 +9,102 @@ process.env.GOOGLE_CLIENT_SECRET = 'test-secret';
 process.env.SESSION_SECRET       = 'test-session-secret-at-least-32-chars';
 process.env.JWT_SECRET           = 'test-jwt-secret-at-least-32-chars!!';
 process.env.NODE_ENV             = 'test';
+process.env.SUPABASE_URL         = 'https://mock.supabase.co';
+process.env.SUPABASE_SERVICE_KEY = 'mock-service-key-for-tests-only';
 process.env.ADMIN_EMAILS         = 'admin@example.com';
 process.env.STRIPE_SECRET_KEY    = ''; // Ensure Stripe is not configured for tests
 
 const os   = require('os');
 const path = require('path');
 process.env.DB_PATH = path.join(os.tmpdir(), `kelion-api-test-${process.pid}.db`);
+
+// ---------------------------------------------------------------------------
+// In-memory DB mock - replaces Supabase with a simple Map
+// ---------------------------------------------------------------------------
+const _users = new Map();
+let _idCounter = 1;
+
+const mockDb = {
+  upsertUser: jest.fn(({ googleId, email, name, picture }) => {
+    // Check if user exists by open_id (googleId)
+    for (const [id, u] of _users) {
+      if (u.open_id === googleId || u.email === email) {
+        return Promise.resolve(u);
+      }
+    }
+    const id = _idCounter++;
+    const user = {
+      id,
+      open_id: googleId,
+      email,
+      name,
+      picture: picture || null,
+      role: email === 'admin@example.com' ? 'admin' : 'user',
+      subscription_tier: 'free',
+      subscription_status: 'active',
+      created_at: new Date().toISOString(),
+    };
+    _users.set(id, user);
+    return Promise.resolve(user);
+  }),
+  findById: jest.fn((id) => {
+    return Promise.resolve(_users.get(Number(id)) || null);
+  }),
+  findByGoogleId: jest.fn((googleId) => {
+    for (const u of _users.values()) {
+      if (u.open_id === googleId) return Promise.resolve(u);
+    }
+    return Promise.resolve(null);
+  }),
+  findByEmail: jest.fn((email) => {
+    for (const u of _users.values()) {
+      if (u.email === email) return Promise.resolve(u);
+    }
+    return Promise.resolve(null);
+  }),
+  updateUser: jest.fn((id, fields) => {
+    const user = _users.get(Number(id));
+    if (!user) return Promise.resolve(null);
+    Object.assign(user, fields);
+    return Promise.resolve(user);
+  }),
+  updateSubscription: jest.fn((id, tier, status) => {
+    const user = _users.get(Number(id));
+    if (!user) return Promise.resolve(null);
+    user.subscription_tier = tier;
+    user.subscription_status = status;
+    return Promise.resolve(user);
+  }),
+  getAllUsers: jest.fn(() => {
+    return Promise.resolve(Array.from(_users.values()));
+  }),
+  getUsage: jest.fn(() => {
+    return Promise.resolve({ today: 0, month: 0, limit: 10 });
+  }),
+  incrementUsage: jest.fn(() => Promise.resolve()),
+  insertUser: jest.fn(({ email, password_hash, name }) => {
+    const id = _idCounter++;
+    const user = {
+      id,
+      open_id: `local-${email}`,
+      email,
+      name: name || email.split('@')[0],
+      password_hash,
+      picture: null,
+      role: 'user',
+      subscription_tier: 'free',
+      subscription_status: 'active',
+      created_at: new Date().toISOString(),
+    };
+    _users.set(id, user);
+    return Promise.resolve(user);
+  }),
+  createReferralCode: jest.fn(() => Promise.resolve({ code: 'TEST123' })),
+  getReferralCode: jest.fn(() => Promise.resolve(null)),
+  useReferralCode: jest.fn(() => Promise.resolve(null)),
+};
+
+jest.mock('../src/db', () => mockDb);
 
 jest.mock('../src/utils/google', () => ({
   generateState:  jest.fn().mockReturnValue('fixed-test-state'),
@@ -31,11 +121,9 @@ const request       = require('supertest');
 const jwt           = require('jsonwebtoken');
 const { exchangeCode, fetchUserInfo } = require('../src/utils/google');
 const app           = require('../src/index');
-const { upsertUser } = require('../src/db');
 
 afterAll(() => {
-  const fs = require('fs');
-  try { fs.unlinkSync(process.env.DB_PATH); } catch (_) {}
+  _users.clear();
 });
 
 afterEach(() => {
@@ -55,8 +143,8 @@ function makeToken(user) {
   );
 }
 
-function seedUser(overrides = {}) {
-  return upsertUser({
+async function seedUser(overrides = {}) {
+  return mockDb.upsertUser({
     googleId: `google-${Date.now()}-${Math.random()}`,
     email:    `user-${Date.now()}@example.com`,
     name:     'Test User',
@@ -65,8 +153,8 @@ function seedUser(overrides = {}) {
   });
 }
 
-function seedAdmin() {
-  return upsertUser({
+async function seedAdmin() {
+  return mockDb.upsertUser({
     googleId: 'google-admin',
     email:    'admin@example.com',
     name:     'Admin User',
@@ -109,7 +197,7 @@ describe('GET /api/users/me', () => {
   });
 
   it('returns user profile with usage info when authenticated', async () => {
-    const user  = seedUser();
+    const user  = await seedUser();
     const token = makeToken(user);
 
     const res = await request(app)
@@ -135,7 +223,7 @@ describe('PUT /api/users/me', () => {
   });
 
   it('updates the user name', async () => {
-    const user  = seedUser();
+    const user  = await seedUser();
     const token = makeToken(user);
 
     const res = await request(app)
@@ -148,7 +236,7 @@ describe('PUT /api/users/me', () => {
   });
 
   it('returns 400 when name is missing', async () => {
-    const user  = seedUser();
+    const user  = await seedUser();
     const token = makeToken(user);
 
     const res = await request(app)
@@ -171,7 +259,7 @@ describe('GET /api/admin/users', () => {
   });
 
   it('returns 403 when non-admin is authenticated', async () => {
-    const user  = seedUser();
+    const user  = await seedUser();
     const token = makeToken(user);
 
     const res = await request(app)
@@ -182,7 +270,7 @@ describe('GET /api/admin/users', () => {
   });
 
   it('returns user list for admin', async () => {
-    const admin = seedAdmin();
+    const admin = await seedAdmin();
     const token = makeToken(admin);
 
     const res = await request(app)
@@ -200,8 +288,8 @@ describe('GET /api/admin/users', () => {
 
 describe('PUT /api/admin/users/:id/subscription', () => {
   it('updates subscription tier as admin', async () => {
-    const admin = seedAdmin();
-    const user  = seedUser();
+    const admin = await seedAdmin();
+    const user  = await seedUser();
     const token = makeToken(admin);
 
     const res = await request(app)
@@ -214,9 +302,9 @@ describe('PUT /api/admin/users/:id/subscription', () => {
   });
 
   it('returns 400 for invalid tier', async () => {
-    const admin = seedAdmin();
+    const admin = await seedAdmin();
     const token = makeToken(admin);
-    const user  = seedUser();
+    const user  = await seedUser();
 
     const res = await request(app)
       .put(`/api/admin/users/${user.id}/subscription`)
@@ -227,11 +315,11 @@ describe('PUT /api/admin/users/:id/subscription', () => {
   });
 
   it('returns 404 for unknown user id', async () => {
-    const admin = seedAdmin();
+    const admin = await seedAdmin();
     const token = makeToken(admin);
 
     const res = await request(app)
-      .put('/api/admin/users/nonexistent-id/subscription')
+      .put('/api/admin/users/99999/subscription')
       .set('Authorization', `Bearer ${token}`)
       .send({ subscription_tier: 'basic' });
 
@@ -250,7 +338,7 @@ describe('GET /api/payments/history', () => {
   });
 
   it('returns empty history when authenticated', async () => {
-    const user  = seedUser();
+    const user  = await seedUser();
     const token = makeToken(user);
 
     const res = await request(app)
@@ -268,7 +356,7 @@ describe('GET /api/payments/history', () => {
 
 describe('POST /api/payments/create-checkout-session', () => {
   it('returns 503 when Stripe is not configured', async () => {
-    const user  = seedUser();
+    const user  = await seedUser();
     const token = makeToken(user);
 
     const res = await request(app)

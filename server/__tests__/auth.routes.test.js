@@ -11,6 +11,8 @@ process.env.GOOGLE_CLIENT_SECRET = 'test-secret';
 process.env.SESSION_SECRET = 'test-session-secret-at-least-32-chars';
 process.env.JWT_SECRET = 'test-jwt-secret-at-least-32-chars!!';
 process.env.NODE_ENV = 'test';
+process.env.SUPABASE_URL = 'https://mock.supabase.co';
+process.env.SUPABASE_SERVICE_KEY = 'mock-service-key-for-tests-only';
 process.env.PORT = '0'; // random port
 process.env.DB_PATH = ':memory:'; // not used by supertest directly
 
