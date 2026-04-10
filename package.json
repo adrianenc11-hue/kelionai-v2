@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "server:install": "cd server && npm install",
     "server:dev": "cd server && npm run dev",
-    "server:start": "cd server && npm start"
+    "server:start": "cd server && mkdir -p data && chmod -R 777 data && npm start"
   },
   "dependencies": {
     "@nxcode/sdk": "^1.0.14",
