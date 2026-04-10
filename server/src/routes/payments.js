@@ -70,7 +70,7 @@ router.post('/create-checkout-session', requireAuth, async (req, res) => {
 
   if (plan.price === 0) {
     // Free plan - no checkout needed
-    updateSubscription(userId, {
+    await updateSubscription(userId, {
       subscription_tier: planId,
       subscription_status: 'active',
       subscription_expires_at: null,
@@ -79,7 +79,7 @@ router.post('/create-checkout-session', requireAuth, async (req, res) => {
   }
 
   try {
-    const user = findById(userId);
+    const user = await findById(userId);
     let customerId = user.stripe_customer_id;
 
     // Create or retrieve Stripe customer
@@ -91,7 +91,7 @@ router.post('/create-checkout-session', requireAuth, async (req, res) => {
       });
       customerId = customer.id;
       // Save customer ID to DB
-      updateSubscription(userId, {
+      await updateSubscription(userId, {
         subscription_tier: user.subscription_tier,
         subscription_status: user.subscription_status,
         stripe_customer_id: customerId
@@ -154,7 +154,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         const { userId, planId } = session.metadata;
 
         // Update user subscription
-        updateSubscription(userId, {
+        await updateSubscription(userId, {
           subscription_tier: planId,
           subscription_status: 'active',
           subscription_expires_at: null,
@@ -170,7 +170,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
 
         if (userId) {
           const status = subscription.status === 'active' ? 'active' : 'inactive';
-          updateSubscription(userId, {
+          await updateSubscription(userId, {
             subscription_status: status,
           });
           console.log(`[payments/webhook] Subscription updated for user ${userId} (status: ${status})`);
@@ -183,7 +183,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         const userId = subscription.metadata?.userId;
 
         if (userId) {
-          updateSubscription(userId, {
+          await updateSubscription(userId, {
             subscription_tier: 'free',
             subscription_status: 'inactive',
           });
@@ -208,7 +208,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
  * Get the current subscription status for the authenticated user
  */
 router.get('/subscription-status', requireAuth, (req, res) => {
-  const user = findById(req.user.id);
+  const user = await findById(req.user.id);
   if (!user) {
     return res.status(404).json({ error: 'User not found' });
   }

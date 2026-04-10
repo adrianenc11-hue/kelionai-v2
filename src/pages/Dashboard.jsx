@@ -190,6 +190,7 @@ export default function Dashboard({ onNavigate }) {
           </h3>
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
             <ActionBtn label="💬 Pornește chat" color="#7c3aed" glow="#a855f7"  onClick={() => onNavigate('chat')} />
+            <ActionBtn label="🎁 Invită prieteni" color="#0f766e" glow="#14b8a6" onClick={() => onNavigate('referral')} />
             <ActionBtn label="💳 Upgrade plan"  color="#1d4ed8" glow="#3b82f6"  onClick={() => onNavigate('pricing')} />
             <ActionBtn label="👤 Profil"        color="#065f46" glow="#10b981"  onClick={() => onNavigate('profile')} />
             {isAdmin && <ActionBtn label="⚙️ Admin panel" color="#92400e" glow="#f59e0b" onClick={() => onNavigate('admin')} />}

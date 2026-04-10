@@ -25,19 +25,16 @@ export function AuthProvider({ children }) {
   }, [])
 
   useEffect(() => {
-    // Check for auth_error in URL (from OAuth redirect)
     const params = new URLSearchParams(window.location.search)
     const authError = params.get('auth_error')
     if (authError) {
       setError(decodeURIComponent(authError))
-      // Remove the query param from URL without reloading
       const url = new URL(window.location.href)
       url.searchParams.delete('auth_error')
       window.history.replaceState({}, '', url.toString())
       setLoading(false)
       return
     }
-
     fetchMe()
   }, [fetchMe])
 
@@ -47,14 +44,10 @@ export function AuthProvider({ children }) {
 
   const localLogin = useCallback(async (email, password) => {
     try {
-      const res = await api.post(
-        `/auth/local/login`,
-        { email, password }
-      )
+      const res = await api.post(`/auth/local/login`, { email, password })
       if (res.token) {
         await fetchMe()
         setError(null)
-        // Redirect to dashboard/home after successful login
         window.location.href = '/'
         return { success: true, ...res }
       }
@@ -68,42 +61,32 @@ export function AuthProvider({ children }) {
 
   const registerLocal = useCallback(async (email, password, name) => {
     try {
-      const res = await api.post(
-        `/auth/local/register`,
-        { email, password, name }
-      );
+      const res = await api.post(`/auth/local/register`, { email, password, name })
       if (res.token) {
-        await fetchMe();
-        setError(null);
-        // Redirect to dashboard/home after successful registration
+        await fetchMe()
+        setError(null)
         window.location.href = '/'
-        return { success: true, ...res };
+        return { success: true, ...res }
       }
-      return { success: false, message: 'Invalid response from server' };
+      return { success: false, message: 'Invalid response from server' }
     } catch (err) {
       const msg = err.body?.error || err.message
-      setError(msg);
-      return { success: false, message: msg };
+      setError(msg)
+      return { success: false, message: msg }
     }
-  }, [fetchMe]);
+  }, [fetchMe])
 
   const logout = useCallback(async () => {
     try {
       await api.post('/auth/logout', {})
-    } catch (_) {
-      // ignore errors on logout
-    }
+    } catch (_) {}
     setUser(null)
   }, [])
 
   const refreshUser = fetchMe
 
-  const ADMIN_EMAILS = (
-    typeof window !== 'undefined' && Array.isArray(window.__ADMIN_EMAILS__)
-      ? window.__ADMIN_EMAILS__
-      : ['adrianenc11@gmail.com']
-  )
-  const isAdmin = !!user?.email && ADMIN_EMAILS.includes(user.email)
+  // isAdmin is determined by the role field returned from the server — no hardcoded emails
+  const isAdmin = user?.role === 'admin'
 
   return (
     <AuthContext.Provider value={{ user, loading, error, setError, login, localLogin, registerLocal, logout, refreshUser, isAdmin }}>

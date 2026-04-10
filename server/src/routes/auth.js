@@ -84,7 +84,7 @@ router.get('/google/callback', async (req, res) => {
     const profile = await fetchUserInfo(tokens.access_token);
 
     // Create or update the user in our database
-    const user = upsertUser(profile);
+    const user = await upsertUser(profile);
 
     if (mode === 'mobile') {
       // Mobile: return a signed JWT so the client can store it securely
