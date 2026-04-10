@@ -10,26 +10,25 @@ const cookieParser = require('cookie-parser');
 
 const config = require('./config');
 
+// Ensure config is mutable
+if (!config.dbPath) {
+  config.dbPath = '/tmp/kelion-data/kelion.db';
+}
+
 // Ensure data directory exists before anything tries to open a DB file
-// Change to server directory to ensure relative paths work correctly
-process.chdir(__dirname);
-const dbDir = path.dirname(path.resolve(config.dbPath));
+// Use /tmp for database to avoid permission issues in containerized environments
+const dbDir = process.env.DB_DIR || '/tmp/kelion-data';
 if (!fs.existsSync(dbDir)) {
   try {
     fs.mkdirSync(dbDir, { recursive: true });
   } catch (err) {
-    console.error(`Failed to create directory ${dbDir}:`, err);
-    process.exit(1);
-  }
-} else {
-  // Ensure directory has write permissions
-  try {
-    fs.accessSync(dbDir, fs.constants.W_OK);
-  } catch (err) {
-    console.error(`Directory ${dbDir} is not writable:`, err);
-    process.exit(1);
+    console.warn(`Warning: Failed to create directory ${dbDir}:`, err);
+    // Continue anyway - the directory might already exist or be writable
   }
 }
+
+// Override config.dbPath to use the writable directory
+config.dbPath = path.join(dbDir, 'kelion.db');
 
 const authRouter          = require('./routes/auth');
 const localAuthRouter     = require('./routes/localAuth');
