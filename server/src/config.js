@@ -57,7 +57,7 @@ module.exports = {
   apiBaseUrl: optional('API_BASE_URL', 'https://kelionai.app'),
 
   // CORS – comma-separated list of allowed origins
-  corsOrigins: optional('CORS_ORIGINS', 'https://kelionai.app, http://localhost:5173').split(',').map((o) => o.trim()),
+  corsOrigins: optional('CORS_ORIGINS', 'https://kelionai.app, http://localhost:5173, https://kelionai-v2.onrender.com').split(',').map((o) => o.trim()),
 
   // Cookie settings
   cookie: {
