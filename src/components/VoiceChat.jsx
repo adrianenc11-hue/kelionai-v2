@@ -74,8 +74,8 @@ function AvatarModel({ modelPath, avatarId, isTalking, armRot, forearmRot }) {
   return (
     <primitive
       object={scene}
-      scale={2.0}
-      position={[0, -2.0, 0]}
+      scale={1.5}
+      position={[0, -1.5, 0]}
       rotation={[0, 0, 0]}
     />
   )
@@ -388,7 +388,7 @@ export default function VoiceChat({ avatar, onBack }) {
       <div style={{ flex: '0 0 55%', position: 'relative', overflow: 'hidden' }}>
         <AvatarErrorBoundary avatarId={avatar.id}>
           <Canvas
-            camera={{ position: [0, 0.2, 2.5], fov: 42 }}
+            camera={{ position: [0, 0.5, 3.2], fov: 50 }}
             style={{ width: '100%', height: '100%' }}
             gl={{ antialias: true, alpha: false }}
           >
