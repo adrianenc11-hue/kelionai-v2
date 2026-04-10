@@ -80,7 +80,7 @@ function ArmPanel({ armRot, forearmRot, onChange, onSave, onClose }) {
 
   return (
     <div style={{
-      position: 'fixed', top: '50%', right: '40px', transform: 'translateY(-50%)',
+      position: 'fixed', top: '20px', right: '40px',
       width: '280px', background: 'rgba(0,0,0,0.95)', backdropFilter: 'blur(16px)',
       borderRadius: '18px', padding: '18px', zIndex: 30,
       display: 'flex', flexDirection: 'column', gap: '6px',
