@@ -80,10 +80,12 @@ function ArmPanel({ armRot, forearmRot, onChange, onSave, onClose }) {
 
   return (
     <div style={{
-      position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-      background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(16px)',
-      borderRadius: '18px', padding: '18px', zIndex: 20,
+      position: 'fixed', top: '50%', right: '40px', transform: 'translateY(-50%)',
+      width: '280px', background: 'rgba(0,0,0,0.95)', backdropFilter: 'blur(16px)',
+      borderRadius: '18px', padding: '18px', zIndex: 30,
       display: 'flex', flexDirection: 'column', gap: '6px',
+      border: '1px solid rgba(168, 85, 247, 0.3)',
+      boxShadow: '0 8px 32px rgba(168, 85, 247, 0.2)',
     }}>
       <div style={{ color: '#fff', fontWeight: '700', fontSize: '14px', marginBottom: '4px' }}>
         🦾 Control Brațe
@@ -131,10 +133,12 @@ export default function AvatarSelect({ onSelect }) {
   return (
     <div style={{
       width: '100vw', height: '100vh', display: 'flex',
-      flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      background: 'radial-gradient(ellipse at center, #1a0533 0%, #0a0a0f 70%)', gap: '40px',
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+      background: 'radial-gradient(ellipse at center, #1a0533 0%, #0a0a0f 70%)', gap: '60px',
+      padding: '20px',
     }}>
-      <div style={{ textAlign: 'center' }}>
+      {/* Left column - Title and instructions */}
+      <div style={{ textAlign: 'center', maxWidth: '300px', order: -1 }}>
         <h1 style={{
           fontSize: '42px', fontWeight: '800',
           background: 'linear-gradient(135deg, #a855f7, #f472b6)',
@@ -146,8 +150,8 @@ export default function AvatarSelect({ onSelect }) {
 
       <div style={{
         border: `2px solid ${KELION.color}`, borderRadius: '20px', overflow: 'hidden',
-        width: '320px', background: 'rgba(255,255,255,0.04)', backdropFilter: 'blur(10px)',
-        boxShadow: `0 0 30px ${KELION.glow}33`, position: 'relative',
+        width: '420px', background: 'rgba(255,255,255,0.04)', backdropFilter: 'blur(10px)',
+        boxShadow: `0 0 30px ${KELION.glow}33`, position: 'relative', flexShrink: 0,
       }}>
         <div style={{ height: '380px', position: 'relative' }}>
           <Canvas camera={{ position: [0, 0.5, 3.0], fov: 45 }}>
