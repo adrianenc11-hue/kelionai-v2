@@ -11,6 +11,8 @@ const cookieParser = require('cookie-parser');
 const config = require('./config');
 
 // Ensure data directory exists before anything tries to open a DB file
+// Change to server directory to ensure relative paths work correctly
+process.chdir(__dirname);
 const dbDir = path.dirname(path.resolve(config.dbPath));
 if (!fs.existsSync(dbDir)) {
   try {
