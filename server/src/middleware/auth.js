@@ -27,7 +27,7 @@ function signAppToken(user) {
  * Sets req.user on success, responds 401 otherwise.
  */
 async function requireAuth(req, res, next) {
-  // 1. Try Bearer token (mobile)
+  // 1. Try Bearer token (mobile / Authorization header)
   const authHeader = req.headers.authorization || '';
   if (authHeader.startsWith('Bearer ')) {
     const token = authHeader.slice(7);
@@ -42,15 +42,20 @@ async function requireAuth(req, res, next) {
     }
   }
 
-  // 2. Try session cookie (web)
-  if (req.session && req.session.userId) {
-    const user = findById(req.session.userId);
-    if (!user) {
-      req.session.destroy(() => {});
+  // 2. Try JWT cookie (web – set after OAuth callback)
+  const cookieToken = req.cookies && req.cookies['kelion.token'];
+  if (cookieToken) {
+    try {
+      const payload = jwt.verify(cookieToken, config.jwt.secret);
+      const user = findById(payload.sub);
+      if (!user) return res.status(401).json({ error: 'User not found' });
+      req.user = user;
+      return next();
+    } catch (err) {
+      // Token invalid or expired – clear it
+      res.clearCookie('kelion.token', { path: '/' });
       return res.status(401).json({ error: 'Session expired' });
     }
-    req.user = user;
-    return next();
   }
 
   return res.status(401).json({ error: 'Authentication required' });

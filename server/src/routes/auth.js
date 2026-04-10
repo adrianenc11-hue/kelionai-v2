@@ -100,8 +100,16 @@ router.get('/google/callback', async (req, res) => {
       });
     }
 
-    // Web: establish a server-side session and set a secure HttpOnly cookie
-    req.session.userId = user.id;
+    // Web: sign a JWT and set it as a secure HttpOnly cookie
+    // (avoids MemoryStore session loss through Cloudflare/Railway proxy)
+    const appToken = signAppToken(user);
+    res.cookie('kelion.token', appToken, {
+      httpOnly: true,
+      secure: config.cookie.secure,
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      path: '/',
+    });
 
     // Redirect the browser back to the app
     return res.redirect(`${config.appBaseUrl}/`);
@@ -134,21 +142,13 @@ router.get('/me', requireAuth, (req, res) => {
 //         We still accept the request and return 200 for uniformity.
 // ---------------------------------------------------------------------------
 router.post('/logout', (req, res) => {
-  if (req.session) {
-    req.session.destroy((err) => {
-      if (err) {
-        console.error('[auth/logout] session destroy error:', err.message);
-      }
-    });
-  }
+  // Clear JWT cookie
+  res.clearCookie('kelion.token', { path: '/' });
 
-  // Clear the session cookie on the client
-  res.clearCookie(config.session.name, {
-    httpOnly: true,
-    secure:   config.cookie.secure,
-    sameSite: config.cookie.sameSite,
-    domain:   config.cookie.domain || undefined,
-  });
+  // Also destroy session if it exists
+  if (req.session) {
+    req.session.destroy(() => {});
+  }
 
   res.json({ message: 'Logged out successfully' });
 });
