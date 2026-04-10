@@ -67,7 +67,8 @@ module.exports = {
   },
 
   // SQLite database file path
-  dbPath: optional('DB_PATH', '/app/server/data/kelion.db'),
+  // Use relative path to ensure it's writable in containerized environments
+  dbPath: optional('DB_PATH', './data/kelion.db'),
 
   // Stripe API Keys
   stripe: {
