@@ -1,5 +1,5 @@
-import { Canvas } from '@react-three/fiber'
-import { OrbitControls, useGLTF, Environment, useFrame } from '@react-three/drei'
+import { Canvas, useFrame } from '@react-three/fiber'
+import { OrbitControls, useGLTF, Environment } from '@react-three/drei'
 import { Suspense, useRef, useState, useEffect } from 'react'
 
 const KELION = {
