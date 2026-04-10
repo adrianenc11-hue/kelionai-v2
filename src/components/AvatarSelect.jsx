@@ -23,7 +23,8 @@ const AVATARS = [
 
 function AvatarModel({ modelPath }) {
   const { scene } = useGLTF(modelPath)
-  return <primitive object={scene} scale={1.8} position={[0, -1.8, 0]} />
+  // rotation-y = Math.PI → avatarul sta cu fata spre utilizator
+  return <primitive object={scene} scale={1.6} position={[0, -1.6, 0]} rotation={[0, Math.PI, 0]} />
 }
 
 function AvatarCard({ avatar, onSelect }) {
@@ -51,7 +52,7 @@ function AvatarCard({ avatar, onSelect }) {
       }}
     >
       <div style={{ height: '340px' }}>
-        <Canvas camera={{ position: [0, 0.5, 3], fov: 45 }}>
+        <Canvas camera={{ position: [0, 0.8, 2.8], fov: 40 }}>
           <ambientLight intensity={0.5} />
           <directionalLight position={[2, 4, 2]} intensity={1.5} />
           <Environment preset="city" />
@@ -61,10 +62,10 @@ function AvatarCard({ avatar, onSelect }) {
           <OrbitControls
             enableZoom={false}
             enablePan={false}
-            autoRotate
-            autoRotateSpeed={2}
+            autoRotate={false}
             minPolarAngle={Math.PI / 3}
-            maxPolarAngle={Math.PI / 2}
+            maxPolarAngle={Math.PI / 2.2}
+            enableRotate={false}
           />
         </Canvas>
       </div>
