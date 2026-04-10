@@ -207,7 +207,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
  * GET /payments/subscription-status
  * Get the current subscription status for the authenticated user
  */
-router.get('/subscription-status', requireAuth, (req, res) => {
+router.get('/subscription-status', requireAuth, async (req, res) => {
   const user = await findById(req.user.id);
   if (!user) {
     return res.status(404).json({ error: 'User not found' });
