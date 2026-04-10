@@ -16,7 +16,7 @@ function AvatarModel({ modelPath, scale, posY }) {
   return <primitive object={scene} scale={scale} position={[0, posY, 0]} rotation={[0, 0, 0]} />
 }
 
-function ZoomControls({ zoom, setZoom }) {
+function ZoomControls({ zoom, setZoom, onSave, saved }) {
   const step = 0.15
   const min = 0.8
   const max = 2.8
@@ -45,6 +45,11 @@ function ZoomControls({ zoom, setZoom }) {
         style={{ ...btnStyle, fontSize: '10px', padding: '4px 6px' }}
         title="Reset zoom"
       >↺</button>
+      <button
+        onClick={e => { e.stopPropagation(); onSave() }}
+        style={{ ...btnStyle, fontSize: '10px', padding: '4px 6px', background: saved ? 'rgba(34,197,94,0.7)' : 'rgba(168,85,247,0.7)', borderColor: saved ? '#22c55e' : '#a855f7' }}
+        title="Salvează zoom"
+      >{saved ? '✓' : '💾'}</button>
     </div>
   )
 }
@@ -63,7 +68,11 @@ const btnStyle = {
 }
 
 export default function AvatarSelect({ onSelect }) {
-  const [zoom, setZoom] = useState(1.6)
+  const [zoom, setZoom] = useState(() => {
+    const saved = localStorage.getItem('kelion_avatar_zoom')
+    return saved ? parseFloat(saved) : 1.6
+  })
+  const [saved, setSaved] = useState(false)
   // scale și posY se calculează din zoom
   const scale = zoom
   const posY = -(zoom * 1.0)
@@ -133,7 +142,7 @@ export default function AvatarSelect({ onSelect }) {
               maxPolarAngle={Math.PI / 1.8}
             />
           </Canvas>
-          <ZoomControls zoom={zoom} setZoom={setZoom} />
+          <ZoomControls zoom={zoom} setZoom={setZoom} onSave={() => { localStorage.setItem('kelion_avatar_zoom', zoom); setSaved(true); setTimeout(() => setSaved(false), 2000) }} saved={saved} />
         </div>
 
         <div style={{ padding: '16px 20px 20px', textAlign: 'center' }}>
