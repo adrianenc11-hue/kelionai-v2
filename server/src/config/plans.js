@@ -14,7 +14,7 @@ const PLANS = {
     dailyLimit: 10,
     features: [
       '10 voice generations/day',
-      'Basic AI assistants (Kelion & Kira)',
+      'Basic AI assistant (Kelion)',
       'Text & voice chat',
     ],
   },

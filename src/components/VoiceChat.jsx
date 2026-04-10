@@ -4,8 +4,7 @@ import { Suspense, useState, useRef, useEffect, useCallback, Component } from 'r
 import Nxcode from '@nxcode/sdk'
 
 const SYSTEM_PROMPT = {
-  kelion: `You are Kelion, a friendly and intelligent male AI assistant. Always respond in the same language the user writes in. Be concise and helpful. Personality: calm, professional, empathetic.`,
-  kira: `You are Kira, a friendly and enthusiastic female AI assistant. Always respond in the same language the user writes in. Be warm and direct. Personality: cheerful, creative, energetic.`,
+  kelion: `You are Kelion, a friendly and intelligent AI assistant. Always respond in the same language the user writes in. Be concise and helpful. Personality: calm, professional, empathetic.`,
 }
 
 const LANGUAGES = [
@@ -77,7 +76,7 @@ function AvatarModel({ modelPath, avatarId, isTalking, armRot, forearmRot }) {
       object={scene}
       scale={2.0}
       position={[0, -2.0, 0]}
-      rotation={[0, Math.PI, 0]}
+      rotation={[0, 0, 0]}
     />
   )
 }
@@ -100,7 +99,7 @@ class AvatarErrorBoundary extends Component {
           flexDirection: 'column', gap: '12px',
         }}>
           <div style={{ fontSize: '80px' }}>
-            {this.props.avatarId === 'kira' ? '👩' : '👨'}
+            {'🤖'}
           </div>
           <div style={{ color: '#aaa', fontSize: '14px' }}>Avatar 3D indisponibil</div>
         </div>
@@ -251,7 +250,7 @@ export default function VoiceChat({ avatar, onBack }) {
     const utter = new SpeechSynthesisUtterance(text)
     utter.lang = voiceLang
     utter.rate = 1.0
-    utter.pitch = avatar.id === 'kira' ? 1.3 : 0.9
+    utter.pitch = 0.9
     utter.onstart = () => setIsTalking(true)
     utter.onend = () => setIsTalking(false)
     utter.onerror = () => setIsTalking(false)
