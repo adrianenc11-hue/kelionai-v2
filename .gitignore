@@ -1,5 +1,5 @@
 node_modules/
-# dist/ - committed for Railway deployment
+dist/
 .vite/
 *.local
 
