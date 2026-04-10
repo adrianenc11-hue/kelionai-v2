@@ -27,7 +27,7 @@ router.post("/register", async (req, res) => {
     
 await insertUser({ id: userId, email, password: hashedPassword, name, role: "user" });
     
-    const token = jwt.sign({ userId: userId, role: "user" }, config.jwt.secret, { expiresIn: config.jwt.expiresIn });
+    const token = jwt.sign({ sub: userId, role: "user" }, config.jwt.secret, { expiresIn: config.jwt.expiresIn });
     res.cookie("kelion.token", token, {
       httpOnly: true,
       secure: config.cookie.secure,
@@ -64,7 +64,7 @@ router.post("/login", async (req, res) => {
       return res.status(400).json({ error: "Invalid credentials" });
     }
 
-    const token = jwt.sign({ userId: user.id, role: user.role }, config.jwt.secret, { expiresIn: config.jwt.expiresIn });
+    const token = jwt.sign({ sub: user.id, role: user.role }, config.jwt.secret, { expiresIn: config.jwt.expiresIn });
 
     // Set HttpOnly cookie for web clients
     res.cookie("kelion.token", token, {
