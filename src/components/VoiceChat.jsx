@@ -17,8 +17,8 @@ const LANGUAGES = [
 ]
 
 // Valorile default pentru brațe (lângă corp)
-const DEFAULT_ARM_ROT = { x: 0.0, y: 0.0, z: 1.2 }
-const DEFAULT_FOREARM_ROT = { x: 0.3, y: 0.0, z: 0.0 }
+const DEFAULT_ARM_ROT = { x: 0.4, y: 0.0, z: 0.15 }
+const DEFAULT_FOREARM_ROT = { x: 0.0, y: 0.0, z: 0.0 }
 
 // Componenta avatar 3D cu control brațe din exterior
 function AvatarModel({ modelPath, avatarId, isTalking, armRot, forearmRot }) {

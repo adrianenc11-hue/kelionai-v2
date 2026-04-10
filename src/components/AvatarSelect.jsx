@@ -11,8 +11,8 @@ const KELION = {
   glow: '#a855f7',
 }
 
-const DEFAULT_ARM = { x: 0.0, y: 0.0, z: 1.2 }
-const DEFAULT_FOREARM = { x: 0.3, y: 0.0, z: 0.0 }
+const DEFAULT_ARM = { x: 0.4, y: 0.0, z: 0.15 }
+const DEFAULT_FOREARM = { x: 0.0, y: 0.0, z: 0.0 }
 const STORAGE_KEY = 'arm_rot_kelion'
 
 function AvatarModel({ modelPath, armRot, forearmRot }) {
