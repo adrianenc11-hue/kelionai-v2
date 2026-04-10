@@ -1,6 +1,7 @@
 services:
   - type: web
     name: kelionai-v2
+    runtime: node
     envVars:
       - key: PORT
         value: "8080"
