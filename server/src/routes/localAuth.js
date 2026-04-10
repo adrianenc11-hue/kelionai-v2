@@ -2,7 +2,6 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const { v4: uuidv4 } = require("uuid");
 const { findByEmail, insertUser } = require("../db/index.js");
 const config = require("../config");
 
@@ -10,7 +9,7 @@ const router = express.Router();
 
 // Register a new user
 router.post("/register", async (req, res) => {
-  const { email, password, name } = req.body; // Added name for registration
+  const { email, password, name } = req.body;
 
   if (!email || !password || !name) {
     return res.status(400).json({ error: "Email, password, and name are required" });
@@ -23,11 +22,15 @@ router.post("/register", async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const userId = uuidv4();
-    
-await insertUser({ id: userId, email, password: hashedPassword, name, role: "user" });
-    
-    const token = jwt.sign({ sub: userId, role: "user" }, config.jwt.secret, { expiresIn: config.jwt.expiresIn });
+
+    // insertUser no longer takes id - Supabase auto-increments it
+    const newUser = await insertUser({ email, password: hashedPassword, name, role: "user" });
+
+    if (!newUser) {
+      return res.status(500).json({ error: "Failed to create user" });
+    }
+
+    const token = jwt.sign({ sub: newUser.id, role: newUser.role || "user" }, config.jwt.secret, { expiresIn: config.jwt.expiresIn });
     res.cookie("kelion.token", token, {
       httpOnly: true,
       secure: config.cookie.secure,
@@ -36,7 +39,7 @@ await insertUser({ id: userId, email, password: hashedPassword, name, role: "use
       maxAge: config.session.maxAgeMs,
       path: "/",
     });
-    res.status(201).json({ message: "User registered successfully", token, user: { id: userId, email, name, role: "user" } });
+    res.status(201).json({ message: "User registered successfully", token, user: { id: newUser.id, email, name, role: newUser.role || "user" } });
   } catch (error) {
     console.error("Error during registration:", error);
     res.status(500).json({ error: "Internal server error" });
@@ -58,7 +61,13 @@ router.post("/login", async (req, res) => {
       return res.status(400).json({ error: "Invalid credentials" });
     }
 
-    const isMatch = await bcrypt.compare(password, user.password);
+    // password_hash is the field name in Supabase
+    const storedHash = user.password_hash || user.password;
+    if (!storedHash) {
+      return res.status(400).json({ error: "Invalid credentials" });
+    }
+
+    const isMatch = await bcrypt.compare(password, storedHash);
 
     if (!isMatch) {
       return res.status(400).json({ error: "Invalid credentials" });
@@ -66,7 +75,6 @@ router.post("/login", async (req, res) => {
 
     const token = jwt.sign({ sub: user.id, role: user.role }, config.jwt.secret, { expiresIn: config.jwt.expiresIn });
 
-    // Set HttpOnly cookie for web clients
     res.cookie("kelion.token", token, {
       httpOnly: true,
       secure: config.cookie.secure,

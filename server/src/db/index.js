@@ -84,12 +84,11 @@ async function upsertUser(profile) {
   return findByGoogleId(profile.googleId);
 }
 
-async function insertUser({ id, email, password, name, role = 'user' }) {
+async function insertUser({ email, password, name, role = 'user' }) {
   const now = new Date().toISOString();
   const rows = await sbQuery('users', {
     method: 'POST',
     body: JSON.stringify({
-      id,
       email,
       password_hash:       password,
       name,
