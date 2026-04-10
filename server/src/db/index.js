@@ -20,8 +20,7 @@ db.pragma("foreign_keys = ON");
  */
 function migrate() {
   db.exec(`
-    DROP TABLE IF EXISTS users;
-    CREATE TABLE users (
+    CREATE TABLE IF NOT EXISTS users (
       id                     TEXT PRIMARY KEY,           -- UUID
       google_id              TEXT UNIQUE NULL,
       password               TEXT NULL,
