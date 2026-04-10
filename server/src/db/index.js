@@ -89,6 +89,7 @@ async function insertUser({ email, password, name, role = 'user' }) {
   const rows = await sbQuery('users', {
     method: 'POST',
     body: JSON.stringify({
+      open_id:             `email_${email}`,
       email,
       password_hash:       password,
       name,
