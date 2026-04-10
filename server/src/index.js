@@ -16,11 +16,12 @@ if (!fs.existsSync(dbDir)) {
   fs.mkdirSync(dbDir, { recursive: true });
 }
 
-const authRouter         = require('./routes/auth');
-const usersRouter        = require('./routes/users');
-const adminRouter        = require('./routes/admin');
+const authRouter          = require('./routes/auth');
+const localAuthRouter     = require('./routes/localAuth');
+const usersRouter         = require('./routes/users');
+const adminRouter         = require('./routes/admin');
 const subscriptionsRouter = require('./routes/subscriptions');
-const paymentsRouter     = require('./routes/payments');
+const paymentsRouter      = require('./routes/payments');
 
 const app = express();
 
@@ -75,6 +76,7 @@ app.use(
 // Routes
 // ---------------------------------------------------------------------------
 app.use('/auth', authRouter);
+app.use("/auth/local", localAuthRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/subscription', subscriptionsRouter);

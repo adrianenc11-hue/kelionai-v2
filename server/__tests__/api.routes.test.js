@@ -10,6 +10,7 @@ process.env.SESSION_SECRET       = 'test-session-secret-at-least-32-chars';
 process.env.JWT_SECRET           = 'test-jwt-secret-at-least-32-chars!!';
 process.env.NODE_ENV             = 'test';
 process.env.ADMIN_EMAILS         = 'admin@example.com';
+process.env.STRIPE_SECRET_KEY    = ''; // Ensure Stripe is not configured for tests
 
 const os   = require('os');
 const path = require('path');

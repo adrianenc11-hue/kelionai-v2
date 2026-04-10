@@ -25,8 +25,8 @@ module.exports = {
 
   // Google OAuth 2.0 / OpenID Connect
   google: {
-    clientId: required('GOOGLE_CLIENT_ID'),
-    clientSecret: required('GOOGLE_CLIENT_SECRET'),
+    clientId: optional('GOOGLE_CLIENT_ID'),
+    clientSecret: optional('GOOGLE_CLIENT_SECRET'),
     redirectUri: optional(
       'GOOGLE_REDIRECT_URI',
       'http://localhost:3001/auth/google/callback'
@@ -41,31 +41,38 @@ module.exports = {
 
   // Session (web clients – HttpOnly cookie)
   session: {
-    secret: required('SESSION_SECRET'),
+   secret: optional('SESSION_SECRET', 'a_default_session_secret'),
     name: 'kelion.sid',
     maxAgeMs: 7 * 24 * 60 * 60 * 1000, // 7 days
   },
 
   // JWT (mobile clients – Bearer token)
   jwt: {
-    secret: required('JWT_SECRET'),
+  secret: optional('JWT_SECRET', 'a_default_jwt_secret'),
     expiresIn: optional('JWT_EXPIRES_IN', '7d'),
   },
 
   // URLs
-  appBaseUrl: optional('APP_BASE_URL', 'http://localhost:5173'),
-  apiBaseUrl: optional('API_BASE_URL', 'http://localhost:3001'),
+  appBaseUrl: optional('APP_BASE_URL', 'https://kelionai.app'),
+  apiBaseUrl: optional('API_BASE_URL', 'https://kelionai.app'),
 
   // CORS – comma-separated list of allowed origins
-  corsOrigins: optional('CORS_ORIGINS', 'http://localhost:5173').split(',').map((o) => o.trim()),
+  corsOrigins: optional('CORS_ORIGINS', 'https://kelionai.app, http://localhost:5173').split(',').map((o) => o.trim()),
 
   // Cookie settings
   cookie: {
-    domain: optional('COOKIE_DOMAIN', ''),
+    domain: optional('COOKIE_DOMAIN', 'kelionai.app'),
     secure: optional('NODE_ENV', 'development') === 'production',
     sameSite: optional('NODE_ENV', 'development') === 'production' ? 'lax' : 'lax',
   },
 
   // SQLite database file path
-  dbPath: optional('DB_PATH', './data/kelion.db'),
+  dbPath: optional('DB_PATH', '/app/server/data/kelion.db'),
+
+  // Stripe API Keys
+  stripe: {
+    secretKey: optional('STRIPE_SECRET_KEY'),
+    publishableKey: optional('STRIPE_PUBLISHABLE_KEY'),
+    webhookSecret: optional('STRIPE_WEBHOOK_SECRET'),
+  },
 };

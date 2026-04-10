@@ -10,14 +10,16 @@
     "test": "jest --coverage"
   },
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.8.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "express-session": "^1.18.0",
-"jsonwebtoken": "^9.0.2",
+    "jsonwebtoken": "^9.0.2",
     "node-fetch": "^2.7.0",
+    "stripe": "^22.0.1",
     "uuid": "^9.0.1"
   },
   "devDependencies": {

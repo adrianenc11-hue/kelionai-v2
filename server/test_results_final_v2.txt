@@ -1,0 +1,269 @@
+
+> kelion-voice-server@1.0.0 test
+> jest --coverage
+
+(node:19746) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+PASS __tests__/google.utils.test.js
+PASS __tests__/auth.routes.test.js
+  ● Console
+
+    console.error
+      [auth/callback] State mismatch: { expected: undefined, got: undefined }
+
+      69 |   // Validate state to prevent CSRF
+      70 |   if (!state || state !== savedState) {
+    > 71 |     console.error('[auth/callback] State mismatch:', { expected: savedState, got: state });
+         |             ^
+      72 |     return res.status(400).json({ error: 'Invalid OAuth state parameter' });
+      73 |   }
+      74 |
+
+      at error (src/routes/auth.js:71:13)
+      at Layer.handle [as handle_request] (node_modules/express/lib/router/layer.js:95:5)
+      at next (node_modules/express/lib/router/route.js:149:13)
+      at Route.dispatch (node_modules/express/lib/router/route.js:119:3)
+      at Layer.handle [as handle_request] (node_modules/express/lib/router/layer.js:95:5)
+      at node_modules/express/lib/router/index.js:284:15
+      at Function.process_params (node_modules/express/lib/router/index.js:346:12)
+      at next (node_modules/express/lib/router/index.js:280:10)
+      at Function.handle (node_modules/express/lib/router/index.js:175:3)
+      at router (node_modules/express/lib/router/index.js:47:12)
+      at Layer.handle [as handle_request] (node_modules/express/lib/router/layer.js:95:5)
+      at trim_prefix (node_modules/express/lib/router/index.js:328:13)
+      at node_modules/express/lib/router/index.js:286:9
+      at Function.process_params (node_modules/express/lib/router/index.js:346:12)
+      at next (node_modules/express/lib/router/index.js:280:10)
+      at session (node_modules/express-session/index.js:494:7)
+      at Layer.handle [as handle_request] (node_modules/express/lib/router/layer.js:95:5)
+      at trim_prefix (node_modules/express/lib/router/index.js:328:13)
+      at node_modules/express/lib/router/index.js:286:9
+      at Function.process_params (node_modules/express/lib/router/index.js:346:12)
+      at next (node_modules/express/lib/router/index.js:280:10)
+      at cookieParser (node_modules/cookie-parser/index.js:57:14)
+      at Layer.handle [as handle_request] (node_modules/express/lib/router/layer.js:95:5)
+      at trim_prefix (node_modules/express/lib/router/index.js:328:13)
+      at node_modules/express/lib/router/index.js:286:9
+      at Function.process_params (node_modules/express/lib/router/index.js:346:12)
+      at next (node_modules/express/lib/router/index.js:280:10)
+      at urlencodedParser (node_modules/body-parser/lib/types/urlencoded.js:91:7)
+      at Layer.handle [as handle_request] (node_modules/express/lib/router/layer.js:95:5)
+      at trim_prefix (node_modules/express/lib/router/index.js:328:13)
+      at node_modules/express/lib/router/index.js:286:9
+      at Function.process_params (node_modules/express/lib/router/index.js:346:12)
+      at next (node_modules/express/lib/router/index.js:280:10)
+      at jsonParser (node_modules/body-parser/lib/types/json.js:113:7)
+      at Layer.handle [as handle_request] (node_modules/express/lib/router/layer.js:95:5)
+      at trim_prefix (node_modules/express/lib/router/index.js:328:13)
+      at node_modules/express/lib/router/index.js:286:9
+      at Function.process_params (node_modules/express/lib/router/index.js:346:12)
+      at next (node_modules/express/lib/router/index.js:280:10)
+      at cors (node_modules/cors/lib/index.js:188:7)
+      at node_modules/cors/lib/index.js:224:17
+      at callback (src/index.js:39:27)
+      at node_modules/cors/lib/index.js:219:13
+      at optionsCallback (node_modules/cors/lib/index.js:199:9)
+      at corsMiddleware (node_modules/cors/lib/index.js:204:7)
+      at Layer.handle [as handle_request] (node_modules/express/lib/router/layer.js:95:5)
+      at trim_prefix (node_modules/express/lib/router/index.js:328:13)
+      at node_modules/express/lib/router/index.js:286:9
+      at Function.process_params (node_modules/express/lib/router/index.js:346:12)
+      at next (node_modules/express/lib/router/index.js:280:10)
+      at expressInit (node_modules/express/lib/middleware/init.js:40:5)
+      at Layer.handle [as handle_request] (node_modules/express/lib/router/layer.js:95:5)
+      at trim_prefix (node_modules/express/lib/router/index.js:328:13)
+      at node_modules/express/lib/router/index.js:286:9
+      at Function.process_params (node_modules/express/lib/router/index.js:346:12)
+      at next (node_modules/express/lib/router/index.js:280:10)
+      at query (node_modules/express/lib/middleware/query.js:45:5)
+      at Layer.handle [as handle_request] (node_modules/express/lib/router/layer.js:95:5)
+      at trim_prefix (node_modules/express/lib/router/index.js:328:13)
+      at node_modules/express/lib/router/index.js:286:9
+      at Function.process_params (node_modules/express/lib/router/index.js:346:12)
+      at next (node_modules/express/lib/router/index.js:280:10)
+      at Function.handle (node_modules/express/lib/router/index.js:175:3)
+      at Function.handle (node_modules/express/lib/application.js:181:10)
+      at Server.app (node_modules/express/lib/express.js:39:9)
+
+    console.error
+      [auth/callback] State mismatch: { expected: undefined, got: 'wrong' }
+
+      69 |   // Validate state to prevent CSRF
+      70 |   if (!state || state !== savedState) {
+    > 71 |     console.error('[auth/callback] State mismatch:', { expected: savedState, got: state });
+         |             ^
+      72 |     return res.status(400).json({ error: 'Invalid OAuth state parameter' });
+      73 |   }
+      74 |
+
+      at error (src/routes/auth.js:71:13)
+      at Layer.handle [as handle_request] (node_modules/express/lib/router/layer.js:95:5)
+      at next (node_modules/express/lib/router/route.js:149:13)
+      at Route.dispatch (node_modules/express/lib/router/route.js:119:3)
+      at Layer.handle [as handle_request] (node_modules/express/lib/router/layer.js:95:5)
+      at node_modules/express/lib/router/index.js:284:15
+      at Function.process_params (node_modules/express/lib/router/index.js:346:12)
+      at next (node_modules/express/lib/router/index.js:280:10)
+      at Function.handle (node_modules/express/lib/router/index.js:175:3)
+      at router (node_modules/express/lib/router/index.js:47:12)
+      at Layer.handle [as handle_request] (node_modules/express/lib/router/layer.js:95:5)
+      at trim_prefix (node_modules/express/lib/router/index.js:328:13)
+      at node_modules/express/lib/router/index.js:286:9
+      at Function.process_params (node_modules/express/lib/router/index.js:346:12)
+      at next (node_modules/express/lib/router/index.js:280:10)
+      at session (node_modules/express-session/index.js:494:7)
+      at Layer.handle [as handle_request] (node_modules/express/lib/router/layer.js:95:5)
+      at trim_prefix (node_modules/express/lib/router/index.js:328:13)
+      at node_modules/express/lib/router/index.js:286:9
+      at Function.process_params (node_modules/express/lib/router/index.js:346:12)
+      at next (node_modules/express/lib/router/index.js:280:10)
+      at cookieParser (node_modules/cookie-parser/index.js:57:14)
+      at Layer.handle [as handle_request] (node_modules/express/lib/router/layer.js:95:5)
+      at trim_prefix (node_modules/express/lib/router/index.js:328:13)
+      at node_modules/express/lib/router/index.js:286:9
+      at Function.process_params (node_modules/express/lib/router/index.js:346:12)
+      at next (node_modules/express/lib/router/index.js:280:10)
+      at urlencodedParser (node_modules/body-parser/lib/types/urlencoded.js:91:7)
+      at Layer.handle [as handle_request] (node_modules/express/lib/router/layer.js:95:5)
+      at trim_prefix (node_modules/express/lib/router/index.js:328:13)
+      at node_modules/express/lib/router/index.js:286:9
+      at Function.process_params (node_modules/express/lib/router/index.js:346:12)
+      at next (node_modules/express/lib/router/index.js:280:10)
+      at jsonParser (node_modules/body-parser/lib/types/json.js:113:7)
+      at Layer.handle [as handle_request] (node_modules/express/lib/router/layer.js:95:5)
+      at trim_prefix (node_modules/express/lib/router/index.js:328:13)
+      at node_modules/express/lib/router/index.js:286:9
+      at Function.process_params (node_modules/express/lib/router/index.js:346:12)
+      at next (node_modules/express/lib/router/index.js:280:10)
+      at cors (node_modules/cors/lib/index.js:188:7)
+      at node_modules/cors/lib/index.js:224:17
+      at callback (src/index.js:39:27)
+      at node_modules/cors/lib/index.js:219:13
+      at optionsCallback (node_modules/cors/lib/index.js:199:9)
+      at corsMiddleware (node_modules/cors/lib/index.js:204:7)
+      at Layer.handle [as handle_request] (node_modules/express/lib/router/layer.js:95:5)
+      at trim_prefix (node_modules/express/lib/router/index.js:328:13)
+      at node_modules/express/lib/router/index.js:286:9
+      at Function.process_params (node_modules/express/lib/router/index.js:346:12)
+      at next (node_modules/express/lib/router/index.js:280:10)
+      at expressInit (node_modules/express/lib/middleware/init.js:40:5)
+      at Layer.handle [as handle_request] (node_modules/express/lib/router/layer.js:95:5)
+      at trim_prefix (node_modules/express/lib/router/index.js:328:13)
+      at node_modules/express/lib/router/index.js:286:9
+      at Function.process_params (node_modules/express/lib/router/index.js:346:12)
+      at next (node_modules/express/lib/router/index.js:280:10)
+      at query (node_modules/express/lib/middleware/query.js:45:5)
+      at Layer.handle [as handle_request] (node_modules/express/lib/router/layer.js:95:5)
+      at trim_prefix (node_modules/express/lib/router/index.js:328:13)
+      at node_modules/express/lib/router/index.js:286:9
+      at Function.process_params (node_modules/express/lib/router/index.js:346:12)
+      at next (node_modules/express/lib/router/index.js:280:10)
+      at Function.handle (node_modules/express/lib/router/index.js:175:3)
+      at Function.handle (node_modules/express/lib/application.js:181:10)
+      at Server.app (node_modules/express/lib/express.js:39:9)
+
+PASS __tests__/auth.callback.test.js
+  ● Console
+
+    console.error
+      [auth/callback] Error: Token exchange failed
+
+      115 |     return res.redirect(`${config.appBaseUrl}/`);
+      116 |   } catch (err) {
+    > 117 |     console.error('[auth/callback] Error:', err.message);
+          |             ^
+      118 |     if (mode === 'mobile') {
+      119 |       return res.status(500).json({ error: 'Authentication failed' });
+      120 |     }
+
+      at error (src/routes/auth.js:117:13)
+
+    console.error
+      [auth/callback] Error: Token exchange failed
+
+      115 |     return res.redirect(`${config.appBaseUrl}/`);
+      116 |   } catch (err) {
+    > 117 |     console.error('[auth/callback] Error:', err.message);
+          |             ^
+      118 |     if (mode === 'mobile') {
+      119 |       return res.status(500).json({ error: 'Authentication failed' });
+      120 |     }
+
+      at error (src/routes/auth.js:117:13)
+
+    console.error
+      [auth/callback] Error: Google account email is not verified
+
+      115 |     return res.redirect(`${config.appBaseUrl}/`);
+      116 |   } catch (err) {
+    > 117 |     console.error('[auth/callback] Error:', err.message);
+          |             ^
+      118 |     if (mode === 'mobile') {
+      119 |       return res.status(500).json({ error: 'Authentication failed' });
+      120 |     }
+
+      at error (src/routes/auth.js:117:13)
+
+FAIL __tests__/api.routes.test.js
+  ● Console
+
+    console.error
+      [payments/create-checkout-session] Error: Invalid API Key provided: sk_test_***********************here
+
+      114 |     res.json({ sessionId: session.id, clientSecret: session.client_secret });
+      115 |   } catch (error) {
+    > 116 |     console.error('[payments/create-checkout-session] Error:', error.message);
+          |             ^
+      117 |     res.status(500).json({ error: 'Failed to create checkout session' });
+      118 |   }
+      119 | });
+
+      at error (src/routes/payments.js:116:13)
+
+  ● POST /api/payments/create-checkout-session › returns 503 when Stripe is not configured
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 503
+    Received: 500
+
+      276 |       .send({ planId: 'basic' });
+      277 |
+    > 278 |     expect(res.status).toBe(503);
+          |                        ^
+      279 |   });
+      280 | });
+      281 |
+
+      at Object.toBe (__tests__/api.routes.test.js:278:24)
+
+-------------------|---------|----------|---------|---------|---------------------------------------
+File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s                     
+-------------------|---------|----------|---------|---------|---------------------------------------
+All files          |   64.85 |    47.82 |    64.7 |   65.04 |                                       
+ src               |   61.42 |       40 |      50 |   60.93 |                                       
+  config.js        |      60 |    57.14 |   66.66 |   55.55 | 11-15                                 
+  index.js         |   61.66 |    33.33 |   42.85 |   61.81 | 16,40-41,92-101,113-114,121-131       
+ src/config        |     100 |      100 |     100 |     100 |                                       
+  plans.js         |     100 |      100 |     100 |     100 |                                       
+ src/db            |   86.95 |    72.72 |   66.66 |   86.95 |                                       
+  index.js         |   86.95 |    72.72 |   66.66 |   86.95 | 9,132-141,191-192,237                 
+ src/middleware    |   59.61 |    53.57 |      80 |      62 |                                       
+  admin.js         |    87.5 |    83.33 |     100 |    87.5 | 13                                    
+  auth.js          |   85.71 |    83.33 |     100 |    92.3 | 56-57                                 
+  subscription.js  |       0 |        0 |       0 |       0 | 3-45                                  
+ src/routes        |   64.73 |    51.92 |   68.42 |    64.7 |                                       
+  admin.js         |   81.48 |    66.66 |   66.66 |      84 | 26-28,41                              
+  auth.js          |     100 |       95 |     100 |     100 | 149                                   
+  localAuth.js     |      25 |        0 |       0 |      25 | 13-42,48-82                           
+  payments.js      |   40.27 |    26.92 |      40 |   40.27 | 47,56,66,73-78,92-114,126-196,205-210 
+  subscriptions.js |     100 |      100 |     100 |     100 |                                       
+  users.js         |   95.23 |    73.68 |     100 |   95.23 | 54                                    
+ src/utils         |   42.85 |     6.25 |      60 |   40.74 |                                       
+  google.js        |   42.85 |     6.25 |      60 |   40.74 | 66-119                                
+-------------------|---------|----------|---------|---------|---------------------------------------
+Test Suites: 1 failed, 3 passed, 4 total
+Tests:       1 failed, 40 passed, 41 total
+Snapshots:   0 total
+Time:        3.332 s
+Ran all test suites.

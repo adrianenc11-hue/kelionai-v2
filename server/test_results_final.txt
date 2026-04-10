@@ -1,0 +1,90 @@
+
+> kelion-voice-server@1.0.0 test
+> jest --coverage
+
+(node:19634) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+PASS __tests__/google.utils.test.js
+FAIL __tests__/api.routes.test.js
+  ● Test suite failed to run
+
+    ReferenceError: express is not defined
+
+      122 |  * Handle Stripe webhook events
+      123 |  */
+    > 124 | router.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+          |                         ^
+      125 |   if (!stripeClient) {
+      126 |     return res.status(503).json({ error: 'Stripe is not configured' });
+      127 |   }
+
+      at Object.express (src/routes/payments.js:124:25)
+      at Object.require (src/index.js:24:29)
+      at Object.require (__tests__/api.routes.test.js:32:23)
+
+FAIL __tests__/auth.callback.test.js
+  ● Test suite failed to run
+
+    ReferenceError: express is not defined
+
+      122 |  * Handle Stripe webhook events
+      123 |  */
+    > 124 | router.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+          |                         ^
+      125 |   if (!stripeClient) {
+      126 |     return res.status(503).json({ error: 'Stripe is not configured' });
+      127 |   }
+
+      at Object.express (src/routes/payments.js:124:25)
+      at Object.require (src/index.js:24:29)
+      at Object.require (__tests__/auth.callback.test.js:40:13)
+
+FAIL __tests__/auth.routes.test.js
+  ● Test suite failed to run
+
+    ReferenceError: express is not defined
+
+      122 |  * Handle Stripe webhook events
+      123 |  */
+    > 124 | router.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+          |                         ^
+      125 |   if (!stripeClient) {
+      126 |     return res.status(503).json({ error: 'Stripe is not configured' });
+      127 |   }
+
+      at Object.express (src/routes/payments.js:124:25)
+      at Object.require (src/index.js:24:29)
+      at Object.require (__tests__/auth.routes.test.js:26:13)
+
+(node:19631) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+-------------------|---------|----------|---------|---------|-------------------
+File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s 
+-------------------|---------|----------|---------|---------|-------------------
+All files          |    4.25 |     2.71 |     9.8 |    3.89 |                   
+ src               |    8.57 |       16 |      20 |    7.81 |                   
+  config.js        |      60 |    57.14 |   66.66 |   55.55 | 11-15             
+  index.js         |       0 |        0 |       0 |       0 | 3-135             
+ src/config        |       0 |      100 |     100 |       0 |                   
+  plans.js         |       0 |      100 |     100 |       0 | 7-70              
+ src/db            |       0 |        0 |       0 |       0 |                   
+  index.js         |       0 |        0 |       0 |       0 | 1-240             
+ src/middleware    |       0 |        0 |       0 |       0 |                   
+  admin.js         |       0 |        0 |       0 |       0 | 3-21              
+  auth.js          |       0 |        0 |       0 |       0 | 3-64              
+  subscription.js  |       0 |        0 |       0 |       0 | 3-45              
+ src/routes        |       0 |        0 |       0 |       0 |                   
+  admin.js         |       0 |        0 |       0 |       0 | 3-58              
+  auth.js          |       0 |        0 |       0 |       0 | 3-156             
+  localAuth.js     |       0 |        0 |       0 |       0 | 2-86              
+  payments.js      |       0 |        0 |       0 |       0 | 3-228             
+  subscriptions.js |       0 |        0 |       0 |       0 | 3-21              
+  users.js         |       0 |        0 |       0 |       0 | 3-64              
+ src/utils         |   42.85 |     6.25 |      60 |   40.74 |                   
+  google.js        |   42.85 |     6.25 |      60 |   40.74 | 66-119            
+-------------------|---------|----------|---------|---------|-------------------
+Test Suites: 3 failed, 1 passed, 4 total
+Tests:       7 passed, 7 total
+Snapshots:   0 total
+Time:        2.176 s
+Ran all test suites.

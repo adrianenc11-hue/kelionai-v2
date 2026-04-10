@@ -72,7 +72,8 @@ describe('GET /auth/google/start', () => {
     const res = await request(app).get('/auth/google/start');
     const cookies = res.headers['set-cookie'];
     expect(cookies).toBeDefined();
-    expect(cookies.some((c) => c.startsWith('kelion.sid'))).toBe(true);
+    expect(cookies.some((c) => c.startsWith('oauth_state'))).toBe(true);
+    expect(cookies.some((c) => c.startsWith('oauth_verifier'))).toBe(true);
   });
 
   it('redirects to Google with required params for mobile mode', async () => {

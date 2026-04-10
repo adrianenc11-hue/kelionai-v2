@@ -2,7 +2,7 @@ import { Canvas } from '@react-three/fiber'
 import { OrbitControls, Environment } from '@react-three/drei'
 import { Suspense, useState, useRef, useEffect, useCallback } from 'react'
 import Nxcode from '@nxcode/sdk'
-import { AvatarModelDebug, DebugPanel } from './AvatarDebug'
+// import { AvatarModelDebug, DebugPanel } from './AvatarDebug' // REMOVED FOR PRODUCTION
 
 const SYSTEM_PROMPT = {
   kelion: `You are Kelion, a friendly and intelligent male AI assistant. Always respond in English, regardless of the language the user writes in. Be concise and helpful. Personality: calm, professional, empathetic.`,
@@ -36,14 +36,7 @@ export default function VoiceChat({ avatar, onBack }) {
   const videoRef  = useRef(null)
   const streamRef = useRef(null)
 
-  // Debug state
-  const [showDebug, setShowDebug] = useState(false)
-  const [debugConfig, setDebugConfig] = useState({
-    scale: 1.8, posX: 0, posY: -1.8, posZ: 0,
-    leftArm: { x: 0, y: 0, z: 0 },
-    rightArm: { x: 0, y: 0, z: 0 },
-  })
-  const [boneNames, setBoneNames] = useState([])
+  // Debug state - REMOVED FOR PRODUCTION
 
   const recognitionRef = useRef(null)
   const chatEndRef = useRef(null)
@@ -259,30 +252,7 @@ export default function VoiceChat({ avatar, onBack }) {
           🖱 Scroll = zoom · Drag = rotate
         </div>
 
-        {/* Debug toggle button */}
-        <button
-          onClick={() => setShowDebug(v => !v)}
-          style={{
-            position: 'absolute', top: '20px', right: '20px',
-            background: showDebug
-              ? `linear-gradient(135deg, ${avatar.color}, ${avatar.glow})`
-              : 'rgba(255,255,255,0.1)',
-            border: `1px solid ${showDebug ? avatar.glow : 'rgba(255,255,255,0.2)'}`,
-            color: '#fff', padding: '8px 14px', borderRadius: '20px',
-            cursor: 'pointer', fontSize: '13px', backdropFilter: 'blur(10px)',
-          }}
-        >
-          {showDebug ? '✕ Debug' : '🔧 Debug'}
-        </button>
-
-        {/* Debug Panel */}
-        <DebugPanel
-          visible={showDebug}
-          avatarColor={avatar.color}
-          avatarGlow={avatar.glow}
-          onConfigChange={setDebugConfig}
-          boneNames={boneNames}
-        />
+        {/* Debug toggle button - REMOVED FOR PRODUCTION */}
 
         {/* Camera preview + controls */}
         <div style={{

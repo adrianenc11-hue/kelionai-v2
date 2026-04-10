@@ -45,6 +45,48 @@ export function AuthProvider({ children }) {
     window.location.href = `${AUTH_BASE}/auth/google/start`
   }, [])
 
+  const localLogin = useCallback(async (email, password) => {
+    try {
+      const res = await api.post(
+        `/auth/local/login`,
+        { email, password }
+      )
+      if (res.token) {
+        await fetchMe()
+        setError(null)
+        // Redirect to dashboard/home after successful login
+        window.location.href = '/'
+        return { success: true, ...res }
+      }
+      return { success: false, message: 'Invalid response from server' }
+    } catch (err) {
+      const msg = err.body?.error || err.message
+      setError(msg)
+      return { success: false, message: msg }
+    }
+  }, [fetchMe])
+
+  const registerLocal = useCallback(async (email, password, name) => {
+    try {
+      const res = await api.post(
+        `/auth/local/register`,
+        { email, password, name }
+      );
+      if (res.token) {
+        await fetchMe();
+        setError(null);
+        // Redirect to dashboard/home after successful registration
+        window.location.href = '/'
+        return { success: true, ...res };
+      }
+      return { success: false, message: 'Invalid response from server' };
+    } catch (err) {
+      const msg = err.body?.error || err.message
+      setError(msg);
+      return { success: false, message: msg };
+    }
+  }, [fetchMe]);
+
   const logout = useCallback(async () => {
     try {
       await api.post('/auth/logout', {})
@@ -64,7 +106,7 @@ export function AuthProvider({ children }) {
   const isAdmin = !!user?.email && ADMIN_EMAILS.includes(user.email)
 
   return (
-    <AuthContext.Provider value={{ user, loading, error, setError, login, logout, refreshUser, isAdmin }}>
+    <AuthContext.Provider value={{ user, loading, error, setError, login, localLogin, registerLocal, logout, refreshUser, isAdmin }}>
       {children}
     </AuthContext.Provider>
   )
