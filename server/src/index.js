@@ -13,7 +13,20 @@ const config = require('./config');
 // Ensure data directory exists before anything tries to open a DB file
 const dbDir = path.dirname(path.resolve(config.dbPath));
 if (!fs.existsSync(dbDir)) {
-  fs.mkdirSync(dbDir, { recursive: true });
+  try {
+    fs.mkdirSync(dbDir, { recursive: true });
+  } catch (err) {
+    console.error(`Failed to create directory ${dbDir}:`, err);
+    process.exit(1);
+  }
+} else {
+  // Ensure directory has write permissions
+  try {
+    fs.accessSync(dbDir, fs.constants.W_OK);
+  } catch (err) {
+    console.error(`Directory ${dbDir} is not writable:`, err);
+    process.exit(1);
+  }
 }
 
 const authRouter          = require('./routes/auth');
