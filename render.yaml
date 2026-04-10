@@ -1,0 +1,8 @@
+services:
+  - type: web
+    name: kelionai-v2
+    envVars:
+      - key: PORT
+        value: "8080"
+    buildCommand: npm install && npm run build && npm run server:install
+    startCommand: npm run server:start
