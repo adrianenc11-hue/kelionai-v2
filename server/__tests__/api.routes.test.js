@@ -62,31 +62,37 @@ const mockDb = {
     }
     return Promise.resolve(null);
   }),
-  updateUser: jest.fn((id, fields) => {
+  findAll: jest.fn(() => {
+    return Promise.resolve(Array.from(_users.values()));
+  }),
+  updateProfile: jest.fn((id, fields) => {
     const user = _users.get(Number(id));
     if (!user) return Promise.resolve(null);
     Object.assign(user, fields);
     return Promise.resolve(user);
   }),
-  updateSubscription: jest.fn((id, tier, status) => {
+  updateSubscription: jest.fn((id, data) => {
     const user = _users.get(Number(id));
     if (!user) return Promise.resolve(null);
-    user.subscription_tier = tier;
-    user.subscription_status = status;
+    if (data.subscription_tier !== undefined) user.subscription_tier = data.subscription_tier;
+    if (data.subscription_status !== undefined) user.subscription_status = data.subscription_status;
     return Promise.resolve(user);
   }),
-  getAllUsers: jest.fn(() => {
-    return Promise.resolve(Array.from(_users.values()));
+  updateRole: jest.fn((id, role) => {
+    const user = _users.get(Number(id));
+    if (!user) return Promise.resolve(null);
+    user.role = role;
+    return Promise.resolve(user);
   }),
-  getUsage: jest.fn(() => {
-    return Promise.resolve({ today: 0, month: 0, limit: 10 });
+  getUsageToday: jest.fn(() => {
+    return Promise.resolve(0);
   }),
   incrementUsage: jest.fn(() => Promise.resolve()),
   insertUser: jest.fn(({ email, password_hash, name }) => {
     const id = _idCounter++;
     const user = {
       id,
-      open_id: `local-${email}`,
+      open_id: `email_${email}`,
       email,
       name: name || email.split('@')[0],
       password_hash,
@@ -100,7 +106,7 @@ const mockDb = {
     return Promise.resolve(user);
   }),
   createReferralCode: jest.fn(() => Promise.resolve({ code: 'TEST123' })),
-  getReferralCode: jest.fn(() => Promise.resolve(null)),
+  findReferralCode: jest.fn(() => Promise.resolve(null)),
   useReferralCode: jest.fn(() => Promise.resolve(null)),
 };
 

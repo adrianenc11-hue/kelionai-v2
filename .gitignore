@@ -1,6 +1,11 @@
 node_modules/
+dist/
+.env
+.env.local
+.env.production.local
 .vite/
 *.local
+.DS_Store
 
 # Server
 server/node_modules/

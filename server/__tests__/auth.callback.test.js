@@ -22,6 +22,29 @@ const path = require('path');
 process.env.DB_PATH = path.join(os.tmpdir(), `kelion-cb-test-${process.pid}.db`);
 
 // ---------------------------------------------------------------------------
+// Mock the DB module
+// ---------------------------------------------------------------------------
+const mockDb = {
+  upsertUser: jest.fn((profile) => Promise.resolve({
+    id: 'mock-user-id',
+    ...profile,
+    role: 'user',
+    subscription_tier: 'free',
+    subscription_status: 'active',
+  })),
+  findByGoogleId: jest.fn(() => Promise.resolve(null)),
+  findById: jest.fn((id) => Promise.resolve({
+    id,
+    email: 'me@example.com',
+    name: 'Me User',
+    role: 'user',
+    subscription_tier: 'free',
+    subscription_status: 'active',
+  })),
+};
+jest.mock('../src/db', () => mockDb);
+
+// ---------------------------------------------------------------------------
 // Mock the Google OAuth utility module so we never call real Google APIs
 // ---------------------------------------------------------------------------
 jest.mock('../src/utils/google', () => ({
@@ -86,7 +109,7 @@ describe('GET /auth/google/callback – web mode (happy path)', () => {
     );
 
     expect(res.status).toBe(302);
-    expect(res.headers.location).toMatch(/^http:\/\/localhost:5173/);
+    expect(res.headers.location).toMatch(/^https:\/\/kelionai\.app/);
   });
 
   it('sets a session so /auth/me returns the user after login', async () => {

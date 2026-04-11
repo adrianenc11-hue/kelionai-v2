@@ -3,11 +3,12 @@ nixPkgs = ["nodejs_20", "python3", "gcc", "gnumake"]
 
 [phases.install]
 cmds = [
+  "npm install",
   "cd server && npm install --omit=dev"
 ]
 
 [phases.build]
-cmds = ["echo 'Using pre-built dist from git'"]
+cmds = ["npm run build"]
 
 [start]
 cmd = "cd server && NODE_ENV=production node src/index.js"
