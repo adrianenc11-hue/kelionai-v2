@@ -47,38 +47,104 @@ function markDemoUsed(key) {
 // ── Avatar 3D ───────────────────────────────────────────────────────────────
 const KELION_MODEL = '/kelion-rpm_e27cb94d.glb'
 
-function KelionModel({ isTalking }) {
+const DEFAULT_ARM     = { x: 0.0, y: 0.0, z: 1.2 }
+const DEFAULT_FOREARM = { x: 0.3, y: 0.0, z: 0.0 }
+const ARM_STORAGE_KEY = 'arm_rot_landing'
+
+function KelionModel({ armRot, forearmRot }) {
   const { scene } = useGLTF(KELION_MODEL)
-  const bonesRef = useRef({})
+  const bonesRef = useRef(null)
 
-  useEffect(() => {
-    const bones = {}
-    scene.traverse((obj) => {
-      if (obj.isBone || obj.type === 'Bone') bones[obj.name] = obj
-      if (obj.isSkinnedMesh && obj.skeleton) {
-        obj.skeleton.bones.forEach(b => { bones[b.name] = b })
-      }
-    })
-    bonesRef.current = bones
-  }, [scene])
-
-  // Persistently apply arm rotations every frame to prevent T-pose
   useFrame(() => {
+    if (!bonesRef.current) {
+      const bones = {}
+      scene.traverse((obj) => {
+        if (obj.isBone || obj.type === 'Bone') bones[obj.name] = obj
+        if (obj.isSkinnedMesh && obj.skeleton) {
+          obj.skeleton.bones.forEach(b => { bones[b.name] = b })
+        }
+      })
+      if (Object.keys(bones).length > 0) bonesRef.current = bones
+    }
     const b = bonesRef.current
     if (!b) return
-    const set = (names, x, y, z) => {
+    const set = (names, rot) => {
       for (const n of names) {
-        if (b[n]) { b[n].rotation.x = x; b[n].rotation.y = y; b[n].rotation.z = z; break }
+        if (b[n]) { b[n].rotation.x = rot.x; b[n].rotation.y = rot.y; b[n].rotation.z = rot.z; break }
       }
     }
-    set(['LeftArm', 'LeftUpperArm'],   0, 0,  1.2)
-    set(['RightArm', 'RightUpperArm'], 0, 0, -1.2)
-    set(['LeftForeArm'],               0.3, 0, 0)
-    set(['RightForeArm'],              0.3, 0, 0)
+    set(['LeftArm', 'LeftUpperArm'],   { x: armRot.x, y:  armRot.y, z:  armRot.z })
+    set(['RightArm', 'RightUpperArm'], { x: armRot.x, y: -armRot.y, z: -armRot.z })
+    set(['LeftForeArm'],               { x: forearmRot.x, y:  forearmRot.y, z:  forearmRot.z })
+    set(['RightForeArm'],              { x: forearmRot.x, y: -forearmRot.y, z: -forearmRot.z })
   })
 
   return (
     <primitive object={scene} scale={1.6} position={[0, -1.6, 0]} rotation={[0, 0, 0]} />
+  )
+}
+
+// ── Arm Control Panel (outside canvas) ─────────────────────────────────────
+function ArmPanel({ armRot, forearmRot, onChange, onSave, onReset }) {
+  const [local, setLocal] = useState({ arm: { ...armRot }, forearm: { ...forearmRot } })
+
+  const update = (part, axis, val) => {
+    const next = { ...local, [part]: { ...local[part], [axis]: parseFloat(val) } }
+    setLocal(next)
+    onChange(next.arm, next.forearm)
+  }
+
+  const reset = () => {
+    const r = { arm: { ...DEFAULT_ARM }, forearm: { ...DEFAULT_FOREARM } }
+    setLocal(r)
+    onReset()
+  }
+
+  const Row = ({ label, part, axis }) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px' }}>
+      <span style={{ color: '#888', fontSize: '11px', width: '95px', flexShrink: 0 }}>{label}</span>
+      <input type="range" min={-3.14} max={3.14} step={0.01}
+        value={local[part][axis]}
+        onChange={e => update(part, axis, e.target.value)}
+        style={{ flex: 1, accentColor: '#a855f7', cursor: 'pointer' }}
+      />
+      <span style={{ color: '#ccc', fontSize: '11px', width: '36px', textAlign: 'right', fontFamily: 'monospace' }}>
+        {parseFloat(local[part][axis]).toFixed(2)}
+      </span>
+    </div>
+  )
+
+  return (
+    <div style={{
+      width: '300px', background: 'rgba(12,12,18,0.98)',
+      backdropFilter: 'blur(20px)', borderRadius: '12px',
+      padding: '14px', border: '1px solid rgba(255,255,255,0.1)',
+      boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
+    }}>
+      <div style={{ color: '#fff', fontWeight: '600', fontSize: '13px', marginBottom: '10px' }}>
+        Arm Controls
+      </div>
+      <div style={{ color: '#a855f7', fontSize: '10px', fontWeight: '600', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Upper Arm</div>
+      <Row label="X (up/down)"    part="arm" axis="x" />
+      <Row label="Y (front/back)" part="arm" axis="y" />
+      <Row label="Z (body side)"  part="arm" axis="z" />
+      <div style={{ color: '#a855f7', fontSize: '10px', fontWeight: '600', margin: '8px 0 4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Forearm</div>
+      <Row label="X (bend)"    part="forearm" axis="x" />
+      <Row label="Y (twist)"   part="forearm" axis="y" />
+      <Row label="Z (lateral)" part="forearm" axis="z" />
+      <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+        <button onClick={reset} style={{
+          flex: 1, padding: '7px', borderRadius: '8px',
+          background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+          color: '#aaa', fontSize: '11px', cursor: 'pointer',
+        }}>Reset</button>
+        <button onClick={() => onSave(local.arm, local.forearm)} style={{
+          flex: 2, padding: '7px', borderRadius: '8px',
+          background: 'linear-gradient(135deg, #7c3aed, #a855f7)',
+          border: 'none', color: '#fff', fontSize: '11px', fontWeight: '600', cursor: 'pointer',
+        }}>Save</button>
+      </div>
+    </div>
   )
 }
 
@@ -476,6 +542,24 @@ export default function LandingPage({ onSignIn, onPricing }) {
   const [demoState, setDemoState] = useState('landing') // 'landing' | 'demo' | 'expired' | 'used'
   const [demoInfo, setDemoInfo] = useState(null)
   const [isTalking, setIsTalking] = useState(false)
+  const [showArmPanel, setShowArmPanel] = useState(false)
+
+  // Load saved arm positions
+  const savedArm = (() => { try { return JSON.parse(localStorage.getItem(ARM_STORAGE_KEY)) } catch { return null } })()
+  const [armRot, setArmRot]         = useState(savedArm?.arm     || { ...DEFAULT_ARM })
+  const [forearmRot, setForearmRot] = useState(savedArm?.forearm || { ...DEFAULT_FOREARM })
+
+  const handleArmSave = (arm, forearm) => {
+    setArmRot(arm)
+    setForearmRot(forearm)
+    localStorage.setItem(ARM_STORAGE_KEY, JSON.stringify({ arm, forearm }))
+  }
+
+  const handleArmReset = () => {
+    setArmRot({ ...DEFAULT_ARM })
+    setForearmRot({ ...DEFAULT_FOREARM })
+    localStorage.removeItem(ARM_STORAGE_KEY)
+  }
 
   const handleStartDemo = () => {
     const check = checkDemoUsed()
@@ -564,7 +648,7 @@ export default function LandingPage({ onSignIn, onPricing }) {
             <pointLight position={[0, 1, 2]} intensity={0.8} color="#a855f7" />
             <Environment preset="city" />
             <Suspense fallback={null}>
-              <KelionModel isTalking={false} />
+              <KelionModel armRot={armRot} forearmRot={forearmRot} />
             </Suspense>
             <OrbitControls enableZoom={false} enablePan={false}
               minPolarAngle={Math.PI / 4} maxPolarAngle={Math.PI / 1.8}
@@ -578,7 +662,32 @@ export default function LandingPage({ onSignIn, onPricing }) {
             background: 'radial-gradient(ellipse, rgba(168,85,247,0.4) 0%, transparent 70%)',
             filter: 'blur(10px)', pointerEvents: 'none',
           }} />
+
+          {/* Arm control toggle button */}
+          <button
+            onClick={() => setShowArmPanel(p => !p)}
+            style={{
+              position: 'absolute', top: '12px', right: '12px',
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              color: '#888', padding: '5px 10px', borderRadius: '8px',
+              fontSize: '11px', cursor: 'pointer', backdropFilter: 'blur(8px)',
+              zIndex: 10,
+            }}
+          >Arm Settings</button>
         </div>
+
+        {/* Arm control panel — outside canvas, between avatar and info */}
+        {showArmPanel && (
+          <div style={{ position: 'absolute', top: '60px', left: '12px', zIndex: 20 }}>
+            <ArmPanel
+              armRot={armRot} forearmRot={forearmRot}
+              onChange={(a, f) => { setArmRot(a); setForearmRot(f) }}
+              onSave={handleArmSave}
+              onReset={handleArmReset}
+            />
+          </div>
+        )}
 
         {/* Info panel */}
         <div style={{
