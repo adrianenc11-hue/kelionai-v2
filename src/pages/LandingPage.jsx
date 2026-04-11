@@ -45,6 +45,15 @@ const KELION_MODEL = '/kelion-rpm_e27cb94d.glb'
 const DEFAULT_ARM     = { x: 0.0, y: 0.0, z: 1.2 }
 const DEFAULT_FOREARM = { x: 0.3, y: 0.0, z: 0.0 }
 
+// Read saved arm positions from localStorage (set via ArmSettings page)
+function getSavedArm() {
+  try {
+    const data = JSON.parse(localStorage.getItem('arm_rot_kelion') || localStorage.getItem('arm_rot_landing') || 'null')
+    if (data && data.arm && data.forearm) return data
+  } catch {}
+  return { arm: { ...DEFAULT_ARM }, forearm: { ...DEFAULT_FOREARM } }
+}
+
 function KelionModel({ armRot, forearmRot }) {
   const { scene } = useGLTF(KELION_MODEL)
   const bonesRef = useRef(null)
@@ -625,7 +634,7 @@ export default function LandingPage({ onSignIn, onPricing }) {
             <pointLight position={[0, 1, 2]} intensity={0.8} color="#a855f7" />
             <Environment preset="city" />
             <Suspense fallback={null}>
-              <KelionModel armRot={DEFAULT_ARM} forearmRot={DEFAULT_FOREARM} />
+              <KelionModel armRot={getSavedArm().arm} forearmRot={getSavedArm().forearm} />
             </Suspense>
             <OrbitControls enableZoom={false} enablePan={false}
               minPolarAngle={Math.PI / 4} maxPolarAngle={Math.PI / 1.8}

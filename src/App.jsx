@@ -52,6 +52,16 @@ function AppInner() {
   }
 
   // Logged in – handle navigation
+  // Landing page is always the first page, even for logged-in users
+  if (page === 'landing') {
+    return (
+      <LandingPage
+        onSignIn={() => setPage('dashboard')}
+        onPricing={() => setPage('pricing')}
+      />
+    )
+  }
+
   if (page === 'chat') {
     if (!selectedAvatar) {
       return <AvatarSelect onSelect={(av) => { setSelectedAvatar(av); setPage('chat') }} />
