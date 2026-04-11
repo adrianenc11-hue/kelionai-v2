@@ -1,58 +1,30 @@
 'use strict';
 
-const express = require('express');
-const { Router } = express;
-const stripe = require('stripe');
-const config = require('../config');
-const { findById, updateSubscription } = require('../db');
+const { Router } = require('express');
 const { requireAuth } = require('../middleware/auth');
+const { PLANS } = require('../config/plans');
+const { updateStripeCustomerId, findByStripeCustomerId, updateSubscription } = require('../db');
+const config = require('../config');
 
 const router = Router();
 
-// Initialize Stripe only if secret key is provided
-const stripeClient = config.stripe.secretKey ? stripe(config.stripe.secretKey) : null;
+// ---------------------------------------------------------------------------
+// Lazy-initialise Stripe only when the key is available
+// ---------------------------------------------------------------------------
+function getStripe() {
+  if (!process.env.STRIPE_SECRET_KEY) return null;
+  // Require lazily so tests don't fail when the package is not installed
+  // and the key isn't set.
+  const Stripe = require('stripe');
+  return Stripe(process.env.STRIPE_SECRET_KEY);
+}
 
-// Define subscription plans
-const SUBSCRIPTION_PLANS = {
-  free: {
-    name: 'Free',
-    price: 0,
-    features: ['Limited voice interactions', 'Basic avatar'],
-  },
-  basic: {
-    name: 'Basic',
-    price: 999, // $9.99 in cents
-    stripeId: 'price_1TKzOWLoR6yrf0RiLuL0ljTB',
-    features: ['Unlimited voice interactions', 'Multiple avatars', 'Priority support'],
-  },
-  premium: {
-    name: 'Premium',
-    price: 2999, // $29.99 in cents
-    stripeId: 'price_1TKzOZLoR6yrf0Riz7yxebhW',
-    features: ['All Basic features', 'Custom avatar', 'Advanced AI models', 'API access'],
-  },
-  enterprise: {
-    name: 'Enterprise',
-    price: 9999, // $99.99 in cents
-    stripeId: 'price_1TKzObLoR6yrf0RilcC24nDW',
-    features: ['All Premium features', 'Dedicated support', 'Custom integrations', 'SLA'],
-  },
-};
-
-/**
- * GET /payments/plans
- * Get all available subscription plans
- */
-router.get('/plans', (req, res) => {
-  res.json({ plans: SUBSCRIPTION_PLANS });
-});
-
-/**
- * POST /payments/create-checkout-session
- * Create a Stripe Checkout session for a subscription
- */
+// ---------------------------------------------------------------------------
+// POST /api/payments/create-checkout-session
+// ---------------------------------------------------------------------------
 router.post('/create-checkout-session', requireAuth, async (req, res) => {
-  if (!stripeClient) {
+  const stripe = getStripe();
+  if (!stripe) {
     return res.status(503).json({
       error: 'Payment processing coming soon',
       message: 'Stripe integration is not yet configured.',
@@ -60,176 +32,152 @@ router.post('/create-checkout-session', requireAuth, async (req, res) => {
   }
 
   const { planId } = req.body;
-  const userId = req.user.id;
-
-  if (!planId || !SUBSCRIPTION_PLANS[planId]) {
-    return res.status(400).json({ error: 'Invalid plan ID' });
-  }
-
-  const plan = SUBSCRIPTION_PLANS[planId];
-
-  if (plan.price === 0) {
-    // Free plan - no checkout needed
-    await updateSubscription(userId, {
-      subscription_tier: planId,
-      subscription_status: 'active',
-      subscription_expires_at: null,
-    });
-    return res.json({ message: 'Free plan activated', redirectUrl: config.appBaseUrl });
+  const plan = PLANS[planId];
+  if (!plan || plan.price === 0) {
+    return res.status(400).json({ error: 'Invalid or free planId' });
   }
 
   try {
-    const user = await findById(userId);
-    let customerId = user.stripe_customer_id;
+    const user = req.user;
 
     // Create or retrieve Stripe customer
-    if (!customerId) {
-      const customer = await stripeClient.customers.create({
-        email: user.email,
-        name: user.name,
-        metadata: { userId },
-      });
-      customerId = customer.id;
-      // Save customer ID to DB
-      await updateSubscription(userId, {
-        subscription_tier: user.subscription_tier,
-        subscription_status: user.subscription_status,
-        stripe_customer_id: customerId
-      });
+    let stripeCustomerId = user.stripe_customer_id;
+    if (!stripeCustomerId) {
+      const customer = await stripe.customers.create({ email: user.email });
+      stripeCustomerId = customer.id;
+      updateStripeCustomerId(user.id, stripeCustomerId);
     }
 
-    // Create checkout session
-    const session = await stripeClient.checkout.sessions.create({
-      customer: customerId,
-      payment_method_types: ['card'],
+    const session = await stripe.checkout.sessions.create({
+      mode: 'subscription',
+      customer: stripeCustomerId,
       line_items: [
         {
-          price: plan.stripeId,
           quantity: 1,
+          price_data: {
+            currency: 'usd',
+            recurring: { interval: 'month' },
+            unit_amount: Math.round(plan.price * 100),
+            product_data: { name: plan.name },
+          },
         },
       ],
-      mode: 'subscription',
-      success_url: `${config.appBaseUrl}/?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${config.appBaseUrl}/pricing`,
-      metadata: {
-        userId,
-        planId,
-      },
+      success_url: `${config.appBaseUrl}/?payment=success`,
+      cancel_url:  `${config.appBaseUrl}/?payment=cancelled`,
+      metadata: { userId: user.id, planId },
     });
 
-    res.json({ sessionId: session.id, clientSecret: session.client_secret });
-  } catch (error) {
-    console.error('[payments/create-checkout-session] Error:', error.message);
-    res.status(500).json({ error: 'Failed to create checkout session' });
+    return res.json({ url: session.url });
+  } catch (err) {
+    console.error('[payments] create-checkout-session error:', err.message);
+    return res.status(500).json({ error: 'Failed to create checkout session' });
   }
 });
 
-/**
- * POST /payments/webhook
- * Handle Stripe webhook events
- */
-router.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
-  if (!stripeClient) {
-    return res.status(503).json({ error: 'Stripe is not configured' });
+// ---------------------------------------------------------------------------
+// POST /api/payments/webhook
+// ---------------------------------------------------------------------------
+// Note: this route requires a raw body — see index.js for the body parser setup.
+// ---------------------------------------------------------------------------
+router.post('/webhook', async (req, res) => {
+  if (!process.env.STRIPE_WEBHOOK_SECRET) {
+    return res.status(503).json({ error: 'Webhook endpoint not configured' });
+  }
+
+  const stripe = getStripe();
+  if (!stripe) {
+    return res.status(503).json({ error: 'Stripe not configured' });
   }
 
   const sig = req.headers['stripe-signature'];
   let event;
-
   try {
-    event = stripeClient.webhooks.constructEvent(
-      req.body,
-      sig,
-      config.stripe.webhookSecret
-    );
-  } catch (error) {
-    console.error('[payments/webhook] Signature verification failed:', error.message);
-    return res.status(400).json({ error: 'Webhook signature verification failed' });
+    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+  } catch (err) {
+    console.error('[payments] webhook signature error:', err.message);
+    return res.status(400).json({ error: `Webhook error: ${err.message}` });
   }
 
   try {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object;
-        const { userId, planId } = session.metadata;
-
-        // Update user subscription
-        await updateSubscription(userId, {
-          subscription_tier: planId,
-          subscription_status: 'active',
-          subscription_expires_at: null,
-        });
-
-        console.log(`[payments/webhook] Subscription activated for user ${userId} (plan: ${planId})`);
-        break;
-      }
-
-      case 'customer.subscription.updated': {
-        const subscription = event.data.object;
-        const userId = subscription.metadata?.userId;
-
-        if (userId) {
-          const status = subscription.status === 'active' ? 'active' : 'inactive';
-          await updateSubscription(userId, {
-            subscription_status: status,
+        const { userId, planId } = session.metadata || {};
+        if (userId && planId) {
+          updateSubscription(userId, {
+            subscription_tier:       planId,
+            subscription_status:     'active',
+            subscription_expires_at: null,
           });
-          console.log(`[payments/webhook] Subscription updated for user ${userId} (status: ${status})`);
         }
         break;
       }
-
       case 'customer.subscription.deleted': {
         const subscription = event.data.object;
-        const userId = subscription.metadata?.userId;
-
-        if (userId) {
-          await updateSubscription(userId, {
-            subscription_tier: 'free',
-            subscription_status: 'inactive',
+        const user = findByStripeCustomerId(subscription.customer);
+        if (user) {
+          updateSubscription(user.id, {
+            subscription_tier:       'free',
+            subscription_status:     'cancelled',
+            subscription_expires_at: null,
           });
-          console.log(`[payments/webhook] Subscription cancelled for user ${userId}`);
         }
         break;
       }
-
+      case 'invoice.payment_failed': {
+        const invoice = event.data.object;
+        const user = findByStripeCustomerId(invoice.customer);
+        if (user) {
+          updateSubscription(user.id, {
+            subscription_tier:       user.subscription_tier,
+            subscription_status:     'expired',
+            subscription_expires_at: null,
+          });
+        }
+        break;
+      }
       default:
-        console.log(`[payments/webhook] Unhandled event type: ${event.type}`);
+        // Unhandled event type — no action needed
+        break;
     }
-
-    res.json({ received: true });
-  } catch (error) {
-    console.error('[payments/webhook] Error processing webhook:', error.message);
-    res.status(500).json({ error: 'Webhook processing failed' });
-  }
-});
-
-/**
- * GET /payments/subscription-status
- * Get the current subscription status for the authenticated user
- */
-router.get('/subscription-status', requireAuth, async (req, res) => {
-  const user = await findById(req.user.id);
-  if (!user) {
-    return res.status(404).json({ error: 'User not found' });
+  } catch (err) {
+    console.error('[payments] webhook handler error:', err.message);
+    return res.status(500).json({ error: 'Webhook processing failed' });
   }
 
-  res.json({
-    tier: user.subscription_tier,
-    status: user.subscription_status,
-    expiresAt: user.subscription_expires_at,
-    plan: SUBSCRIPTION_PLANS[user.subscription_tier],
-  });
+  return res.json({ received: true });
 });
 
-/**
- * GET /payments/history
- * Returns payment history for the current user
- */
-router.get('/history', requireAuth, (req, res) => {
-  res.json({
-    payments: [],
-    message: 'Payment history will be available after Stripe integration is fully configured.',
-  });
+// ---------------------------------------------------------------------------
+// GET /api/payments/history
+// ---------------------------------------------------------------------------
+router.get('/history', requireAuth, async (req, res) => {
+  const stripe = getStripe();
+  if (!stripe || !req.user.stripe_customer_id) {
+    return res.json({ payments: [] });
+  }
+
+  try {
+    const invoices = await stripe.invoices.list({
+      customer: req.user.stripe_customer_id,
+      limit: 24,
+    });
+
+    const payments = invoices.data.map((inv) => ({
+      id:        inv.id,
+      amount:    inv.amount_paid / 100,
+      currency:  inv.currency,
+      status:    inv.status,
+      date:      new Date(inv.created * 1000).toISOString(),
+      pdf:       inv.invoice_pdf,
+      hostedUrl: inv.hosted_invoice_url,
+    }));
+
+    return res.json({ payments });
+  } catch (err) {
+    console.error('[payments] history error:', err.message);
+    return res.status(500).json({ error: 'Failed to fetch payment history' });
+  }
 });
 
 module.exports = router;

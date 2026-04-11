@@ -1,253 +1,247 @@
 'use strict';
+
+const path = require('path');
+const fs = require('fs');
+const Database = require('better-sqlite3');
+const config = require('../config');
+
+// Ensure the directory for the DB file exists
+const dbDir = path.dirname(path.resolve(config.dbPath));
+if (!fs.existsSync(dbDir)) {
+  fs.mkdirSync(dbDir, { recursive: true });
+}
+
+const db = new Database(path.resolve(config.dbPath));
+
+// Enable WAL mode for better concurrent-read performance
+db.pragma('journal_mode = WAL');
+db.pragma('foreign_keys = ON');
+
 /**
- * Database layer — Supabase (PostgreSQL) via REST API.
- * All public functions are async and preserve the same signatures.
+ * Run schema migrations (idempotent).
  */
+function migrate() {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id                     TEXT PRIMARY KEY,           -- UUID
+      google_id              TEXT UNIQUE NOT NULL,
+      email                  TEXT UNIQUE NOT NULL,
+      name                   TEXT NOT NULL,
+      picture                TEXT,
+      avatar_url             TEXT,
+      subscription_tier      TEXT NOT NULL DEFAULT 'free',
+      subscription_status    TEXT NOT NULL DEFAULT 'active',
+      subscription_expires_at TEXT,
+      stripe_customer_id     TEXT,
+      created_at             TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at             TEXT NOT NULL DEFAULT (datetime('now')),
+      last_login_at          TEXT
+    );
 
-const fetch = require('node-fetch');
+    CREATE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id);
+    CREATE INDEX IF NOT EXISTS idx_users_email     ON users(email);
 
-const SUPABASE_URL         = process.env.SUPABASE_URL         || 'https://nqlobybfwmtkmsqadqqr.supabase.co';
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5xbG9ieWJmd210a21zcWFkcXFyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTg3MzAyMiwiZXhwIjoyMDg3NDQ5MDIyfQ.AngYdhgIOXas4UssEP1ENLiZCW9CYPgecvYej3PvLOQ';
+    CREATE TABLE IF NOT EXISTS usage_logs (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      date       TEXT NOT NULL,              -- YYYY-MM-DD
+      count      INTEGER NOT NULL DEFAULT 0,
+      UNIQUE(user_id, date)
+    );
 
-const BASE_HEADERS = {
-  'apikey':        SUPABASE_SERVICE_KEY,
-  'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
-  'Content-Type':  'application/json',
-  'Prefer':        'return=representation',
-};
+    CREATE INDEX IF NOT EXISTS idx_usage_logs_user_date ON usage_logs(user_id, date);
+  `);
 
-async function sbQuery(path, options = {}) {
-  const url = `${SUPABASE_URL}/rest/v1/${path}`;
-  const res = await fetch(url, {
-    headers: { ...BASE_HEADERS, ...(options.headers || {}) },
-    ...options,
-  });
-  const text = await res.text();
-  if (!res.ok) throw new Error(`Supabase ${res.status}: ${text}`);
-  return text ? JSON.parse(text) : null;
-}
-
-// ---------------------------------------------------------------------------
-// Users
-// ---------------------------------------------------------------------------
-
-async function findByGoogleId(googleId) {
-  const rows = await sbQuery(`users?google_id=eq.${encodeURIComponent(googleId)}&limit=1`);
-  return (rows && rows[0]) || null;
-}
-
-async function findByEmail(email) {
-  const rows = await sbQuery(`users?email=eq.${encodeURIComponent(email)}&limit=1`);
-  return (rows && rows[0]) || null;
-}
-
-async function findById(id) {
-  const rows = await sbQuery(`users?id=eq.${encodeURIComponent(id)}&limit=1`);
-  return (rows && rows[0]) || null;
-}
-
-async function findAll() {
-  return await sbQuery('users?order=created_at.desc');
-}
-
-async function upsertUser(profile) {
-  const { v4: uuidv4 } = require('uuid');
-  const existing = await findByGoogleId(profile.googleId);
-  const id  = existing ? existing.id : uuidv4();
-  const now = new Date().toISOString();
-
-  const payload = {
-    id,
-    google_id:     profile.googleId,
-    email:         profile.email,
-    name:          profile.name,
-    picture:       profile.picture || null,
-    avatar_url:    profile.picture || null,
-    updated_at:    now,
-    last_signed_in: now,
-  };
-
-  if (!existing) {
-    payload.created_at          = now;
-    payload.subscription_tier   = 'free';
-    payload.subscription_status = 'active';
-    payload.role                = 'user';
-    payload.login_method        = 'google';
+  // Add new columns to existing users table if they don't exist yet (migration safety)
+  const cols = db.pragma('table_info(users)').map((c) => c.name);
+  const additions = [
+    ['avatar_url',              'TEXT'],
+    ['subscription_tier',       "TEXT NOT NULL DEFAULT 'free'"],
+    ['subscription_status',     "TEXT NOT NULL DEFAULT 'active'"],
+    ['subscription_expires_at', 'TEXT'],
+    ['stripe_customer_id',      'TEXT'],
+    ['last_login_at',           'TEXT'],
+  ];
+  for (const [col, def] of additions) {
+    if (!cols.includes(col)) {
+      db.exec(`ALTER TABLE users ADD COLUMN ${col} ${def}`);
+    }
   }
-
-  await sbQuery('users', {
-    method:  'POST',
-    headers: { ...BASE_HEADERS, 'Prefer': 'resolution=merge-duplicates,return=representation' },
-    body:    JSON.stringify(payload),
-  });
-
-  return findByGoogleId(profile.googleId);
 }
 
-async function insertUser({ email, password, name, role = 'user' }) {
-  const now = new Date().toISOString();
-  const rows = await sbQuery('users', {
-    method: 'POST',
-    body: JSON.stringify({
-      open_id:             `email_${email}`,
-      email,
-      password_hash:       password,
-      name,
-      role,
-      subscription_tier:   'free',
-      subscription_status: 'active',
-      login_method:        'local',
-      created_at:          now,
-      updated_at:          now,
-      last_signed_in:      now,
-    }),
-  });
-  return (rows && rows[0]) || null;
-}
-
-async function updateProfile(id, data) {
-  const rows = await sbQuery(`users?id=eq.${encodeURIComponent(id)}`, {
-    method: 'PATCH',
-    body:   JSON.stringify({ name: data.name, updated_at: new Date().toISOString() }),
-  });
-  return (rows && rows[0]) || findById(id);
-}
-
-async function updateSubscription(id, data) {
-  const patch = { updated_at: new Date().toISOString() };
-  if (data.subscription_tier       !== undefined) patch.subscription_tier       = data.subscription_tier;
-  if (data.subscription_status     !== undefined) patch.subscription_status     = data.subscription_status;
-  if (data.subscription_expires_at !== undefined) patch.subscription_expires_at = data.subscription_expires_at;
-  if (data.stripe_customer_id      !== undefined) patch.stripe_customer_id      = data.stripe_customer_id;
-
-  const rows = await sbQuery(`users?id=eq.${encodeURIComponent(id)}`, {
-    method: 'PATCH',
-    body:   JSON.stringify(patch),
-  });
-  return (rows && rows[0]) || findById(id);
-}
-
-async function updateRole(id, role) {
-  const rows = await sbQuery(`users?id=eq.${encodeURIComponent(id)}`, {
-    method: 'PATCH',
-    body:   JSON.stringify({ role, updated_at: new Date().toISOString() }),
-  });
-  return (rows && rows[0]) || findById(id);
-}
+migrate();
 
 // ---------------------------------------------------------------------------
+// Prepared statements
+// ---------------------------------------------------------------------------
+
+const stmtFindByGoogleId = db.prepare('SELECT * FROM users WHERE google_id = ?');
+const stmtFindById       = db.prepare('SELECT * FROM users WHERE id = ?');
+const stmtFindAll        = db.prepare('SELECT * FROM users ORDER BY created_at DESC');
+
+const stmtUpsert = db.prepare(`
+  INSERT INTO users (id, google_id, email, name, picture, created_at, updated_at, last_login_at)
+  VALUES (@id, @google_id, @email, @name, @picture, datetime('now'), datetime('now'), datetime('now'))
+  ON CONFLICT(google_id) DO UPDATE SET
+    email         = excluded.email,
+    name          = excluded.name,
+    picture       = excluded.picture,
+    updated_at    = datetime('now'),
+    last_login_at = datetime('now')
+`);
+
+const stmtUpdateProfile = db.prepare(`
+  UPDATE users
+  SET name = @name, updated_at = datetime('now')
+  WHERE id = @id
+`);
+
+const stmtUpdateSubscription = db.prepare(`
+  UPDATE users
+  SET subscription_tier      = @subscription_tier,
+      subscription_status    = @subscription_status,
+      subscription_expires_at = @subscription_expires_at,
+      updated_at             = datetime('now')
+  WHERE id = @id
+`);
+
+const stmtUpdateStripeCustomerId = db.prepare(`
+  UPDATE users
+  SET stripe_customer_id = @stripe_customer_id,
+      updated_at         = datetime('now')
+  WHERE id = @id
+`);
+
+const stmtFindByStripeCustomerId = db.prepare(
+  'SELECT * FROM users WHERE stripe_customer_id = ?'
+);
+
 // Usage logs
+const stmtGetUsageToday = db.prepare(`
+  SELECT count FROM usage_logs WHERE user_id = ? AND date = date('now')
+`);
+
+const stmtIncrementUsage = db.prepare(`
+  INSERT INTO usage_logs (user_id, date, count)
+  VALUES (?, date('now'), 1)
+  ON CONFLICT(user_id, date) DO UPDATE SET count = count + 1
+`);
+
+// ---------------------------------------------------------------------------
+// Exported helpers
 // ---------------------------------------------------------------------------
 
-async function getUsageToday(userId) {
-  // Supabase user_usage: messages_this_month resets monthly via last_reset_date
-  const rows = await sbQuery(`user_usage?user_id=eq.${encodeURIComponent(userId)}&limit=1`);
-  if (!rows || !rows[0]) return 0;
-  const row = rows[0];
-  const now = new Date();
-  const resetDate = row.last_reset_date ? new Date(row.last_reset_date) : null;
-  const sameMonth = resetDate &&
-    resetDate.getFullYear() === now.getFullYear() &&
-    resetDate.getMonth() === now.getMonth();
-  return sameMonth ? (row.messages_this_month || 0) : 0;
+/**
+ * Find a user by their Google subject ID.
+ * @param {string} googleId
+ * @returns {object|undefined}
+ */
+function findByGoogleId(googleId) {
+  return stmtFindByGoogleId.get(googleId);
 }
 
-async function incrementUsage(userId) {
-  const rows = await sbQuery(`user_usage?user_id=eq.${encodeURIComponent(userId)}&limit=1`);
-  const now = new Date();
-  const nowISO = now.toISOString();
-  if (!rows || !rows[0]) {
-    await sbQuery('user_usage', {
-      method: 'POST',
-      body: JSON.stringify({
-        user_id: userId,
-        messages_this_month: 1,
-        voice_minutes_this_month: 0,
-        last_reset_date: nowISO,
-        created_at: nowISO,
-        updated_at: nowISO,
-      }),
-    });
-  } else {
-    const row = rows[0];
-    const resetDate = row.last_reset_date ? new Date(row.last_reset_date) : null;
-    const sameMonth = resetDate &&
-      resetDate.getFullYear() === now.getFullYear() &&
-      resetDate.getMonth() === now.getMonth();
-    const newCount = sameMonth ? (row.messages_this_month || 0) + 1 : 1;
-    await sbQuery(`user_usage?user_id=eq.${encodeURIComponent(userId)}`, {
-      method: 'PATCH',
-      body: JSON.stringify({
-        messages_this_month: newCount,
-        last_reset_date: sameMonth ? row.last_reset_date : nowISO,
-        updated_at: nowISO,
-      }),
-    });
-  }
+/**
+ * Find a user by their internal UUID.
+ * @param {string} id
+ * @returns {object|undefined}
+ */
+function findById(id) {
+  return stmtFindById.get(id);
 }
 
-// ---------------------------------------------------------------------------
-// Referral codes
-// ---------------------------------------------------------------------------
+/**
+ * Return all users ordered by created_at desc.
+ * @returns {object[]}
+ */
+function findAll() {
+  return stmtFindAll.all();
+}
 
-async function createReferralCode(userId) {
+/**
+ * Create or update a user from Google profile data.
+ * Returns the user row after the upsert.
+ *
+ * @param {{ googleId: string, email: string, name: string, picture?: string }} profile
+ * @returns {object}
+ */
+function upsertUser(profile) {
   const { v4: uuidv4 } = require('uuid');
-  const code      = uuidv4().replace(/-/g, '').substring(0, 8).toUpperCase();
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-  const now       = new Date().toISOString();
 
-  const rows = await sbQuery('referral_codes', {
-    method: 'POST',
-    body:   JSON.stringify({ code, referrer_id: userId, expires_at: expiresAt, used: false, created_at: now }),
-  });
-  return (rows && rows[0]) || { code, expires_at: expiresAt };
-}
+  // Try to find existing user first (to preserve the id)
+  let user = stmtFindByGoogleId.get(profile.googleId);
 
-async function findReferralCode(code) {
-  const rows = await sbQuery(`referral_codes?code=eq.${encodeURIComponent(code)}&limit=1`);
-  return (rows && rows[0]) || null;
-}
-
-async function useReferralCode(code, newUserId) {
-  const ref = await findReferralCode(code);
-  if (!ref)              throw new Error('Referral code not found');
-  if (ref.used)          throw new Error('Referral code already used');
-  if (new Date(ref.expires_at) < new Date()) throw new Error('Referral code expired');
-
-  await sbQuery(`referral_codes?code=eq.${encodeURIComponent(code)}`, {
-    method: 'PATCH',
-    body:   JSON.stringify({ used: true, used_by: newUserId, used_at: new Date().toISOString() }),
+  stmtUpsert.run({
+    id:        user ? user.id : uuidv4(),
+    google_id: profile.googleId,
+    email:     profile.email,
+    name:      profile.name,
+    picture:   profile.picture || null,
   });
 
-  // Extend referrer subscription by 5 days
-  const referrer = await findById(ref.referrer_id);
-  if (referrer) {
-    const base = referrer.subscription_expires_at
-      ? new Date(referrer.subscription_expires_at)
-      : new Date();
-    if (base < new Date()) base.setTime(Date.now());
-    base.setDate(base.getDate() + 5);
-    await updateSubscription(ref.referrer_id, { subscription_expires_at: base.toISOString() });
-  }
-
-  return ref;
+  return stmtFindByGoogleId.get(profile.googleId);
 }
 
-console.log('[db] Supabase PostgreSQL layer loaded.');
+/**
+ * Update a user's display name.
+ * @param {string} id
+ * @param {{ name: string }} data
+ * @returns {object|undefined}
+ */
+function updateProfile(id, data) {
+  stmtUpdateProfile.run({ id, name: data.name });
+  return stmtFindById.get(id);
+}
 
-module.exports = {
-  findByGoogleId,
-  findByEmail,
-  findById,
-  findAll,
-  upsertUser,
-  insertUser,
-  updateProfile,
-  updateSubscription,
-  updateRole,
-  getUsageToday,
-  incrementUsage,
-  createReferralCode,
-  findReferralCode,
-  useReferralCode,
-};
+/**
+ * Update a user's Stripe customer ID.
+ * @param {string} id
+ * @param {string} stripeCustomerId
+ */
+function updateStripeCustomerId(id, stripeCustomerId) {
+  stmtUpdateStripeCustomerId.run({ id, stripe_customer_id: stripeCustomerId });
+}
+
+/**
+ * Find a user by their Stripe customer ID.
+ * @param {string} stripeCustomerId
+ * @returns {object|undefined}
+ */
+function findByStripeCustomerId(stripeCustomerId) {
+  return stmtFindByStripeCustomerId.get(stripeCustomerId);
+}
+
+/**
+ * Update a user's subscription.
+ * @param {string} id
+ * @param {{ subscription_tier: string, subscription_status: string, subscription_expires_at: string|null }} data
+ * @returns {object|undefined}
+ */
+function updateSubscription(id, data) {
+  stmtUpdateSubscription.run({
+    id,
+    subscription_tier:       data.subscription_tier,
+    subscription_status:     data.subscription_status,
+    subscription_expires_at: data.subscription_expires_at || null,
+  });
+  return stmtFindById.get(id);
+}
+
+/**
+ * Get today's usage count for a user.
+ * @param {string} userId
+ * @returns {number}
+ */
+function getUsageToday(userId) {
+  const row = stmtGetUsageToday.get(userId);
+  return row ? row.count : 0;
+}
+
+/**
+ * Increment today's usage count for a user by 1.
+ * @param {string} userId
+ */
+function incrementUsage(userId) {
+  stmtIncrementUsage.run(userId);
+}
+
+module.exports = { db, findByGoogleId, findById, findAll, upsertUser, updateProfile, updateSubscription, updateStripeCustomerId, findByStripeCustomerId, getUsageToday, incrementUsage };
