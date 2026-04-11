@@ -7,8 +7,8 @@ const SYSTEM_PROMPT = {
 }
 
 // Default arm positions - arms close to body
-const DEFAULT_ARM_ROT = { x: 0.0, y: 0.0, z: 1.2 }
-const DEFAULT_FOREARM_ROT = { x: 0.3, y: 0.0, z: 0.0 }
+const DEFAULT_ARM_ROT = { x: 1.3, y: 0.0, z: 0.15 }
+const DEFAULT_FOREARM_ROT = { x: 0.4, y: 0.0, z: 0.0 }
 
 // 3D Avatar Model
 function AvatarModel({ modelPath, avatarId, isTalking, armRot, forearmRot }) {
@@ -261,6 +261,9 @@ export default function VoiceChat({ avatar, onBack }) {
       let assistantText = ''
       const aiMessages = newMessages.map(m => ({ role: m.role, content: m.content }))
 
+      // Capture camera frame for AI Vision
+      const frame = captureFrame()
+
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -268,6 +271,7 @@ export default function VoiceChat({ avatar, onBack }) {
         body: JSON.stringify({
           messages: aiMessages,
           systemPrompt: SYSTEM_PROMPT[avatar.id] || SYSTEM_PROMPT.kelion,
+          image: frame || undefined,
         })
       })
 

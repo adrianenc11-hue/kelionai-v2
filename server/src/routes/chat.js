@@ -11,10 +11,11 @@ const OPENAI_MODEL = config.openai.model || 'gpt-4.1-mini';
 /**
  * POST /api/chat
  * Streaming AI chat endpoint using OpenAI
+ * Supports text + optional image (Vision) from camera
  * Works for both authenticated users and demo users
  */
 router.post('/', async (req, res) => {
-  const { messages, systemPrompt } = req.body;
+  const { messages, systemPrompt, image } = req.body;
 
   if (!messages || !Array.isArray(messages)) {
     return res.status(400).json({ error: 'messages array is required' });
@@ -27,12 +28,40 @@ router.post('/', async (req, res) => {
   const systemMsg = systemPrompt || 
     'You are Kelion, a friendly and intelligent AI assistant. Always respond in the same language the user writes in. Be concise and helpful. Personality: calm, professional, empathetic.';
 
+  // Build messages array for OpenAI
   const allMessages = [
     { role: 'system', content: systemMsg },
-    ...messages.slice(-20), // Keep last 20 messages for context
   ];
 
+  // Add conversation history (last 20 messages)
+  const recentMessages = messages.slice(-20);
+  
+  for (let i = 0; i < recentMessages.length; i++) {
+    const msg = recentMessages[i];
+    
+    // If this is the LAST user message AND we have an image, use Vision format
+    if (i === recentMessages.length - 1 && msg.role === 'user' && image) {
+      allMessages.push({
+        role: 'user',
+        content: [
+          { type: 'text', text: msg.content },
+          {
+            type: 'image_url',
+            image_url: {
+              url: image,
+              detail: 'low',
+            }
+          }
+        ]
+      });
+    } else {
+      allMessages.push({ role: msg.role, content: msg.content });
+    }
+  }
+
   try {
+    console.log(`[chat] Sending to ${OPENAI_BASE_URL}/chat/completions with model ${OPENAI_MODEL}, image: ${!!image}`);
+    
     const response = await fetch(`${OPENAI_BASE_URL}/chat/completions`, {
       method: 'POST',
       headers: {

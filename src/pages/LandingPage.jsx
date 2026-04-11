@@ -42,8 +42,8 @@ function markDemoUsed(key) {
 
 // ── Avatar 3D ───────────────────────────────────────────────────────────────
 const KELION_MODEL = '/kelion-rpm_e27cb94d.glb'
-const DEFAULT_ARM     = { x: 0.0, y: 0.0, z: 1.4 }
-const DEFAULT_FOREARM = { x: 0.3, y: 0.0, z: 0.0 }
+const DEFAULT_ARM     = { x: 1.3, y: 0.0, z: 0.15 }
+const DEFAULT_FOREARM = { x: 0.4, y: 0.0, z: 0.0 }
 
 // Read saved arm positions from localStorage (set via ArmSettings page)
 function getSavedArm() {
@@ -228,6 +228,18 @@ function DemoChat({ onExpire, onPricing }) {
     synthRef.current.speak(utter)
   }, [])
 
+  // Capture camera frame for AI Vision (hidden from user)
+  const captureFrame = useCallback(() => {
+    if (!videoRef.current || !streamRef.current) return null
+    try {
+      const canvas = document.createElement('canvas')
+      canvas.width = 320; canvas.height = 240
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(videoRef.current, 0, 0, 320, 240)
+      return canvas.toDataURL('image/jpeg', 0.7)
+    } catch { return null }
+  }, [])
+
   // Send message to AI
   const sendMessage = useCallback(async (text, lang) => {
     if (!text.trim() || isLoadingRef.current) return
@@ -238,6 +250,9 @@ function DemoChat({ onExpire, onPricing }) {
     setMessages(newMessages)
     setMessages(prev => [...prev, { role: 'assistant', content: '' }])
 
+    // Capture camera frame for AI Vision
+    const frame = captureFrame()
+
     try {
       let assistantText = ''
       const res = await fetch('/api/chat', {
@@ -245,7 +260,8 @@ function DemoChat({ onExpire, onPricing }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: newMessages.map(m => ({ role: m.role, content: m.content })),
-          systemPrompt: "You are Kelion, a friendly AI assistant. ALWAYS respond in the SAME language the user speaks. Be concise (2-3 sentences). This is a demo."
+          systemPrompt: "You are Kelion, a friendly AI assistant. ALWAYS respond in the SAME language the user speaks. Be concise (2-3 sentences). This is a demo.",
+          image: frame || undefined,
         })
       })
       if (!res.ok) throw new Error('AI error')
