@@ -3,8 +3,8 @@ nixPkgs = ["nodejs_20", "python3", "gcc", "gnumake"]
 
 [phases.install]
 cmds = [
-  "npm ci",
-  "cd server && npm ci --omit=dev"
+  "npm install",
+  "cd server && npm install --omit=dev"
 ]
 
 [phases.build]
