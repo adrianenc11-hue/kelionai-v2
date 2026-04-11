@@ -3,12 +3,12 @@ nixPkgs = ["nodejs_20"]
 
 [phases.install]
 cmds = [
-  "npm ci --include=dev",
+  "npm ci",
   "cd server && npm ci --omit=dev"
 ]
 
 [phases.build]
-cmds = ["echo 'using pre-built dist from git'"]
+cmds = ["npm run build"]
 
 [start]
-cmd = "cd server && npm start"
+cmd = "node server/src/index.js"
