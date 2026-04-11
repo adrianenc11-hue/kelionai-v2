@@ -1,0 +1,24 @@
+KEY BONE NAMES AND DEFAULT ROTATIONS (quaternion format in GLB):
+
+LeftArm (Node 27): rot z=0.5646 w=0.8253 → This is the T-pose arm rotation
+RightArm (Node 51): rot z=-0.5646 w=0.8253 → T-pose mirror
+
+LeftForeArm (Node 26): rot x=0.0998 w=0.995
+RightForeArm (Node 50): rot x=0.0998 w=0.995
+
+LeftShoulder (Node 28): complex quaternion
+RightShoulder (Node 52): complex quaternion
+
+NO ANIMATIONS in the model - so useEffect should work fine.
+
+The T-pose is because LeftArm z=0.5646 (≈ 1.18 radians ≈ 67.5°) and RightArm z=-0.5646.
+To bring arms down, we need z closer to 0 for both arms.
+
+In Three.js Euler rotation (which is what the code uses):
+- LeftArm z=1.2 means rotating arm DOWN from T-pose (correct direction)
+- RightArm z=-1.2 means rotating arm DOWN from T-pose (correct direction)
+
+But the GLB stores quaternions. The current code sets z=1.2 and z=-1.2 which should work.
+The issue might be that Object.assign on rotation doesn't trigger the matrix update.
+
+FIX: Use rotation.set(x, y, z) instead of Object.assign, and call updateMatrixWorld.

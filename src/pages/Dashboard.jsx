@@ -193,6 +193,7 @@ export default function Dashboard({ onNavigate }) {
             <ActionBtn label="🎁 Invite Friends" color="#0f766e" glow="#14b8a6" onClick={() => onNavigate('referral')} />
             <ActionBtn label="💳 Upgrade plan"  color="#1d4ed8" glow="#3b82f6"  onClick={() => onNavigate('pricing')} />
             <ActionBtn label="👤 Profile"        color="#065f46" glow="#10b981"  onClick={() => onNavigate('profile')} />
+            <ActionBtn label="🦾 Arm Settings"    color="#7e22ce" glow="#a855f7"  onClick={() => onNavigate('arm-settings')} />
             {isAdmin && <ActionBtn label="⚙️ Admin panel" color="#92400e" glow="#f59e0b" onClick={() => onNavigate('admin')} />}
           </div>
         </div>

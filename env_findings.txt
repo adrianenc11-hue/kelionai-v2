@@ -1,0 +1,20 @@
+Render Environment Variables found:
+- COOKIE_DOMAIN
+- CORS_ORIGINS
+- GOOGLE_REDIRECT_URI
+- NODE_ENV
+- OPENAI_API_KEY (present but values hidden)
+- PORT
+- SESSION_SECRET
+- STRIPE_PUBLISHABLE_KEY
+- STRIPE_SECRET_KEY
+- SUPABASE_SERVICE_KEY
+- SUPABASE_URL
+- VITE_API_BASE_URL
+
+All keys are present. The 502 error on /api/chat could be:
+1. OPENAI_API_KEY value might be wrong/expired
+2. The server config uses config.openai.apiKey which reads from OPENAI_API_KEY env var
+3. The OpenAI API call fails and returns 502
+
+Need to check Render logs to see the actual error.
