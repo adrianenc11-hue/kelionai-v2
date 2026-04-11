@@ -43,7 +43,7 @@ function AvatarModel({ armRot, forearmRot }) {
     set(['RightForeArm','mixamorigRightForeArm'],        { x: forearmRot.x, y: -forearmRot.y, z: -forearmRot.z })
   })
 
-  return <primitive object={scene} scale={2.2} position={[0, -2.1, 0]} rotation={[0, 0, 0]} />
+  return <primitive object={scene} scale={2.0} position={[0, -2.2, 0]} rotation={[0, 0, 0]} />
 }
 
 function ArmPanel({ armRot, forearmRot, onChange, onSave, onClose }) {
@@ -179,7 +179,7 @@ export default function AvatarSelect({ onSelect }) {
           }} />
 
           <Canvas
-            camera={{ position: [0, 0.2, 2.6], fov: 40 }}
+            camera={{ position: [0, 0.6, 3.5], fov: 42 }}
             style={{ width: '100%', height: '100%' }}
             gl={{ antialias: true, alpha: true }}
           >
