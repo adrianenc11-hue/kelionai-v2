@@ -542,24 +542,6 @@ export default function LandingPage({ onSignIn, onPricing }) {
   const [demoState, setDemoState] = useState('landing') // 'landing' | 'demo' | 'expired' | 'used'
   const [demoInfo, setDemoInfo] = useState(null)
   const [isTalking, setIsTalking] = useState(false)
-  const [showArmPanel, setShowArmPanel] = useState(false)
-
-  // Load saved arm positions
-  const savedArm = (() => { try { return JSON.parse(localStorage.getItem(ARM_STORAGE_KEY)) } catch { return null } })()
-  const [armRot, setArmRot]         = useState(savedArm?.arm     || { ...DEFAULT_ARM })
-  const [forearmRot, setForearmRot] = useState(savedArm?.forearm || { ...DEFAULT_FOREARM })
-
-  const handleArmSave = (arm, forearm) => {
-    setArmRot(arm)
-    setForearmRot(forearm)
-    localStorage.setItem(ARM_STORAGE_KEY, JSON.stringify({ arm, forearm }))
-  }
-
-  const handleArmReset = () => {
-    setArmRot({ ...DEFAULT_ARM })
-    setForearmRot({ ...DEFAULT_FOREARM })
-    localStorage.removeItem(ARM_STORAGE_KEY)
-  }
 
   const handleStartDemo = () => {
     const check = checkDemoUsed()
@@ -648,7 +630,7 @@ export default function LandingPage({ onSignIn, onPricing }) {
             <pointLight position={[0, 1, 2]} intensity={0.8} color="#a855f7" />
             <Environment preset="city" />
             <Suspense fallback={null}>
-              <KelionModel armRot={armRot} forearmRot={forearmRot} />
+              <KelionModel armRot={DEFAULT_ARM} forearmRot={DEFAULT_FOREARM} />
             </Suspense>
             <OrbitControls enableZoom={false} enablePan={false}
               minPolarAngle={Math.PI / 4} maxPolarAngle={Math.PI / 1.8}
@@ -663,31 +645,7 @@ export default function LandingPage({ onSignIn, onPricing }) {
             filter: 'blur(10px)', pointerEvents: 'none',
           }} />
 
-          {/* Arm control toggle button */}
-          <button
-            onClick={() => setShowArmPanel(p => !p)}
-            style={{
-              position: 'absolute', top: '12px', right: '12px',
-              background: 'rgba(255,255,255,0.06)',
-              border: '1px solid rgba(255,255,255,0.12)',
-              color: '#888', padding: '5px 10px', borderRadius: '8px',
-              fontSize: '11px', cursor: 'pointer', backdropFilter: 'blur(8px)',
-              zIndex: 10,
-            }}
-          >Arm Settings</button>
         </div>
-
-        {/* Arm control panel — outside canvas, between avatar and info */}
-        {showArmPanel && (
-          <div style={{ position: 'absolute', top: '60px', left: '12px', zIndex: 20 }}>
-            <ArmPanel
-              armRot={armRot} forearmRot={forearmRot}
-              onChange={(a, f) => { setArmRot(a); setForearmRot(f) }}
-              onSave={handleArmSave}
-              onReset={handleArmReset}
-            />
-          </div>
-        )}
 
         {/* Info panel */}
         <div style={{

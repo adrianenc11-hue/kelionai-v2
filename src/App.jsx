@@ -9,7 +9,6 @@ import AdminPage from './pages/AdminPage'
 import AvatarSelect from './components/AvatarSelect'
 import VoiceChat from './components/VoiceChat'
 import ReferralPage from './pages/ReferralPage'
-import ArmSettingsPage from './pages/ArmSettingsPage'
 
 function AppInner() {
   const { user, loading } = useAuth()
@@ -69,7 +68,6 @@ function AppInner() {
   if (page === 'profile') return <ProfilePage onNavigate={setPage} />
   if (page === 'admin')    return <AdminPage    onNavigate={setPage} />
   if (page === 'referral') return <ReferralPage onNavigate={setPage} />
-  if (page === 'arm-settings') return <ArmSettingsPage onNavigate={setPage} />
 
   // Default: dashboard
   return <Dashboard onNavigate={(p) => { setPage(p); if (p !== 'chat') setSelectedAvatar(null) }} />
