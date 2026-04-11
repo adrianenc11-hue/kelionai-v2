@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, Suspense } from 'react'
-import { Canvas } from '@react-three/fiber'
+import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls, Environment, useGLTF } from '@react-three/drei'
 
 // ── Fingerprint anti-abuse ──────────────────────────────────────────────────
@@ -45,7 +45,7 @@ function markDemoUsed(key) {
 }
 
 // ── Avatar 3D ───────────────────────────────────────────────────────────────
-const KELION_MODEL = '/models/kelion.glb'
+const KELION_MODEL = '/kelion-rpm_e27cb94d.glb'
 
 function KelionModel({ isTalking }) {
   const { scene } = useGLTF(KELION_MODEL)
@@ -60,18 +60,22 @@ function KelionModel({ isTalking }) {
       }
     })
     bonesRef.current = bones
+  }, [scene])
 
-    // Set arms close to body
-    const setArm = (names, rot) => {
+  // Persistently apply arm rotations every frame to prevent T-pose
+  useFrame(() => {
+    const b = bonesRef.current
+    if (!b) return
+    const set = (names, x, y, z) => {
       for (const n of names) {
-        if (bones[n]) { Object.assign(bones[n].rotation, rot); break }
+        if (b[n]) { b[n].rotation.x = x; b[n].rotation.y = y; b[n].rotation.z = z; break }
       }
     }
-    setArm(['LeftArm','LeftUpperArm','mixamorigLeftArm'],  { x: 0, y: 0, z: 1.2 })
-    setArm(['RightArm','RightUpperArm','mixamorigRightArm'], { x: 0, y: 0, z: -1.2 })
-    setArm(['LeftForeArm','mixamorigLeftForeArm'],  { x: 0.3, y: 0, z: 0 })
-    setArm(['RightForeArm','mixamorigRightForeArm'], { x: 0.3, y: 0, z: 0 })
-  }, [scene])
+    set(['LeftArm', 'LeftUpperArm'],   0, 0,  1.2)
+    set(['RightArm', 'RightUpperArm'], 0, 0, -1.2)
+    set(['LeftForeArm'],               0.3, 0, 0)
+    set(['RightForeArm'],              0.3, 0, 0)
+  })
 
   return (
     <primitive object={scene} scale={1.6} position={[0, -1.6, 0]} rotation={[0, 0, 0]} />
