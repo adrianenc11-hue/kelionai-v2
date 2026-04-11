@@ -58,17 +58,29 @@ function KelionModel({ armRot, forearmRot }) {
   const { scene } = useGLTF(KELION_MODEL)
   const bonesRef = useRef(null)
 
-  useFrame(() => {
-    if (!bonesRef.current) {
-      const bones = {}
-      scene.traverse((obj) => {
-        if (obj.isBone || obj.type === 'Bone') bones[obj.name] = obj
-        if (obj.isSkinnedMesh && obj.skeleton) {
-          obj.skeleton.bones.forEach(b => { bones[b.name] = b })
-        }
-      })
-      if (Object.keys(bones).length > 0) bonesRef.current = bones
+  // Initial bone setup — same pattern as AvatarSelect
+  useEffect(() => {
+    const bones = {}
+    scene.traverse((obj) => {
+      if (obj.isBone || obj.type === 'Bone') bones[obj.name] = obj
+      if (obj.isSkinnedMesh && obj.skeleton) {
+        obj.skeleton.bones.forEach(b => { bones[b.name] = b })
+      }
+    })
+    bonesRef.current = bones
+    const setRot = (names, x, y, z) => {
+      for (const n of names) {
+        if (bones[n]) { bones[n].rotation.set(x, y, z); break }
+      }
     }
+    setRot(['LeftArm', 'LeftUpperArm'],   armRot.x,  armRot.y,  armRot.z)
+    setRot(['RightArm', 'RightUpperArm'], armRot.x, -armRot.y, -armRot.z)
+    setRot(['LeftForeArm'],               forearmRot.x,  forearmRot.y,  forearmRot.z)
+    setRot(['RightForeArm'],              forearmRot.x, -forearmRot.y, -forearmRot.z)
+  }, [scene, armRot, forearmRot])
+
+  // Persistent enforcement every frame
+  useFrame(() => {
     const b = bonesRef.current
     if (!b) return
     const set = (names, rot) => {
