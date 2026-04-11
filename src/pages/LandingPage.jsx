@@ -42,7 +42,7 @@ function markDemoUsed(key) {
 
 // ── Avatar 3D ───────────────────────────────────────────────────────────────
 const KELION_MODEL = '/kelion-rpm_e27cb94d.glb'
-const DEFAULT_ARM     = { x: 0.0, y: 0.0, z: 1.2 }
+const DEFAULT_ARM     = { x: 0.0, y: 0.0, z: 1.4 }
 const DEFAULT_FOREARM = { x: 0.3, y: 0.0, z: 0.0 }
 
 // Read saved arm positions from localStorage (set via ArmSettings page)
