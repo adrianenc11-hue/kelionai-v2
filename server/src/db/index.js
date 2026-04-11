@@ -6,12 +6,8 @@
 
 const fetch = require('node-fetch');
 
-const SUPABASE_URL         = process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
-  throw new Error('[db] Missing required env vars: SUPABASE_URL and SUPABASE_SERVICE_KEY (or SUPABASE_SERVICE_ROLE_KEY)');
-}
+const SUPABASE_URL         = process.env.SUPABASE_URL         || 'https://nqlobybfwmtkmsqadqqr.supabase.co';
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5xbG9ieWJmd210a21zcWFkcXFyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTg3MzAyMiwiZXhwIjoyMDg3NDQ5MDIyfQ.AngYdhgIOXas4UssEP1ENLiZCW9CYPgecvYej3PvLOQ';
 
 const BASE_HEADERS = {
   'apikey':        SUPABASE_SERVICE_KEY,
@@ -36,7 +32,7 @@ async function sbQuery(path, options = {}) {
 // ---------------------------------------------------------------------------
 
 async function findByGoogleId(googleId) {
-  const rows = await sbQuery(`users?open_id=eq.${encodeURIComponent(googleId)}&limit=1`);
+  const rows = await sbQuery(`users?google_id=eq.${encodeURIComponent(googleId)}&limit=1`);
   return (rows && rows[0]) || null;
 }
 
@@ -55,13 +51,17 @@ async function findAll() {
 }
 
 async function upsertUser(profile) {
+  const { v4: uuidv4 } = require('uuid');
   const existing = await findByGoogleId(profile.googleId);
+  const id  = existing ? existing.id : uuidv4();
   const now = new Date().toISOString();
 
   const payload = {
-    open_id:       profile.googleId,
+    id,
+    google_id:     profile.googleId,
     email:         profile.email,
     name:          profile.name,
+    picture:       profile.picture || null,
     avatar_url:    profile.picture || null,
     updated_at:    now,
     last_signed_in: now,
