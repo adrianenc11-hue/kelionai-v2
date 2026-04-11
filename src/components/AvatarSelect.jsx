@@ -54,17 +54,10 @@ function AvatarModel({ armRot, forearmRot }) {
         if (b[n]) { b[n].rotation.x = rot.x; b[n].rotation.y = rot.y; b[n].rotation.z = rot.z; break }
       }
     }
-    // Only apply user overrides if they differ from zero (user adjusted via panel)
-    const hasArmOverride = armRot.x !== 0 || armRot.y !== 0 || armRot.z !== 0
-    const hasForearmOverride = forearmRot.x !== 0 || forearmRot.y !== 0 || forearmRot.z !== 0
-    if (hasArmOverride) {
-      set(['LeftArm','LeftUpperArm'],   { x: armRot.x, y: armRot.y,  z:  armRot.z })
-      set(['RightArm','RightUpperArm'], { x: armRot.x, y: -armRot.y, z: -armRot.z })
-    }
-    if (hasForearmOverride) {
-      set(['LeftForeArm'],  { x: forearmRot.x, y:  forearmRot.y, z:  forearmRot.z })
-      set(['RightForeArm'], { x: forearmRot.x, y: -forearmRot.y, z: -forearmRot.z })
-    }
+    set(['LeftArm','LeftUpperArm'],   { x: armRot.x, y:  armRot.y, z:  armRot.z })
+    set(['RightArm','RightUpperArm'], { x: armRot.x, y: -armRot.y, z: -armRot.z })
+    set(['LeftForeArm'],              { x: forearmRot.x, y:  forearmRot.y, z:  forearmRot.z })
+    set(['RightForeArm'],             { x: forearmRot.x, y: -forearmRot.y, z: -forearmRot.z })
   })
 
   return <primitive object={scene} scale={2.0} position={[0, -2.2, 0]} rotation={[0, 0, 0]} />
