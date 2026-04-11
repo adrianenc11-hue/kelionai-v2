@@ -22,19 +22,19 @@ const SUBSCRIPTION_PLANS = {
   basic: {
     name: 'Basic',
     price: 999, // $9.99 in cents
-    stripeId: 'price_basic_monthly',
+    stripeId: 'price_1TKzOWLoR6yrf0RiLuL0ljTB',
     features: ['Unlimited voice interactions', 'Multiple avatars', 'Priority support'],
   },
   premium: {
     name: 'Premium',
     price: 2999, // $29.99 in cents
-    stripeId: 'price_premium_monthly',
+    stripeId: 'price_1TKzOZLoR6yrf0Riz7yxebhW',
     features: ['All Basic features', 'Custom avatar', 'Advanced AI models', 'API access'],
   },
   enterprise: {
     name: 'Enterprise',
     price: 9999, // $99.99 in cents
-    stripeId: 'price_enterprise_monthly',
+    stripeId: 'price_1TKzObLoR6yrf0RilcC24nDW',
     features: ['All Premium features', 'Dedicated support', 'Custom integrations', 'SLA'],
   },
 };
