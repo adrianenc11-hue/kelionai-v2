@@ -1,4 +1,4 @@
-{
+﻿{
   "name": "kelion-voice",
   "private": true,
   "version": "0.1.0",
@@ -29,3 +29,4 @@
     "vite": "^6.3.1"
   }
 }
+
