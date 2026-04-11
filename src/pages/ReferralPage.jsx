@@ -44,7 +44,7 @@ export default function ReferralPage({ onNavigate }) {
     setApplyError(null)
     try {
       const res = await api.post('/api/referral/use', { code: applyCode.trim().toUpperCase() })
-      setApplyMsg(res.message || 'Cod aplicat cu succes!')
+      setApplyMsg(res.message || 'Code applied successfully!')
     } catch (err) {
       setApplyError(err.body?.error || err.message)
     } finally {
@@ -63,16 +63,16 @@ export default function ReferralPage({ onNavigate }) {
           onClick={() => onNavigate('dashboard')}
           style={{ background: 'none', border: '1px solid rgba(255,255,255,0.2)', color: '#aaa', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', marginBottom: '24px' }}
         >
-          ← Înapoi
+          ← Back
         </button>
 
         <h1 style={{ fontSize: '28px', fontWeight: '800', marginBottom: '8px',
           background: 'linear-gradient(135deg, #14b8a6, #a855f7)',
           WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-          🎁 Invită prieteni
+          🎁 Invite Friends
         </h1>
         <p style={{ color: '#888', marginBottom: '32px' }}>
-          Generează un cod de invitație. Când prietenul tău se abonează și folosește codul, primești <strong style={{ color: '#14b8a6' }}>+5 zile gratuit</strong> la abonamentul tău.
+          Generate an invitation code. When your friend subscribes and uses the code, you get <strong style={{ color: '#14b8a6' }}>+5 free days</strong> added to your subscription.
         </p>
 
         {/* Generate code section */}
@@ -80,7 +80,7 @@ export default function ReferralPage({ onNavigate }) {
           background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
           borderRadius: '16px', padding: '24px', marginBottom: '24px',
         }}>
-          <h3 style={{ color: '#fff', marginBottom: '16px' }}>Generează cod de invitație</h3>
+          <h3 style={{ color: '#fff', marginBottom: '16px' }}>Generate Invitation Code</h3>
           {code ? (
             <div>
               <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '12px' }}>
@@ -99,11 +99,11 @@ export default function ReferralPage({ onNavigate }) {
                     padding: '14px 20px', borderRadius: '10px', cursor: 'pointer', fontSize: '14px',
                   }}
                 >
-                  {copied ? '✓ Copiat' : '📋 Copiază'}
+                  {copied ? '✓ Copied' : '📋 Copy'}
                 </button>
               </div>
               <p style={{ color: '#666', fontSize: '13px' }}>
-                Expiră: {expires ? new Date(expires).toLocaleDateString('ro-RO') : '—'}
+                Expires: {expires ? new Date(expires).toLocaleDateString('en-US') : '—'}
               </p>
             </div>
           ) : (
@@ -117,7 +117,7 @@ export default function ReferralPage({ onNavigate }) {
                 cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1,
               }}
             >
-              {loading ? 'Se generează...' : '✨ Generează cod'}
+              {loading ? 'Generating...' : '✨ Generate Code'}
             </button>
           )}
           {error && <p style={{ color: '#f87171', marginTop: '12px', fontSize: '14px' }}>{error}</p>}
@@ -128,9 +128,9 @@ export default function ReferralPage({ onNavigate }) {
           background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
           borderRadius: '16px', padding: '24px',
         }}>
-          <h3 style={{ color: '#fff', marginBottom: '8px' }}>Ai un cod de invitație?</h3>
+          <h3 style={{ color: '#fff', marginBottom: '8px' }}>Have an invitation code?</h3>
           <p style={{ color: '#888', fontSize: '13px', marginBottom: '16px' }}>
-            Introdu codul primit de la un prieten pentru a-l activa după abonare.
+            Enter the code received from a friend to activate it after subscribing.
           </p>
           <div style={{ display: 'flex', gap: '12px' }}>
             <input
@@ -154,7 +154,7 @@ export default function ReferralPage({ onNavigate }) {
                 cursor: applying ? 'not-allowed' : 'pointer', opacity: applying ? 0.7 : 1,
               }}
             >
-              {applying ? '...' : 'Aplică'}
+              {applying ? '...' : 'Apply'}
             </button>
           </div>
           {applyMsg   && <p style={{ color: '#4ade80', marginTop: '12px', fontSize: '14px' }}>✓ {applyMsg}</p>}

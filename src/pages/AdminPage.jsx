@@ -36,8 +36,8 @@ export default function AdminPage({ onNavigate }) {
         background: '#0a0a0f', color: '#fff', flexDirection: 'column', gap: '16px',
       }}>
         <div style={{ fontSize: '48px' }}>🔒</div>
-        <h2>Acces interzis</h2>
-        <p style={{ color: '#666' }}>Nu ai permisiuni de administrator.</p>
+        <h2>Access Denied</h2>
+        <p style={{ color: '#666' }}>You do not have administrator permissions.</p>
         <button onClick={() => onNavigate('dashboard')}
           style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', padding: '10px 20px', borderRadius: '10px', cursor: 'pointer' }}>
           ← Dashboard
@@ -57,10 +57,10 @@ export default function AdminPage({ onNavigate }) {
         subscription_expires_at: editing.expires || null,
       })
       setUsers((prev) => prev.map((u) => u.id === updated.id ? updated : u))
-      setMsg('Abonament actualizat!')
+      setMsg('Subscription updated!')
       setEditing(null)
     } catch (err) {
-      setMsg(err.message || 'Eroare la salvare')
+      setMsg(err.message || 'Error saving')
     } finally {
       setSaving(false)
     }
@@ -99,9 +99,9 @@ export default function AdminPage({ onNavigate }) {
 
       {/* Content */}
       <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '40px 24px' }}>
-        <h2 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '8px' }}>⚙️ Panou Admin</h2>
+        <h2 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '8px' }}>⚙️ Admin Panel</h2>
         <p style={{ color: '#666', marginBottom: '32px' }}>
-          Gestionează useri și abonamente · Logat ca <strong style={{ color: '#a855f7' }}>{user?.email}</strong>
+          Manage users and subscriptions · Logged in as <strong style={{ color: '#a855f7' }}>{user?.email}</strong>
         </p>
 
         {msg && (
@@ -125,7 +125,7 @@ export default function AdminPage({ onNavigate }) {
         )}
 
         {loading ? (
-          <div style={{ color: '#666' }}>Se încarcă userii...</div>
+          <div style={{ color: '#666' }}>Loading users...</div>
         ) : (
           <div style={{
             background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
@@ -139,7 +139,7 @@ export default function AdminPage({ onNavigate }) {
               borderBottom: '1px solid rgba(255,255,255,0.07)',
               background: 'rgba(255,255,255,0.04)',
             }}>
-              {['Nume', 'Email', 'Plan', 'Status', 'Înregistrat', 'Ultima accesare', 'Acțiuni'].map((h) => (
+              {['Name', 'Email', 'Plan', 'Status', 'Registered', 'Last Access', 'Actions'].map((h) => (
                 <div key={h} style={{ color: '#666', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                   {h}
                 </div>
@@ -148,7 +148,7 @@ export default function AdminPage({ onNavigate }) {
 
             {users.length === 0 ? (
               <div style={{ padding: '32px', textAlign: 'center', color: '#555' }}>
-                Niciun user înregistrat.
+                No users registered.
               </div>
             ) : users.map((u) => (
               <div key={u.id} style={{
@@ -178,10 +178,10 @@ export default function AdminPage({ onNavigate }) {
                   {u.subscription_status || 'active'}
                 </div>
                 <div style={{ color: '#666', fontSize: '12px' }}>
-                  {u.created_at ? new Date(u.created_at).toLocaleDateString('ro-RO') : '—'}
+                  {u.created_at ? new Date(u.created_at).toLocaleDateString('en-US') : '—'}
                 </div>
                 <div style={{ color: '#666', fontSize: '12px' }}>
-                  {u.last_login_at ? new Date(u.last_login_at).toLocaleDateString('ro-RO') : '—'}
+                  {u.last_login_at ? new Date(u.last_login_at).toLocaleDateString('en-US') : '—'}
                 </div>
                 <div>
                   <button
@@ -197,7 +197,7 @@ export default function AdminPage({ onNavigate }) {
                       cursor: 'pointer', fontSize: '12px',
                     }}
                   >
-                    Editează
+                    Edit
                   </button>
                 </div>
               </div>
@@ -218,7 +218,7 @@ export default function AdminPage({ onNavigate }) {
               boxShadow: '0 0 60px rgba(168,85,247,0.2)',
             }}>
               <h3 style={{ color: '#fff', fontSize: '18px', fontWeight: '700', marginBottom: '24px' }}>
-                Editează abonament
+                Edit Subscription
               </h3>
 
               <div style={{ marginBottom: '16px' }}>
@@ -253,7 +253,7 @@ export default function AdminPage({ onNavigate }) {
 
               <div style={{ marginBottom: '24px' }}>
                 <label style={{ color: '#888', fontSize: '13px', display: 'block', marginBottom: '6px' }}>
-                  Expiră la (opțional)
+                  Expires on (optional)
                 </label>
                 <input
                   type="date"
@@ -280,7 +280,7 @@ export default function AdminPage({ onNavigate }) {
                     opacity: saving ? 0.7 : 1,
                   }}
                 >
-                  {saving ? 'Se salvează...' : 'Salvează'}
+                  {saving ? 'Saving...' : 'Save'}
                 </button>
                 <button
                   onClick={() => setEditing(null)}
@@ -291,7 +291,7 @@ export default function AdminPage({ onNavigate }) {
                     cursor: 'pointer',
                   }}
                 >
-                  Anulează
+                  Cancel
                 </button>
               </div>
             </div>

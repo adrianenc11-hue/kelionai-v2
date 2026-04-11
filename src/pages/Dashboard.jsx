@@ -63,8 +63,8 @@ export default function Dashboard({ onNavigate }) {
           {[
             { label: '🏠 Dashboard', page: 'dashboard' },
             { label: '💬 Chat',      page: 'chat' },
-            { label: '💳 Prețuri',   page: 'pricing' },
-            { label: '👤 Profil',    page: 'profile' },
+            { label: '💳 Pricing',   page: 'pricing' },
+            { label: '👤 Profile',    page: 'profile' },
             ...(isAdmin ? [{ label: '⚙️ Admin', page: 'admin' }] : []),
           ].map(({ label, page }) => (
             <button
@@ -87,7 +87,7 @@ export default function Dashboard({ onNavigate }) {
               cursor: 'pointer', fontSize: '13px', fontWeight: '500',
             }}
           >
-            Ieși
+            Sign Out
           </button>
         </nav>
       </div>
@@ -112,7 +112,7 @@ export default function Dashboard({ onNavigate }) {
             )}
             <div>
               <h2 style={{ fontSize: '24px', fontWeight: '700', color: '#fff' }}>
-                Bun venit, {user.name?.split(' ')[0]}! 👋
+                Welcome, {user.name?.split(' ')[0]}! 👋
               </h2>
               <p style={{ color: '#666', fontSize: '14px' }}>{user.email}</p>
             </div>
@@ -135,12 +135,12 @@ export default function Dashboard({ onNavigate }) {
 
         {/* Stats row */}
         <div style={{ display: 'flex', gap: '16px', marginBottom: '32px', flexWrap: 'wrap' }}>
-          {statBox('Plan curent', TIER_LABELS[tier])}
-          {statBox('Utilizare azi', `${usedToday}/${dailyLimit ?? '∞'}`, 'generări vocale')}
+          {statBox('Current Plan', TIER_LABELS[tier])}
+          {statBox('Today\'s Usage', `${usedToday}/${dailyLimit ?? '∞'}`, 'voice generations')}
           {statBox('Status', user.subscription_status || 'active')}
           {statBox(
-            'Membru din',
-            user.created_at ? new Date(user.created_at).toLocaleDateString('ro-RO') : '—'
+            'Member Since',
+            user.created_at ? new Date(user.created_at).toLocaleDateString('en-US') : '—'
           )}
         </div>
 
@@ -151,7 +151,7 @@ export default function Dashboard({ onNavigate }) {
             borderRadius: '16px', padding: '20px 24px', marginBottom: '32px',
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-              <span style={{ color: '#aaa', fontSize: '14px' }}>Utilizare zilnică</span>
+              <span style={{ color: '#aaa', fontSize: '14px' }}>Daily Usage</span>
               <span style={{ color: '#aaa', fontSize: '14px' }}>{usedToday} / {dailyLimit}</span>
             </div>
             <div style={{
@@ -168,7 +168,7 @@ export default function Dashboard({ onNavigate }) {
             </div>
             {usagePct >= 100 && (
               <p style={{ color: '#fca5a5', fontSize: '13px', marginTop: '10px' }}>
-                ⚠️ Limita zilnică atinsă.{' '}
+                ⚠️ Daily limit reached.{' '}
                 <button
                   onClick={() => onNavigate('pricing')}
                   style={{ background: 'none', border: 'none', color: colors.glow, cursor: 'pointer', fontSize: '13px', padding: 0 }}
@@ -186,13 +186,13 @@ export default function Dashboard({ onNavigate }) {
           borderRadius: '16px', padding: '24px',
         }}>
           <h3 style={{ color: '#fff', fontSize: '16px', fontWeight: '600', marginBottom: '16px' }}>
-            Acțiuni rapide
+            Quick Actions
           </h3>
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-            <ActionBtn label="💬 Pornește chat" color="#7c3aed" glow="#a855f7"  onClick={() => onNavigate('chat')} />
-            <ActionBtn label="🎁 Invită prieteni" color="#0f766e" glow="#14b8a6" onClick={() => onNavigate('referral')} />
+            <ActionBtn label="💬 Start Chat" color="#7c3aed" glow="#a855f7"  onClick={() => onNavigate('chat')} />
+            <ActionBtn label="🎁 Invite Friends" color="#0f766e" glow="#14b8a6" onClick={() => onNavigate('referral')} />
             <ActionBtn label="💳 Upgrade plan"  color="#1d4ed8" glow="#3b82f6"  onClick={() => onNavigate('pricing')} />
-            <ActionBtn label="👤 Profil"        color="#065f46" glow="#10b981"  onClick={() => onNavigate('profile')} />
+            <ActionBtn label="👤 Profile"        color="#065f46" glow="#10b981"  onClick={() => onNavigate('profile')} />
             {isAdmin && <ActionBtn label="⚙️ Admin panel" color="#92400e" glow="#f59e0b" onClick={() => onNavigate('admin')} />}
           </div>
         </div>

@@ -29,10 +29,10 @@ export default function ProfilePage({ onNavigate }) {
     try {
       await api.put('/api/users/me', { name: name.trim() })
       await refreshUser()
-      setMsg('Profil actualizat!')
+      setMsg('Profile updated!')
       setMsgType('success')
     } catch (err) {
-      setMsg(err.message || 'Eroare la salvare')
+      setMsg(err.message || 'Error saving profile')
       setMsgType('error')
     } finally {
       setSaving(false)
@@ -72,7 +72,7 @@ export default function ProfilePage({ onNavigate }) {
 
       {/* Content */}
       <div style={{ maxWidth: '600px', margin: '0 auto', padding: '40px 24px' }}>
-        <h2 style={{ fontSize: '28px', fontWeight: '700', marginBottom: '32px' }}>👤 Profil</h2>
+        <h2 style={{ fontSize: '28px', fontWeight: '700', marginBottom: '32px' }}>👤 Profile</h2>
 
         {/* Avatar + info */}
         <div style={{
@@ -115,10 +115,10 @@ export default function ProfilePage({ onNavigate }) {
           background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
           borderRadius: '20px', padding: '28px', marginBottom: '24px',
         }}>
-          <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '20px' }}>Editează profil</h3>
+          <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '20px' }}>Edit Profile</h3>
           <form onSubmit={handleSave}>
             <label style={{ display: 'block', color: '#888', fontSize: '13px', marginBottom: '6px' }}>
-              Nume
+              Name
             </label>
             <input
               type="text"
@@ -156,7 +156,7 @@ export default function ProfilePage({ onNavigate }) {
                 opacity: saving ? 0.7 : 1,
               }}
             >
-              {saving ? 'Se salvează...' : 'Salvează'}
+              {saving ? 'Saving...' : 'Save'}
             </button>
           </form>
         </div>
@@ -166,14 +166,14 @@ export default function ProfilePage({ onNavigate }) {
           background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
           borderRadius: '20px', padding: '28px',
         }}>
-          <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '20px' }}>Abonament</h3>
+          <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '20px' }}>Subscription</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <Row label="Plan" value={tier.charAt(0).toUpperCase() + tier.slice(1)} />
             <Row label="Status" value={user.subscription_status || 'active'} />
-            <Row label="Expiră" value={user.subscription_expires_at
-              ? new Date(user.subscription_expires_at).toLocaleDateString('ro-RO')
+            <Row label="Expires" value={user.subscription_expires_at
+              ? new Date(user.subscription_expires_at).toLocaleDateString('en-US')
               : 'N/A'} />
-            <Row label="Utilizare azi" value={`${user.usage?.today ?? 0} / ${user.usage?.daily_limit ?? '∞'}`} />
+            <Row label="Today's Usage" value={`${user.usage?.today ?? 0} / ${user.usage?.daily_limit ?? '∞'}`} />
           </div>
           <button
             onClick={() => onNavigate('pricing')}
@@ -185,7 +185,7 @@ export default function ProfilePage({ onNavigate }) {
               cursor: 'pointer',
             }}
           >
-            💳 Schimbă planul
+            💳 Change Plan
           </button>
         </div>
       </div>
