@@ -11,4 +11,4 @@ cmds = [
 cmds = ["npm run build"]
 
 [start]
-cmd = "node server/src/index.js"
+cmd = "cd server && NODE_ENV=production node src/index.js"
