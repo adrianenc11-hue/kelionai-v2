@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import LoginPage from './pages/LoginPage'
+import LandingPage from './pages/LandingPage'
 import Dashboard from './pages/Dashboard'
 import PricingPage from './pages/PricingPage'
 import ProfilePage from './pages/ProfilePage'
@@ -11,7 +12,7 @@ import ReferralPage from './pages/ReferralPage'
 
 function AppInner() {
   const { user, loading } = useAuth()
-  const [page, setPage]   = useState('dashboard')        // current page
+  const [page, setPage]   = useState('landing')
   const [selectedAvatar, setSelectedAvatar] = useState(null)
 
   // While checking auth status, show a minimal loader
@@ -33,12 +34,21 @@ function AppInner() {
     )
   }
 
-  // Not logged in → show login page (pricing is also public)
+  // Not logged in
   if (!user) {
     if (page === 'pricing') {
       return <PricingPage onNavigate={setPage} />
     }
-    return <LoginPage />
+    if (page === 'login') {
+      return <LoginPage onNavigate={setPage} />
+    }
+    // Default: landing page with demo
+    return (
+      <LandingPage
+        onSignIn={() => setPage('login')}
+        onPricing={() => setPage('pricing')}
+      />
+    )
   }
 
   // Logged in – handle navigation

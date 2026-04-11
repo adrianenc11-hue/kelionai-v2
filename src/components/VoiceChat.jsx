@@ -1,7 +1,6 @@
 import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls, Environment, useGLTF } from '@react-three/drei'
 import { Suspense, useState, useRef, useEffect, useCallback, Component } from 'react'
-import Nxcode from '@nxcode/sdk'
 
 const SYSTEM_PROMPT = {
   kelion: `You are Kelion, a friendly and intelligent AI assistant. Always respond in the same language the user writes in. Be concise and helpful. Personality: calm, professional, empathetic.`,
@@ -14,13 +13,21 @@ const LANGUAGES = [
   { code: 'de-DE', label: '🇩🇪 DE' },
   { code: 'es-ES', label: '🇪🇸 ES' },
   { code: 'it-IT', label: '🇮🇹 IT' },
+  { code: 'pt-PT', label: '🇵🇹 PT' },
+  { code: 'nl-NL', label: '🇳🇱 NL' },
+  { code: 'pl-PL', label: '🇵🇱 PL' },
+  { code: 'ru-RU', label: '🇷🇺 RU' },
+  { code: 'zh-CN', label: '🇨🇳 ZH' },
+  { code: 'ja-JP', label: '🇯🇵 JA' },
+  { code: 'ar-SA', label: '🇸🇦 AR' },
+  { code: 'hi-IN', label: '🇮🇳 HI' },
 ]
 
-// Valorile default pentru brațe (lângă corp)
+// Default arm positions - arms close to body
 const DEFAULT_ARM_ROT = { x: 0.0, y: 0.0, z: 1.2 }
 const DEFAULT_FOREARM_ROT = { x: 0.3, y: 0.0, z: 0.0 }
 
-// Componenta avatar 3D cu control brațe din exterior
+// 3D Avatar Model
 function AvatarModel({ modelPath, avatarId, isTalking, armRot, forearmRot }) {
   const { scene } = useGLTF(modelPath)
   const bonesRef = useRef({})
@@ -36,7 +43,6 @@ function AvatarModel({ modelPath, avatarId, isTalking, armRot, forearmRot }) {
     bonesRef.current = bones
   }, [scene, avatarId])
 
-  // Aplică rotația brațelor la fiecare frame (reactiv la schimbări)
   useFrame(() => {
     const bones = bonesRef.current
     if (!bones) return
@@ -53,19 +59,15 @@ function AvatarModel({ modelPath, avatarId, isTalking, armRot, forearmRot }) {
       }
     }
 
-    // Braț stâng (z pozitiv = lângă corp)
     applyRot(['LeftArm', 'LeftUpperArm', 'mixamorigLeftArm', 'Left_Arm'], {
       x: armRot.x, y: armRot.y, z: armRot.z
     })
-    // Braț drept (z negativ = oglindă)
     applyRot(['RightArm', 'RightUpperArm', 'mixamorigRightArm', 'Right_Arm'], {
       x: armRot.x, y: -armRot.y, z: -armRot.z
     })
-    // Antebraț stâng
     applyRot(['LeftForeArm', 'mixamorigLeftForeArm', 'Left_ForeArm'], {
       x: forearmRot.x, y: forearmRot.y, z: forearmRot.z
     })
-    // Antebraț drept (oglindă)
     applyRot(['RightForeArm', 'mixamorigRightForeArm', 'Right_ForeArm'], {
       x: forearmRot.x, y: -forearmRot.y, z: -forearmRot.z
     })
@@ -81,7 +83,7 @@ function AvatarModel({ modelPath, avatarId, isTalking, armRot, forearmRot }) {
   )
 }
 
-// Error Boundary pentru crash-uri Three.js/WebGL
+// Error Boundary
 class AvatarErrorBoundary extends Component {
   constructor(props) {
     super(props)
@@ -98,10 +100,8 @@ class AvatarErrorBoundary extends Component {
           alignItems: 'center', justifyContent: 'center',
           flexDirection: 'column', gap: '12px',
         }}>
-          <div style={{ fontSize: '80px' }}>
-            {'🤖'}
-          </div>
-          <div style={{ color: '#aaa', fontSize: '14px' }}>Avatar 3D indisponibil</div>
+          <div style={{ fontSize: '80px' }}>🤖</div>
+          <div style={{ color: '#aaa', fontSize: '14px' }}>3D Avatar unavailable</div>
         </div>
       )
     }
@@ -109,7 +109,7 @@ class AvatarErrorBoundary extends Component {
   }
 }
 
-// Panou de control brațe
+// Arm Control Panel
 function ArmControlPanel({ armRot, forearmRot, onChange, onSave, onReset, color, glow }) {
   const [local, setLocal] = useState({ arm: { ...armRot }, forearm: { ...forearmRot } })
 
@@ -149,17 +149,17 @@ function ArmControlPanel({ armRot, forearmRot, onChange, onSave, onReset, color,
       padding: '14px 16px', zIndex: 20, width: '280px',
     }}>
       <div style={{ color: '#fff', fontWeight: '700', fontSize: '13px', marginBottom: '10px' }}>
-        🦾 Control Brațe <span style={{ color: '#666', fontWeight: '400', fontSize: '11px' }}>(oglindă automată)</span>
+        🦾 Arm Control <span style={{ color: '#666', fontWeight: '400', fontSize: '11px' }}>(mirror auto)</span>
       </div>
 
-      <div style={{ color: glow, fontSize: '11px', fontWeight: '600', marginBottom: '4px' }}>Braț superior</div>
-      <Slider label="X (sus/jos)" part="arm" axis="x" />
-      <Slider label="Y (față/spate)" part="arm" axis="y" />
-      <Slider label="Z (lângă corp)" part="arm" axis="z" />
+      <div style={{ color: glow, fontSize: '11px', fontWeight: '600', marginBottom: '4px' }}>Upper Arm</div>
+      <Slider label="X (up/down)" part="arm" axis="x" />
+      <Slider label="Y (fwd/back)" part="arm" axis="y" />
+      <Slider label="Z (to body)" part="arm" axis="z" />
 
-      <div style={{ color: glow, fontSize: '11px', fontWeight: '600', margin: '8px 0 4px' }}>Antebraț</div>
-      <Slider label="X (îndoire)" part="forearm" axis="x" />
-      <Slider label="Y (răsucire)" part="forearm" axis="y" />
+      <div style={{ color: glow, fontSize: '11px', fontWeight: '600', margin: '8px 0 4px' }}>Forearm</div>
+      <Slider label="X (bend)" part="forearm" axis="x" />
+      <Slider label="Y (twist)" part="forearm" axis="y" />
       <Slider label="Z (lateral)" part="forearm" axis="z" />
 
       <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
@@ -182,7 +182,7 @@ function ArmControlPanel({ armRot, forearmRot, onChange, onSave, onReset, color,
             fontWeight: '600', cursor: 'pointer',
           }}
         >
-          ✓ Salvează & Închide
+          ✓ Save & Close
         </button>
       </div>
     </div>
@@ -191,17 +191,16 @@ function ArmControlPanel({ armRot, forearmRot, onChange, onSave, onReset, color,
 
 export default function VoiceChat({ avatar, onBack }) {
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: `Buna! Sunt ${avatar.name}. Cu ce te pot ajuta?` }
+    { role: 'assistant', content: `Hi! I'm ${avatar.name}. How can I help you today?` }
   ])
   const [inputText, setInputText] = useState('')
   const [isListening, setIsListening] = useState(false)
   const [isTalking, setIsTalking] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [transcript, setTranscript] = useState('')
-  const [voiceLang, setVoiceLang] = useState('ro-RO')
+  const [voiceLang, setVoiceLang] = useState('en-US')
   const [showArmPanel, setShowArmPanel] = useState(false)
 
-  // Valorile brațelor - încărcate din localStorage dacă există
   const storageKey = `arm_rot_${avatar.id}`
   const saved = (() => {
     try { return JSON.parse(localStorage.getItem(storageKey)) } catch { return null }
@@ -219,17 +218,23 @@ export default function VoiceChat({ avatar, onBack }) {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // Pornire microfon + cameră simultan (invizibilă)
+  // Start microphone + camera simultaneously
   const startMediaDevices = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user', width: { ideal: 320 }, height: { ideal: 240 } },
-        audio: false,
+        audio: true, // FIXED: audio must be true
       })
       streamRef.current = stream
       if (videoRef.current) videoRef.current.srcObject = stream
     } catch (err) {
-      console.warn('Camera unavailable:', err.message)
+      // Try audio only if camera fails
+      try {
+        const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        streamRef.current = audioStream
+      } catch (audioErr) {
+        console.warn('Media devices unavailable:', audioErr.message)
+      }
     }
   }, [])
 
@@ -255,7 +260,7 @@ export default function VoiceChat({ avatar, onBack }) {
     utter.onend = () => setIsTalking(false)
     utter.onerror = () => setIsTalking(false)
     synthRef.current.speak(utter)
-  }, [avatar.id, voiceLang])
+  }, [voiceLang])
 
   const captureFrame = useCallback(() => {
     if (!videoRef.current || !streamRef.current) return null
@@ -275,43 +280,57 @@ export default function VoiceChat({ avatar, onBack }) {
     setInputText('')
     setTranscript('')
 
-    const frameBase64 = captureFrame()
     const newMessages = [...messages, { role: 'user', content: text }]
     setMessages(newMessages)
+    setMessages(prev => [...prev, { role: 'assistant', content: '' }])
 
     try {
       let assistantText = ''
-      setMessages(prev => [...prev, { role: 'assistant', content: '' }])
 
-      const aiMessages = [
-        { role: 'system', content: SYSTEM_PROMPT[avatar.id] || SYSTEM_PROMPT.kelion },
-        ...newMessages,
-      ]
+      const aiMessages = newMessages.map(m => ({ role: m.role, content: m.content }))
 
-      // Dacă avem frame din cameră, adăugăm context vizual
-      if (frameBase64) {
-        aiMessages.push({
-          role: 'user',
-          content: `[Camera frame available - user is visible]`,
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          messages: aiMessages,
+          systemPrompt: SYSTEM_PROMPT[avatar.id] || SYSTEM_PROMPT.kelion,
         })
-      }
-
-      await Nxcode.ai.chatStream({
-        messages: aiMessages,
-        model: 'fast',
-        onChunk: (chunk) => {
-          assistantText += chunk.content || ''
-          setMessages(prev => {
-            const updated = [...prev]
-            updated[updated.length - 1] = { role: 'assistant', content: assistantText }
-            return updated
-          })
-          if (chunk.done) speak(assistantText)
-        }
       })
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        const chunk = decoder.decode(value)
+        const lines = chunk.split('\n')
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6).trim()
+            if (data === '[DONE]') {
+              speak(assistantText)
+              break
+            }
+            try {
+              const parsed = JSON.parse(data)
+              assistantText += parsed.content || ''
+              setMessages(prev => {
+                const updated = [...prev]
+                updated[updated.length - 1] = { role: 'assistant', content: assistantText }
+                return updated
+              })
+            } catch {}
+          }
+        }
+      }
     } catch (err) {
       console.error('AI error:', err)
-      const errorMsg = 'Imi pare rau, a aparut o eroare. Te rog incearca din nou.'
+      const errorMsg = "I'm sorry, an error occurred. Please try again."
       setMessages(prev => {
         const updated = [...prev]
         updated[updated.length - 1] = { role: 'assistant', content: errorMsg }
@@ -321,7 +340,7 @@ export default function VoiceChat({ avatar, onBack }) {
     } finally {
       setIsLoading(false)
     }
-  }, [messages, isLoading, avatar.id, speak, captureFrame])
+  }, [messages, isLoading, avatar.id, speak])
 
   const toggleListening = useCallback(() => {
     if (isListening) {
@@ -332,11 +351,11 @@ export default function VoiceChat({ avatar, onBack }) {
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
     if (!SpeechRecognition) {
-      alert('Browserul tau nu suporta recunoasterea vocala. Foloseste Chrome.')
+      alert('Voice recognition requires Chrome browser.')
       return
     }
 
-    // Pornește camera invizibil simultan cu microfonul
+    // Start camera + mic simultaneously
     startMediaDevices()
 
     synthRef.current?.cancel()
@@ -376,19 +395,13 @@ export default function VoiceChat({ avatar, onBack }) {
     setShowArmPanel(false)
   }
 
-  const handleArmReset = () => {
-    setArmRot({ ...DEFAULT_ARM_ROT })
-    setForearmRot({ ...DEFAULT_FOREARM_ROT })
-    localStorage.removeItem(storageKey)
-  }
-
   return (
-    <div style={{ width: '100vw', height: '100vh', display: 'flex', background: '#0a0a0f', overflow: 'hidden' }}>
-      {/* Avatar 3D - stanga */}
+    <div style={{ width: '100vw', height: '100vh', display: 'flex', background: '#0a0a0f', overflow: 'hidden', fontFamily: "'Inter', sans-serif" }}>
+      {/* Avatar 3D - left */}
       <div style={{ flex: '0 0 55%', position: 'relative', overflow: 'hidden' }}>
         <AvatarErrorBoundary avatarId={avatar.id}>
           <Canvas
-            camera={{ position: [0, 0.5, 3.2], fov: 50 }}
+            camera={{ position: [0, 0.3, 3.2], fov: 45 }}
             style={{ width: '100%', height: '100%' }}
             gl={{ antialias: true, alpha: false }}
           >
@@ -431,10 +444,10 @@ export default function VoiceChat({ avatar, onBack }) {
             cursor: 'pointer', fontSize: '14px', backdropFilter: 'blur(10px)', zIndex: 10,
           }}
         >
-          ← Inapoi
+          ← Back
         </button>
 
-        {/* Buton Control Brațe */}
+        {/* Arm control button */}
         <button
           onClick={() => setShowArmPanel(prev => !prev)}
           style={{
@@ -447,23 +460,23 @@ export default function VoiceChat({ avatar, onBack }) {
             cursor: 'pointer', fontSize: '13px', backdropFilter: 'blur(10px)', zIndex: 10,
           }}
         >
-          🦾 Brațe
+          🦾 Arms
         </button>
 
-        {/* Panou control brațe */}
+        {/* Arm control panel */}
         {showArmPanel && (
           <ArmControlPanel
             armRot={armRot}
             forearmRot={forearmRot}
             onChange={handleArmChange}
             onSave={handleArmSave}
-            onReset={handleArmReset}
+            onReset={() => { setArmRot({ ...DEFAULT_ARM_ROT }); setForearmRot({ ...DEFAULT_FOREARM_ROT }) }}
             color={avatar.color}
             glow={avatar.glow}
           />
         )}
 
-        {/* Video invizibil - doar pentru AI */}
+        {/* Hidden video for AI vision */}
         <video ref={videoRef} autoPlay playsInline muted style={{ display: 'none' }} />
 
         {/* Avatar name + talking indicator */}
@@ -488,13 +501,13 @@ export default function VoiceChat({ avatar, onBack }) {
               {avatar.name}
             </span>
             {isTalking && (
-              <span style={{ color: avatar.glow, fontSize: '12px' }}>vorbeste...</span>
+              <span style={{ color: avatar.glow, fontSize: '12px' }}>speaking...</span>
             )}
           </div>
         </div>
       </div>
 
-      {/* Chat Panel - dreapta */}
+      {/* Chat Panel - right */}
       <div style={{
         flex: '0 0 45%', display: 'flex', flexDirection: 'column',
         borderLeft: `1px solid ${avatar.color}33`,
@@ -513,7 +526,7 @@ export default function VoiceChat({ avatar, onBack }) {
             background: avatar.glow, boxShadow: `0 0 8px ${avatar.glow}`,
           }} />
           <span style={{ fontWeight: '600', color: '#fff', fontSize: '14px' }}>
-            Chat cu {avatar.name}
+            Chat with {avatar.name}
           </span>
           <select
             value={voiceLang}
@@ -591,7 +604,7 @@ export default function VoiceChat({ avatar, onBack }) {
               opacity: isLoading ? 0.6 : 1,
             }}
           >
-            {isListening ? '⏹ Stop' : '🎤 Vorbeste'}
+            {isListening ? '⏹ Stop' : '🎤 Speak'}
           </button>
 
           <div style={{ display: 'flex', gap: '8px' }}>
@@ -599,7 +612,7 @@ export default function VoiceChat({ avatar, onBack }) {
               value={inputText}
               onChange={e => setInputText(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Scrie in orice limba... (Enter = trimite)"
+              placeholder="Type in any language... (Enter = send)"
               disabled={isLoading || isListening}
               rows={2}
               style={{

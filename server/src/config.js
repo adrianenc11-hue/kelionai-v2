@@ -70,6 +70,13 @@ module.exports = {
   // Use relative path to ensure it's writable in containerized environments
   dbPath: optional('DB_PATH', './data/kelion.db'),
 
+  // OpenAI / AI
+  openai: {
+    apiKey: optional('OPENAI_API_KEY'),
+    baseUrl: optional('OPENAI_BASE_URL', 'https://api.openai.com/v1'),
+    model: optional('OPENAI_MODEL', 'gpt-4.1-mini'),
+  },
+
   // Stripe API Keys
   stripe: {
     secretKey: optional('STRIPE_SECRET_KEY'),
