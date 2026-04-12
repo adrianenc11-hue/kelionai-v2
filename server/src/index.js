@@ -21,7 +21,24 @@ const app = express();
 // ---------------------------------------------------------------------------
 // Security headers
 // ---------------------------------------------------------------------------
-app.use(helmet());
+// ---------------------------------------------------------------------------
+// Security headers
+// ---------------------------------------------------------------------------
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+        'img-src': ["'self'", 'data:', 'https://*.googleusercontent.com', 'https://*.githack.com'],
+        'connect-src': ["'self'", 'https://*.githack.com', 'https://api.openai.com', 'https://api.elevenlabs.io'],
+        'font-src': ["'self'", 'https://fonts.gstatic.com'],
+        'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+        'script-src': ["'self'", "'unsafe-inline'", 'https://apis.google.com'],
+        'worker-src': ["'self'", 'blob:'],
+      },
+    },
+  })
+);
 
 // ---------------------------------------------------------------------------
 // CORS
