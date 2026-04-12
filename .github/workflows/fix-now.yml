@@ -1,4 +1,4 @@
-name: FIX NOW
+name: Fix Now
 
 on:
   push:
@@ -8,35 +8,18 @@ jobs:
   fix:
     runs-on: ubuntu-latest
     steps:
-      - name: Resume and redeploy Render
+      - name: Redeploy Railway service
         run: |
-          KEY="rnd_1UglFqUPIGkaaFVQiL0RYQXy3PJg"
-          
-          # Get all services
-          SERVICES=$(curl -s "https://api.render.com/v1/services?limit=20" \
-            -H "Authorization: Bearer $KEY")
-          echo "Services: $SERVICES"
-          
-          # Resume + redeploy each
-          echo "$SERVICES" | python3 -c "
-          import json,sys
-          data=json.load(sys.stdin)
-          svcs=data if isinstance(data,list) else data.get('services',[])
-          for s in svcs:
-            svc=s.get('service',s)
-            print(svc.get('id',''))
-          " | while read ID; do
-            [ -z "$ID" ] && continue
-            echo "=== Resuming $ID ==="
-            curl -s -X POST "https://api.render.com/v1/services/$ID/resume" \
-              -H "Authorization: Bearer $KEY"
-            echo ""
-            sleep 2
-            echo "=== Deploying $ID ==="
-            curl -s -X POST "https://api.render.com/v1/services/$ID/deploys" \
-              -H "Authorization: Bearer $KEY" \
-              -H "Content-Type: application/json" \
-              -d '{"clearCache":"do_not_clear"}'
-            echo ""
-          done
-          echo "DONE"
+          TOKEN="f2eb5a87-ed09-4ca6-bc07-956b9a307523"
+          SERVICE_ID="e983c608-8711-4f7e-8e97-774899602d44"
+
+          echo "=== Triggering redeploy ==="
+          curl -s -X POST https://backboard.railway.app/graphql/v2 \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"query\":\"mutation { serviceInstanceRedeploy(serviceId: \\\"$SERVICE_ID\\\") }\"}"
+
+          echo ""
+          echo "=== Health check in 30s ==="
+          sleep 30
+          curl -s https://kelionai-v2-production.up.railway.app/health
