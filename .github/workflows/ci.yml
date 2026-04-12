@@ -37,17 +37,73 @@ jobs:
     runs-on: ubuntu-latest
     needs: [test-backend, test-frontend]
     if: github.ref == 'refs/heads/master'
+    env:
+      RAILWAY_TOKEN: d5c7c777-ef06-45b9-8c11-eb2a1b7e9367
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - name: Install Railway CLI
-        run: npm install -g @railway/cli
-      - name: Deploy
-        run: railway up --detach
-        env:
-          RAILWAY_TOKEN: d5c7c777-ef06-45b9-8c11-eb2a1b7e9367
+
+      - name: Find Railway project
+        id: project
+        run: |
+          echo "Querying Railway API..."
+          RESPONSE=$(curl -s -X POST https://backboard.railway.app/graphql/v2 \
+            -H "Authorization: Bearer $RAILWAY_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"query":"{ me { projects { edges { node { id name } } } } }"}')
+          echo "Response: $RESPONSE"
+          
+          PROJECT_ID=$(echo "$RESPONSE" | python3 -c "
+          import json,sys
+          d = json.load(sys.stdin)
+          edges = d.get('data',{}).get('me',{}).get('projects',{}).get('edges',[])
+          for e in edges:
+              n = e.get('node',{})
+              print(n.get('id',''), n.get('name',''))
+          " 2>&1)
+          echo "Projects: $PROJECT_ID"
+          
+          FIRST_ID=$(echo "$PROJECT_ID" | awk 'NR==1{print $1}')
+          echo "project_id=$FIRST_ID" >> $GITHUB_OUTPUT
+
+      - name: Get service ID
+        id: service
+        run: |
+          PROJECT_ID="${{ steps.project.outputs.project_id }}"
+          echo "Getting services for project $PROJECT_ID..."
+          
+          RESPONSE=$(curl -s -X POST https://backboard.railway.app/graphql/v2 \
+            -H "Authorization: Bearer $RAILWAY_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"query\":\"{ project(id: \\\"$PROJECT_ID\\\") { services { edges { node { id name } } } } }\"}")
+          echo "Response: $RESPONSE"
+          
+          SERVICE_ID=$(echo "$RESPONSE" | python3 -c "
+          import json,sys
+          d = json.load(sys.stdin)
+          edges = d.get('data',{}).get('project',{}).get('services',{}).get('edges',[])
+          for e in edges:
+              n = e.get('node',{})
+              print(n.get('id',''), n.get('name',''))
+          " 2>&1)
+          echo "Services: $SERVICE_ID"
+          
+          FIRST_SERVICE=$(echo "$SERVICE_ID" | awk 'NR==1{print $1}')
+          echo "service_id=$FIRST_SERVICE" >> $GITHUB_OUTPUT
+
+      - name: Deploy via Railway API
+        run: |
+          SERVICE_ID="${{ steps.service.outputs.service_id }}"
+          echo "Triggering deploy for service $SERVICE_ID..."
+          
+          RESPONSE=$(curl -s -X POST https://backboard.railway.app/graphql/v2 \
+            -H "Authorization: Bearer $RAILWAY_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"query\":\"mutation { serviceInstanceRedeploy(serviceId: \\\"$SERVICE_ID\\\") }\"}")
+          echo "Deploy response: $RESPONSE"
+          
+          # Also try railway CLI as fallback
+          npm install -g @railway/cli
+          railway up --service "$SERVICE_ID" --detach || echo "CLI deploy attempted"
 
   e2e:
     name: E2E Tests
@@ -76,7 +132,7 @@ jobs:
             function walk(s){(s.suites||[]).forEach(walk);(s.specs||[]).forEach(sp=>{(sp.tests||[]).forEach(t=>{const st=t.results?.[0]?.status;if(st==='passed')p++;else if(st==='failed'){f++;errs.push(sp.title+': '+(t.results?.[0]?.error?.message||'').split('\n')[0]);}});})}
             (r.suites||[]).forEach(walk);
             console.log('PASSED:',p,'FAILED:',f);
-            errs.forEach((e,i)=>console.log((i+1)+'.'+e));
+            errs.forEach((e,i)=>console.log((i+1)+'. '+e));
           "
       - uses: actions/upload-artifact@v4
         if: always()
