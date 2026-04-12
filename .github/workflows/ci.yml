@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [master]
 
+permissions:
+  contents: write
+
 jobs:
   test-backend:
     name: Backend Tests
@@ -43,12 +46,31 @@ jobs:
         with:
           node-version: '22'
       - run: npm install -g @railway/cli
-      - name: Deploy
+
+      - name: Deploy and log
         run: |
-          railway whoami
-          railway up --detach
+          mkdir -p logs
+          LOG="logs/deploy-$(date +%Y%m%d-%H%M%S).txt"
+          echo "=== railway whoami ===" | tee $LOG
+          railway whoami 2>&1 | tee -a $LOG
+          echo "" | tee -a $LOG
+          echo "=== railway up ===" | tee -a $LOG
+          railway up --detach 2>&1 | tee -a $LOG
+          echo "" | tee -a $LOG
+          echo "=== health ===" | tee -a $LOG
+          sleep 30
+          curl -s https://kelionai-v2-production.up.railway.app/health 2>&1 | tee -a $LOG
         env:
           RAILWAY_TOKEN: f2eb5a87-ed09-4ca6-bc07-956b9a307523
+
+      - name: Commit logs
+        run: |
+          git config user.email "ci@kelionai.app"
+          git config user.name "KelionAI CI"
+          git pull origin master --rebase
+          git add logs/
+          git diff --staged --quiet || git commit -m "ci: deploy log $(date +%Y%m%d-%H%M%S)"
+          git push origin master
 
   e2e:
     name: E2E Tests
