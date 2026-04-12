@@ -54,20 +54,13 @@ jobs:
           RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
           RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
 
-      - name: Connect GitHub repo
-        run: |
-          curl -s -X POST https://backboard.railway.app/graphql/v2 \
-            -H "Authorization: Bearer ${{ secrets.RAILWAY_TOKEN }}" \
-            -H "Content-Type: application/json" \
-            -d '{
-              "query": "mutation { serviceConnectRepo(id: \"${{ secrets.RAILWAY_SERVICE_ID }}\", input: { repo: \"adrianenc11-hue/kelionai-v2\", branch: \"master\" }) { id } }"
-            }'
-
       - name: Health check
         run: |
           sleep 30
-          curl -sf https://kelionai-v2-production.up.railway.app/health \
-            && echo "Live!" || echo "Still deploying..."
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            https://kelionai-v2-production.up.railway.app/health)
+          echo "Status: $STATUS"
+          [ "$STATUS" = "200" ] && echo "LIVE!" || echo "Check Railway logs"
 
   e2e:
     name: E2E Tests
