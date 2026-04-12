@@ -11,9 +11,9 @@ jobs:
   diagnose-and-fix:
     runs-on: ubuntu-latest
     env:
-      RAILWAY_TOKEN: d5c7c777-ef06-45b9-8c11-eb2a1b7e9367
-      RAILWAY_PROJECT_ID: b2a7f85e-7065-42c6-9922-82f5d2b01ebe
-      RAILWAY_SERVICE_ID: e983c608-8711-4f7e-8e97-774899602d44
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+      RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
     steps:
       - uses: actions/checkout@v4
 
@@ -46,7 +46,7 @@ jobs:
           curl -s -X POST https://backboard.railway.app/graphql/v2 \
             -H "Authorization: Bearer $RAILWAY_TOKEN" \
             -H "Content-Type: application/json" \
-            -d '{"query":"{ service(id: \"'"$RAILWAY_SERVICE_ID"'\") { id name source { repo branch } } }"}' \
+            -d "{\"query\":\"{ service(id: \\\"$RAILWAY_SERVICE_ID\\\") { id name source { repo branch } } }\"}" \
             | python3 -m json.tool 2>&1 | tee -a $LOG
 
           echo "" | tee -a $LOG
@@ -54,21 +54,13 @@ jobs:
           railway up --detach 2>&1 | tee -a $LOG
 
           echo "" | tee -a $LOG
-          echo "=== Latest deployment status ===" | tee -a $LOG
-          curl -s -X POST https://backboard.railway.app/graphql/v2 \
-            -H "Authorization: Bearer $RAILWAY_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d '{"query":"{ deployments(input: { serviceId: \"'"$RAILWAY_SERVICE_ID"'\" }, first: 3) { edges { node { id status createdAt } } } }"}' \
-            | python3 -m json.tool 2>&1 | tee -a $LOG
-
-          echo "" | tee -a $LOG
           echo "=== Health check ===" | tee -a $LOG
-          sleep 20
+          sleep 30
           curl -s https://kelionai-v2-production.up.railway.app/health 2>&1 | tee -a $LOG
 
           echo "LOG=$LOG" >> $GITHUB_OUTPUT
 
-      - name: Commit logs back
+      - name: Commit logs
         run: |
           git config user.email "ci@kelionai.app"
           git config user.name "KelionAI CI"
