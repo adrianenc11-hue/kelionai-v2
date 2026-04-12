@@ -1,0 +1,81 @@
+=== railway whoami ===
+Unauthorized. Please check that your RAILWAY_TOKEN is valid and has access to the resource you're trying to use.
+
+=== Projects ===
+{
+    "errors": [
+        {
+            "message": "Not Authorized",
+            "locations": [
+                {
+                    "line": 1,
+                    "column": 3
+                }
+            ],
+            "path": [
+                "me"
+            ],
+            "extensions": {
+                "code": "INTERNAL_SERVER_ERROR"
+            },
+            "traceId": "1353217653324353499"
+        }
+    ],
+    "data": null
+}
+
+=== Service info ===
+{
+    "errors": [
+        {
+            "message": "Cannot query field \"source\" on type \"Service\".",
+            "locations": [
+                {
+                    "line": 1,
+                    "column": 65
+                }
+            ],
+            "extensions": {
+                "code": "GRAPHQL_VALIDATION_FAILED"
+            },
+            "traceId": "7243968620439593411"
+        }
+    ]
+}
+
+=== railway up ===
+Invalid RAILWAY_TOKEN. Please check that it is valid and has access to the resource you're trying to use.
+
+=== Latest deployment status ===
+{
+    "data": {
+        "deployments": {
+            "edges": [
+                {
+                    "node": {
+                        "id": "80181d03-f979-44dc-9d4a-50c2d032153f",
+                        "status": "SUCCESS",
+                        "createdAt": "2026-04-12T06:57:34.412Z"
+                    }
+                },
+                {
+                    "node": {
+                        "id": "f9b040f8-b096-4db6-8995-b641d36eebdb",
+                        "status": "REMOVED",
+                        "createdAt": "2026-04-12T06:57:00.332Z"
+                    }
+                },
+                {
+                    "node": {
+                        "id": "0c8941cf-a01b-4241-ab9c-18c15ea80488",
+                        "status": "REMOVED",
+                        "createdAt": "2026-04-12T06:54:36.560Z"
+                    }
+                }
+            ]
+        }
+    }
+}
+
+=== Health check ===
+{"status":"ok","ts":"2026-04-12T08:12:13.291Z"}
