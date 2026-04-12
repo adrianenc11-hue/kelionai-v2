@@ -1,0 +1,31 @@
+name: Resume Render
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  resume:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resume all Render services
+        run: |
+          RKEY="rnd_1UglFqUPIGkaaFVQiL0RYQXy3PJg"
+          SERVICES=$(curl -s "https://api.render.com/v1/services?limit=20" \
+            -H "Authorization: Bearer $RKEY" -H "Accept: application/json")
+          echo "$SERVICES" | python3 -c "
+          import json,sys
+          data=json.load(sys.stdin)
+          svcs=data if isinstance(data,list) else data.get('services',[])
+          for s in svcs:
+            svc=s.get('service',s)
+            print(svc.get('id',''), svc.get('name',''))
+          " | while read ID NAME; do
+            [ -n "$ID" ] || continue
+            echo "Resuming $NAME ($ID)..."
+            curl -s -X POST \
+              "https://api.render.com/v1/services/$ID/resume" \
+              -H "Authorization: Bearer $RKEY" -H "Accept: application/json"
+            echo ""
+          done
+          echo "All Render services resumed"
