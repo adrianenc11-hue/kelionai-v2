@@ -14,7 +14,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: server/package-lock.json
       - run: cd server && npm install
@@ -27,7 +27,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
       - run: npm install
       - run: npm run build
@@ -39,28 +39,31 @@ jobs:
     if: github.ref == 'refs/heads/master'
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Install Railway CLI
         run: npm install -g @railway/cli
 
       - name: Deploy
-        run: railway up --detach
+        run: |
+          echo "Railway CLI version:"
+          railway version
+
+          echo "Attempting deploy..."
+          railway up --detach \
+            --project b2a7f85e-7065-42c6-9922-82f5d2b01ebe \
+            --service e983c608-8711-4f7e-8e97-774899602d44
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
-          RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
 
       - name: Health check
+        if: always()
         run: |
           sleep 30
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            https://kelionai-v2-production.up.railway.app/health)
-          echo "Status: $STATUS"
-          [ "$STATUS" = "200" ] && echo "LIVE!" || echo "Check Railway logs"
+          STATUS=$(curl -sf https://kelionai-v2-production.up.railway.app/health 2>/dev/null && echo "OK" || echo "FAIL")
+          echo "Health: $STATUS"
 
   e2e:
     name: E2E Tests
@@ -71,7 +74,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
       - run: npm install
       - run: npx playwright install chromium --with-deps
       - run: npx playwright test --reporter=list,json
