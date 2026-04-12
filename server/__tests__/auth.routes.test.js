@@ -16,6 +16,49 @@ process.env.SUPABASE_SERVICE_KEY = 'mock-service-key-for-tests-only';
 process.env.PORT = '0'; // random port
 process.env.DB_PATH = ':memory:'; // not used by supertest directly
 
+
+// Mock the DB module so better-sqlite3 native binary is never loaded in tests
+jest.mock('../src/db', () => ({
+  upsertUser: jest.fn((profile) => Promise.resolve({
+    id: 'mock-user-id',
+    google_id: profile.googleId,
+    email: profile.email,
+    name: profile.name,
+    picture: profile.picture || null,
+    role: 'user',
+    subscription_tier: 'free',
+    subscription_status: 'active',
+    created_at: new Date().toISOString(),
+  })),
+  findById: jest.fn((id) => Promise.resolve(
+    id === 'mock-user-id'
+      ? { id, email: 'test@example.com', name: 'Test User', role: 'user', subscription_tier: 'free', subscription_status: 'active' }
+      : null
+  )),
+  findByGoogleId: jest.fn(() => Promise.resolve(null)),
+  findByEmail: jest.fn(() => Promise.resolve(null)),
+  findAll: jest.fn(() => Promise.resolve([])),
+  updateProfile: jest.fn((id, data) => Promise.resolve({ id, ...data })),
+  updateRole: jest.fn((id, role) => Promise.resolve({ id, role })),
+  updateSubscription: jest.fn((id, data) => Promise.resolve({ id, ...data })),
+  updateStripeCustomerId: jest.fn(() => Promise.resolve()),
+  findByStripeCustomerId: jest.fn(() => Promise.resolve(null)),
+  getUsageToday: jest.fn(() => Promise.resolve(0)),
+  incrementUsage: jest.fn(() => Promise.resolve()),
+  createReferralCode: jest.fn(() => Promise.resolve({ code: 'TEST1234', expires_at: new Date().toISOString() })),
+  findReferralCode: jest.fn(() => Promise.resolve(null)),
+  useReferralCode: jest.fn(() => Promise.resolve()),
+}));
+
+// Also mock Google utils since we don't hit real Google
+jest.mock('../src/utils/google', () => ({
+  generateState:  jest.fn().mockReturnValue('fixed-test-state'),
+  generatePKCE:   jest.fn().mockReturnValue({ codeVerifier: 'verifier', codeChallenge: 'challenge' }),
+  buildAuthUrl:   jest.fn().mockReturnValue('https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id=test-client-id&scope=openid+email+profile&state=fixed-test-state&code_challenge=challenge&code_challenge_method=S256'),
+  exchangeCode:   jest.fn(),
+  fetchUserInfo:  jest.fn(),
+}));
+
 const request = require('supertest');
 
 // We need to patch better-sqlite3 to use an in-memory DB for tests
