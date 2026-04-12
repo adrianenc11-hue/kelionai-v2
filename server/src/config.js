@@ -65,7 +65,7 @@ module.exports = {
   cookie: {
     domain: optional('COOKIE_DOMAIN', optional('NODE_ENV', 'development') === 'production' ? 'kelionai.app' : ''),
     secure: optional('NODE_ENV', 'development') === 'production',
-    sameSite: optional('NODE_ENV', 'development') === 'production' ? 'lax' : 'lax',
+    sameSite: 'lax',
   },
 
   // SQLite database file path

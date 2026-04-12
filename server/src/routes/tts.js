@@ -25,6 +25,9 @@ router.post('/', requireAuth, checkSubscription, async (req, res) => {
   if (!text) {
     return res.status(400).json({ error: 'Text is required' });
   }
+  if (typeof text !== 'string' || text.length > 2000) {
+    return res.status(400).json({ error: 'Text must be a string under 2000 characters' });
+  }
 
   const openai = getOpenAI();
   if (!openai) {

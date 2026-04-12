@@ -6,16 +6,14 @@ const { checkSubscription } = require('../middleware/subscription');
 
 const router = Router();
 
-// System prompts per avatar — defined on the server so they are not exposed to
-// the client and can be changed without a frontend deploy.
 const SYSTEM_PROMPTS = {
   kelion: 'You are Kelion, a friendly and intelligent male AI assistant. Detect the language the user is writing in and always respond in that same language. Be concise and helpful. Personality: calm, professional, empathetic.',
   kira:   'You are Kira, a friendly and enthusiastic female AI assistant. Detect the language the user is writing in and always respond in that same language. Be warm and direct. Personality: cheerful, creative, energetic.',
 };
 
-// ---------------------------------------------------------------------------
-// Lazy-initialise the OpenAI client only when the key is present
-// ---------------------------------------------------------------------------
+const MAX_MESSAGE_LENGTH = 4000;   // chars per message
+const MAX_MESSAGES_COUNT = 40;     // history depth
+
 function getOpenAI() {
   const key = process.env.OPENAI_API_KEY || process.env.AI_API_KEY;
   if (!key) return null;
@@ -36,14 +34,27 @@ router.post('/', requireAuth, checkSubscription, async (req, res) => {
   }
 
   const { messages = [], avatar = 'kelion' } = req.body;
+
   if (!Array.isArray(messages)) {
     return res.status(400).json({ error: 'messages must be an array' });
   }
 
+  // Sanitize: only allow 'user' and 'assistant' roles — never 'system'
+  // Strip messages that are too long or have invalid role
+  const sanitized = messages
+    .filter(m => m && typeof m === 'object' && ['user', 'assistant'].includes(m.role))
+    .slice(-MAX_MESSAGES_COUNT)
+    .map(m => ({
+      role:    m.role,
+      content: typeof m.content === 'string'
+        ? m.content.slice(0, MAX_MESSAGE_LENGTH)
+        : '',
+    }))
+    .filter(m => m.content.length > 0);
+
   const systemPrompt = SYSTEM_PROMPTS[avatar] || SYSTEM_PROMPTS.kelion;
   const model = process.env.AI_MODEL || 'gpt-4o-mini';
 
-  // Set up SSE headers
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
@@ -55,7 +66,7 @@ router.post('/', requireAuth, checkSubscription, async (req, res) => {
       stream: true,
       messages: [
         { role: 'system', content: systemPrompt },
-        ...messages,
+        ...sanitized,
       ],
     });
 

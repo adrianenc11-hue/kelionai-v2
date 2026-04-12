@@ -257,11 +257,11 @@ function DemoChat({ onExpire, onPricing }) {
       let assistantText = ''
       const res = await fetch('/api/chat', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: newMessages.map(m => ({ role: m.role, content: m.content })),
-          systemPrompt: "You are Kelion, a friendly AI assistant. ALWAYS respond in the SAME language the user speaks. Be concise (2-3 sentences). This is a demo.",
-          image: frame || undefined,
+          avatar: 'kelion',
         })
       })
       if (!res.ok) throw new Error('AI error')
