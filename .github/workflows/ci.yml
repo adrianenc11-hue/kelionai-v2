@@ -36,7 +36,7 @@ jobs:
     name: Deploy to Railway
     runs-on: ubuntu-latest
     needs: [test-backend, test-frontend]
-    if: github.ref == 'refs/heads/master' && secrets.RAILWAY_TOKEN != ''
+    if: github.ref == 'refs/heads/master'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -44,16 +44,16 @@ jobs:
           node-version: '22'
       - run: npm install -g @railway/cli
       - name: Deploy
-        run: railway up --detach
+        run: |
+          railway whoami
+          railway up --detach
         env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-          RAILWAY_PROJECT_ID: b2a7f85e-7065-42c6-9922-82f5d2b01ebe
-          RAILWAY_SERVICE_ID: e983c608-8711-4f7e-8e97-774899602d44
+          RAILWAY_TOKEN: f2eb5a87-ed09-4ca6-bc07-956b9a307523
 
   e2e:
     name: E2E Tests
     runs-on: ubuntu-latest
-    needs: [test-backend, test-frontend]
+    needs: deploy
     if: github.ref == 'refs/heads/master'
     steps:
       - uses: actions/checkout@v4
