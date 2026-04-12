@@ -5,10 +5,16 @@ services:
     envVars:
       - key: PORT
         value: "8080"
-      - key: PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD
-        value: "1"
       - key: NODE_ENV
         value: "production"
-    preDeployCommand: mkdir -p server/data && chmod -R 777 server/data
+      - key: PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD
+        value: "1"
+      - key: DB_PATH
+        value: "/data/kelion.db"
     buildCommand: npm install && npm run build && cd server && npm install --omit=dev
     startCommand: node server/src/index.js
+    disk:
+      name: kelionai-db
+      mountPath: /data
+      sizeGB: 1
+

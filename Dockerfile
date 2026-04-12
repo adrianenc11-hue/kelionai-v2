@@ -1,37 +1,30 @@
 FROM node:20-slim AS base
 
-# Install system dependencies for better-sqlite3 and other native modules
+# Native build tools for better-sqlite3
 RUN apt-get update && apt-get install -y \
-    python3 \
-    make \
-    g++ \
+    python3 make g++ \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copy root manifests
+# Install root (frontend) dependencies
 COPY package.json package-lock.json ./
-
-# Copy server manifests
-COPY server/package.json server/package-lock.json ./server/
-
-# Install root dependencies (frontend)
 RUN npm install
 
 # Install server dependencies
+COPY server/package.json server/package-lock.json ./server/
 RUN cd server && npm install --omit=dev
 
-# Copy all files
+# Copy source and build frontend
 COPY . .
-
-# Build the frontend
 RUN npm run build
 
-# Production Environment
 ENV NODE_ENV=production
-ENV PORT=3000
+ENV PORT=8080
+ENV DB_PATH=/data/kelion.db
 
-EXPOSE 3000
+RUN mkdir -p /data
 
-# Start from the server directory
-CMD ["npm", "run", "server:start"]
+EXPOSE 8080
+
+CMD ["node", "server/src/index.js"]
