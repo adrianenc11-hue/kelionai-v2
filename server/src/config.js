@@ -29,7 +29,9 @@ module.exports = {
     clientSecret: optional('GOOGLE_CLIENT_SECRET'),
     redirectUri: optional(
       'GOOGLE_REDIRECT_URI',
-      'http://localhost:3001/auth/google/callback'
+      optional('NODE_ENV') === 'production' 
+        ? 'https://kelionai.app/auth/google/callback'
+        : 'http://localhost:3001/auth/google/callback'
     ),
     // Google's OIDC endpoints
     authEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
@@ -53,8 +55,8 @@ module.exports = {
   },
 
   // URLs
-  appBaseUrl: optional('APP_BASE_URL', 'https://kelionai.app'),
-  apiBaseUrl: optional('API_BASE_URL', 'https://kelionai.app'),
+  appBaseUrl: optional('APP_BASE_URL', optional('NODE_ENV') === 'production' ? 'https://kelionai.app' : 'http://localhost:5173'),
+  apiBaseUrl: optional('API_BASE_URL', optional('NODE_ENV') === 'production' ? 'https://kelionai.app' : 'http://localhost:3001'),
 
   // CORS – comma-separated list of allowed origins
   corsOrigins: optional('CORS_ORIGINS', 'https://kelionai.app, http://localhost:5173, https://kelionai-v2.onrender.com').split(',').map((o) => o.trim()),
