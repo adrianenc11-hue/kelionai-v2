@@ -22,7 +22,7 @@ const distPath = path.resolve(__dirname, '../../dist');
 console.log(`[kelion-startup] Resolved distPath: ${distPath}`);
 const fs = require('fs');
 if (fs.existsSync(distPath)) {
-  console.log(`[kelion-startup] dist folder FOUND. Files:`, fs.readdirSync(distPath));
+  console.log(`[kelion-startup] dist folder FOUND. Files: ${JSON.stringify(fs.readdirSync(distPath))}`);
 } else {
   console.error(`[kelion-startup] dist folder MISSING at: ${distPath}`);
 }
