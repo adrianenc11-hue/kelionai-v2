@@ -35,30 +35,9 @@ if (fs.existsSync(distPath)) {
 // ---------------------------------------------------------------------------
 app.use(
   helmet({
-    contentSecurityPolicy: {
-      useDefaults: true,
-      directives: {
-        'default-src': ["'self'"],
-        'script-src': ["'self'", "'unsafe-inline'", 'https://apis.google.com'],
-        'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
-        'img-src': ["'self'", 'data:', 'blob:', 'https://*.googleusercontent.com', 'https://*.githack.com', 'https://*.githubusercontent.com'],
-        'connect-src': [
-          "'self'",
-          'https://*.githack.com',
-          'https://*.githubusercontent.com',
-          'https://api.openai.com',
-          'https://api.elevenlabs.io',
-          'https://*.googleapis.com',
-        ],
-        'font-src': ["'self'", 'https://fonts.gstatic.com'],
-        'object-src': ["'none'"],
-        'media-src': ["'self'", 'blob:', 'data:'],
-        'worker-src': ["'self'", 'blob:'],
-        'upgrade-insecure-requests': [],
-      },
-    },
+    contentSecurityPolicy: false,
     crossOriginEmbedderPolicy: false,
-    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    crossOriginResourcePolicy: false,
   })
 );
 
