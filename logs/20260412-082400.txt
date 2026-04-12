@@ -1,0 +1,50 @@
+=== railway whoami ===
+Unauthorized. Please check that your RAILWAY_TOKEN is valid and has access to the resource you're trying to use.
+
+=== Projects ===
+{
+    "errors": [
+        {
+            "message": "Not Authorized",
+            "locations": [
+                {
+                    "line": 1,
+                    "column": 3
+                }
+            ],
+            "path": [
+                "me"
+            ],
+            "extensions": {
+                "code": "INTERNAL_SERVER_ERROR"
+            },
+            "traceId": "2305426825597339817"
+        }
+    ],
+    "data": null
+}
+
+=== Service info ===
+{
+    "errors": [
+        {
+            "message": "Cannot query field \"source\" on type \"Service\".",
+            "locations": [
+                {
+                    "line": 1,
+                    "column": 29
+                }
+            ],
+            "extensions": {
+                "code": "GRAPHQL_VALIDATION_FAILED"
+            },
+            "traceId": "8826884989514777526"
+        }
+    ]
+}
+
+=== railway up ===
+Invalid RAILWAY_TOKEN. Please check that it is valid and has access to the resource you're trying to use.
+
+=== Health check ===
+{"status":"ok","ts":"2026-04-12T08:24:32.910Z"}
