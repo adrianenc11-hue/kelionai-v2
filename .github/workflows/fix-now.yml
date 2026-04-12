@@ -1,0 +1,42 @@
+name: FIX NOW
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resume and redeploy Render
+        run: |
+          KEY="rnd_1UglFqUPIGkaaFVQiL0RYQXy3PJg"
+          
+          # Get all services
+          SERVICES=$(curl -s "https://api.render.com/v1/services?limit=20" \
+            -H "Authorization: Bearer $KEY")
+          echo "Services: $SERVICES"
+          
+          # Resume + redeploy each
+          echo "$SERVICES" | python3 -c "
+          import json,sys
+          data=json.load(sys.stdin)
+          svcs=data if isinstance(data,list) else data.get('services',[])
+          for s in svcs:
+            svc=s.get('service',s)
+            print(svc.get('id',''))
+          " | while read ID; do
+            [ -z "$ID" ] && continue
+            echo "=== Resuming $ID ==="
+            curl -s -X POST "https://api.render.com/v1/services/$ID/resume" \
+              -H "Authorization: Bearer $KEY"
+            echo ""
+            sleep 2
+            echo "=== Deploying $ID ==="
+            curl -s -X POST "https://api.render.com/v1/services/$ID/deploys" \
+              -H "Authorization: Bearer $KEY" \
+              -H "Content-Type: application/json" \
+              -d '{"clearCache":"do_not_clear"}'
+            echo ""
+          done
+          echo "DONE"
