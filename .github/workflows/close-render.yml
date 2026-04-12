@@ -14,16 +14,15 @@ jobs:
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
         run: |
-          SERVICES=$(curl -s \
-            "https://api.render.com/v1/services?limit=20" \
+          [ -z "$RENDER_API_KEY" ] && echo "No RENDER_API_KEY set" && exit 0
+          SERVICES=$(curl -s "https://api.render.com/v1/services?limit=20" \
             -H "Authorization: Bearer $RENDER_API_KEY")
-          
           echo "$SERVICES" | python3 -c "
           import json,sys
-          data = json.load(sys.stdin)
-          svcs = data if isinstance(data,list) else data.get('services',[])
+          data=json.load(sys.stdin)
+          svcs=data if isinstance(data,list) else data.get('services',[])
           for s in svcs:
-            svc = s.get('service',s)
+            svc=s.get('service',s)
             print(svc.get('id',''))
           " | while read ID; do
             [ -n "$ID" ] && curl -s -X POST \
