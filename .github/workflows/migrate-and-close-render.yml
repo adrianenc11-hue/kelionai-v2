@@ -1,0 +1,116 @@
+name: Migrate Render → Railway & Close Render
+
+on:
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    name: Migrate env vars and close Render
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get Render service ID and env vars
+        id: render
+        run: |
+          echo "Fetching Render services..."
+          SERVICES=$(curl -s "https://api.render.com/v1/services?limit=20" \
+            -H "Authorization: Bearer rnd_1UglFqUPIGkaaFVQiL0RYQXy3PJg" \
+            -H "Accept: application/json")
+          echo "$SERVICES" | python3 -m json.tool
+          
+          SERVICE_ID=$(echo "$SERVICES" | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          services = data if isinstance(data, list) else data.get('services', [])
+          for s in services:
+              svc = s.get('service', s)
+              name = svc.get('name','')
+              if 'kelion' in name.lower():
+                  print(svc.get('id',''))
+                  break
+          ")
+          echo "SERVICE_ID=$SERVICE_ID"
+          echo "service_id=$SERVICE_ID" >> $GITHUB_OUTPUT
+
+      - name: Fetch Render env vars
+        id: envvars
+        run: |
+          SERVICE_ID="${{ steps.render.outputs.service_id }}"
+          if [ -z "$SERVICE_ID" ]; then
+            echo "No Render service found"
+            exit 1
+          fi
+          
+          echo "Fetching env vars for service $SERVICE_ID..."
+          ENVVARS=$(curl -s "https://api.render.com/v1/services/$SERVICE_ID/env-vars" \
+            -H "Authorization: Bearer rnd_1UglFqUPIGkaaFVQiL0RYQXy3PJg" \
+            -H "Accept: application/json")
+          echo "$ENVVARS"
+          
+          # Extract values and write to file
+          echo "$ENVVARS" | python3 -c "
+          import json, sys, os
+          data = json.load(sys.stdin)
+          env_list = data if isinstance(data, list) else data.get('envVars', [])
+          lines = []
+          for item in env_list:
+              ev = item.get('envVar', item)
+              key = ev.get('key','')
+              val = ev.get('value','')
+              if key and val and val not in ['your-openai-api-key','your-google-client-id','replace-with']:
+                  lines.append(f'{key}={val}')
+                  print(f'Found: {key}')
+          with open('render_envvars.txt','w') as f:
+              f.write('\n'.join(lines))
+          "
+          echo "Env vars saved"
+
+      - name: Set Railway environment variables
+        run: |
+          npm install -g @railway/cli
+          
+          echo "Setting Railway env vars..."
+          while IFS='=' read -r KEY VALUE; do
+            if [ -n "$KEY" ] && [ -n "$VALUE" ]; then
+              echo "Setting $KEY..."
+              railway variables set "$KEY=$VALUE" 2>/dev/null || echo "Warning: could not set $KEY"
+            fi
+          done < render_envvars.txt
+          
+          # Set Railway-specific vars
+          railway variables set "NODE_ENV=production"
+          railway variables set "PORT=8080"
+          railway variables set "APP_BASE_URL=https://kelionai.app"
+          railway variables set "API_BASE_URL=https://kelionai.app"
+          railway variables set "CORS_ORIGINS=https://kelionai.app"
+          railway variables set "COOKIE_DOMAIN=kelionai.app"
+          railway variables set "DB_PATH=/app/data/kelion.db"
+          railway variables set "GOOGLE_REDIRECT_URI=https://kelionai.app/auth/google/callback"
+          
+          echo "All variables set on Railway"
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+      - name: Suspend Render service
+        run: |
+          SERVICE_ID="${{ steps.render.outputs.service_id }}"
+          echo "Suspending Render service $SERVICE_ID..."
+          
+          RESULT=$(curl -s -X POST \
+            "https://api.render.com/v1/services/$SERVICE_ID/suspend" \
+            -H "Authorization: Bearer rnd_1UglFqUPIGkaaFVQiL0RYQXy3PJg" \
+            -H "Accept: application/json")
+          echo "$RESULT"
+          echo "Render service suspended (no more billing)"
+
+      - name: Done
+        run: |
+          echo "============================================"
+          echo "Migration complete!"
+          echo "- Render: SUSPENDED (no more charges)"
+          echo "- Railway: env vars configured"
+          echo "============================================"
+          echo ""
+          echo "Next step: connect GitHub repo on Railway dashboard"
+          echo "railway.app → project → Settings → Source → GitHub"
