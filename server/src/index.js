@@ -18,6 +18,15 @@ const ttsRouter          = require('./routes/tts');
 
 const app = express();
 
+const distPath = path.resolve(__dirname, '../../dist');
+console.log(`[kelion-startup] Resolved distPath: ${distPath}`);
+const fs = require('fs');
+if (fs.existsSync(distPath)) {
+  console.log(`[kelion-startup] dist folder FOUND. Files:`, fs.readdirSync(distPath));
+} else {
+  console.error(`[kelion-startup] dist folder MISSING at: ${distPath}`);
+}
+
 // ---------------------------------------------------------------------------
 // Security headers
 // ---------------------------------------------------------------------------
@@ -117,16 +126,7 @@ app.get('/health', (_req, res) => res.json({ status: 'ok', ts: new Date().toISOS
 // Serve frontend static files in production (must come after API routes)
 // ---------------------------------------------------------------------------
 if (process.env.NODE_ENV === 'production') {
-  const distPath = path.resolve(__dirname, '../../dist');
-  console.log(`[kelion-api] Serving static files from: ${distPath}`);
-  
-  const fs = require('fs');
-  if (fs.existsSync(distPath)) {
-    console.log(`[kelion-api] Contents of dist:`, fs.readdirSync(distPath));
-  } else {
-    console.error(`[kelion-api] ERROR: distPath does not exist!`);
-  }
-
+  console.log(`[kelion-api] Production mode: serving from ${distPath}`);
   app.use(express.static(distPath));
 
   // SPA fallback — serve index.html for any non-API GET request
