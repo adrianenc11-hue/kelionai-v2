@@ -21,7 +21,8 @@
     "node-fetch": "^2.7.0",
     "openai": "^6.34.0",
     "stripe": "^22.0.1",
-    "uuid": "^9.0.1"
+    "uuid": "^9.0.1",
+    "bcryptjs": "^2.4.3"
   },
   "devDependencies": {
     "jest": "^29.7.0",

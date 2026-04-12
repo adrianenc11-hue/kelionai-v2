@@ -12,3 +12,6 @@ server/node_modules/
 server/.env
 server/data/
 server/coverage/
+# Production env files with real secrets
+server/.env.production
+server/.env.staging

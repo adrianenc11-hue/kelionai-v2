@@ -8,18 +8,19 @@ const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
 
 const config = require('./config');
-const authRouter         = require('./routes/auth');
-const usersRouter        = require('./routes/users');
-const adminRouter        = require('./routes/admin');
+const authRouter          = require('./routes/auth');
+const localAuthRouter     = require('./routes/localAuth');
+const usersRouter         = require('./routes/users');
+const adminRouter         = require('./routes/admin');
 const subscriptionsRouter = require('./routes/subscriptions');
-const paymentsRouter     = require('./routes/payments');
-const chatRouter         = require('./routes/chat');
-const ttsRouter          = require('./routes/tts');
+const paymentsRouter      = require('./routes/payments');
+const chatRouter          = require('./routes/chat');
+const ttsRouter           = require('./routes/tts');
+const referralRouter      = require('./routes/referral');
 
 const app = express();
 
 const distPath = path.resolve(__dirname, '../../dist');
-console.log(`[kelion-startup] Resolved distPath: ${distPath}`);
 const fs = require('fs');
 if (fs.existsSync(distPath)) {
   console.log(`[kelion-startup] dist folder FOUND. Files: ${JSON.stringify(fs.readdirSync(distPath))}`);
@@ -27,9 +28,6 @@ if (fs.existsSync(distPath)) {
   console.error(`[kelion-startup] dist folder MISSING at: ${distPath}`);
 }
 
-// ---------------------------------------------------------------------------
-// Security headers
-// ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
 // Security headers
 // ---------------------------------------------------------------------------
@@ -47,12 +45,11 @@ app.use(
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (mobile apps, curl, Postman)
       if (!origin) return callback(null, true);
       if (config.corsOrigins.includes(origin)) return callback(null, true);
       callback(new Error(`CORS: origin '${origin}' is not allowed`));
     },
-    credentials: true,   // Required for cookies to be sent cross-origin
+    credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   })
@@ -61,15 +58,13 @@ app.use(
 // ---------------------------------------------------------------------------
 // Body parsers
 // ---------------------------------------------------------------------------
-// Stripe webhook needs the raw body for signature verification — register a
-// raw parser for that route BEFORE the global express.json() middleware.
 app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 
 // ---------------------------------------------------------------------------
-// Session (used by web clients and transiently during the OAuth flow)
+// Session
 // ---------------------------------------------------------------------------
 app.use(
   session({
@@ -90,26 +85,26 @@ app.use(
 // ---------------------------------------------------------------------------
 // Routes
 // ---------------------------------------------------------------------------
-app.use('/auth', authRouter);
-app.use('/api/users', usersRouter);
-app.use('/api/admin', adminRouter);
+app.use('/auth',             authRouter);
+app.use('/auth/local',       localAuthRouter);   // FIX: was missing
+app.use('/api/users',        usersRouter);
+app.use('/api/admin',        adminRouter);
 app.use('/api/subscription', subscriptionsRouter);
-app.use('/api/payments', paymentsRouter);
-app.use('/api/chat', chatRouter);
-app.use('/api/tts', ttsRouter);
+app.use('/api/payments',     paymentsRouter);
+app.use('/api/chat',         chatRouter);
+app.use('/api/tts',          ttsRouter);
+app.use('/api/referral',     referralRouter);    // FIX: was missing
 
-// Health / readiness probe (useful for Railway)
 app.get('/health', (_req, res) => res.json({ status: 'ok', ts: new Date().toISOString() }));
-app.get('/ping', (_req, res) => res.send('<h1>PONG - Server is alive and reached!</h1>'));
+app.get('/ping',   (_req, res) => res.send('<h1>PONG - Server is alive and reached!</h1>'));
 
 // ---------------------------------------------------------------------------
-// Serve frontend static files in production (must come after API routes)
+// Serve frontend static files in production
 // ---------------------------------------------------------------------------
 if (process.env.NODE_ENV === 'production') {
   console.log(`[kelion-api] Production mode: serving from ${distPath}`);
   app.use(express.static(distPath));
 
-  // SPA fallback — serve index.html for any non-API GET request
   app.get('*', (req, res, next) => {
     if (/^\/(api|auth)(\/|$)/.test(req.path) || req.path === '/health') {
       return next();
@@ -120,20 +115,14 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-// 404 catch-all (reached in development for all unmatched routes, and in
-// production for unmatched API/auth routes or non-GET requests to unknown paths)
 app.use((_req, res) => res.status(404).json({ error: 'Not found' }));
 
-// Global error handler
 // eslint-disable-next-line no-unused-vars
 app.use((err, _req, res, _next) => {
   console.error('[error]', err.message);
   res.status(500).json({ error: 'Internal server error' });
 });
 
-// ---------------------------------------------------------------------------
-// Start server (only when run directly, not when imported by tests)
-// ---------------------------------------------------------------------------
 if (require.main === module) {
   const PORT = config.port;
   app.listen(PORT, () => {
@@ -143,4 +132,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = app; // export for testing
+module.exports = app;

@@ -1,93 +1,105 @@
+'use strict';
 
-const express = require("express");
-const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
-const { findByEmail, insertUser } = require("../db/index.js");
-const config = require("../config");
+const { Router } = require('express');
+const bcrypt = require('bcryptjs');
+const config = require('../config');
+const { findByEmail, insertUser } = require('../db');
+const { signAppToken } = require('../middleware/auth');
 
-const router = express.Router();
+const router = Router();
 
-// Register a new user
-router.post("/register", async (req, res) => {
+// ---------------------------------------------------------------------------
+// POST /auth/local/register
+// ---------------------------------------------------------------------------
+router.post('/register', async (req, res) => {
   const { email, password, name } = req.body;
 
   if (!email || !password || !name) {
-    return res.status(400).json({ error: "Email, password, and name are required" });
+    return res.status(400).json({ error: 'Email, password, and name are required' });
+  }
+  if (typeof password !== 'string' || password.length < 8) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters' });
   }
 
   try {
-    const existingUser = await findByEmail(email);
-    if (existingUser) {
-      return res.status(409).json({ error: "Email already registered" });
+    const existing = findByEmail(email);
+    if (existing) {
+      return res.status(409).json({ error: 'Email already registered' });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // insertUser no longer takes id - Supabase auto-increments it
-    const newUser = await insertUser({ email, password: hashedPassword, name, role: "user" });
+    const password_hash = await bcrypt.hash(password, 12);
+    const newUser = insertUser({ email, password_hash, name, role: 'user' });
 
     if (!newUser) {
-      return res.status(500).json({ error: "Failed to create user" });
+      return res.status(500).json({ error: 'Failed to create user' });
     }
 
-    const token = jwt.sign({ sub: newUser.id, role: newUser.role || "user" }, config.jwt.secret, { expiresIn: config.jwt.expiresIn });
-    res.cookie("kelion.token", token, {
+    const token = signAppToken(newUser);
+    res.cookie('kelion.token', token, {
       httpOnly: true,
-      secure: config.cookie.secure,
+      secure:   config.cookie.secure,
       sameSite: config.cookie.sameSite,
-      domain: config.cookie.domain || undefined,
-      maxAge: config.session.maxAgeMs,
-      path: "/",
+      domain:   config.cookie.domain || undefined,
+      maxAge:   config.session.maxAgeMs,
+      path:     '/',
     });
-    res.status(201).json({ message: "User registered successfully", token, user: { id: newUser.id, email, name, role: newUser.role || "user" } });
-  } catch (error) {
-    console.error("Error during registration:", error);
-    res.status(500).json({ error: "Internal server error" });
+
+    return res.status(201).json({
+      message: 'User registered successfully',
+      token,
+      user: { id: newUser.id, email: newUser.email, name: newUser.name, role: newUser.role },
+    });
+  } catch (err) {
+    console.error('[localAuth/register]', err.message);
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// Login user
-router.post("/login", async (req, res) => {
+// ---------------------------------------------------------------------------
+// POST /auth/local/login
+// ---------------------------------------------------------------------------
+router.post('/login', async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
-    return res.status(400).json({ error: "Email and password are required" });
+    return res.status(400).json({ error: 'Email and password are required' });
   }
 
   try {
-    const user = await findByEmail(email);
-
+    const user = findByEmail(email);
     if (!user) {
-      return res.status(400).json({ error: "Invalid credentials" });
+      return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // password_hash is the field name in Supabase
-    const storedHash = user.password_hash || user.password;
+    const storedHash = user.password_hash;
     if (!storedHash) {
-      return res.status(400).json({ error: "Invalid credentials" });
+      // User registered via Google OAuth — no password set
+      return res.status(401).json({ error: 'This account uses Google Sign-In. Please login with Google.' });
     }
 
     const isMatch = await bcrypt.compare(password, storedHash);
-
     if (!isMatch) {
-      return res.status(400).json({ error: "Invalid credentials" });
+      return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    const token = jwt.sign({ sub: user.id, role: user.role }, config.jwt.secret, { expiresIn: config.jwt.expiresIn });
-
-    res.cookie("kelion.token", token, {
+    const token = signAppToken(user);
+    res.cookie('kelion.token', token, {
       httpOnly: true,
-      secure: config.cookie.secure,
+      secure:   config.cookie.secure,
       sameSite: config.cookie.sameSite,
-      domain: config.cookie.domain || undefined,
-      maxAge: config.session.maxAgeMs,
-      path: "/",
+      domain:   config.cookie.domain || undefined,
+      maxAge:   config.session.maxAgeMs,
+      path:     '/',
     });
 
-    res.json({ message: "Logged in successfully", token, user: { id: user.id, email: user.email, name: user.name, role: user.role } });
-  } catch (error) {
-    console.error("Error during login:", error);
-    res.status(500).json({ error: "Internal server error" });
+    return res.json({
+      message: 'Logged in successfully',
+      token,
+      user: { id: user.id, email: user.email, name: user.name, role: user.role },
+    });
+  } catch (err) {
+    console.error('[localAuth/login]', err.message);
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 

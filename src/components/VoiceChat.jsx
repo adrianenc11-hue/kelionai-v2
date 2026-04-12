@@ -28,6 +28,7 @@ export default function VoiceChat({ avatar, onBack }) {
   
   // High-quality Voice & LipSync
   const audioRef = useRef(null)
+  const synthRef = useRef(typeof window !== 'undefined' && window.speechSynthesis ? window.speechSynthesis : null)
   const mouthOpen = useLipSync(audioRef)
 
   useEffect(() => {
@@ -145,7 +146,7 @@ export default function VoiceChat({ avatar, onBack }) {
       return
     }
 
-    synthRef.current.cancel()
+    if (synthRef.current) synthRef.current.cancel()
     const recognition = new SpeechRecognition()
     recognition.lang = 'en-US'
     recognition.continuous = false

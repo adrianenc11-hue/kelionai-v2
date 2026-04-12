@@ -63,7 +63,7 @@ module.exports = {
 
   // Cookie settings
   cookie: {
-    domain: optional('COOKIE_DOMAIN', 'kelionai.app'),
+    domain: optional('COOKIE_DOMAIN', optional('NODE_ENV', 'development') === 'production' ? 'kelionai.app' : ''),
     secure: optional('NODE_ENV', 'development') === 'production',
     sameSite: optional('NODE_ENV', 'development') === 'production' ? 'lax' : 'lax',
   },
