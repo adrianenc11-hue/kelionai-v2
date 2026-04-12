@@ -182,8 +182,8 @@ export default function VoiceChat({ avatar, onBack }) {
           <ambientLight intensity={0.4} />
           <directionalLight position={[2, 4, 2]} intensity={1.5} />
           <pointLight position={[0, 2, 2]} intensity={isTalking ? 2 : 0.5} color={avatar.glow} />
-          <Environment preset="city" />
           <Suspense fallback={null}>
+            <Environment preset="city" />
             <AvatarModelDebug
               modelPath={avatar.model}
               debugConfig={debugConfig}

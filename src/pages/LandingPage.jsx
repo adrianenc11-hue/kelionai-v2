@@ -357,8 +357,8 @@ function DemoChat({ onExpire, onPricing }) {
           <ambientLight intensity={0.5} />
           <directionalLight position={[2, 4, 2]} intensity={1.5} />
           <pointLight position={[0, 1, 2]} intensity={isTalking ? 2.5 : 0.8} color="#a855f7" />
-          <Environment preset="city" />
           <Suspense fallback={null}>
+            <Environment preset="city" />
             <KelionModel armRot={DEFAULT_ARM} forearmRot={DEFAULT_FOREARM} />
           </Suspense>
           <OrbitControls enableZoom={false} enablePan={false}
@@ -660,8 +660,8 @@ export default function LandingPage({ onSignIn, onPricing }) {
             <ambientLight intensity={0.5} />
             <directionalLight position={[2, 4, 2]} intensity={1.5} />
             <pointLight position={[0, 1, 2]} intensity={0.8} color="#a855f7" />
-            <Environment preset="city" />
             <Suspense fallback={null}>
+              <Environment preset="city" />
               <KelionModel armRot={getSavedArm().arm} forearmRot={getSavedArm().forearm} />
             </Suspense>
             <OrbitControls enableZoom={false} enablePan={false}
