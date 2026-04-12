@@ -121,6 +121,7 @@ app.use('/api/tts', ttsRouter);
 
 // Health / readiness probe (useful for Railway)
 app.get('/health', (_req, res) => res.json({ status: 'ok', ts: new Date().toISOString() }));
+app.get('/ping', (_req, res) => res.send('<h1>PONG - Server is alive and reached!</h1>'));
 
 // ---------------------------------------------------------------------------
 // Serve frontend static files in production (must come after API routes)
