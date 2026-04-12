@@ -8,34 +8,47 @@ on:
 jobs:
   e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-
+    timeout-minutes: 20
+    # Run after CI+Deploy job completes (waits for deploy to finish)
+    
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node.js 24
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-
-      - name: Check site reachability
-        run: |
-          echo "=== Checking https://kelionai.app ==="
-          STATUS=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 https://kelionai.app/health 2>/dev/null || echo "UNREACHABLE")
-          echo "HTTP status: $STATUS"
-          if [ "$STATUS" = "UNREACHABLE" ] || [ "$STATUS" = "000" ]; then
-            echo "::warning::Site kelionai.app is unreachable — tests will fail with connection errors"
-          fi
-
-      - name: Install Playwright (CI only — NOT in render build)
-        run: |
-          npm install --save-dev @playwright/test
-          npx playwright install chromium --with-deps
+          node-version: 24
         env:
-          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "0"
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
-      - name: Run E2E tests against live site
+      - name: Wait for site to be live (max 5 min)
+        run: |
+          echo "Waiting for https://kelionai.app to respond..."
+          for i in $(seq 1 30); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 https://kelionai.app/health 2>/dev/null)
+            echo "Attempt $i/30 — HTTP $STATUS"
+            if [ "$STATUS" = "200" ]; then
+              echo "Site is UP!"
+              break
+            fi
+            if [ "$i" = "30" ]; then
+              echo "::error::Site kelionai.app is not reachable after 5 minutes."
+              echo "SITE_UP=false" >> $GITHUB_ENV
+            else
+              sleep 10
+            fi
+          done
+          echo "SITE_UP=true" >> $GITHUB_ENV
+
+      - name: Install Playwright (CI only)
+        if: env.SITE_UP == 'true'
+        run: |
+          npm install --save-dev @playwright/test@1.44.0
+          npx playwright install chromium --with-deps
+
+      - name: Run E2E tests
+        if: env.SITE_UP == 'true'
         run: |
           npx playwright test \
             --reporter=list,json \
@@ -45,37 +58,41 @@ jobs:
           PLAYWRIGHT_JSON_OUTPUT_NAME: e2e-results.json
         continue-on-error: true
 
-      - name: Show full output & parse errors
+      - name: Print results summary
         if: always()
         run: |
           echo "================================================"
           echo "PLAYWRIGHT OUTPUT"
           echo "================================================"
-          cat playwright-output.txt 2>/dev/null || echo "(no output)"
+          cat playwright-output.txt 2>/dev/null || echo "(no output — site was unreachable or playwright not installed)"
           echo ""
           echo "================================================"
-          echo "PARSED RESULTS"
+          echo "E2E RESULTS SUMMARY"
           echo "================================================"
           node -e "
             const fs = require('fs');
             if (!fs.existsSync('e2e-results.json')) {
-              console.log('No JSON results — Playwright likely could not reach the site.');
+              console.log('No JSON results file found.');
               if (fs.existsSync('playwright-output.txt')) {
                 const txt = fs.readFileSync('playwright-output.txt','utf8');
-                const errLines = txt.split('\n').filter(l =>
-                  l.includes('Error') || l.includes('FAILED') || l.includes('failed') ||
-                  l.includes('net::') || l.includes('connect') || l.includes('timeout')
+                const lines = txt.split('\n');
+                const errLines = lines.filter(l =>
+                  l.includes('Error') || l.includes('FAILED') ||
+                  l.includes('net::') || l.includes('TimeoutError') ||
+                  l.includes('failed') || l.includes('passed')
                 );
                 if (errLines.length) {
-                  console.log('Errors found:');
-                  errLines.forEach(l => console.log(' ', l.trim()));
+                  console.log('Key lines from output:');
+                  errLines.slice(0,30).forEach(l => console.log('  ' + l.trim()));
                 }
               }
               process.exit(0);
             }
+
             const r = JSON.parse(fs.readFileSync('e2e-results.json','utf8'));
             let passed=0, failed=0, skipped=0;
             const errors = [];
+
             function walk(suite, parentTitle) {
               const title = suite.title || parentTitle || '';
               for (const s of (suite.suites||[])) walk(s, title);
@@ -85,23 +102,26 @@ jobs:
                   if (res?.status==='passed') passed++;
                   else if (res?.status==='failed') {
                     failed++;
-                    const err = res?.error?.message?.split('\n').slice(0,2).join(' ') || 'unknown';
-                    errors.push({ suite: title, test: spec.title, error: err });
+                    const errMsg = (res?.error?.message||'unknown error')
+                      .split('\n').slice(0,3).join(' ');
+                    errors.push({ suite: title, test: spec.title, error: errMsg });
                   } else skipped++;
                 }
               }
             }
             for (const s of (r.suites||[])) walk(s, '');
+
             console.log('PASSED : ' + passed);
             console.log('FAILED : ' + failed);
             console.log('SKIPPED: ' + skipped);
             console.log('TOTAL  : ' + (passed+failed+skipped));
+
             if (errors.length) {
               console.log('');
               console.log('FAILED TESTS:');
               errors.forEach((e,i) => {
                 console.log('');
-                console.log('[' + (i+1) + '] ' + e.suite + ' > ' + e.test);
+                console.log('[' + (i+1) + '] ' + (e.suite ? e.suite + ' > ' : '') + e.test);
                 console.log('    ' + e.error);
               });
             } else if (passed > 0) {
