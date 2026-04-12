@@ -34,6 +34,9 @@
     "coverageDirectory": "coverage",
     "collectCoverageFrom": [
       "src/**/*.js"
+    ],
+    "testPathIgnorePatterns": [
+      "__tests__/helpers/"
     ]
   },
   "engines": {

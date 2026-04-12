@@ -23,18 +23,18 @@ function getStripe() {
 // POST /api/payments/create-checkout-session
 // ---------------------------------------------------------------------------
 router.post('/create-checkout-session', requireAuth, async (req, res) => {
+  const { planId } = req.body;
+  const plan = PLANS[planId];
+  if (!plan || plan.price === 0) {
+    return res.status(400).json({ error: 'Invalid or free planId' });
+  }
+
   const stripe = getStripe();
   if (!stripe) {
     return res.status(503).json({
       error: 'Payment processing coming soon',
       message: 'Stripe integration is not yet configured.',
     });
-  }
-
-  const { planId } = req.body;
-  const plan = PLANS[planId];
-  if (!plan || plan.price === 0) {
-    return res.status(400).json({ error: 'Invalid or free planId' });
   }
 
   try {

@@ -25,18 +25,18 @@ function getOpenAI() {
 // POST /api/chat
 // ---------------------------------------------------------------------------
 router.post('/', requireAuth, checkSubscription, async (req, res) => {
+  const { messages = [], avatar = 'kelion' } = req.body;
+
+  if (!Array.isArray(messages)) {
+    return res.status(400).json({ error: 'messages must be an array' });
+  }
+
   const openai = getOpenAI();
   if (!openai) {
     return res.status(503).json({
       error: 'AI service not configured',
       message: 'Set OPENAI_API_KEY to enable chat.',
     });
-  }
-
-  const { messages = [], avatar = 'kelion' } = req.body;
-
-  if (!Array.isArray(messages)) {
-    return res.status(400).json({ error: 'messages must be an array' });
   }
 
   // Sanitize: only allow 'user' and 'assistant' roles — never 'system'
