@@ -76,7 +76,7 @@ jobs:
           mkdir -p logs
           LOG="logs/deploy-$(date +%Y%m%d-%H%M%S).txt"
           railway whoami 2>&1 | tee $LOG
-          railway up --detach 2>&1 | tee -a $LOG
+          railway up --detach --service e983c608-8711-4f7e-8e97-774899602d44 2>&1 | tee -a $LOG
           sleep 30
           curl -s https://kelionai-v2-production.up.railway.app/health | tee -a $LOG
           git config user.email "ci@kelionai.app"
