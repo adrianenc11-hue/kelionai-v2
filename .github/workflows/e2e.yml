@@ -22,92 +22,91 @@ jobs:
       - name: Check site reachability
         run: |
           echo "=== Checking https://kelionai.app ==="
-          curl -v --max-time 15 https://kelionai.app/health 2>&1 || true
-          echo "HTTP status: $(curl -s -o /dev/null -w '%{http_code}' --max-time 15 https://kelionai.app/health 2>/dev/null || echo 'UNREACHABLE')"
+          STATUS=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 https://kelionai.app/health 2>/dev/null || echo "UNREACHABLE")
+          echo "HTTP status: $STATUS"
+          if [ "$STATUS" = "UNREACHABLE" ] || [ "$STATUS" = "000" ]; then
+            echo "::warning::Site kelionai.app is unreachable — tests will fail with connection errors"
+          fi
 
-      - name: Install root dependencies
-        run: npm install
-
-      - name: Install Playwright + browsers
-        run: npx playwright install chromium --with-deps
+      - name: Install Playwright (CI only — NOT in render build)
+        run: |
+          npm install --save-dev @playwright/test
+          npx playwright install chromium --with-deps
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "0"
 
       - name: Run E2E tests against live site
         run: |
           npx playwright test \
-            --reporter=list \
-            --output=test-results \
+            --reporter=list,json \
             2>&1 | tee playwright-output.txt
-          echo "EXIT_CODE=$?" >> $GITHUB_ENV
         env:
           BASE_URL: https://kelionai.app
+          PLAYWRIGHT_JSON_OUTPUT_NAME: e2e-results.json
         continue-on-error: true
 
-      - name: Show full Playwright output
+      - name: Show full output & parse errors
         if: always()
         run: |
           echo "================================================"
           echo "PLAYWRIGHT OUTPUT"
           echo "================================================"
-          cat playwright-output.txt 2>/dev/null || echo "(no output file)"
-
-      - name: Parse and display errors
-        if: always()
-        run: |
+          cat playwright-output.txt 2>/dev/null || echo "(no output)"
           echo ""
           echo "================================================"
-          echo "E2E RESULTS SUMMARY"
+          echo "PARSED RESULTS"
           echo "================================================"
           node -e "
             const fs = require('fs');
-
-            // Try JSON results first
-            if (fs.existsSync('e2e-results.json')) {
-              const r = JSON.parse(fs.readFileSync('e2e-results.json','utf8'));
-              let passed=0, failed=0;
-              const errors = [];
-              function walk(suite) {
-                for (const s of (suite.suites||[])) walk(s);
-                for (const spec of (suite.specs||[])) {
-                  for (const t of (spec.tests||[])) {
-                    const res = t.results?.[0];
-                    if (res?.status==='passed') passed++;
-                    else if (res?.status==='failed') {
-                      failed++;
-                      errors.push({
-                        suite: suite.title,
-                        test: spec.title,
-                        error: res?.error?.message?.split('\n')[0] || 'unknown'
-                      });
-                    }
-                  }
-                }
-              }
-              for (const s of (r.suites||[])) walk(s);
-              console.log('PASSED : ' + passed);
-              console.log('FAILED : ' + failed);
-              if (errors.length) {
-                console.log('\nFAILED TESTS:');
-                errors.forEach((e,i) => {
-                  console.log('');
-                  console.log('[' + (i+1) + '] ' + e.suite + ' > ' + e.test);
-                  console.log('    ERROR: ' + e.error);
-                });
-              }
-            } else {
-              // Fall back to parsing text output
+            if (!fs.existsSync('e2e-results.json')) {
+              console.log('No JSON results — Playwright likely could not reach the site.');
               if (fs.existsSync('playwright-output.txt')) {
                 const txt = fs.readFileSync('playwright-output.txt','utf8');
-                const lines = txt.split('\n');
-                const failLines = lines.filter(l => l.includes('FAILED') || l.includes('Error') || l.includes('failed'));
-                console.log('Raw failures from output:');
-                failLines.forEach(l => console.log(' ', l));
-                // Count summary line
-                const summary = lines.find(l => /\d+ (passed|failed)/.test(l));
-                if (summary) console.log('\nSummary: ' + summary.trim());
-              } else {
-                console.log('No results or output files found.');
-                console.log('This usually means the site is unreachable or Playwright crashed.');
+                const errLines = txt.split('\n').filter(l =>
+                  l.includes('Error') || l.includes('FAILED') || l.includes('failed') ||
+                  l.includes('net::') || l.includes('connect') || l.includes('timeout')
+                );
+                if (errLines.length) {
+                  console.log('Errors found:');
+                  errLines.forEach(l => console.log(' ', l.trim()));
+                }
               }
+              process.exit(0);
+            }
+            const r = JSON.parse(fs.readFileSync('e2e-results.json','utf8'));
+            let passed=0, failed=0, skipped=0;
+            const errors = [];
+            function walk(suite, parentTitle) {
+              const title = suite.title || parentTitle || '';
+              for (const s of (suite.suites||[])) walk(s, title);
+              for (const spec of (suite.specs||[])) {
+                for (const t of (spec.tests||[])) {
+                  const res = t.results?.[0];
+                  if (res?.status==='passed') passed++;
+                  else if (res?.status==='failed') {
+                    failed++;
+                    const err = res?.error?.message?.split('\n').slice(0,2).join(' ') || 'unknown';
+                    errors.push({ suite: title, test: spec.title, error: err });
+                  } else skipped++;
+                }
+              }
+            }
+            for (const s of (r.suites||[])) walk(s, '');
+            console.log('PASSED : ' + passed);
+            console.log('FAILED : ' + failed);
+            console.log('SKIPPED: ' + skipped);
+            console.log('TOTAL  : ' + (passed+failed+skipped));
+            if (errors.length) {
+              console.log('');
+              console.log('FAILED TESTS:');
+              errors.forEach((e,i) => {
+                console.log('');
+                console.log('[' + (i+1) + '] ' + e.suite + ' > ' + e.test);
+                console.log('    ' + e.error);
+              });
+            } else if (passed > 0) {
+              console.log('');
+              console.log('All tests passed!');
             }
           " 2>/dev/null || true
           echo "================================================"

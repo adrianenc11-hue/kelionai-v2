@@ -5,6 +5,10 @@ services:
     envVars:
       - key: PORT
         value: "8080"
+      - key: PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD
+        value: "1"
+      - key: NODE_ENV
+        value: "production"
     preDeployCommand: mkdir -p server/data && chmod -R 777 server/data
-    buildCommand: npm install && npm run build
-    startCommand: npm run server:start
+    buildCommand: npm install && npm run build && cd server && npm install --omit=dev
+    startCommand: node server/src/index.js
