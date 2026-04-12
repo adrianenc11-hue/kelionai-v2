@@ -32,10 +32,11 @@ app.use(
         'default-src': ["'self'"],
         'script-src': ["'self'", "'unsafe-inline'", 'https://apis.google.com'],
         'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
-        'img-src': ["'self'", 'data:', 'blob:', 'https://*.googleusercontent.com', 'https://*.githack.com'],
+        'img-src': ["'self'", 'data:', 'blob:', 'https://*.googleusercontent.com', 'https://*.githack.com', 'https://*.githubusercontent.com'],
         'connect-src': [
           "'self'",
           'https://*.githack.com',
+          'https://*.githubusercontent.com',
           'https://api.openai.com',
           'https://api.elevenlabs.io',
           'https://*.googleapis.com',
