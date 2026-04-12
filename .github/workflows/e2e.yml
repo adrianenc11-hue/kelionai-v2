@@ -9,8 +9,9 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # Run after CI+Deploy job completes (waits for deploy to finish)
-    
+    permissions:
+      contents: write
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -19,73 +20,53 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
-        env:
-          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
-      - name: Wait for site to be live (max 5 min)
+      - name: Check site reachability
         run: |
-          echo "Waiting for https://kelionai.app to respond..."
-          for i in $(seq 1 30); do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 https://kelionai.app/health 2>/dev/null)
-            echo "Attempt $i/30 — HTTP $STATUS"
-            if [ "$STATUS" = "200" ]; then
-              echo "Site is UP!"
-              break
-            fi
-            if [ "$i" = "30" ]; then
-              echo "::error::Site kelionai.app is not reachable after 5 minutes."
-              echo "SITE_UP=false" >> $GITHUB_ENV
-            else
-              sleep 10
-            fi
-          done
-          echo "SITE_UP=true" >> $GITHUB_ENV
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 https://kelionai.app/health || echo "000")
+          echo "Site status: $STATUS"
+          if [ "$STATUS" != "200" ]; then
+            echo "WARNING: Site returned $STATUS. Will still attempt tests."
+          fi
+        continue-on-error: true
 
-      - name: Install Playwright (CI only)
-        if: env.SITE_UP == 'true'
+      - name: Install Playwright
         run: |
           npm install --save-dev @playwright/test@1.44.0
           npx playwright install chromium --with-deps
 
       - name: Run E2E tests
-        if: env.SITE_UP == 'true'
-        run: |
-          npx playwright test \
-            --reporter=list,json \
-            2>&1 | tee playwright-output.txt
+        run: npx playwright test --reporter=list,json
         env:
           BASE_URL: https://kelionai.app
           PLAYWRIGHT_JSON_OUTPUT_NAME: e2e-results.json
         continue-on-error: true
 
-      - name: Print results summary
+      - name: Commit results to repo
         if: always()
         run: |
-          echo "================================================"
-          echo "PLAYWRIGHT OUTPUT"
-          echo "================================================"
-          cat playwright-output.txt 2>/dev/null || echo "(no output — site was unreachable or playwright not installed)"
-          echo ""
-          echo "================================================"
-          echo "E2E RESULTS SUMMARY"
-          echo "================================================"
+          mkdir -p e2e-reports
+          TIMESTAMP=$(date -u +"%Y-%m-%dT%H-%M-%SZ")
+
+          # Save playwright output
+          if [ -f e2e-results.json ]; then
+            cp e2e-results.json e2e-reports/latest-results.json
+          fi
+
+          # Generate readable summary
           node -e "
             const fs = require('fs');
+            const ts = new Date().toISOString();
+
             if (!fs.existsSync('e2e-results.json')) {
-              console.log('No JSON results file found.');
-              if (fs.existsSync('playwright-output.txt')) {
-                const txt = fs.readFileSync('playwright-output.txt','utf8');
-                const lines = txt.split('\n');
-                const errLines = lines.filter(l =>
-                  l.includes('Error') || l.includes('FAILED') ||
-                  l.includes('net::') || l.includes('TimeoutError') ||
-                  l.includes('failed') || l.includes('passed')
-                );
-                if (errLines.length) {
-                  console.log('Key lines from output:');
-                  errLines.slice(0,30).forEach(l => console.log('  ' + l.trim()));
-                }
-              }
+              const summary = {
+                timestamp: ts,
+                status: 'NO_RESULTS',
+                note: 'Playwright did not generate output — site may be unreachable',
+                passed: 0, failed: 0, total: 0, errors: []
+              };
+              fs.writeFileSync('e2e-reports/latest-summary.json', JSON.stringify(summary, null, 2));
+              console.log(JSON.stringify(summary, null, 2));
               process.exit(0);
             }
 
@@ -102,8 +83,9 @@ jobs:
                   if (res?.status==='passed') passed++;
                   else if (res?.status==='failed') {
                     failed++;
-                    const errMsg = (res?.error?.message||'unknown error')
-                      .split('\n').slice(0,3).join(' ');
+                    const errMsg = (res?.error?.message||'unknown')
+                      .replace(/\x1b\[[0-9;]*m/g,'')
+                      .split('\n').slice(0,5).join(' | ');
                     errors.push({ suite: title, test: spec.title, error: errMsg });
                   } else skipped++;
                 }
@@ -111,22 +93,13 @@ jobs:
             }
             for (const s of (r.suites||[])) walk(s, '');
 
-            console.log('PASSED : ' + passed);
-            console.log('FAILED : ' + failed);
-            console.log('SKIPPED: ' + skipped);
-            console.log('TOTAL  : ' + (passed+failed+skipped));
+            const summary = { timestamp: ts, passed, failed, skipped, total: passed+failed+skipped, errors };
+            fs.writeFileSync('e2e-reports/latest-summary.json', JSON.stringify(summary, null, 2));
+            console.log(JSON.stringify(summary, null, 2));
+          " || true
 
-            if (errors.length) {
-              console.log('');
-              console.log('FAILED TESTS:');
-              errors.forEach((e,i) => {
-                console.log('');
-                console.log('[' + (i+1) + '] ' + (e.suite ? e.suite + ' > ' : '') + e.test);
-                console.log('    ' + e.error);
-              });
-            } else if (passed > 0) {
-              console.log('');
-              console.log('All tests passed!');
-            }
-          " 2>/dev/null || true
-          echo "================================================"
+          git config user.email "e2e-bot@kelionai.app"
+          git config user.name "E2E Bot"
+          git add e2e-reports/
+          git diff --cached --quiet || git commit -m "ci: E2E results $(date -u +'%Y-%m-%d %H:%M UTC')"
+          git push || true
