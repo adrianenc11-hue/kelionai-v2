@@ -117,7 +117,16 @@ app.get('/health', (_req, res) => res.json({ status: 'ok', ts: new Date().toISOS
 // Serve frontend static files in production (must come after API routes)
 // ---------------------------------------------------------------------------
 if (process.env.NODE_ENV === 'production') {
-  const distPath = path.join(__dirname, '../../dist');
+  const distPath = path.resolve(__dirname, '../../dist');
+  console.log(`[kelion-api] Serving static files from: ${distPath}`);
+  
+  const fs = require('fs');
+  if (fs.existsSync(distPath)) {
+    console.log(`[kelion-api] Contents of dist:`, fs.readdirSync(distPath));
+  } else {
+    console.error(`[kelion-api] ERROR: distPath does not exist!`);
+  }
+
   app.use(express.static(distPath));
 
   // SPA fallback — serve index.html for any non-API GET request
