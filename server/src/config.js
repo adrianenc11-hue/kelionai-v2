@@ -41,14 +41,14 @@ module.exports = {
 
   // Session (web clients – HttpOnly cookie)
   session: {
-   secret: optional('SESSION_SECRET', 'a_default_session_secret'),
+    secret:    optional('SESSION_SECRET', 'a_default_session_secret'),
     name: 'kelion.sid',
     maxAgeMs: 7 * 24 * 60 * 60 * 1000, // 7 days
   },
 
   // JWT (mobile clients – Bearer token)
   jwt: {
-  secret: optional('JWT_SECRET', 'a_default_jwt_secret'),
+    secret:    optional('JWT_SECRET', 'a_default_jwt_secret'),
     expiresIn: optional('JWT_EXPIRES_IN', '7d'),
   },
 

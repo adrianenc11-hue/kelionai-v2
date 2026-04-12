@@ -2,6 +2,7 @@ import { Canvas } from '@react-three/fiber'
 import { OrbitControls, Environment } from '@react-three/drei'
 import { Suspense, useState, useRef, useEffect, useCallback } from 'react'
 import { AvatarModelDebug, DebugPanel } from './AvatarDebug'
+import { useLipSync } from '../lib/lipSync'
 
 export default function VoiceChat({ avatar, onBack }) {
   const [messages, setMessages] = useState([
@@ -24,28 +25,47 @@ export default function VoiceChat({ avatar, onBack }) {
 
   const recognitionRef = useRef(null)
   const chatEndRef = useRef(null)
-  const synthRef = useRef(window.speechSynthesis)
+  
+  // High-quality Voice & LipSync
+  const audioRef = useRef(null)
+  const mouthOpen = useLipSync(audioRef)
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // Detectare limba din ultimul mesaj user
-  const detectLang = useCallback((text) => {
-    // Simplu: lasam AI-ul sa detecteze, dar pentru voce folosim 'auto' sau engleza
-    // Browser SpeechRecognition nu are auto, deci folosim ultima limba detectata
-    return 'en-US' // fallback, AI se ocupa de restul
-  }, [])
+  const speak = useCallback(async (text) => {
+    if (!text) return
+    setIsTalking(true)
+    
+    try {
+      const response = await fetch('/api/tts', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          text, 
+          voice: avatar.id === 'kira' ? 'nova' : 'alloy' 
+        }),
+      })
 
-  const speak = useCallback((text, lang) => {
-    synthRef.current.cancel()
-    const utter = new SpeechSynthesisUtterance(text)
-    utter.lang = lang || 'en-US'
-    utter.rate = 1.0
-    utter.pitch = avatar.id === 'kira' ? 1.3 : 0.9
-    utter.onstart = () => setIsTalking(true)
-    utter.onend = () => setIsTalking(false)
-    synthRef.current.speak(utter)
+      if (!response.ok) throw new Error('TTS request failed')
+
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      
+      if (audioRef.current) {
+        audioRef.current.src = url
+        audioRef.current.onended = () => setIsTalking(false)
+        audioRef.current.play().catch(e => {
+            console.error('Audio play failed:', e)
+            setIsTalking(false)
+        })
+      }
+    } catch (err) {
+      console.error('[speak] Error:', err.message)
+      setIsTalking(false)
+    }
   }, [avatar.id])
 
   const sendMessage = useCallback(async (text) => {
@@ -167,6 +187,7 @@ export default function VoiceChat({ avatar, onBack }) {
             <AvatarModelDebug
               modelPath={avatar.model}
               debugConfig={debugConfig}
+              mouthOpen={mouthOpen}
               onBonesReady={setBoneNames}
             />
           </Suspense>
@@ -180,6 +201,9 @@ export default function VoiceChat({ avatar, onBack }) {
             zoomSpeed={0.8}
           />
         </Canvas>
+
+        {/* Hidden audio for LipSync */}
+        <audio ref={audioRef} style={{ display: 'none' }} />
 
         {/* Back button */}
         <button

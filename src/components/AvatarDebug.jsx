@@ -2,29 +2,70 @@ import { useEffect, useRef, useState } from 'react'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 
+import { useFrame } from '@react-three/fiber'
+
 // Componenta care expune oasele din model
-export function AvatarModelDebug({ modelPath, debugConfig, onBonesReady }) {
+export function AvatarModelDebug({ modelPath, debugConfig, mouthOpen = 0, onBonesReady }) {
   const { scene } = useGLTF(modelPath)
   const bonesRef = useRef({})
+  const morphsRef = useRef([])
 
   useEffect(() => {
     const bones = {}
+    const morphs = []
     scene.traverse((obj) => {
       if (obj.isBone || obj.type === 'Bone') {
         bones[obj.name] = obj
       }
-      // RPM foloseste SkinnedMesh cu skeleton
       if (obj.isSkinnedMesh && obj.skeleton) {
         obj.skeleton.bones.forEach(b => {
           bones[b.name] = b
         })
       }
+      if (obj.isMesh || obj.isSkinnedMesh) {
+        if (obj.morphTargetDictionary) {
+          morphs.push(obj)
+        }
+      }
     })
     bonesRef.current = bones
+    morphsRef.current = morphs
     if (onBonesReady) onBonesReady(Object.keys(bones))
   }, [scene, onBonesReady])
 
-  // Aplica rotatii din debugConfig
+  // Animație loop (Idle + LipSync)
+  useFrame((state) => {
+    const t = state.clock.getElapsedTime()
+
+    // 1. Idle animation (breathing/sway)
+    const spine = bonesRef.current['Spine1'] || bonesRef.current['Spine'] || bonesRef.current['mixamorigSpine']
+    if (spine) {
+      spine.rotation.z = Math.sin(t * 0.5) * 0.02
+      spine.rotation.x = Math.sin(t * 0.8) * 0.01
+    }
+
+    // 2. Lip Sync (Mouth Open)
+    // Try Jaw bone first (common in many models)
+    const jaw = bonesRef.current['Jaw'] || bonesRef.current['mixamorigJaw'] || bonesRef.current['Wolf3D_Head'] // Wolf3D_Head is RPM
+    if (jaw) {
+      // Rotation X usually controls opening
+      jaw.rotation.x = mouthOpen * 0.2
+    }
+
+    // Try Morph Targets (RPM visemes)
+    for (const mesh of morphsRef.current) {
+      const dict = mesh.morphTargetDictionary
+      if (dict) {
+        // RPM naming: mouthOpen, viseme_AA, etc.
+        const targetIdx = dict['mouthOpen'] ?? dict['viseme_AA'] ?? dict['jawOpen']
+        if (targetIdx !== undefined) {
+          mesh.morphTargetInfluences[targetIdx] = mouthOpen
+        }
+      }
+    }
+  })
+
+  // Aplica rotatii din debugConfig (pentru pozitionare brate etc.)
   useEffect(() => {
     if (!debugConfig) return
     const { leftArm, rightArm } = debugConfig

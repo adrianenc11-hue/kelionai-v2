@@ -215,6 +215,15 @@ NODE_ENV=production
 ADMIN_EMAILS=adrianenc11@gmail.com
 ```
 
+### 7.1. Database Persistence (SQLite)
+
+Since the app uses SQLite, you **must** mount a persistent volume in Railway to prevent data loss on every deploy:
+
+1.  In Railway, go to **Settings** → **Volumes** → **+ Add Volume**.
+2.  **Mount Path**: `/app/server/data`
+3.  **Name**: `kelion-data` (or any name)
+4.  This volume will host the `kelion.db` file and ensure your users and subscriptions are saved.
+
 ---
 
 ## 8. Security Notes

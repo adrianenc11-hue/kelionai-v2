@@ -14,6 +14,7 @@ const adminRouter        = require('./routes/admin');
 const subscriptionsRouter = require('./routes/subscriptions');
 const paymentsRouter     = require('./routes/payments');
 const chatRouter         = require('./routes/chat');
+const ttsRouter          = require('./routes/tts');
 
 const app = express();
 
@@ -77,6 +78,7 @@ app.use('/api/admin', adminRouter);
 app.use('/api/subscription', subscriptionsRouter);
 app.use('/api/payments', paymentsRouter);
 app.use('/api/chat', chatRouter);
+app.use('/api/tts', ttsRouter);
 
 // Health / readiness probe (useful for Railway)
 app.get('/health', (_req, res) => res.json({ status: 'ok', ts: new Date().toISOString() }));
