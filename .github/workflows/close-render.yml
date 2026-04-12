@@ -4,59 +4,30 @@ on:
   push:
     branches: [master]
   schedule:
-    - cron: '*/10 * * * *'  # every 10 min as backup
+    - cron: '*/10 * * * *'
 
 jobs:
   suspend:
     runs-on: ubuntu-latest
     steps:
-      - name: Suspend ALL Render services
+      - name: Suspend all Render services
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
         run: |
-          echo "Fetching all Render services..."
-          RESP=$(curl -s -w "\n%{http_code}" \
+          SERVICES=$(curl -s \
             "https://api.render.com/v1/services?limit=20" \
-            -H "Authorization: Bearer rnd_1UglFqUPIGkaaFVQiL0RYQXy3PJg" \
-            -H "Accept: application/json")
-
-          HTTP_CODE=$(echo "$RESP" | tail -1)
-          BODY=$(echo "$RESP" | head -n -1)
-
-          echo "HTTP: $HTTP_CODE"
-          echo "Response: $BODY"
-
-          # Extract ALL service IDs
-          IDS=$(echo "$BODY" | python3 -c "
-          import json, sys
-          try:
-              data = json.load(sys.stdin)
-              svcs = data if isinstance(data, list) else data.get('services', [])
-              for s in svcs:
-                  svc = s.get('service', s)
-                  sid = svc.get('id', '')
-                  name = svc.get('name', '')
-                  if sid:
-                      print(f'{sid} {name}')
-          except Exception as e:
-              print(f'ERROR: {e}', file=sys.stderr)
-          " 2>&1)
-
-          echo "Services found:"
-          echo "$IDS"
-
-          # Suspend each one
-          while IFS= read -r line; do
-            ID=$(echo "$line" | awk '{print $1}')
-            NAME=$(echo "$line" | awk '{print $2}')
-            if [ -n "$ID" ]; then
-              echo "Suspending $NAME ($ID)..."
-              RESULT=$(curl -s -w "\n%{http_code}" -X POST \
-                "https://api.render.com/v1/services/$ID/suspend" \
-                -H "Authorization: Bearer rnd_1UglFqUPIGkaaFVQiL0RYQXy3PJg" \
-                -H "Accept: application/json")
-              CODE=$(echo "$RESULT" | tail -1)
-              BODY=$(echo "$RESULT" | head -n -1)
-              echo "Result $CODE: $BODY"
-            fi
-          done <<< "$IDS"
-
-          echo "Done — all Render services suspended"
+            -H "Authorization: Bearer $RENDER_API_KEY")
+          
+          echo "$SERVICES" | python3 -c "
+          import json,sys
+          data = json.load(sys.stdin)
+          svcs = data if isinstance(data,list) else data.get('services',[])
+          for s in svcs:
+            svc = s.get('service',s)
+            print(svc.get('id',''))
+          " | while read ID; do
+            [ -n "$ID" ] && curl -s -X POST \
+              "https://api.render.com/v1/services/$ID/suspend" \
+              -H "Authorization: Bearer $RENDER_API_KEY" \
+              && echo "Suspended $ID"
+          done
