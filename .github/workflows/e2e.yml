@@ -19,6 +19,12 @@ jobs:
         with:
           node-version: 20
 
+      - name: Check site reachability
+        run: |
+          echo "=== Checking https://kelionai.app ==="
+          curl -v --max-time 15 https://kelionai.app/health 2>&1 || true
+          echo "HTTP status: $(curl -s -o /dev/null -w '%{http_code}' --max-time 15 https://kelionai.app/health 2>/dev/null || echo 'UNREACHABLE')"
+
       - name: Install root dependencies
         run: npm install
 
@@ -26,70 +32,82 @@ jobs:
         run: npx playwright install chromium --with-deps
 
       - name: Run E2E tests against live site
-        run: npx playwright test --reporter=list,json
+        run: |
+          npx playwright test \
+            --reporter=list \
+            --output=test-results \
+            2>&1 | tee playwright-output.txt
+          echo "EXIT_CODE=$?" >> $GITHUB_ENV
         env:
           BASE_URL: https://kelionai.app
         continue-on-error: true
 
-      - name: Upload HTML report
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: playwright-report
-          path: playwright-report/
-          retention-days: 7
-
-      - name: Upload JSON results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: e2e-results-json
-          path: e2e-results.json
-          retention-days: 7
-
-      - name: Print test summary
+      - name: Show full Playwright output
         if: always()
         run: |
           echo "================================================"
-          echo "E2E TEST RESULTS — kelionai.app"
+          echo "PLAYWRIGHT OUTPUT"
+          echo "================================================"
+          cat playwright-output.txt 2>/dev/null || echo "(no output file)"
+
+      - name: Parse and display errors
+        if: always()
+        run: |
+          echo ""
+          echo "================================================"
+          echo "E2E RESULTS SUMMARY"
           echo "================================================"
           node -e "
             const fs = require('fs');
-            if (!fs.existsSync('e2e-results.json')) { console.log('No results file found.'); process.exit(0); }
-            const r = JSON.parse(fs.readFileSync('e2e-results.json','utf8'));
-            const suites = r.suites || [];
-            let passed=0, failed=0, skipped=0;
-            const errors = [];
-            function walk(suite) {
-              for (const s of (suite.suites||[])) walk(s);
-              for (const spec of (suite.specs||[])) {
-                for (const t of (spec.tests||[])) {
-                  const status = t.results?.[0]?.status;
-                  if (status==='passed') passed++;
-                  else if (status==='failed') {
-                    failed++;
-                    const err = t.results?.[0]?.error?.message || 'unknown error';
-                    errors.push({ title: spec.title, error: err });
-                  } else skipped++;
+
+            // Try JSON results first
+            if (fs.existsSync('e2e-results.json')) {
+              const r = JSON.parse(fs.readFileSync('e2e-results.json','utf8'));
+              let passed=0, failed=0;
+              const errors = [];
+              function walk(suite) {
+                for (const s of (suite.suites||[])) walk(s);
+                for (const spec of (suite.specs||[])) {
+                  for (const t of (spec.tests||[])) {
+                    const res = t.results?.[0];
+                    if (res?.status==='passed') passed++;
+                    else if (res?.status==='failed') {
+                      failed++;
+                      errors.push({
+                        suite: suite.title,
+                        test: spec.title,
+                        error: res?.error?.message?.split('\n')[0] || 'unknown'
+                      });
+                    }
+                  }
                 }
               }
-            }
-            for (const s of suites) walk(s);
-            console.log('PASSED : ' + passed);
-            console.log('FAILED : ' + failed);
-            console.log('SKIPPED: ' + skipped);
-            console.log('TOTAL  : ' + (passed+failed+skipped));
-            if (errors.length) {
-              console.log('');
-              console.log('ERRORS:');
-              errors.forEach((e,i) => {
-                console.log('');
-                console.log('[' + (i+1) + '] ' + e.title);
-                console.log('    ' + e.error.split('\n')[0]);
-              });
+              for (const s of (r.suites||[])) walk(s);
+              console.log('PASSED : ' + passed);
+              console.log('FAILED : ' + failed);
+              if (errors.length) {
+                console.log('\nFAILED TESTS:');
+                errors.forEach((e,i) => {
+                  console.log('');
+                  console.log('[' + (i+1) + '] ' + e.suite + ' > ' + e.test);
+                  console.log('    ERROR: ' + e.error);
+                });
+              }
             } else {
-              console.log('');
-              console.log('All tests passed!');
+              // Fall back to parsing text output
+              if (fs.existsSync('playwright-output.txt')) {
+                const txt = fs.readFileSync('playwright-output.txt','utf8');
+                const lines = txt.split('\n');
+                const failLines = lines.filter(l => l.includes('FAILED') || l.includes('Error') || l.includes('failed'));
+                console.log('Raw failures from output:');
+                failLines.forEach(l => console.log(' ', l));
+                // Count summary line
+                const summary = lines.find(l => /\d+ (passed|failed)/.test(l));
+                if (summary) console.log('\nSummary: ' + summary.trim());
+              } else {
+                console.log('No results or output files found.');
+                console.log('This usually means the site is unreachable or Playwright crashed.');
+              }
             }
-          "
+          " 2>/dev/null || true
           echo "================================================"
