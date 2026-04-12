@@ -56,7 +56,7 @@ jobs:
           railway --version 2>&1 | tee -a $LOG
 
           echo "=== railway up ===" | tee -a $LOG
-          railway up --detach 2>&1 | tee -a $LOG
+          railway up --service kelionai-v2 --detach 2>&1 | tee -a $LOG
 
           echo "=== health ===" | tee -a $LOG
           sleep 30
