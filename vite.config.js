@@ -7,19 +7,25 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    build: {
+      chunkSizeWarningLimit: 1400,
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'react-vendor':  ['react', 'react-dom'],
+            'three-vendor':  ['three', '@react-three/fiber', '@react-three/drei'],
+            'router':        ['react-router-dom'],
+          },
+        },
+      },
+    },
     server: {
       host: '0.0.0.0',
       allowedHosts: 'all',
       port: 5173,
       proxy: {
-        '/api': {
-          target: backendTarget,
-          changeOrigin: true,
-        },
-        '/auth': {
-          target: backendTarget,
-          changeOrigin: true,
-        },
+        '/api':  { target: backendTarget, changeOrigin: true },
+        '/auth': { target: backendTarget, changeOrigin: true },
       },
     },
   }

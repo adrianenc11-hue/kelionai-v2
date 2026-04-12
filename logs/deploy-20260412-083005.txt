@@ -1,8 +1,0 @@
-=== railway whoami ===
-Unauthorized. Please check that your RAILWAY_TOKEN is valid and has access to the resource you're trying to use.
-
-=== railway up ===
-Multiple services found. Please specify a service via the `--service` flag.
-
-=== health ===
-{"status":"ok","ts":"2026-04-12T08:30:36.900Z"}

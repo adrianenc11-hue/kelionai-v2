@@ -15,3 +15,20 @@ server/coverage/
 # Production env files with real secrets
 server/.env.production
 server/.env.staging
+
+# Logs
+logs/
+
+# Debug files
+arm_debug.txt
+bone_findings.txt
+env_findings.txt
+inspect_bones.cjs
+
+# Root GLB files (use public/ only)
+*.glb
+
+# E2E reports
+e2e-reports/
+playwright-report/
+e2e-results.json
