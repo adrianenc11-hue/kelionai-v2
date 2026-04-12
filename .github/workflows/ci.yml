@@ -6,11 +6,6 @@ on:
   pull_request:
     branches: [master]
 
-env:
-  RAILWAY_TOKEN: d5c7c777-ef06-45b9-8c11-eb2a1b7e9367
-  RAILWAY_PROJECT_ID: b2a7f85e-7065-42c6-9922-82f5d2b01ebe
-  RAILWAY_SERVICE_ID: e983c608-8711-4f7e-8e97-774899602d44
-
 jobs:
   test-backend:
     name: Backend Tests
@@ -52,27 +47,26 @@ jobs:
       - name: Install Railway CLI
         run: npm install -g @railway/cli
 
-      - name: Deploy
-        run: |
-          railway up \
-            --service $RAILWAY_SERVICE_ID \
-            --detach
+      - name: Deploy to Railway
+        run: railway up --detach
         env:
-          RAILWAY_TOKEN: ${{ env.RAILWAY_TOKEN }}
+          RAILWAY_TOKEN: d5c7c777-ef06-45b9-8c11-eb2a1b7e9367
+          RAILWAY_PROJECT_ID: b2a7f85e-7065-42c6-9922-82f5d2b01ebe
+          RAILWAY_SERVICE_ID: e983c608-8711-4f7e-8e97-774899602d44
 
-      - name: Wait and verify
+      - name: Connect GitHub repo to Railway service
         run: |
-          echo "Waiting 90s for deploy to complete..."
-          sleep 90
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            --max-time 15 \
-            https://kelionai-v2-production.up.railway.app/health)
-          echo "Health check: $STATUS"
-          if [ "$STATUS" = "200" ]; then
-            echo "Deploy successful — service is live!"
-          else
-            echo "Warning: health check returned $STATUS"
-          fi
+          curl -s -X POST https://backboard.railway.app/graphql/v2 \
+            -H "Authorization: Bearer d5c7c777-ef06-45b9-8c11-eb2a1b7e9367" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "query": "mutation { serviceConnectRepo(id: \"e983c608-8711-4f7e-8e97-774899602d44\", input: { repo: \"adrianenc11-hue/kelionai-v2\", branch: \"master\" }) { id } }"
+            }' | python3 -m json.tool
+
+      - name: Verify health
+        run: |
+          sleep 30
+          curl -sf https://kelionai-v2-production.up.railway.app/health && echo "LIVE" || echo "Starting..."
 
   e2e:
     name: E2E Tests
@@ -94,27 +88,15 @@ jobs:
         if: always()
         run: |
           node -e "
-            const fs = require('fs');
-            if (!fs.existsSync('e2e-results.json')) { console.log('No results'); process.exit(0); }
-            const r = JSON.parse(fs.readFileSync('e2e-results.json','utf8'));
+            const fs=require('fs');
+            if(!fs.existsSync('e2e-results.json')){console.log('No results');process.exit(0);}
+            const r=JSON.parse(fs.readFileSync('e2e-results.json','utf8'));
             let p=0,f=0,errs=[];
-            function walk(s){
-              (s.suites||[]).forEach(walk);
-              (s.specs||[]).forEach(sp=>{
-                (sp.tests||[]).forEach(t=>{
-                  const st=t.results?.[0]?.status;
-                  if(st==='passed')p++;
-                  else if(st==='failed'){
-                    f++;
-                    errs.push(sp.title+': '+(t.results?.[0]?.error?.message||'').split('\n')[0]);
-                  }
-                });
-              });
-            }
+            function walk(s){(s.suites||[]).forEach(walk);(s.specs||[]).forEach(sp=>{(sp.tests||[]).forEach(t=>{const st=t.results?.[0]?.status;if(st==='passed')p++;else if(st==='failed'){f++;errs.push(sp.title+': '+(t.results?.[0]?.error?.message||'').split('\n')[0]);}});})}
             (r.suites||[]).forEach(walk);
-            console.log('PASSED:',p,' FAILED:',f,' TOTAL:',(p+f));
-            if(errs.length){console.log('');errs.forEach((e,i)=>console.log((i+1)+'. '+e));}
-            else if(p>0) console.log('All tests passed!');
+            console.log('PASSED:',p,'FAILED:',f);
+            if(errs.length)errs.forEach((e,i)=>console.log((i+1)+'.'+e));
+            else if(p>0)console.log('All tests passed!');
           "
       - uses: actions/upload-artifact@v4
         if: always()
