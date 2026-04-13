@@ -36,11 +36,11 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc:  ["'self'", "'unsafe-inline'", "https://js.stripe.com"],
+        scriptSrc:  ["'self'", "'unsafe-inline'", "https://js.stripe.com", "blob:"],
         styleSrc:   ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         fontSrc:    ["'self'", "https://fonts.gstatic.com"],
         imgSrc:     ["'self'", "data:", "blob:", "https:"],
-        connectSrc: ["'self'", "https://api.openai.com", "https://api.stripe.com"],
+        connectSrc: ["'self'", "https://api.openai.com", "https://api.stripe.com", "https://raw.githack.com", "https://*.githubusercontent.com", "blob:"],
         frameSrc:   ["https://js.stripe.com"],
         mediaSrc:   ["'self'", "blob:"],
         workerSrc:  ["'self'", "blob:"],
