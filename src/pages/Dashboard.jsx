@@ -105,6 +105,7 @@ export default function Dashboard() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             {user.picture ? (
               <img src={user.picture} alt={user.name}
+                referrerPolicy="no-referrer"
                 style={{ width: '56px', height: '56px', borderRadius: '50%', border: `2px solid ${colors.color}` }} />
             ) : (
               <div style={{

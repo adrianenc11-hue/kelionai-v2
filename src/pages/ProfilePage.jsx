@@ -84,6 +84,7 @@ export default function ProfilePage() {
         }}>
           {user.picture ? (
             <img src={user.picture} alt={user.name}
+              referrerPolicy="no-referrer"
               style={{ width: '72px', height: '72px', borderRadius: '50%', border: `3px solid ${colors.color}` }} />
           ) : (
             <div style={{
