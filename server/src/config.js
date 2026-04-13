@@ -66,15 +66,13 @@ module.exports = {
     optional('NODE_ENV') === 'production' ? 'https://kelionai.app' : 'http://localhost:3001'
   ),
 
-  corsOrigins: optional('CORS_ORIGINS', 'https://kelionai.app,http://localhost:5173')
-    .split(',').map(o => o.trim()),
+  corsOrigins: optional('CORS_ORIGINS', 'https://kelionai.app,https://kelionai-v2-production.up.railway.app,http://localhost:5173')
+    .split(',').map(o => o.trim()).filter(Boolean),
 
   cookie: {
-    domain:   optional('COOKIE_DOMAIN',
-      optional('NODE_ENV') === 'production' ? 'kelionai.app' : ''
-    ),
+    domain:   optional('COOKIE_DOMAIN', ''),
     secure:   optional('NODE_ENV', 'development') === 'production',
-    sameSite: isProd ? 'strict' : 'lax',
+    sameSite: isProd ? 'lax' : 'lax',
   },
 
   dbPath: optional('DB_PATH', './data/kelion.db'),
