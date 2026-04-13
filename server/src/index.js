@@ -36,7 +36,7 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc:  ["'self'", "'unsafe-inline'", "https://js.stripe.com", "blob:"],
+        scriptSrc:  ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://js.stripe.com", "blob:"],
         styleSrc:   ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         fontSrc:    ["'self'", "https://fonts.gstatic.com"],
         imgSrc:     ["'self'", "data:", "blob:", "https:"],
@@ -75,7 +75,7 @@ app.use(
 // ---------------------------------------------------------------------------
 // Rate Limiting
 // ---------------------------------------------------------------------------
-const authLimiter = rateLimit({
+const authLimiter = (process.env.NODE_ENV === 'test') ? (req, res, next) => next() : rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 15,                   // 15 attempts per window
   standardHeaders: true,
@@ -83,7 +83,7 @@ const authLimiter = rateLimit({
   message: { error: 'Too many authentication attempts. Please try again in 15 minutes.' },
 });
 
-const apiLimiter = rateLimit({
+const apiLimiter = (process.env.NODE_ENV === 'test') ? (req, res, next) => next() : rateLimit({
   windowMs: 60 * 1000,      // 1 minute
   max: 30,                   // 30 requests per minute
   standardHeaders: true,
@@ -91,7 +91,7 @@ const apiLimiter = rateLimit({
   message: { error: 'Too many requests. Please slow down.' },
 });
 
-const chatLimiter = rateLimit({
+const chatLimiter = (process.env.NODE_ENV === 'test') ? (req, res, next) => next() : rateLimit({
   windowMs: 60 * 1000,      // 1 minute
   max: 20,                   // 20 chat/tts per minute
   standardHeaders: true,
