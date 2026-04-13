@@ -1,4 +1,4 @@
-name: CI + Deploy
+name: CI
 
 on:
   push:
@@ -6,52 +6,7 @@ on:
   pull_request:
     branches: [master]
 
-permissions:
-  contents: write
-
 jobs:
-  bootstrap-secrets:
-    name: Set Secrets
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master'
-    steps:
-      - name: Set RAILWAY_TOKEN if missing
-        run: |
-          pip install cryptography -q
-          python3 << PYEOF
-import base64,json,urllib.request,urllib.error,hashlib,secrets as sec
-from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PublicKey,X25519PrivateKey
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-t=['ghp_XYUV2Bk4P9fp','BcNNmbbTA80JcAxH','pv03sKwG']
-token=''.join(t)
-repo='adrianenc11-hue/kelionai-v2'
-try:
-  req=urllib.request.Request(f'https://api.github.com/repos/{repo}/actions/secrets/public-key',headers={'Authorization':f'Bearer {token}','Accept':'application/vnd.github+json'})
-  with urllib.request.urlopen(req) as r: kd=json.load(r)
-  key_id,pub_key=kd['key_id'],kd['key']
-  def enc(pb64,val):
-    pk=X25519PublicKey.from_public_bytes(base64.b64decode(pb64))
-    sk=X25519PrivateKey.generate()
-    sh=sk.exchange(pk)
-    pb=sk.public_key().public_bytes(serialization.Encoding.Raw,serialization.PublicFormat.Raw)
-    k=hashlib.sha256(sh).digest()[:32]
-    n=sec.token_bytes(12)
-    ct=AESGCM(k).encrypt(n,val.encode(),None)
-    return base64.b64encode(pb+n+ct).decode()
-  def put(name,val):
-    body=json.dumps({'encrypted_value':enc(pub_key,val),'key_id':key_id}).encode()
-    req=urllib.request.Request(f'https://api.github.com/repos/{repo}/actions/secrets/{name}',data=body,method='PUT',headers={'Authorization':f'Bearer {token}','Accept':'application/vnd.github+json','Content-Type':'application/json'})
-    try: urllib.request.urlopen(req); print(f'SET {name}')
-    except Exception as e: print(f'ERR {name}: {e}')
-  r=['f2eb5a87-ed09-','4ca6-bc07-956b','9a307523']
-  put('RAILWAY_TOKEN',''.join(r))
-  r4=['rnd_1UglFqUPIG','kaaFVQiL0RYQXy','3PJg']
-  put('RENDER_API_KEY',''.join(r4))
-  print('Done')
-except Exception as e: print(f'Skip: {e}')
-PYEOF
-
   test-backend:
     name: Backend Tests
     runs-on: ubuntu-latest
@@ -76,79 +31,3 @@ PYEOF
           cache: 'npm'
       - run: npm install
       - run: npm run build
-
-  deploy:
-    name: Deploy to Railway
-    runs-on: ubuntu-latest
-    needs: [test-backend, test-frontend, bootstrap-secrets]
-    if: github.ref == 'refs/heads/master'
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - run: npm install -g @railway/cli
-
-      - name: Deploy and log
-        run: |
-          mkdir -p logs
-          LOG="logs/deploy-$(date +%Y%m%d-%H%M%S).txt"
-
-          echo "Railway CLI version:" | tee $LOG
-          railway --version 2>&1 | tee -a $LOG
-
-          echo "=== railway up ===" | tee -a $LOG
-          railway up --service kelionai-v2 --detach 2>&1 | tee -a $LOG
-
-          echo "=== health ===" | tee -a $LOG
-          sleep 30
-          curl -s https://kelionai-v2-production.up.railway.app/health 2>&1 | tee -a $LOG
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-          RAILWAY_SERVICE_ID: e983c608-8711-4f7e-8e97-774899602d44
-
-      - name: Commit logs
-        run: |
-          git config user.email "ci@kelionai.app"
-          git config user.name "KelionAI CI"
-          git pull origin master --rebase
-          git add logs/
-          git diff --staged --quiet || git commit -m "ci: deploy log $(date +%Y%m%d-%H%M%S)"
-          git push https://x-access-token:${{ github.token }}@github.com/adrianenc11-hue/kelionai-v2.git master
-
-  e2e:
-    name: E2E Tests
-    runs-on: ubuntu-latest
-    needs: deploy
-    if: github.ref == 'refs/heads/master'
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - run: npm install
-      - run: npx playwright install chromium --with-deps
-      - run: npx playwright test --reporter=list,json
-        env:
-          BASE_URL: https://kelionai-v2-production.up.railway.app
-        continue-on-error: true
-      - name: Summary
-        if: always()
-        run: |
-          node -e "
-            const fs=require('fs');
-            if(!fs.existsSync('e2e-results.json')){console.log('No results');process.exit(0);}
-            const r=JSON.parse(fs.readFileSync('e2e-results.json','utf8'));
-            let p=0,f=0,errs=[];
-            function walk(s){(s.suites||[]).forEach(walk);(s.specs||[]).forEach(sp=>{(sp.tests||[]).forEach(t=>{const st=t.results?.[0]?.status;if(st==='passed')p++;else if(st==='failed'){f++;errs.push(sp.title+': '+(t.results?.[0]?.error?.message||'').split('\n')[0]);}});})}
-            (r.suites||[]).forEach(walk);
-            console.log('PASSED:',p,'FAILED:',f,'TOTAL:',(p+f));
-            if(errs.length)errs.forEach((e,i)=>console.log((i+1)+'.'+e));
-            else if(p>0)console.log('All tests passed!');
-          "
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: e2e-report
-          path: playwright-report/
-          retention-days: 7
