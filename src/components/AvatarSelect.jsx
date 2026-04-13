@@ -206,7 +206,7 @@ export default function AvatarSelect() {
             <directionalLight position={[2, 4, 3]} intensity={1.8} color="#ffffff" />
             <directionalLight position={[-2, 2, -1]} intensity={0.3} color="#8b9cf4" />
             <pointLight position={[0, 1.5, 2]} intensity={0.6} color="#6366f1" />
-            <Environment preset="city" />
+            <hemisphereLight skyColor="#b1e1ff" groundColor="#000000" intensity={0.6} />
             <Suspense fallback={null}>
               <AvatarModel armRot={armRot} forearmRot={forearmRot} />
             </Suspense>

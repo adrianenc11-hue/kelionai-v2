@@ -99,7 +99,7 @@ export default function ArmSettingsPage({ onNavigate }) {
           <ambientLight intensity={0.6} />
           <directionalLight position={[2, 4, 2]} intensity={1.5} />
           <pointLight position={[0, 1, 2]} intensity={0.8} color="#a855f7" />
-          <Environment preset="city" />
+          <hemisphereLight skyColor="#b1e1ff" groundColor="#000000" intensity={0.6} />
           <Suspense fallback={null}>
             <AvatarModel armRot={armRot} forearmRot={forearmRot} />
           </Suspense>
