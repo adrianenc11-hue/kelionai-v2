@@ -1,7 +1,7 @@
 // API base URL.
 // Production: empty string → relative URLs (same origin, cookies work).
 // Development: localhost:3001 (backend dev server).
-const API_BASE = import.meta.env.PROD
+const API_BASE = (typeof window !== 'undefined' && window.location.hostname !== 'localhost')
   ? ''
   : (import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001')
 
