@@ -52,6 +52,7 @@ router.get('/google/callback', async (req, res) => {
 
   // User denied consent or an error occurred on Google's side
   if (error) {
+    console.log(`[kelion-api] Google auth error: ${error}`);
     const msg = encodeURIComponent(`Google auth error: ${error}`);
     return res.redirect(`${config.appBaseUrl}/?auth_error=${msg}`);
   }
@@ -103,18 +104,21 @@ router.get('/google/callback', async (req, res) => {
     // Web: sign a JWT and set it as a secure HttpOnly cookie
     // (avoids MemoryStore session loss through Cloudflare/Railway proxy)
     const appToken = signAppToken(user);
+    console.log(`[auth/callback] Successful login for user: ${user.email}. Setting cookie...`);
+    
     res.cookie('kelion.token', appToken, {
       httpOnly: true,
-      secure: config.cookie.secure,
+      secure: true, // Always true since we have SSL
       sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       path: '/',
     });
 
+    console.log(`[auth/callback] Cookie set. Redirecting to: ${config.appBaseUrl}/`);
     // Redirect the browser back to the app
     return res.redirect(`${config.appBaseUrl}/`);
   } catch (err) {
-    console.error('[auth/callback] Error:', err.message);
+    console.error('[auth/callback] CRITICAL Error:', err);
     if (mode === 'mobile') {
       return res.status(500).json({ error: 'Authentication failed' });
     }
