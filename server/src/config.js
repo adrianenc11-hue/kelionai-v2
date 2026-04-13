@@ -21,6 +21,14 @@ const required = (name) => {
 
 const optional = (name, fallback = '') => process.env[name] || fallback;
 
+// In production, critical secrets MUST be set via env vars — no fallback allowed.
+const isProd = (process.env.NODE_ENV || 'development') === 'production';
+const secret = (name, devFallback) => {
+  const value = process.env[name];
+  if (!value && isProd) throw new Error(`Missing required secret in production: ${name}`);
+  return value || devFallback;
+};
+
 module.exports = {
   port: parseInt(optional('PORT', '3001'), 10),
   nodeEnv: optional('NODE_ENV', 'development'),
@@ -41,13 +49,13 @@ module.exports = {
   },
 
   session: {
-    secret:   optional('SESSION_SECRET', 'a_default_session_secret'),
+    secret:   secret('SESSION_SECRET', 'dev-only-session-secret-do-not-use-in-prod'),
     name:     'kelion.sid',
     maxAgeMs: 7 * 24 * 60 * 60 * 1000,
   },
 
   jwt: {
-    secret:    optional('JWT_SECRET', 'a_default_jwt_secret'),
+    secret:    secret('JWT_SECRET', 'dev-only-jwt-secret-do-not-use-in-prod'),
     expiresIn: optional('JWT_EXPIRES_IN', '7d'),
   },
 
@@ -66,7 +74,7 @@ module.exports = {
       optional('NODE_ENV') === 'production' ? 'kelionai.app' : ''
     ),
     secure:   optional('NODE_ENV', 'development') === 'production',
-    sameSite: 'lax',
+    sameSite: isProd ? 'strict' : 'lax',
   },
 
   dbPath: optional('DB_PATH', './data/kelion.db'),

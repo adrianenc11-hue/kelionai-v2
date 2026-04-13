@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { api, AUTH_BASE } from '../lib/api'
 
 const AuthContext = createContext(null)
@@ -7,6 +8,7 @@ export function AuthProvider({ children }) {
   const [user, setUser]       = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState(null)
+  const navigate = useNavigate()
 
   const fetchMe = useCallback(async () => {
     try {
@@ -48,7 +50,7 @@ export function AuthProvider({ children }) {
       if (res.token) {
         await fetchMe()
         setError(null)
-        window.location.href = '/'
+        navigate('/dashboard')
         return { success: true, ...res }
       }
       return { success: false, message: 'Invalid response from server' }
@@ -65,7 +67,7 @@ export function AuthProvider({ children }) {
       if (res.token) {
         await fetchMe()
         setError(null)
-        window.location.href = '/'
+        navigate('/dashboard')
         return { success: true, ...res }
       }
       return { success: false, message: 'Invalid response from server' }

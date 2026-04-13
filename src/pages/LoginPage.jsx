@@ -1,8 +1,10 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 
-export default function LoginPage({ onNavigate }) {
+export default function LoginPage() {
   const { login, localLogin, registerLocal, error: authError, setError } = useAuth()
+  const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
@@ -37,19 +39,17 @@ export default function LoginPage({ onNavigate }) {
       justifyContent: 'center', background: '#0a0a0f', fontFamily: "'Inter', sans-serif",
     }}>
       {/* Back to landing */}
-      {onNavigate && (
-        <button
-          onClick={() => onNavigate('landing')}
-          style={{
-            position: 'absolute', top: '20px', left: '20px',
-            background: 'transparent', border: '1px solid rgba(255,255,255,0.15)',
-            borderRadius: '8px', color: '#888', padding: '8px 16px',
-            fontSize: '13px', cursor: 'pointer',
-          }}
-        >
-          ← Back
-        </button>
-      )}
+      <button
+        onClick={() => navigate('/')}
+        style={{
+          position: 'absolute', top: '20px', left: '20px',
+          background: 'transparent', border: '1px solid rgba(255,255,255,0.15)',
+          borderRadius: '8px', color: '#888', padding: '8px 16px',
+          fontSize: '13px', cursor: 'pointer',
+        }}
+      >
+        ← Back
+      </button>
 
       <div style={{
         width: '100%', maxWidth: '420px', padding: '40px 36px',

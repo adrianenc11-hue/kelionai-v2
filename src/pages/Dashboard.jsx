@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 
 const TIER_COLORS = {
@@ -14,10 +15,14 @@ const TIER_LABELS = {
   enterprise: 'Enterprise',
 }
 
-export default function Dashboard({ onNavigate }) {
+export default function Dashboard() {
   const { user, logout, isAdmin } = useAuth()
+  const navigate = useNavigate()
 
-  if (!user) return null
+  if (!user) {
+    navigate('/login')
+    return null
+  }
 
   const tier    = user.subscription_tier || 'free'
   const colors  = TIER_COLORS[tier] || TIER_COLORS.free
@@ -55,21 +60,22 @@ export default function Dashboard({ onNavigate }) {
           fontSize: '22px', fontWeight: '800',
           background: 'linear-gradient(135deg, #a855f7, #f472b6)',
           WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-        }}>
+          cursor: 'pointer',
+        }} onClick={() => navigate('/')}>
           KelionAI
         </h1>
 
         <nav style={{ display: 'flex', gap: '8px' }}>
           {[
-            { label: '🏠 Dashboard', page: 'dashboard' },
-            { label: '💬 Chat',      page: 'chat' },
-            { label: '💳 Pricing',   page: 'pricing' },
-            { label: '👤 Profile',    page: 'profile' },
-            ...(isAdmin ? [{ label: '⚙️ Admin', page: 'admin' }] : []),
-          ].map(({ label, page }) => (
+            { label: '🏠 Dashboard', path: '/dashboard' },
+            { label: '💬 Chat',      path: '/chat' },
+            { label: '💳 Pricing',   path: '/pricing' },
+            { label: '👤 Profile',    path: '/profile' },
+            ...(isAdmin ? [{ label: '⚙️ Admin', path: '/admin' }] : []),
+          ].map(({ label, path }) => (
             <button
-              key={page}
-              onClick={() => onNavigate(page)}
+              key={path}
+              onClick={() => navigate(path)}
               style={{
                 background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
                 color: '#ccc', padding: '8px 14px', borderRadius: '10px',
@@ -80,7 +86,7 @@ export default function Dashboard({ onNavigate }) {
             </button>
           ))}
           <button
-            onClick={logout}
+            onClick={async () => { await logout(); navigate('/') }}
             style={{
               background: 'rgba(220,38,38,0.15)', border: '1px solid rgba(220,38,38,0.3)',
               color: '#fca5a5', padding: '8px 14px', borderRadius: '10px',
@@ -170,7 +176,7 @@ export default function Dashboard({ onNavigate }) {
               <p style={{ color: '#fca5a5', fontSize: '13px', marginTop: '10px' }}>
                 ⚠️ Daily limit reached.{' '}
                 <button
-                  onClick={() => onNavigate('pricing')}
+                  onClick={() => navigate('/pricing')}
                   style={{ background: 'none', border: 'none', color: colors.glow, cursor: 'pointer', fontSize: '13px', padding: 0 }}
                 >
                   Upgrade plan →
@@ -189,11 +195,11 @@ export default function Dashboard({ onNavigate }) {
             Quick Actions
           </h3>
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-            <ActionBtn label="💬 Start Chat" color="#7c3aed" glow="#a855f7"  onClick={() => onNavigate('chat')} />
-            <ActionBtn label="🎁 Invite Friends" color="#0f766e" glow="#14b8a6" onClick={() => onNavigate('referral')} />
-            <ActionBtn label="💳 Upgrade plan"  color="#1d4ed8" glow="#3b82f6"  onClick={() => onNavigate('pricing')} />
-            <ActionBtn label="👤 Profile"        color="#065f46" glow="#10b981"  onClick={() => onNavigate('profile')} />
-            {isAdmin && <ActionBtn label="⚙️ Admin panel" color="#92400e" glow="#f59e0b" onClick={() => onNavigate('admin')} />}
+            <ActionBtn label="💬 Start Chat" color="#7c3aed" glow="#a855f7"  onClick={() => navigate('/chat')} />
+            <ActionBtn label="🎁 Invite Friends" color="#0f766e" glow="#14b8a6" onClick={() => navigate('/referral')} />
+            <ActionBtn label="💳 Upgrade plan"  color="#1d4ed8" glow="#3b82f6"  onClick={() => navigate('/pricing')} />
+            <ActionBtn label="👤 Profile"        color="#065f46" glow="#10b981"  onClick={() => navigate('/profile')} />
+            {isAdmin && <ActionBtn label="⚙️ Admin panel" color="#92400e" glow="#f59e0b" onClick={() => navigate('/admin')} />}
           </div>
         </div>
       </div>

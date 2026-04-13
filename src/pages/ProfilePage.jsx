@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { api } from '../lib/api'
 
@@ -9,8 +10,9 @@ const TIER_COLORS = {
   enterprise: { color: '#f59e0b', glow: '#fbbf24' },
 }
 
-export default function ProfilePage({ onNavigate }) {
+export default function ProfilePage() {
   const { user, refreshUser } = useAuth()
+  const navigate = useNavigate()
   const [name, setName]     = useState(user?.name || '')
   const [saving, setSaving] = useState(false)
   const [msg, setMsg]       = useState(null)
@@ -59,7 +61,7 @@ export default function ProfilePage({ onNavigate }) {
           KelionAI
         </h1>
         <button
-          onClick={() => onNavigate('dashboard')}
+          onClick={() => navigate('/dashboard')}
           style={{
             background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
             color: '#ccc', padding: '8px 14px', borderRadius: '10px',
@@ -176,7 +178,7 @@ export default function ProfilePage({ onNavigate }) {
             <Row label="Today's Usage" value={`${user.usage?.today ?? 0} / ${user.usage?.daily_limit ?? '∞'}`} />
           </div>
           <button
-            onClick={() => onNavigate('pricing')}
+            onClick={() => navigate('/pricing')}
             style={{
               marginTop: '20px',
               background: `linear-gradient(135deg, ${colors.color}, ${colors.glow})`,

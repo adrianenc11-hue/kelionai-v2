@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { api } from '../lib/api'
 
@@ -12,8 +13,9 @@ const TIER_COLORS = {
   enterprise: '#fbbf24',
 }
 
-export default function AdminPage({ onNavigate }) {
+export default function AdminPage() {
   const { user, isAdmin } = useAuth()
+  const navigate = useNavigate()
   const [users, setUsers]   = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError]   = useState(null)
@@ -38,7 +40,7 @@ export default function AdminPage({ onNavigate }) {
         <div style={{ fontSize: '48px' }}>🔒</div>
         <h2>Access Denied</h2>
         <p style={{ color: '#666' }}>You do not have administrator permissions.</p>
-        <button onClick={() => onNavigate('dashboard')}
+        <button onClick={() => navigate('/dashboard')}
           style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', padding: '10px 20px', borderRadius: '10px', cursor: 'pointer' }}>
           ← Dashboard
         </button>
@@ -86,7 +88,7 @@ export default function AdminPage({ onNavigate }) {
           KelionAI Admin
         </h1>
         <button
-          onClick={() => onNavigate('dashboard')}
+          onClick={() => navigate('/dashboard')}
           style={{
             background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
             color: '#ccc', padding: '8px 14px', borderRadius: '10px',

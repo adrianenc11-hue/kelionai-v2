@@ -1,9 +1,11 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { api } from '../lib/api'
 
-export default function ReferralPage({ onNavigate }) {
+export default function ReferralPage() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [code, setCode]       = useState(null)
   const [expires, setExpires] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -60,7 +62,7 @@ export default function ReferralPage({ onNavigate }) {
     }}>
       <div style={{ maxWidth: '600px', margin: '0 auto' }}>
         <button
-          onClick={() => onNavigate('dashboard')}
+          onClick={() => navigate('/dashboard')}
           style={{ background: 'none', border: '1px solid rgba(255,255,255,0.2)', color: '#aaa', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', marginBottom: '24px' }}
         >
           ← Back

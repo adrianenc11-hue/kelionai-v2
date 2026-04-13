@@ -27,6 +27,9 @@ router.post('/register', async (req, res) => {
   if (typeof password !== 'string' || password.length < 8) {
     return res.status(400).json({ error: 'Password must be at least 8 characters' });
   }
+  if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password)) {
+    return res.status(400).json({ error: 'Password must contain uppercase, lowercase and a number' });
+  }
 
   try {
     const existing = findByEmail(email);

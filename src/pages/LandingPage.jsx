@@ -1,4 +1,5 @@
 import { Suspense, useState, useRef, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls, Environment, useGLTF } from '@react-three/drei'
 
@@ -593,7 +594,10 @@ function AlreadyUsed({ usedAt, onPricing, onSignIn }) {
 }
 
 // ── Main Landing Page ────────────────────────────────────────────────────────
-export default function LandingPage({ onSignIn, onPricing }) {
+export default function LandingPage() {
+  const navigate = useNavigate()
+  const onSignIn = () => navigate('/login')
+  const onPricing = () => navigate('/pricing')
   const [demoState, setDemoState] = useState('landing')
   const [demoInfo, setDemoInfo] = useState(null)
 

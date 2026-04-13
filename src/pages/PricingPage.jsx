@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { api } from '../lib/api'
 
@@ -9,8 +10,9 @@ const PLAN_COLORS = {
   enterprise: { color: '#f59e0b', glow: '#fbbf24' },
 }
 
-export default function PricingPage({ onNavigate }) {
+export default function PricingPage() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [plans, setPlans] = useState([])
   const [loading, setLoading] = useState(true)
   const [checkoutError, setCheckoutError] = useState(null)
@@ -45,7 +47,7 @@ export default function PricingPage({ onNavigate }) {
         </h1>
         {user && (
           <button
-            onClick={() => onNavigate('dashboard')}
+            onClick={() => navigate('/dashboard')}
             style={{
               background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
               color: '#ccc', padding: '8px 14px', borderRadius: '10px',
@@ -151,8 +153,8 @@ export default function PricingPage({ onNavigate }) {
                   <button
                     onClick={async () => {
                       if (isCurrent) return
-                      if (!user) { onNavigate('login'); return }
-                      if (plan.price === 0) { onNavigate('dashboard'); return }
+                      if (!user) { navigate('/login'); return }
+                      if (plan.price === 0) { navigate('/dashboard'); return }
                       setCheckoutError(null)
                       try {
                         const { url } = await api.post('/api/payments/create-checkout-session', { planId: plan.id })

@@ -6,13 +6,7 @@ const { checkSubscription } = require('../middleware/subscription');
 
 const router = Router();
 
-// OpenAI Client helper
-function getOpenAI() {
-  const key = process.env.OPENAI_API_KEY || process.env.AI_API_KEY;
-  if (!key) return null;
-  const OpenAI = require('openai');
-  return new OpenAI({ apiKey: key });
-}
+const { getOpenAI } = require('../utils/openai');
 
 /**
  * POST /api/tts

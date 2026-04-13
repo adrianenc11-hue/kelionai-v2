@@ -2,10 +2,10 @@
 
 const path = require('path');
 const express = require('express');
-const session = require('express-session');
 const cors = require('cors');
 const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
+const rateLimit = require('express-rate-limit');
 
 const config = require('./config');
 const authRouter          = require('./routes/auth');
@@ -29,15 +29,32 @@ if (fs.existsSync(distPath)) {
 }
 
 // ---------------------------------------------------------------------------
-// Security headers
+// Security headers — CSP configured for the app's needs
 // ---------------------------------------------------------------------------
 app.use(
   helmet({
-    contentSecurityPolicy: false,
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc:  ["'self'", "'unsafe-inline'", "https://js.stripe.com"],
+        styleSrc:   ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        fontSrc:    ["'self'", "https://fonts.gstatic.com"],
+        imgSrc:     ["'self'", "data:", "blob:", "https:"],
+        connectSrc: ["'self'", "https://api.openai.com", "https://api.stripe.com"],
+        frameSrc:   ["https://js.stripe.com"],
+        mediaSrc:   ["'self'", "blob:"],
+        workerSrc:  ["'self'", "blob:"],
+      },
+    },
     crossOriginEmbedderPolicy: false,
     crossOriginResourcePolicy: false,
   })
 );
+
+// ---------------------------------------------------------------------------
+// Trust proxy (Railway/Cloudflare sit behind reverse proxies)
+// ---------------------------------------------------------------------------
+app.set('trust proxy', 1);
 
 // ---------------------------------------------------------------------------
 // CORS
@@ -56,44 +73,52 @@ app.use(
 );
 
 // ---------------------------------------------------------------------------
+// Rate Limiting
+// ---------------------------------------------------------------------------
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 15,                   // 15 attempts per window
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many authentication attempts. Please try again in 15 minutes.' },
+});
+
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,      // 1 minute
+  max: 30,                   // 30 requests per minute
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please slow down.' },
+});
+
+const chatLimiter = rateLimit({
+  windowMs: 60 * 1000,      // 1 minute
+  max: 20,                   // 20 chat/tts per minute
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Rate limit exceeded for AI services. Please wait a moment.' },
+});
+
+// ---------------------------------------------------------------------------
 // Body parsers
 // ---------------------------------------------------------------------------
 app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 
 // ---------------------------------------------------------------------------
-// Session
+// Routes (with rate limiting applied per group)
 // ---------------------------------------------------------------------------
-app.use(
-  session({
-    name:   config.session.name,
-    secret: config.session.secret,
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      httpOnly: true,
-      secure:   config.cookie.secure,
-      sameSite: config.cookie.sameSite,
-      domain:   config.cookie.domain || undefined,
-      maxAge:   config.session.maxAgeMs,
-    },
-  })
-);
-
-// ---------------------------------------------------------------------------
-// Routes
-// ---------------------------------------------------------------------------
-app.use('/auth',             authRouter);
-app.use('/auth/local',       localAuthRouter);   // FIX: was missing
-app.use('/api/users',        usersRouter);
-app.use('/api/admin',        adminRouter);
-app.use('/api/subscription', subscriptionsRouter);
-app.use('/api/payments',     paymentsRouter);
-app.use('/api/chat',         chatRouter);
-app.use('/api/tts',          ttsRouter);
-app.use('/api/referral',     referralRouter);    // FIX: was missing
+app.use('/auth',             authLimiter, authRouter);
+app.use('/auth/local',       authLimiter, localAuthRouter);
+app.use('/api/users',        apiLimiter,  usersRouter);
+app.use('/api/admin',        apiLimiter,  adminRouter);
+app.use('/api/subscription', apiLimiter,  subscriptionsRouter);
+app.use('/api/payments',     apiLimiter,  paymentsRouter);
+app.use('/api/chat',         chatLimiter, chatRouter);
+app.use('/api/tts',          chatLimiter, ttsRouter);
+app.use('/api/referral',     apiLimiter,  referralRouter);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok', ts: new Date().toISOString() }));
 app.get('/ping',   (_req, res) => res.send('<h1>PONG - Server is alive and reached!</h1>'));

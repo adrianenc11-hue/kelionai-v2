@@ -1,10 +1,33 @@
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, Environment } from '@react-three/drei'
 import { Suspense, useState, useRef, useEffect, useCallback } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
 import { AvatarModelDebug, DebugPanel } from './AvatarDebug'
 import { useLipSync } from '../lib/lipSync'
 
-export default function VoiceChat({ avatar, onBack }) {
+const AVATARS = {
+  kelion: {
+    id: 'kelion',
+    name: 'Kelion',
+    model: '/kelion-rpm_e27cb94d.glb',
+    color: '#7c3aed',
+    glow: '#a855f7',
+  },
+  kira: {
+    id: 'kira',
+    name: 'Kira',
+    model: '/kira-rpm.glb',
+    color: '#ec4899',
+    glow: '#f472b6',
+  },
+}
+
+export default function VoiceChat() {
+  const { avatarId } = useParams()
+  const navigate = useNavigate()
+  const avatar = AVATARS[avatarId] || AVATARS.kelion
+  const onBack = () => navigate('/dashboard')
+
   const [messages, setMessages] = useState([
     { role: 'assistant', content: `Hi! I'm ${avatar.name}. How can I help you?` }
   ])

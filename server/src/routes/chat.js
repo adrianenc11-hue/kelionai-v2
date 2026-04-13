@@ -4,6 +4,8 @@ const { Router } = require('express');
 const { requireAuth } = require('../middleware/auth');
 const { checkSubscription } = require('../middleware/subscription');
 
+const { getOpenAI } = require('../utils/openai');
+
 const router = Router();
 
 const SYSTEM_PROMPTS = {
@@ -14,12 +16,6 @@ const SYSTEM_PROMPTS = {
 const MAX_MESSAGE_LENGTH = 4000;   // chars per message
 const MAX_MESSAGES_COUNT = 40;     // history depth
 
-function getOpenAI() {
-  const key = process.env.OPENAI_API_KEY || process.env.AI_API_KEY;
-  if (!key) return null;
-  const OpenAI = require('openai');
-  return new OpenAI({ apiKey: key });
-}
 
 // ---------------------------------------------------------------------------
 // POST /api/chat
