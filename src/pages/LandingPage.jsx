@@ -726,15 +726,13 @@ export default function LandingPage() {
               cursor: 'pointer', boxShadow: '0 8px 30px rgba(168,85,247,0.4)',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
             }}>▶ Start Free 15-min Demo</button>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.1)' }} />
-              <span style={{ color: '#555', fontSize: '12px' }}>or</span>
-              <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.1)' }} />
-            </div>
-            <button onClick={onSignIn} style={{
-              background: 'transparent', border: '1px solid rgba(255,255,255,0.2)',
-              borderRadius: '14px', color: '#ccc', padding: '14px 32px', fontSize: '15px', cursor: 'pointer',
-            }}>Already have an account? Sign In</button>
+            <span
+              onClick={onSignIn}
+              style={{
+                color: '#777', fontSize: '13px', cursor: 'pointer', textAlign: 'center',
+                marginTop: '4px', textDecoration: 'underline', textUnderlineOffset: '3px',
+              }}
+            >Already have an account? Sign in above ↗</span>
           </div>
 
           <p style={{ color: '#444', fontSize: '12px', marginTop: '16px' }}>
