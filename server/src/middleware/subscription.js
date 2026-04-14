@@ -6,6 +6,16 @@ async function checkSubscription(req, res, next) {
   if (!req.user) {
     return res.status(401).json({ error: 'Authentication required' });
   }
+
+  const expires = req.user.subscription_expires_at;
+  if (expires && new Date(expires) < new Date()) {
+    return res.status(403).json({
+      error: 'Subscription expired',
+      expired_at: expires,
+      upgradeUrl: '/pricing',
+    });
+  }
+
   const tier  = req.user.subscription_tier || 'free';
   const plan  = PLANS[tier] || PLANS.free;
   const limit = plan.dailyLimit;

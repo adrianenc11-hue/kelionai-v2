@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { api } from '../lib/api'
@@ -11,14 +11,18 @@ const TIER_COLORS = {
 }
 
 export default function ProfilePage() {
-  const { user, refreshUser } = useAuth()
+  const { user, refreshUser, loading } = useAuth()
   const navigate = useNavigate()
+
+  useEffect(() => {
+    if (!loading && !user) navigate('/login')
+  }, [loading, user, navigate])
+
+  if (loading || !user) return null
   const [name, setName]     = useState(user?.name || '')
   const [saving, setSaving] = useState(false)
   const [msg, setMsg]       = useState(null)
   const [msgType, setMsgType] = useState('success')
-
-  if (!user) return null
 
   const tier   = user.subscription_tier || 'free'
   const colors = TIER_COLORS[tier] || TIER_COLORS.free

@@ -83,4 +83,60 @@ router.post('/', requireAuth, csrfProtection, checkSubscription, async (req, res
   }
 });
 
+// ---------------------------------------------------------------------------
+// POST /api/chat/demo — anonymous demo chat (rate-limited, no auth)
+// ---------------------------------------------------------------------------
+router.post('/demo', async (req, res) => {
+  const { messages = [] } = req.body;
+
+  if (!Array.isArray(messages)) {
+    return res.status(400).json({ error: 'messages must be an array' });
+  }
+
+  const openai = getOpenAI();
+  if (!openai) {
+    return res.status(503).json({ error: 'AI service not configured' });
+  }
+
+  const sanitized = messages
+    .filter(m => m && typeof m === 'object' && ['user', 'assistant'].includes(m.role))
+    .slice(-10)
+    .map(m => ({
+      role:    m.role,
+      content: typeof m.content === 'string' ? m.content.slice(0, 2000) : '',
+    }))
+    .filter(m => m.content.length > 0);
+
+  const model = process.env.AI_MODEL || 'gpt-4o-mini';
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  try {
+    const stream = await openai.chat.completions.create({
+      model,
+      stream: true,
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPTS.kelion },
+        ...sanitized,
+      ],
+    });
+
+    for await (const chunk of stream) {
+      const content = chunk.choices[0]?.delta?.content;
+      if (content) {
+        res.write(`data: ${JSON.stringify({ content })}\n\n`);
+      }
+    }
+    res.write('data: [DONE]\n\n');
+  } catch (err) {
+    console.error('[chat/demo] error:', err.message);
+    res.write(`data: ${JSON.stringify({ error: 'AI service encountered an error. Please try again.' })}\n\n`);
+  } finally {
+    res.end();
+  }
+});
+
 module.exports = router;

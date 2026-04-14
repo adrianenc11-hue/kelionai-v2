@@ -67,13 +67,11 @@ export default function Dashboard() {
 
         <nav style={{ display: 'flex', gap: '8px' }}>
           {[
-            { label: '💬 Chat', path: '/chat' },
-            ...(isAdmin ? [
-              { label: '🏠 Dashboard', path: '/dashboard' },
-              { label: '💳 Pricing',   path: '/pricing' },
-              { label: '👤 Profile',    path: '/profile' },
-              { label: '⚙️ Admin',     path: '/admin' },
-            ] : []),
+            { label: '💬 Chat',    path: '/chat' },
+            { label: '💳 Pricing', path: '/pricing' },
+            { label: '👤 Profile', path: '/profile' },
+            { label: '🎁 Referral', path: '/referral' },
+            ...(isAdmin ? [{ label: '⚙️ Admin', path: '/admin' }] : []),
           ].map(({ label, path }) => (
             <button
               key={path}

@@ -41,6 +41,8 @@ const mockDb = {
     subscription_tier: 'free',
     subscription_status: 'active',
   })),
+  getUsageToday: jest.fn(() => Promise.resolve(0)),
+  sanitizeUser: jest.fn((u) => { if (!u) return u; const c = { ...u }; delete c.password_hash; return c; }),
 };
 jest.mock('../src/db', () => mockDb);
 

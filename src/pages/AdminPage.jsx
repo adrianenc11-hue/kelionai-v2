@@ -186,21 +186,42 @@ export default function AdminPage() {
                   {u.last_login_at ? new Date(u.last_login_at).toLocaleDateString('en-US') : '—'}
                 </div>
                 <div>
-                  <button
-                    onClick={() => setEditing({
-                      userId:  u.id,
-                      tier:    u.subscription_tier || 'free',
-                      status:  u.subscription_status || 'active',
-                      expires: u.subscription_expires_at || '',
-                    })}
-                    style={{
-                      background: 'rgba(168,85,247,0.15)', border: '1px solid rgba(168,85,247,0.3)',
-                      color: '#c084fc', padding: '5px 10px', borderRadius: '8px',
-                      cursor: 'pointer', fontSize: '12px',
-                    }}
-                  >
-                    Edit
-                  </button>
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    <button
+                      onClick={() => setEditing({
+                        userId:  u.id,
+                        tier:    u.subscription_tier || 'free',
+                        status:  u.subscription_status || 'active',
+                        expires: u.subscription_expires_at || '',
+                      })}
+                      style={{
+                        background: 'rgba(168,85,247,0.15)', border: '1px solid rgba(168,85,247,0.3)',
+                        color: '#c084fc', padding: '5px 8px', borderRadius: '8px',
+                        cursor: 'pointer', fontSize: '11px',
+                      }}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={async () => {
+                        const newRole = u.role === 'admin' ? 'user' : 'admin'
+                        try {
+                          const updated = await api.put(`/api/admin/users/${u.id}/role`, { role: newRole })
+                          setUsers(prev => prev.map(x => x.id === updated.id ? updated : x))
+                          setMsg(`Role changed to ${newRole}`)
+                        } catch (err) { setMsg(err.message) }
+                      }}
+                      style={{
+                        background: u.role === 'admin' ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.15)',
+                        border: `1px solid ${u.role === 'admin' ? 'rgba(239,68,68,0.3)' : 'rgba(34,197,94,0.3)'}`,
+                        color: u.role === 'admin' ? '#fca5a5' : '#86efac',
+                        padding: '5px 8px', borderRadius: '8px',
+                        cursor: 'pointer', fontSize: '11px',
+                      }}
+                    >
+                      {u.role === 'admin' ? '↓ User' : '↑ Admin'}
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}

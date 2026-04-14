@@ -3,7 +3,8 @@
 const { Router } = require('express');
 const config = require('../config');
 const { generateState, generatePKCE, buildAuthUrl, exchangeCode, fetchUserInfo } = require('../utils/google');
-const { upsertUser } = require('../db');
+const { upsertUser, getUsageToday } = require('../db');
+const { PLANS } = require('../config/plans');
 const { signAppToken, requireAuth } = require('../middleware/auth');
 
 const router = Router();
@@ -132,17 +133,24 @@ router.get('/google/callback', async (req, res) => {
 // Returns the currently authenticated user's profile.
 // Works for both web (session cookie) and mobile (Bearer token).
 // ---------------------------------------------------------------------------
-router.get('/me', requireAuth, (req, res) => {
+router.get('/me', requireAuth, async (req, res) => {
   const u = req.user;
+  const tier = u.subscription_tier || 'free';
+  const plan = PLANS[tier] || PLANS.free;
+  const usedToday = await getUsageToday(u.id);
   res.json({
     id:                      u.id,
     email:                   u.email,
     name:                    u.name,
     picture:                 u.picture || u.avatar_url,
     role:                    u.role || 'user',
-    subscription_tier:       u.subscription_tier || 'free',
+    subscription_tier:       tier,
     subscription_status:     u.subscription_status || 'active',
     created_at:              u.created_at,
+    usage: {
+      today:       usedToday,
+      daily_limit: plan.dailyLimit === Infinity ? null : plan.dailyLimit,
+    },
   });
 });
 

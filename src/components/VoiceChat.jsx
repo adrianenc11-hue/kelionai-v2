@@ -4,6 +4,7 @@ import { Suspense, useState, useRef, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { AvatarModelDebug, DebugPanel } from './AvatarDebug'
 import { getCsrfToken } from '../lib/api'
+import { useAuth } from '../contexts/AuthContext'
 import { useLipSync } from '../lib/lipSync'
 
 const AVATARS = {
@@ -26,8 +27,15 @@ const AVATARS = {
 export default function VoiceChat() {
   const { avatarId } = useParams()
   const navigate = useNavigate()
+  const { user, loading } = useAuth()
   const avatar = AVATARS[avatarId] || AVATARS.kelion
   const onBack = () => navigate('/dashboard')
+
+  useEffect(() => {
+    if (!loading && !user) navigate('/login')
+  }, [loading, user, navigate])
+
+  if (loading || !user) return null
 
   const [messages, setMessages] = useState([
     { role: 'assistant', content: `Hi! I'm ${avatar.name}. How can I help you?` }
@@ -203,9 +211,11 @@ export default function VoiceChat() {
         }
       }
     } catch (err) {
-      const errorMsg = 'Sorry, an error occurred. Please try again.'
+      const isLimit = err.message?.includes('429')
+      const errorMsg = isLimit
+        ? 'Daily usage limit reached. Upgrade your plan for more.'
+        : 'Sorry, an error occurred. Please try again.'
       setMessages(prev => [...prev, { role: 'assistant', content: errorMsg }])
-      speak(errorMsg)
     } finally {
       setIsLoading(false)
     }

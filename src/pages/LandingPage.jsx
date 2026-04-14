@@ -257,13 +257,11 @@ function DemoChat({ onExpire, onPricing }) {
 
     try {
       let assistantText = ''
-      const res = await fetch('/api/chat', {
+      const res = await fetch('/api/chat/demo', {
         method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: newMessages.map(m => ({ role: m.role, content: m.content })),
-          avatar: 'kelion',
         })
       })
       if (!res.ok) throw new Error('AI error')
@@ -602,19 +600,26 @@ export default function LandingPage() {
   const [demoState, setDemoState] = useState('landing')
   const [demoInfo, setDemoInfo] = useState(null)
 
+  const demoKeyRef = useRef(null)
+
   const handleStartDemo = () => {
     const check = checkDemoUsed()
     if (check.used) {
       setDemoInfo(check)
       setDemoState('used')
     } else {
-      markDemoUsed(check.key)
+      demoKeyRef.current = check.key
       setDemoState('demo')
     }
   }
 
+  const handleDemoExpire = () => {
+    if (demoKeyRef.current) markDemoUsed(demoKeyRef.current)
+    setDemoState('expired')
+  }
+
   if (demoState === 'demo') {
-    return <DemoChat onExpire={() => setDemoState('expired')} onPricing={onPricing} />
+    return <DemoChat onExpire={handleDemoExpire} onPricing={onPricing} />
   }
 
   if (demoState === 'expired') {
