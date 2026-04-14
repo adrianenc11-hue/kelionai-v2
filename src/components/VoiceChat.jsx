@@ -63,27 +63,30 @@ export default function VoiceChat() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // Start camera when component mounts
-  useEffect(() => {
-    async function startCamera() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'user', width: { ideal: 320 }, height: { ideal: 240 } },
-        })
-        streamRef.current = stream
-        if (videoRef.current) videoRef.current.srcObject = stream
-      } catch (err) {
-        console.warn('[camera] Could not start:', err.message)
-      }
-    }
-    startCamera()
-    return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(t => t.stop())
-        streamRef.current = null
-      }
+  const startCamera = useCallback(async () => {
+    if (streamRef.current) return
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 320 }, height: { ideal: 240 } },
+      })
+      streamRef.current = stream
+      if (videoRef.current) videoRef.current.srcObject = stream
+    } catch (err) {
+      console.warn('[camera] Could not start:', err.message)
     }
   }, [])
+
+  const stopCamera = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop())
+      streamRef.current = null
+    }
+    if (videoRef.current) videoRef.current.srcObject = null
+  }, [])
+
+  useEffect(() => {
+    return () => stopCamera()
+  }, [stopCamera])
 
   const speak = useCallback(async (text) => {
     if (!text) return
@@ -216,6 +219,7 @@ export default function VoiceChat() {
     }
 
     if (synthRef.current) synthRef.current.cancel()
+    startCamera()
     const recognition = new SpeechRecognition()
     recognition.lang = navigator.language || 'en-US'
     recognition.continuous = true
@@ -255,7 +259,8 @@ export default function VoiceChat() {
       r.stop()
     }
     setIsListening(false)
-  }, [])
+    stopCamera()
+  }, [stopCamera])
 
   const toggleListening = useCallback(() => {
     if (isListening) {
