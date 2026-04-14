@@ -8,6 +8,7 @@ const cookieParser = require('cookie-parser');
 const rateLimit = require('express-rate-limit');
 
 const config = require('./config');
+const { csrfProtection }  = require('./middleware/csrf');
 const authRouter          = require('./routes/auth');
 const localAuthRouter     = require('./routes/localAuth');
 const usersRouter         = require('./routes/users');
@@ -111,14 +112,15 @@ app.use(cookieParser());
 // Routes (with rate limiting applied per group)
 // ---------------------------------------------------------------------------
 app.use('/auth',             authLimiter, authRouter);
-app.use('/auth/local',       authLimiter, localAuthRouter);
-app.use('/api/users',        apiLimiter,  usersRouter);
-app.use('/api/admin',        apiLimiter,  adminRouter);
+app.use('/auth/local',       authLimiter, csrfProtection, localAuthRouter);
+app.use('/api/users',        apiLimiter,  csrfProtection, usersRouter);
+app.use('/api/admin',        apiLimiter,  csrfProtection, adminRouter);
 app.use('/api/subscription', apiLimiter,  subscriptionsRouter);
-app.use('/api/payments',     apiLimiter,  paymentsRouter);
-app.use('/api/chat',         chatLimiter, chatRouter);
-app.use('/api/tts',          chatLimiter, ttsRouter);
-app.use('/api/referral',     apiLimiter,  referralRouter);
+app.use('/api/payments/webhook', paymentsRouter);   // webhook before csrf — Stripe sends directly
+app.use('/api/payments',     apiLimiter,  csrfProtection, paymentsRouter);
+app.use('/api/chat',         chatLimiter, csrfProtection, chatRouter);
+app.use('/api/tts',          chatLimiter, csrfProtection, ttsRouter);
+app.use('/api/referral',     apiLimiter,  csrfProtection, referralRouter);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok', ts: new Date().toISOString() }));
 app.get('/ping',   (_req, res) => res.send('<h1>PONG - Server is alive and reached!</h1>'));

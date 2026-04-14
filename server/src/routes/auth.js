@@ -146,14 +146,7 @@ router.get('/me', requireAuth, (req, res) => {
 //         We still accept the request and return 200 for uniformity.
 // ---------------------------------------------------------------------------
 router.post('/logout', (req, res) => {
-  // Clear JWT cookie
   res.clearCookie('kelion.token', { path: '/' });
-
-  // Also destroy session if it exists
-  if (req.session) {
-    req.session.destroy(() => {});
-  }
-
   res.json({ message: 'Logged out successfully' });
 });
 

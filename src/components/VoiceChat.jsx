@@ -3,6 +3,7 @@ import { OrbitControls, Environment } from '@react-three/drei'
 import { Suspense, useState, useRef, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { AvatarModelDebug, DebugPanel } from './AvatarDebug'
+import { getCsrfToken } from '../lib/api'
 import { useLipSync } from '../lib/lipSync'
 
 const AVATARS = {
@@ -66,7 +67,7 @@ export default function VoiceChat() {
       const response = await fetch('/api/tts', {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
         body: JSON.stringify({ 
           text, 
           voice: avatar.id === 'kira' ? 'nova' : 'alloy' 
@@ -107,7 +108,7 @@ export default function VoiceChat() {
       const response = await fetch('/api/chat', {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
         body: JSON.stringify({ messages: newMessages, avatar: avatar.id }),
       })
 

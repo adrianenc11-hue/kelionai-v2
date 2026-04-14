@@ -5,6 +5,11 @@ const API_BASE = (typeof window !== 'undefined' && window.location.hostname !== 
   ? ''
   : (import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001')
 
+export function getCsrfToken() {
+  const match = document.cookie.match(/(?:^|;\s*)kelion\.csrf=([^;]+)/)
+  return match ? match[1] : ''
+}
+
 async function apiFetch(path, options = {}) {
   const url = `${API_BASE}${path}`
   const controller = new AbortController()
@@ -15,6 +20,7 @@ async function apiFetch(path, options = {}) {
       credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
+        'X-CSRF-Token': getCsrfToken(),
         ...options.headers,
       },
       signal: controller.signal,

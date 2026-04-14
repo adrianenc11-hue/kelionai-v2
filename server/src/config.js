@@ -21,12 +21,18 @@ const required = (name) => {
 
 const optional = (name, fallback = '') => process.env[name] || fallback;
 
-// In production, critical secrets MUST be set via env vars — no fallback allowed.
 const isProd = (process.env.NODE_ENV || 'development') === 'production';
-const secret = (name, devFallback) => {
+const isTest = process.env.NODE_ENV === 'test';
+
+const secret = (name) => {
   const value = process.env[name];
   if (!value && isProd) throw new Error(`Missing required secret in production: ${name}`);
-  return value || devFallback;
+  if (!value && !isTest) {
+    const generated = require('crypto').randomBytes(48).toString('hex');
+    console.warn(`[config] ${name} not set — generated a random ephemeral value (will change on restart)`);
+    return generated;
+  }
+  return value || 'test-only-secret';
 };
 
 module.exports = {
@@ -35,8 +41,8 @@ module.exports = {
   isProduction: optional('NODE_ENV', 'development') === 'production',
 
   google: {
-    clientId:     optional('GOOGLE_CLIENT_ID'),
-    clientSecret: optional('GOOGLE_CLIENT_SECRET'),
+    clientId:     isProd ? required('GOOGLE_CLIENT_ID') : optional('GOOGLE_CLIENT_ID'),
+    clientSecret: isProd ? required('GOOGLE_CLIENT_SECRET') : optional('GOOGLE_CLIENT_SECRET'),
     redirectUri:  optional('GOOGLE_REDIRECT_URI',
       optional('NODE_ENV') === 'production'
         ? 'https://kelionai.app/auth/google/callback'
@@ -49,13 +55,13 @@ module.exports = {
   },
 
   session: {
-    secret:   secret('SESSION_SECRET', 'dev-only-session-secret-do-not-use-in-prod'),
+    secret:   secret('SESSION_SECRET'),
     name:     'kelion.sid',
     maxAgeMs: 7 * 24 * 60 * 60 * 1000,
   },
 
   jwt: {
-    secret:    secret('JWT_SECRET', 'dev-only-jwt-secret-do-not-use-in-prod'),
+    secret:    secret('JWT_SECRET'),
     expiresIn: optional('JWT_EXPIRES_IN', '7d'),
   },
 

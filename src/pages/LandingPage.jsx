@@ -2,6 +2,7 @@ import { Suspense, useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls, Environment, useGLTF } from '@react-three/drei'
+import { getCsrfToken } from '../lib/api'
 
 // ── Fingerprint anti-abuse ──────────────────────────────────────────────────
 function getFingerprint() {
@@ -259,7 +260,7 @@ function DemoChat({ onExpire, onPricing }) {
       const res = await fetch('/api/chat', {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
         body: JSON.stringify({
           messages: newMessages.map(m => ({ role: m.role, content: m.content })),
           avatar: 'kelion',

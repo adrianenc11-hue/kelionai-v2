@@ -89,7 +89,7 @@ cp server/.env.example server/.env
 | `DB_PATH` | SQLite file path | `./data/kelion.db` |
 | `PORT` | API server port | `3001` |
 | `NODE_ENV` | `development` or `production` | `production` |
-| `ADMIN_EMAILS` | Comma-separated admin email addresses | `adrianenc11@gmail.com` |
+| `ADMIN_EMAILS` | Comma-separated admin email addresses | `your-admin@example.com` |
 | `STRIPE_SECRET_KEY` | Stripe secret key (optional, for payments) | `sk_live_...` |
 | `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret (optional) | `whsec_...` |
 
@@ -212,7 +212,7 @@ CORS_ORIGINS=https://kelionai.app
 COOKIE_DOMAIN=kelionai.app
 DB_PATH=./data/kelion.db
 NODE_ENV=production
-ADMIN_EMAILS=adrianenc11@gmail.com
+ADMIN_EMAILS=your-admin@example.com
 ```
 
 ### 7.1. Database Persistence (SQLite)
