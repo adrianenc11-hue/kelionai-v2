@@ -131,7 +131,7 @@ export default function VoiceChat() {
       console.error('[speak] Error:', err.message)
       setIsTalking(false)
     }
-  }, [avatar.id, isListening, startListening])
+  }, [avatar.id, isListening])
 
   const captureFrame = useCallback(() => {
     if (!videoRef.current || !streamRef.current) return null
