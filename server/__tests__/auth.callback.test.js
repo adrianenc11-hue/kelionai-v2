@@ -113,7 +113,7 @@ describe('GET /auth/google/callback – web mode (happy path)', () => {
     expect(res.headers.location).toMatch(/^https?:\/\//);
   });
 
-  it('sets a session so /auth/me returns the user after login', async () => {
+  it('sets a JWT cookie so /auth/me returns the user after login', async () => {
     const agent = await startOAuthFlow('web');
 
     exchangeCode.mockResolvedValueOnce({ access_token: 'mock-access-token' });
@@ -124,11 +124,16 @@ describe('GET /auth/google/callback – web mode (happy path)', () => {
       picture:  null,
     });
 
-    await agent.get(
+    const cbRes = await agent.get(
       '/auth/google/callback?code=valid-code&state=fixed-test-state'
     );
 
-    const meRes = await agent.get('/auth/me');
+    const cookies = cbRes.headers['set-cookie'] || [];
+    const tokenCookie = cookies.find(c => c.startsWith('kelion.token='));
+    expect(tokenCookie).toBeDefined();
+
+    const token = tokenCookie.split('=')[1].split(';')[0];
+    const meRes = await agent.get('/auth/me').set('Cookie', `kelion.token=${token}`);
     expect(meRes.status).toBe(200);
     expect(meRes.body.email).toBe('me@example.com');
     expect(meRes.body.name).toBe('Me User');
