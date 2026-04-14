@@ -281,11 +281,11 @@ export default function VoiceChat() {
     }
   }
 
-  if (!loading && !user) {
-    navigate('/login')
-    return null
-  }
-  if (loading) return null
+  useEffect(() => {
+    if (!loading && !user) navigate('/login')
+  }, [loading, user, navigate])
+
+  if (loading || !user) return null
 
   return (
     <div style={{ width: '100vw', height: '100vh', display: 'flex', background: '#0a0a0f' }}>
