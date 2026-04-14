@@ -3,6 +3,7 @@ const { Router } = require('express');
 const { requireAuth } = require('../middleware/auth');
 const { requireAdmin } = require('../middleware/admin');
 const { findAll, findById, updateSubscription, updateRole, sanitizeUser } = require('../db');
+const { csrfProtection } = require('../middleware/csrf');
 const { VALID_TIERS, VALID_STATUSES } = require('../config/plans');
 
 const router = Router();
@@ -22,7 +23,7 @@ router.get('/users/:id', async (req, res) => {
 });
 
 // PUT /api/admin/users/:id/subscription
-router.put('/users/:id/subscription', async (req, res) => {
+router.put('/users/:id/subscription', csrfProtection, async (req, res) => {
   const { subscription_tier, subscription_status, subscription_expires_at } = req.body;
   if (subscription_tier && !VALID_TIERS.includes(subscription_tier)) {
     return res.status(400).json({ error: `Invalid tier. Valid values: ${VALID_TIERS.join(', ')}` });
@@ -43,7 +44,7 @@ router.put('/users/:id/subscription', async (req, res) => {
 });
 
 // PUT /api/admin/users/:id/role — promote/demote user
-router.put('/users/:id/role', async (req, res) => {
+router.put('/users/:id/role', csrfProtection, async (req, res) => {
   const { role } = req.body;
   if (!['admin', 'user'].includes(role)) {
     return res.status(400).json({ error: 'Role must be admin or user' });

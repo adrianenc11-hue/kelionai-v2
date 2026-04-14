@@ -1,13 +1,14 @@
 'use strict';
 const { Router } = require('express');
 const { requireAuth } = require('../middleware/auth');
+const { csrfProtection } = require('../middleware/csrf');
 const { createReferralCode, findReferralCode, useReferralCode } = require('../db');
 
 const router = Router();
 router.use(requireAuth);
 
 // POST /api/referral/generate — generate a new referral code for the logged-in user
-router.post('/generate', async (req, res) => {
+router.post('/generate', csrfProtection, async (req, res) => {
   try {
     const ref = await createReferralCode(req.user.id);
     res.json({ code: ref.code, expires_at: ref.expires_at });
@@ -31,7 +32,7 @@ router.get('/validate/:code', async (req, res) => {
 });
 
 // POST /api/referral/use — apply a referral code (called after payment)
-router.post('/use', async (req, res) => {
+router.post('/use', csrfProtection, async (req, res) => {
   const { code } = req.body;
   if (!code) return res.status(400).json({ error: 'Code is required' });
   try {

@@ -6,30 +6,36 @@ const CSRF_COOKIE = 'kelion.csrf';
 const CSRF_HEADER = 'x-csrf-token';
 
 /**
- * Double-submit cookie CSRF protection.
- *
- * On every response, a random token is set in a non-HttpOnly cookie so the
- * frontend JavaScript can read it. On state-changing requests (POST, PUT,
- * DELETE) the client must echo that token back via the X-CSRF-Token header.
- *
- * An attacker on a different origin cannot read the cookie (same-origin
- * policy), so they cannot forge the header.
+ * Seed the CSRF cookie on every response if it doesn't exist yet.
+ * Runs on ALL routes (GET included) so the frontend always has a token
+ * before making its first POST.
  */
-function csrfProtection(req, res, next) {
+function csrfSeed(req, res, next) {
   if (process.env.NODE_ENV === 'test') return next();
-  // Always set / refresh the CSRF cookie so the frontend has a token
+
   if (!req.cookies[CSRF_COOKIE]) {
     const token = crypto.randomBytes(32).toString('hex');
     res.cookie(CSRF_COOKIE, token, {
-      httpOnly: false,   // JS must be able to read it
+      httpOnly: false,
       secure:   process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       path:     '/',
       maxAge:   7 * 24 * 60 * 60 * 1000,
     });
   }
+  return next();
+}
 
-  // Only enforce on state-changing methods
+/**
+ * Enforce CSRF on state-changing requests. Must be used AFTER csrfSeed
+ * has had a chance to set the cookie (on a previous page load / GET).
+ *
+ * An attacker on a different origin cannot read the cookie (same-origin
+ * policy), so they cannot forge the header.
+ */
+function csrfProtection(req, res, next) {
+  if (process.env.NODE_ENV === 'test') return next();
+
   if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method)) {
     const cookieToken = req.cookies[CSRF_COOKIE];
     const headerToken = req.headers[CSRF_HEADER];
@@ -42,4 +48,4 @@ function csrfProtection(req, res, next) {
   return next();
 }
 
-module.exports = { csrfProtection, CSRF_COOKIE, CSRF_HEADER };
+module.exports = { csrfSeed, csrfProtection, CSRF_COOKIE, CSRF_HEADER };

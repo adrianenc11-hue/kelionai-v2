@@ -2,6 +2,7 @@
 
 const { Router } = require('express');
 const { requireAuth } = require('../middleware/auth');
+const { csrfProtection } = require('../middleware/csrf');
 const { checkSubscription } = require('../middleware/subscription');
 
 const { getOpenAI } = require('../utils/openai');
@@ -20,7 +21,7 @@ const MAX_MESSAGES_COUNT = 40;     // history depth
 // ---------------------------------------------------------------------------
 // POST /api/chat
 // ---------------------------------------------------------------------------
-router.post('/', requireAuth, checkSubscription, async (req, res) => {
+router.post('/', requireAuth, csrfProtection, checkSubscription, async (req, res) => {
   const { messages = [], avatar = 'kelion' } = req.body;
 
   if (!Array.isArray(messages)) {

@@ -1,6 +1,7 @@
 'use strict';
 const { Router } = require('express');
 const { requireAuth } = require('../middleware/auth');
+const { csrfProtection } = require('../middleware/csrf');
 const { getUsageToday, updateProfile } = require('../db');
 const { PLANS } = require('../config/plans');
 
@@ -34,7 +35,7 @@ router.get('/me', async (req, res) => {
 });
 
 // PUT /api/users/me
-router.put('/me', async (req, res) => {
+router.put('/me', csrfProtection, async (req, res) => {
   const { name } = req.body;
   if (!name || typeof name !== 'string' || !name.trim()) {
     return res.status(400).json({ error: 'Name is required' });

@@ -2,6 +2,7 @@
 
 const { Router } = require('express');
 const { requireAuth } = require('../middleware/auth');
+const { csrfProtection } = require('../middleware/csrf');
 const { PLANS } = require('../config/plans');
 const { updateStripeCustomerId, findByStripeCustomerId, updateSubscription } = require('../db');
 const config = require('../config');
@@ -22,7 +23,7 @@ function getStripe() {
 // ---------------------------------------------------------------------------
 // POST /api/payments/create-checkout-session
 // ---------------------------------------------------------------------------
-router.post('/create-checkout-session', requireAuth, async (req, res) => {
+router.post('/create-checkout-session', csrfProtection, requireAuth, async (req, res) => {
   const { planId } = req.body;
   const plan = PLANS[planId];
   if (!plan || plan.price === 0) {
