@@ -50,7 +50,7 @@ export function AuthProvider({ children }) {
       if (res.user) {
         await fetchMe()
         setError(null)
-        navigate('/dashboard')
+        navigate('/chat')
         return { success: true, ...res }
       }
       return { success: false, message: 'Invalid response from server' }
@@ -67,7 +67,7 @@ export function AuthProvider({ children }) {
       if (res.user) {
         await fetchMe()
         setError(null)
-        navigate('/dashboard')
+        navigate('/chat')
         return { success: true, ...res }
       }
       return { success: false, message: 'Invalid response from server' }

@@ -114,9 +114,8 @@ router.get('/google/callback', async (req, res) => {
       path: '/',
     });
 
-    console.log(`[auth/callback] Cookie set. Redirecting to: ${config.appBaseUrl}/`);
-    // Redirect the browser back to the app
-    return res.redirect(`${config.appBaseUrl}/`);
+    console.log(`[auth/callback] Cookie set. Redirecting to: ${config.appBaseUrl}/chat`);
+    return res.redirect(`${config.appBaseUrl}/chat`);
   } catch (err) {
     console.error('[auth/callback] CRITICAL Error:', err);
     if (mode === 'mobile') {
@@ -134,8 +133,17 @@ router.get('/google/callback', async (req, res) => {
 // Works for both web (session cookie) and mobile (Bearer token).
 // ---------------------------------------------------------------------------
 router.get('/me', requireAuth, (req, res) => {
-  const { id, email, name, picture, created_at } = req.user;
-  res.json({ id, email, name, picture, created_at });
+  const u = req.user;
+  res.json({
+    id:                      u.id,
+    email:                   u.email,
+    name:                    u.name,
+    picture:                 u.picture || u.avatar_url,
+    role:                    u.role || 'user',
+    subscription_tier:       u.subscription_tier || 'free',
+    subscription_status:     u.subscription_status || 'active',
+    created_at:              u.created_at,
+  });
 });
 
 // ---------------------------------------------------------------------------
