@@ -108,6 +108,12 @@ const mockDb = {
   createReferralCode: jest.fn(() => Promise.resolve({ code: 'TEST123' })),
   findReferralCode: jest.fn(() => Promise.resolve(null)),
   useReferralCode: jest.fn(() => Promise.resolve(null)),
+  sanitizeUser: jest.fn((user) => {
+    if (!user) return user;
+    const clean = { ...user };
+    delete clean.password_hash;
+    return clean;
+  }),
 };
 
 jest.mock('../src/db', () => mockDb);

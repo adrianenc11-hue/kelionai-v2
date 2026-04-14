@@ -16,6 +16,7 @@ jest.mock('../src/utils/google', () => ({
 }));
 
 const request = require('supertest');
+const jwt     = require('jsonwebtoken');
 const app     = require('../src/index');
 
 beforeEach(() => mockDb._reset());
@@ -25,7 +26,10 @@ const unique = () => `sub_${Date.now()}_${Math.random().toString(36).slice(2)}@t
 async function createUser() {
   const r = await request(app).post('/auth/local/register')
     .send({ email: unique(), password: 'ValidPass123!', name: 'Sub User' });
-  return { token: r.body.token, id: r.body.user.id };
+  const id = r.body.user.id;
+  const token = jwt.sign({ sub: id, email: r.body.user.email, name: 'Sub User' },
+    process.env.JWT_SECRET, { expiresIn: '1h' });
+  return { token, id };
 }
 
 describe('GET /api/subscription/plans', () => {

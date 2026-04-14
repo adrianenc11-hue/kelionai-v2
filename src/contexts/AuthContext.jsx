@@ -47,7 +47,7 @@ export function AuthProvider({ children }) {
   const localLogin = useCallback(async (email, password) => {
     try {
       const res = await api.post(`/auth/local/login`, { email, password })
-      if (res.token) {
+      if (res.user) {
         await fetchMe()
         setError(null)
         navigate('/dashboard')
@@ -64,7 +64,7 @@ export function AuthProvider({ children }) {
   const registerLocal = useCallback(async (email, password, name) => {
     try {
       const res = await api.post(`/auth/local/register`, { email, password, name })
-      if (res.token) {
+      if (res.user) {
         await fetchMe()
         setError(null)
         navigate('/dashboard')

@@ -2,7 +2,7 @@
 const { Router } = require('express');
 const { requireAuth } = require('../middleware/auth');
 const { requireAdmin } = require('../middleware/admin');
-const { findAll, findById, updateSubscription, updateRole } = require('../db');
+const { findAll, findById, updateSubscription, updateRole, sanitizeUser } = require('../db');
 const { VALID_TIERS, VALID_STATUSES } = require('../config/plans');
 
 const router = Router();
@@ -11,14 +11,14 @@ router.use(requireAuth, requireAdmin);
 // GET /api/admin/users
 router.get('/users', async (_req, res) => {
   const users = await findAll();
-  res.json({ users });
+  res.json({ users: users.map(sanitizeUser) });
 });
 
 // GET /api/admin/users/:id
 router.get('/users/:id', async (req, res) => {
   const user = await findById(req.params.id);
   if (!user) return res.status(404).json({ error: 'User not found' });
-  res.json(user);
+  res.json(sanitizeUser(user));
 });
 
 // PUT /api/admin/users/:id/subscription
@@ -39,7 +39,7 @@ router.put('/users/:id/subscription', async (req, res) => {
       ? subscription_expires_at
       : existing.subscription_expires_at,
   });
-  res.json(updated);
+  res.json(sanitizeUser(updated));
 });
 
 // PUT /api/admin/users/:id/role — promote/demote user
@@ -51,7 +51,7 @@ router.put('/users/:id/role', async (req, res) => {
   const existing = await findById(req.params.id);
   if (!existing) return res.status(404).json({ error: 'User not found' });
   const updated = await updateRole(req.params.id, role);
-  res.json(updated);
+  res.json(sanitizeUser(updated));
 });
 
 module.exports = router;

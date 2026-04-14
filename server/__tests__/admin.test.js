@@ -27,7 +27,10 @@ async function createUser() {
   const email = unique();
   const r = await request(app).post('/auth/local/register')
     .send({ email, password: 'ValidPass123!', name: 'Test User' });
-  return { token: r.body.token, id: r.body.user.id, email };
+  const id = r.body.user.id;
+  const token = jwt.sign({ sub: id, email, name: 'Test User' },
+    process.env.JWT_SECRET, { expiresIn: '1h' });
+  return { token, id, email };
 }
 
 async function createAdmin() {

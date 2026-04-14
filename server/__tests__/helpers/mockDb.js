@@ -56,6 +56,12 @@ function createMockDb() {
       if (ref.owner_id === userId) throw new Error('Cannot use your own referral code');
       ref.used = 1; ref.used_by = userId;
     }),
+    sanitizeUser: jest.fn((user) => {
+      if (!user) return user;
+      const clean = { ...user };
+      delete clean.password_hash;
+      return clean;
+    }),
     _users:    users,
     _referrals: referrals,
     _usage:    usage,

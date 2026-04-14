@@ -16,6 +16,7 @@ jest.mock('../src/utils/google', () => ({
 }));
 
 const request = require('supertest');
+const jwt     = require('jsonwebtoken');
 const app     = require('../src/index');
 
 beforeEach(() => mockDb._reset());
@@ -26,7 +27,10 @@ async function createUser() {
   const email = unique();
   const r = await request(app).post('/auth/local/register')
     .send({ email, password: 'ValidPass123!', name: 'Ref User' });
-  return { token: r.body.token, id: r.body.user.id };
+  const id = r.body.user.id;
+  const token = jwt.sign({ sub: id, email: r.body.user.email, name: 'Ref User' },
+    process.env.JWT_SECRET, { expiresIn: '1h' });
+  return { token, id };
 }
 
 describe('Referral system', () => {

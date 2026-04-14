@@ -76,7 +76,7 @@ router.post('/', requireAuth, checkSubscription, async (req, res) => {
     res.write('data: [DONE]\n\n');
   } catch (err) {
     console.error('[chat] OpenAI error:', err.message);
-    res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
+    res.write(`data: ${JSON.stringify({ error: 'AI service encountered an error. Please try again.' })}\n\n`);
   } finally {
     res.end();
   }

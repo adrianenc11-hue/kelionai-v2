@@ -23,7 +23,6 @@ router.get('/me', async (req, res) => {
     subscription_tier:       tier,
     subscription_status:     user.subscription_status || 'active',
     subscription_expires_at: user.subscription_expires_at || null,
-    stripe_customer_id:      user.stripe_customer_id || null,
     created_at:              user.created_at,
     updated_at:              user.updated_at,
     last_login_at:           user.last_signed_in || user.last_login_at,

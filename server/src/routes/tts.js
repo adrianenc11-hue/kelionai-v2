@@ -14,7 +14,10 @@ const { getOpenAI } = require('../utils/openai');
  * Returns the audio file directly as a stream.
  */
 router.post('/', requireAuth, checkSubscription, async (req, res) => {
-  const { text, model = 'tts-1', voice = 'alloy' } = req.body;
+  const ALLOWED_MODELS = ['tts-1', 'tts-1-hd'];
+  const ALLOWED_VOICES = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'];
+
+  const { text, model: rawModel = 'tts-1', voice: rawVoice = 'alloy' } = req.body;
 
   if (!text) {
     return res.status(400).json({ error: 'Text is required' });
@@ -22,6 +25,9 @@ router.post('/', requireAuth, checkSubscription, async (req, res) => {
   if (typeof text !== 'string' || text.length > 2000) {
     return res.status(400).json({ error: 'Text must be a string under 2000 characters' });
   }
+
+  const model = ALLOWED_MODELS.includes(rawModel) ? rawModel : 'tts-1';
+  const voice = ALLOWED_VOICES.includes(rawVoice) ? rawVoice : 'alloy';
 
   const openai = getOpenAI();
   if (!openai) {

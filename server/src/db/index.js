@@ -286,8 +286,24 @@ function useReferralCode(code, usedByUserId) {
   applyReferral();
 }
 
+const SENSITIVE_FIELDS = ['password_hash'];
+
+/**
+ * Return a shallow copy of a user row with sensitive fields removed.
+ * Safe to send over the wire.
+ */
+function sanitizeUser(user) {
+  if (!user) return user;
+  const clean = { ...user };
+  for (const field of SENSITIVE_FIELDS) {
+    delete clean[field];
+  }
+  return clean;
+}
+
 module.exports = {
   db,
+  sanitizeUser,
   findByGoogleId,
   findById,
   findByEmail,
