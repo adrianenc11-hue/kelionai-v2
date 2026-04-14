@@ -49,7 +49,10 @@ export default function VoiceChat() {
 
   const recognitionRef = useRef(null)
   const startListeningRef = useRef(null)
+  const wasListeningRef = useRef(false)
   const chatEndRef = useRef(null)
+  const videoRef = useRef(null)
+  const streamRef = useRef(null)
   
   // High-quality Voice & LipSync
   const audioRef = useRef(null)
@@ -60,8 +63,27 @@ export default function VoiceChat() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  const wasListeningRef = useRef(false)
-  const startListeningRef = useRef(null)
+  // Start camera when component mounts
+  useEffect(() => {
+    async function startCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'user', width: { ideal: 320 }, height: { ideal: 240 } },
+        })
+        streamRef.current = stream
+        if (videoRef.current) videoRef.current.srcObject = stream
+      } catch (err) {
+        console.warn('[camera] Could not start:', err.message)
+      }
+    }
+    startCamera()
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop())
+        streamRef.current = null
+      }
+    }
+  }, [])
 
   const speak = useCallback(async (text) => {
     if (!text) return
