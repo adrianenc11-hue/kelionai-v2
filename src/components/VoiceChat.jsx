@@ -48,6 +48,7 @@ export default function VoiceChat() {
   const [boneNames, setBoneNames] = useState([])
 
   const recognitionRef = useRef(null)
+  const startListeningRef = useRef(null)
   const chatEndRef = useRef(null)
   
   // High-quality Voice & LipSync
@@ -59,9 +60,17 @@ export default function VoiceChat() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  const wasListeningRef = useRef(false)
+  const startListeningRef = useRef(null)
+
   const speak = useCallback(async (text) => {
     if (!text) return
     setIsTalking(true)
+
+    if (recognitionRef.current && isListening) {
+      wasListeningRef.current = true
+      try { recognitionRef.current.stop() } catch (_) {}
+    }
     
     try {
       const response = await fetch('/api/tts', {
@@ -81,7 +90,13 @@ export default function VoiceChat() {
       
       if (audioRef.current) {
         audioRef.current.src = url
-        audioRef.current.onended = () => setIsTalking(false)
+        audioRef.current.onended = () => {
+          setIsTalking(false)
+          if (wasListeningRef.current) {
+            wasListeningRef.current = false
+            setTimeout(() => startListeningRef.current?.(), 300)
+          }
+        }
         audioRef.current.play().catch(e => {
             console.error('Audio play failed:', e)
             setIsTalking(false)
@@ -91,7 +106,7 @@ export default function VoiceChat() {
       console.error('[speak] Error:', err.message)
       setIsTalking(false)
     }
-  }, [avatar.id])
+  }, [avatar.id, isListening, startListening])
 
   const sendMessage = useCallback(async (text) => {
     if (!text.trim()) return
@@ -158,12 +173,7 @@ export default function VoiceChat() {
     }
   }, [messages, avatar.id, speak])
 
-  const toggleListening = useCallback(() => {
-    if (isListening) {
-      recognitionRef.current?.stop()
-      return
-    }
-
+  const startListening = useCallback(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
     if (!SpeechRecognition) {
       alert('Your browser does not support voice recognition. Use Chrome.')
@@ -172,25 +182,53 @@ export default function VoiceChat() {
 
     if (synthRef.current) synthRef.current.cancel()
     const recognition = new SpeechRecognition()
-    recognition.lang = 'en-US'
-    recognition.continuous = false
+    recognition.lang = navigator.language || 'en-US'
+    recognition.continuous = true
     recognition.interimResults = true
 
     recognition.onstart = () => setIsListening(true)
     recognition.onresult = (e) => {
-      const t = Array.from(e.results).map(r => r[0].transcript).join('')
+      const last = e.results[e.results.length - 1]
+      const t = last[0].transcript
       setTranscript(t)
-      if (e.results[e.results.length - 1].isFinal) {
-        recognition.stop()
+      if (last.isFinal && t.trim()) {
         sendMessage(t)
+        setTranscript('')
       }
     }
-    recognition.onerror = () => setIsListening(false)
-    recognition.onend = () => setIsListening(false)
+    recognition.onerror = (e) => {
+      if (e.error !== 'no-speech') setIsListening(false)
+    }
+    recognition.onend = () => {
+      if (recognitionRef.current === recognition && isListening) {
+        try { recognition.start() } catch (_) {}
+      } else {
+        setIsListening(false)
+      }
+    }
 
     recognitionRef.current = recognition
     recognition.start()
-  }, [isListening, sendMessage])
+  }, [sendMessage, isListening])
+
+  useEffect(() => { startListeningRef.current = startListening }, [startListening])
+
+  const stopListening = useCallback(() => {
+    if (recognitionRef.current) {
+      const r = recognitionRef.current
+      recognitionRef.current = null
+      r.stop()
+    }
+    setIsListening(false)
+  }, [])
+
+  const toggleListening = useCallback(() => {
+    if (isListening) {
+      stopListening()
+    } else {
+      startListening()
+    }
+  }, [isListening, startListening, stopListening])
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
