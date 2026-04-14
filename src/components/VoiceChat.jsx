@@ -130,6 +130,17 @@ export default function VoiceChat() {
     }
   }, [avatar.id, isListening, startListening])
 
+  const captureFrame = useCallback(() => {
+    if (!videoRef.current || !streamRef.current) return null
+    try {
+      const canvas = document.createElement('canvas')
+      canvas.width = 320; canvas.height = 240
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(videoRef.current, 0, 0, 320, 240)
+      return canvas.toDataURL('image/jpeg', 0.7)
+    } catch { return null }
+  }, [])
+
   const sendMessage = useCallback(async (text) => {
     if (!text.trim()) return
     setIsLoading(true)
@@ -137,6 +148,8 @@ export default function VoiceChat() {
     setMessages(newMessages)
     setInputText('')
     setTranscript('')
+
+    const frame = captureFrame()
 
     try {
       let assistantText = ''
@@ -146,7 +159,7 @@ export default function VoiceChat() {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
-        body: JSON.stringify({ messages: newMessages, avatar: avatar.id }),
+        body: JSON.stringify({ messages: newMessages, avatar: avatar.id, frame }),
       })
 
       if (!response.ok) {
@@ -261,6 +274,8 @@ export default function VoiceChat() {
 
   return (
     <div style={{ width: '100vw', height: '100vh', display: 'flex', background: '#0a0a0f' }}>
+      {/* Hidden video for camera capture */}
+      <video ref={videoRef} autoPlay playsInline muted style={{ display: 'none' }} />
       {/* Avatar 3D */}
       <div style={{ flex: 1, position: 'relative' }}>
         <Canvas camera={{ position: [0, 0.5, 3], fov: 45 }}>
