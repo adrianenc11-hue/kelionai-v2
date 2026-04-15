@@ -144,7 +144,7 @@ export default function LandingPage() {
           </div>
 
           <div style={{ maxWidth: '380px' }}>
-            <button onClick={() => navigate('/chat')} style={{
+            <button onClick={() => navigate('/chat/kelion')} style={{
               width: '100%',
               background: 'linear-gradient(135deg, #7c3aed, #a855f7)',
               border: 'none', borderRadius: '14px', color: '#fff',

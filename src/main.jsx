@@ -6,7 +6,6 @@ import './index.css'
 
 import LandingPage from './pages/LandingPage'
 
-const AvatarSelect = lazy(() => import('./components/AvatarSelect'))
 const VoiceChat = lazy(() => import('./components/VoiceChat'))
 
 function Loader() {
@@ -34,7 +33,6 @@ createRoot(document.getElementById('root')).render(
         <Suspense fallback={<Loader />}>
           <Routes>
             <Route path="/" element={<LandingPage />} />
-            <Route path="/chat" element={<AvatarSelect />} />
             <Route path="/chat/:avatarId" element={<VoiceChat />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
