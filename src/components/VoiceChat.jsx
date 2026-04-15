@@ -87,8 +87,8 @@ function KelionModel({ modelPath, mouthOpen = 0 }) {
   return (
     <primitive
       object={scene}
-      scale={2.15}
-      position={[0.170, -1.800, 0.460]}
+      scale={2.2}
+      position={[0, -2.1, 0]}
     />
   )
 }
@@ -342,7 +342,7 @@ export default function VoiceChat() {
       <video ref={videoRef} autoPlay playsInline muted style={{ display: 'none' }} />
       {/* Avatar 3D */}
       <div style={{ flex: 1, position: 'relative' }}>
-        <Canvas camera={{ position: [0, 0.5, 3], fov: 45 }}>
+        <Canvas camera={{ position: [0, 0.4, 3.2], fov: 38 }}>
           <ambientLight intensity={0.4} />
           <directionalLight position={[2, 4, 2]} intensity={1.5} />
           <pointLight position={[0, 2, 2]} intensity={isTalking ? 2 : 0.5} color={avatar.glow} />
@@ -351,13 +351,12 @@ export default function VoiceChat() {
             <KelionModel modelPath={avatar.model} mouthOpen={mouthOpen} />
           </Suspense>
           <OrbitControls
-            enableZoom={true}
+            enableZoom={false}
             enablePan={false}
-            minDistance={1}
-            maxDistance={8}
             minPolarAngle={Math.PI / 4}
             maxPolarAngle={Math.PI / 1.8}
-            zoomSpeed={0.8}
+            minAzimuthAngle={-Math.PI / 5}
+            maxAzimuthAngle={Math.PI / 5}
           />
         </Canvas>
 
