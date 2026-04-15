@@ -5,14 +5,12 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { getCsrfToken } from '../lib/api'
 import { useLipSync } from '../lib/lipSync'
 
-const AVATARS = {
-  kelion: {
-    id: 'kelion',
-    name: 'Kelion',
-    model: '/kelion-rpm_e27cb94d.glb',
-    color: '#7c3aed',
-    glow: '#a855f7',
-  },
+const AVATAR = {
+  id: 'kelion',
+  name: 'Kelion',
+  model: '/kelion-rpm_e27cb94d.glb',
+  color: '#7c3aed',
+  glow: '#a855f7',
 }
 
 const ARM_ROT     = { x: 1.3, y: 0.0, z: 0.15 }
@@ -28,42 +26,32 @@ function KelionModel({ modelPath, mouthOpen = 0 }) {
     const morphs = []
     scene.traverse((obj) => {
       if (obj.isBone || obj.type === 'Bone') bones[obj.name] = obj
-      if (obj.isSkinnedMesh && obj.skeleton) {
+      if (obj.isSkinnedMesh && obj.skeleton)
         obj.skeleton.bones.forEach(b => { bones[b.name] = b })
-      }
-      if ((obj.isMesh || obj.isSkinnedMesh) && obj.morphTargetDictionary) {
+      if ((obj.isMesh || obj.isSkinnedMesh) && obj.morphTargetDictionary)
         morphs.push(obj)
-      }
     })
     bonesRef.current = bones
     morphsRef.current = morphs
-
     const setRot = (names, x, y, z) => {
-      for (const n of names) {
-        if (bones[n]) { bones[n].rotation.set(x, y, z); break }
-      }
+      for (const n of names) { if (bones[n]) { bones[n].rotation.set(x, y, z); break } }
     }
-    setRot(['LeftArm',  'LeftUpperArm'],   ARM_ROT.x,  ARM_ROT.y,  ARM_ROT.z)
-    setRot(['RightArm', 'RightUpperArm'],  ARM_ROT.x, -ARM_ROT.y, -ARM_ROT.z)
-    setRot(['LeftForeArm'],                FOREARM_ROT.x,  FOREARM_ROT.y,  FOREARM_ROT.z)
-    setRot(['RightForeArm'],               FOREARM_ROT.x, -FOREARM_ROT.y, -FOREARM_ROT.z)
+    setRot(['LeftArm',  'LeftUpperArm'],  ARM_ROT.x,  ARM_ROT.y,  ARM_ROT.z)
+    setRot(['RightArm', 'RightUpperArm'], ARM_ROT.x, -ARM_ROT.y, -ARM_ROT.z)
+    setRot(['LeftForeArm'],               FOREARM_ROT.x,  FOREARM_ROT.y,  FOREARM_ROT.z)
+    setRot(['RightForeArm'],              FOREARM_ROT.x, -FOREARM_ROT.y, -FOREARM_ROT.z)
   }, [scene])
 
-  useFrame((state) => {
+  useFrame(() => {
     const b = bonesRef.current
     if (!b) return
-
     const set = (names, x, y, z) => {
-      for (const n of names) {
-        if (b[n]) { b[n].rotation.x = x; b[n].rotation.y = y; b[n].rotation.z = z; break }
-      }
+      for (const n of names) { if (b[n]) { b[n].rotation.x = x; b[n].rotation.y = y; b[n].rotation.z = z; break } }
     }
     set(['LeftArm',  'LeftUpperArm'],  ARM_ROT.x,  ARM_ROT.y,  ARM_ROT.z)
     set(['RightArm', 'RightUpperArm'], ARM_ROT.x, -ARM_ROT.y, -ARM_ROT.z)
     set(['LeftForeArm'],               FOREARM_ROT.x,  FOREARM_ROT.y,  FOREARM_ROT.z)
     set(['RightForeArm'],              FOREARM_ROT.x, -FOREARM_ROT.y, -FOREARM_ROT.z)
-
-    // LipSync
     const jaw = b['Jaw'] || b['mixamorigJaw']
     if (jaw) jaw.rotation.x = mouthOpen * 0.2
     for (const mesh of morphsRef.current) {
@@ -74,90 +62,52 @@ function KelionModel({ modelPath, mouthOpen = 0 }) {
     }
   })
 
-  return (
-    <primitive object={scene} scale={1.6} position={[0, -1.6, 0]} rotation={[0, 0, 0]} />
-  )
+  return <primitive object={scene} scale={1.6} position={[0, -1.6, 0]} rotation={[0, 0, 0]} />
 }
 
 export default function VoiceChat() {
-  const { avatarId } = useParams()
   const navigate = useNavigate()
-  const avatar = AVATARS[avatarId] || AVATARS.kelion
-  const onBack = () => navigate('/')
 
+  // messages kept only for API context (history), not all displayed
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: `Hi! I'm ${avatar.name}. How can I help you?` }
+    { role: 'assistant', content: `Hi! I'm ${AVATAR.name}. How can I help you?` }
   ])
-  const [inputText, setInputText] = useState('')
+  const [inputText, setInputText]   = useState('')
   const [isListening, setIsListening] = useState(false)
-  const [isTalking, setIsTalking] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
+  const [isTalking, setIsTalking]   = useState(false)
+  const [isLoading, setIsLoading]   = useState(false)
   const [transcript, setTranscript] = useState('')
 
-
-  const recognitionRef = useRef(null)
+  const messagesRef      = useRef(messages)
+  const sendMessageRef   = useRef(null)
   const startListeningRef = useRef(null)
-  const wasListeningRef = useRef(false)
-  const chatEndRef = useRef(null)
-  const videoRef = useRef(null)
-  const streamRef = useRef(null)
-  
-  // High-quality Voice & LipSync
-  const audioRef = useRef(null)
-  const synthRef = useRef(typeof window !== 'undefined' && window.speechSynthesis ? window.speechSynthesis : null)
-  const mouthOpen = useLipSync(audioRef)
+  const recognitionRef   = useRef(null)
+  const wasListeningRef  = useRef(false)
+  const isListeningRef   = useRef(false)
+  const audioRef         = useRef(null)
+  const mouthOpen        = useLipSync(audioRef)
 
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  useEffect(() => { messagesRef.current = messages }, [messages])
+  useEffect(() => { isListeningRef.current = isListening }, [isListening])
 
-  const startCamera = useCallback(async () => {
-    if (streamRef.current) return
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 320 }, height: { ideal: 240 } },
-      })
-      streamRef.current = stream
-      if (videoRef.current) videoRef.current.srcObject = stream
-    } catch (err) {
-      console.warn('[camera] Could not start:', err.message)
-    }
-  }, [])
-
-  const stopCamera = useCallback(() => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop())
-      streamRef.current = null
-    }
-    if (videoRef.current) videoRef.current.srcObject = null
-  }, [])
-
-  useEffect(() => {
-    return () => stopCamera()
-  }, [stopCamera])
-
+  // ── ElevenLabs TTS ──────────────────────────────────────────────────────────
   const speak = useCallback(async (text) => {
     if (!text) return
     setIsTalking(true)
-
-    if (recognitionRef.current && isListening) {
+    if (recognitionRef.current && isListeningRef.current) {
       wasListeningRef.current = true
       try { recognitionRef.current.stop() } catch (_) {}
     }
-    
     try {
       const response = await fetch('/api/tts', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
-        body: JSON.stringify({ text, voice: 'alloy' }),
+        body: JSON.stringify({ text }),
       })
-
-      if (!response.ok) throw new Error('TTS request failed')
-
+      if (!response.ok) throw new Error('TTS failed')
       const blob = await response.blob()
-      const url = URL.createObjectURL(blob)
-      
+      const url  = URL.createObjectURL(blob)
       if (audioRef.current) {
         audioRef.current.src = url
         audioRef.current.onended = () => {
@@ -167,33 +117,19 @@ export default function VoiceChat() {
             setTimeout(() => startListeningRef.current?.(), 300)
           }
         }
-        audioRef.current.play().catch(e => {
-            console.error('Audio play failed:', e)
-            setIsTalking(false)
-        })
+        audioRef.current.play().catch(() => setIsTalking(false))
       }
-    } catch (err) {
-      console.error('[speak] Error:', err.message)
+    } catch {
       setIsTalking(false)
     }
-  }, [avatar.id, isListening])
-
-  const captureFrame = useCallback(() => {
-    if (!videoRef.current || !streamRef.current) return null
-    try {
-      const canvas = document.createElement('canvas')
-      canvas.width = 320; canvas.height = 240
-      const ctx = canvas.getContext('2d')
-      ctx.drawImage(videoRef.current, 0, 0, 320, 240)
-      return canvas.toDataURL('image/jpeg', 0.7)
-    } catch { return null }
   }, [])
 
-  const sendMessage = useCallback(async (text) => {
-    if (!text.trim()) return
+  // ── Streaming chat ──────────────────────────────────────────────────────────
+  const sendMessage = useCallback(async (userText) => {
+    if (!userText.trim()) return
     setIsLoading(true)
-    const newMessages = [...messages, { role: 'user', content: text }]
-    setMessages(newMessages)
+    const history = [...messagesRef.current, { role: 'user', content: userText }]
+    setMessages(history)
     setInputText('')
     setTranscript('')
 
@@ -205,33 +141,23 @@ export default function VoiceChat() {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
-        body: JSON.stringify({ messages: newMessages, avatar: avatar.id }),
+        body: JSON.stringify({ messages: history, avatar: AVATAR.id }),
       })
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
 
-      if (!response.ok) {
-        throw new Error(`Chat request failed: ${response.status}`)
-      }
-
-      const reader = response.body.getReader()
+      const reader  = response.body.getReader()
       const decoder = new TextDecoder()
 
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
-
-        const text = decoder.decode(value, { stream: true })
-        const lines = text.split('\n')
-
-        for (const line of lines) {
+        const chunk = decoder.decode(value, { stream: true })
+        for (const line of chunk.split('\n')) {
           if (!line.startsWith('data: ')) continue
           const data = line.slice(6).trim()
-          if (data === '[DONE]') {
-            speak(assistantText)
-            break
-          }
+          if (data === '[DONE]') { speak(assistantText); break }
           try {
             const parsed = JSON.parse(data)
-            if (parsed.error) throw new Error(parsed.error)
             if (parsed.content) {
               assistantText += parsed.content
               setMessages(prev => {
@@ -240,60 +166,51 @@ export default function VoiceChat() {
                 return updated
               })
             }
-          } catch (parseErr) {
-            console.warn('Failed to parse SSE chunk:', parseErr)
-          }
+          } catch (_) {}
         }
       }
-    } catch (err) {
-      const isLimit = err.message?.includes('429')
-      const errorMsg = isLimit
-        ? 'Daily usage limit reached. Upgrade your plan for more.'
-        : 'Sorry, an error occurred. Please try again.'
-      setMessages(prev => [...prev, { role: 'assistant', content: errorMsg }])
+    } catch {
+      setMessages(prev => {
+        const updated = [...prev]
+        updated[updated.length - 1] = { role: 'assistant', content: 'Sorry, an error occurred. Please try again.' }
+        return updated
+      })
     } finally {
       setIsLoading(false)
     }
-  }, [messages, avatar.id, speak])
+  }, [speak])
 
+  useEffect(() => { sendMessageRef.current = sendMessage }, [sendMessage])
+
+  // ── Speech recognition ──────────────────────────────────────────────────────
   const startListening = useCallback(() => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
-    if (!SpeechRecognition) {
-      alert('Your browser does not support voice recognition. Use Chrome.')
-      return
-    }
-
-    if (synthRef.current) synthRef.current.cancel()
-    startCamera()
-    const recognition = new SpeechRecognition()
-    recognition.lang = navigator.language || 'en-US'
-    recognition.continuous = true
-    recognition.interimResults = true
-
-    recognition.onstart = () => setIsListening(true)
-    recognition.onresult = (e) => {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (!SR) return
+    const rec = new SR()
+    rec.lang = navigator.language || 'en-US'
+    rec.continuous = true
+    rec.interimResults = true
+    rec.onstart  = () => setIsListening(true)
+    rec.onresult = (e) => {
       const last = e.results[e.results.length - 1]
-      const t = last[0].transcript
+      const t    = last[0].transcript
       setTranscript(t)
       if (last.isFinal && t.trim()) {
-        sendMessage(t)
         setTranscript('')
+        sendMessageRef.current?.(t)
       }
     }
-    recognition.onerror = (e) => {
-      if (e.error !== 'no-speech') setIsListening(false)
-    }
-    recognition.onend = () => {
-      if (recognitionRef.current === recognition && isListening) {
-        try { recognition.start() } catch (_) {}
+    rec.onerror = (e) => { if (e.error !== 'no-speech') setIsListening(false) }
+    rec.onend   = () => {
+      if (recognitionRef.current === rec && isListeningRef.current) {
+        try { rec.start() } catch (_) {}
       } else {
         setIsListening(false)
       }
     }
-
-    recognitionRef.current = recognition
-    recognition.start()
-  }, [sendMessage, isListening])
+    recognitionRef.current = rec
+    rec.start()
+  }, [])
 
   useEffect(() => { startListeningRef.current = startListening }, [startListening])
 
@@ -304,38 +221,28 @@ export default function VoiceChat() {
       r.stop()
     }
     setIsListening(false)
-    stopCamera()
-  }, [stopCamera])
+  }, [])
 
-  const toggleListening = useCallback(() => {
-    if (isListening) {
-      stopListening()
-    } else {
-      startListening()
-    }
-  }, [isListening, startListening, stopListening])
+  const toggleListening = () => isListening ? stopListening() : startListening()
 
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      sendMessage(inputText)
-    }
-  }
+  // ── Derived display values ──────────────────────────────────────────────────
+  const lastAssistant = [...messages].reverse().find(m => m.role === 'assistant')
+  const lastUser      = [...messages].reverse().find(m => m.role === 'user')
 
   return (
     <div style={{ width: '100vw', height: '100vh', display: 'flex', background: '#0a0a0f' }}>
-      {/* Hidden video for camera capture */}
-      <video ref={videoRef} autoPlay playsInline muted style={{ display: 'none' }} />
-      {/* Avatar 3D */}
+      <audio ref={audioRef} style={{ display: 'none' }} />
+
+      {/* ── Avatar panel ── */}
       <div style={{ flex: 1, position: 'relative' }}>
         <Canvas camera={{ position: [0, 0.3, 3.5], fov: 45 }} style={{ width: '100%', height: '100%' }} gl={{ antialias: true }}>
           <color attach="background" args={['#0a0a0f']} />
           <ambientLight intensity={0.5} />
           <directionalLight position={[2, 4, 2]} intensity={1.5} />
-          <pointLight position={[0, 1, 2]} intensity={isTalking ? 2 : 0.8} color={avatar.glow} />
+          <pointLight position={[0, 1, 2]} intensity={isTalking ? 2 : 0.8} color={AVATAR.glow} />
           <Suspense fallback={null}>
             <hemisphereLight skyColor="#b1e1ff" groundColor="#000000" intensity={0.6} />
-            <KelionModel modelPath={avatar.model} mouthOpen={mouthOpen} />
+            <KelionModel modelPath={AVATAR.model} mouthOpen={mouthOpen} />
           </Suspense>
           <OrbitControls enableZoom={false} enablePan={false}
             minPolarAngle={Math.PI / 4} maxPolarAngle={Math.PI / 1.8}
@@ -343,171 +250,146 @@ export default function VoiceChat() {
           />
         </Canvas>
 
-        {/* Hidden audio for LipSync */}
-        <audio ref={audioRef} style={{ display: 'none' }} />
+        {/* Back */}
+        <button onClick={() => navigate('/')} style={{
+          position: 'absolute', top: '20px', left: '20px',
+          background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)',
+          color: '#fff', padding: '8px 16px', borderRadius: '20px',
+          cursor: 'pointer', fontSize: '14px', backdropFilter: 'blur(10px)',
+        }}>← Back</button>
 
-        {/* Back button */}
-        <button
-          onClick={onBack}
-          style={{
-            position: 'absolute', top: '20px', left: '20px',
-            background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)',
-            color: '#fff', padding: '8px 16px', borderRadius: '20px',
-            cursor: 'pointer', fontSize: '14px', backdropFilter: 'blur(10px)',
-          }}
-        >
-          ← Back
-        </button>
-
-        {/* Zoom hint */}
+        {/* Status badge */}
         <div style={{
-          position: 'absolute', top: '20px', left: '50%', transform: 'translateX(-50%)',
-          background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)',
-          border: '1px solid rgba(255,255,255,0.1)',
-          color: '#888', padding: '4px 14px', borderRadius: '20px', fontSize: '11px',
-          pointerEvents: 'none',
+          position: 'absolute', bottom: '30px', left: '50%', transform: 'translateX(-50%)',
+          display: 'flex', alignItems: 'center', gap: '8px',
+          background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)',
+          padding: '8px 20px', borderRadius: '30px', border: `1px solid ${AVATAR.color}44`,
         }}>
-          🖱 Scroll = zoom · Drag = rotate
-        </div>
-
-
-        {/* Avatar name + talking indicator */}
-        <div style={{
-          position: 'absolute', bottom: '30px', left: '50%',
-          transform: 'translateX(-50%)', textAlign: 'center',
-        }}>
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: '8px',
-            background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)',
-            padding: '8px 20px', borderRadius: '30px',
-            border: `1px solid ${avatar.color}44`,
-          }}>
-            {isTalking && (
-              <span style={{
-                width: '8px', height: '8px', borderRadius: '50%',
-                background: avatar.glow, animation: 'pulse 0.8s infinite',
-                boxShadow: `0 0 10px ${avatar.glow}`,
-              }} />
-            )}
-            <span style={{ color: avatar.glow, fontWeight: '600' }}>{avatar.name}</span>
-            {isTalking && <span style={{ color: '#aaa', fontSize: '12px' }}>talking...</span>}
-          </div>
+          {(isTalking || isListening) && (
+            <span style={{
+              width: '8px', height: '8px', borderRadius: '50%',
+              background: isTalking ? AVATAR.glow : '#22c55e',
+              animation: 'pulse 0.8s infinite',
+              boxShadow: `0 0 10px ${isTalking ? AVATAR.glow : '#22c55e'}`,
+            }} />
+          )}
+          <span style={{ color: AVATAR.glow, fontWeight: '600' }}>{AVATAR.name}</span>
+          {isTalking   && <span style={{ color: '#aaa', fontSize: '12px' }}>talking...</span>}
+          {isListening && !isTalking && <span style={{ color: '#22c55e', fontSize: '12px' }}>listening...</span>}
+          {isLoading   && !isTalking && <span style={{ color: '#f59e0b', fontSize: '12px' }}>thinking...</span>}
         </div>
       </div>
 
-      {/* Chat Panel */}
+      {/* ── Chat panel ── */}
       <div style={{
-        width: '380px', display: 'flex', flexDirection: 'column',
-        background: 'rgba(255,255,255,0.03)', borderLeft: '1px solid rgba(255,255,255,0.08)',
+        width: '400px', display: 'flex', flexDirection: 'column',
+        background: 'rgba(0,0,0,0.35)', borderLeft: '1px solid rgba(255,255,255,0.07)',
       }}>
         {/* Header */}
         <div style={{
-          padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)',
-          display: 'flex', alignItems: 'center', gap: '10px',
+          padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.07)',
+          display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0,
         }}>
           <div style={{
             width: '10px', height: '10px', borderRadius: '50%',
-            background: avatar.glow, boxShadow: `0 0 8px ${avatar.glow}`,
+            background: AVATAR.glow, boxShadow: `0 0 8px ${AVATAR.glow}`,
           }} />
-          <span style={{ fontWeight: '600', color: '#fff' }}>Chat with {avatar.name}</span>
+          <span style={{ fontWeight: '600', color: '#fff', fontSize: '15px' }}>Chat with {AVATAR.name}</span>
           <span style={{ marginLeft: 'auto', fontSize: '11px', color: '#555' }}>🌍 any language</span>
         </div>
 
-        {/* Messages */}
-        <div style={{
-          flex: 1, overflowY: 'auto', padding: '16px',
-          display: 'flex', flexDirection: 'column', gap: '12px',
-        }}>
-          {messages.map((msg, i) => (
-            <div key={i} style={{
-              display: 'flex',
-              justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
-            }}>
+        {/* Messages — only last from each side */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '24px 20px', gap: '16px' }}>
+          {/* Last assistant message */}
+          {lastAssistant && (
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
               <div style={{
-                maxWidth: '80%', padding: '10px 14px', borderRadius: '16px',
-                fontSize: '14px', lineHeight: '1.5',
-                background: msg.role === 'user'
-                  ? `linear-gradient(135deg, ${avatar.color}, ${avatar.glow})`
-                  : 'rgba(255,255,255,0.08)',
-                color: '#fff',
-                borderBottomRightRadius: msg.role === 'user' ? '4px' : '16px',
-                borderBottomLeftRadius: msg.role === 'assistant' ? '4px' : '16px',
-              }}>
-                {msg.content || <span style={{ opacity: 0.5 }}>...</span>}
-              </div>
-            </div>
-          ))}
-          {transcript && (
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                width: '32px', height: '32px', borderRadius: '50%', flexShrink: 0,
+                background: `linear-gradient(135deg, ${AVATAR.color}, ${AVATAR.glow})`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '14px', fontWeight: '700', color: '#fff',
+              }}>K</div>
               <div style={{
-                maxWidth: '80%', padding: '10px 14px', borderRadius: '16px',
-                fontSize: '14px', background: 'rgba(168,85,247,0.2)',
-                border: '1px dashed rgba(168,85,247,0.5)', color: '#ccc',
+                flex: 1, background: 'rgba(255,255,255,0.07)', borderRadius: '4px 18px 18px 18px',
+                padding: '14px 16px', color: '#e5e7eb', fontSize: '15px', lineHeight: '1.6',
+                border: '1px solid rgba(255,255,255,0.06)',
               }}>
-                🎤 {transcript}
+                {lastAssistant.content || <span style={{ opacity: 0.4 }}>...</span>}
               </div>
             </div>
           )}
-          <div ref={chatEndRef} />
+
+          {/* Last user message or live transcript */}
+          {(lastUser || transcript) && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <div style={{
+                maxWidth: '80%', padding: '12px 16px', borderRadius: '18px 4px 18px 18px',
+                fontSize: '15px', lineHeight: '1.6', color: '#fff',
+                background: transcript
+                  ? 'rgba(34,197,94,0.15)'
+                  : `linear-gradient(135deg, ${AVATAR.color}, ${AVATAR.glow})`,
+                border: transcript ? '1px dashed rgba(34,197,94,0.5)' : 'none',
+              }}>
+                {transcript ? `🎤 ${transcript}` : lastUser?.content}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Input area */}
-        <div style={{ padding: '16px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-          {/* Voice button */}
+        <div style={{ padding: '16px 20px', borderTop: '1px solid rgba(255,255,255,0.07)', flexShrink: 0 }}>
           <button
             onClick={toggleListening}
-            disabled={isLoading}
+            disabled={isLoading || isTalking}
             style={{
               width: '100%', padding: '14px', marginBottom: '10px',
-              borderRadius: '14px', border: 'none', cursor: isLoading ? 'not-allowed' : 'pointer',
+              borderRadius: '14px', border: 'none',
+              cursor: (isLoading || isTalking) ? 'not-allowed' : 'pointer',
               background: isListening
-                ? `linear-gradient(135deg, #dc2626, #ef4444)`
-                : `linear-gradient(135deg, ${avatar.color}, ${avatar.glow})`,
-              color: '#fff', fontSize: '16px', fontWeight: '600',
-              transition: 'all 0.2s',
-              boxShadow: isListening ? '0 0 20px rgba(220,38,38,0.5)' : `0 0 20px ${avatar.glow}44`,
+                ? 'linear-gradient(135deg, #dc2626, #ef4444)'
+                : `linear-gradient(135deg, ${AVATAR.color}, ${AVATAR.glow})`,
+              color: '#fff', fontSize: '16px', fontWeight: '600', transition: 'all 0.2s',
+              boxShadow: isListening ? '0 0 20px rgba(220,38,38,0.4)' : `0 0 20px ${AVATAR.glow}33`,
+              opacity: (isLoading || isTalking) ? 0.6 : 1,
             }}
           >
             {isListening ? '⏹ Stop' : '🎤 Speak'}
           </button>
 
-          {/* Text input */}
           <div style={{ display: 'flex', gap: '8px' }}>
             <textarea
               value={inputText}
               onChange={e => setInputText(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Write in any language... (Enter = send)"
-              disabled={isLoading || isListening}
+              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(inputText) } }}
+              placeholder="Write in any language… (Enter = send)"
+              disabled={isLoading || isListening || isTalking}
               rows={2}
               style={{
-                flex: 1, background: 'rgba(255,255,255,0.06)',
-                border: '1px solid rgba(255,255,255,0.12)', borderRadius: '12px',
+                flex: 1, background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px',
                 color: '#fff', padding: '10px 14px', fontSize: '14px',
                 resize: 'none', outline: 'none', fontFamily: 'inherit',
               }}
             />
             <button
               onClick={() => sendMessage(inputText)}
-              disabled={isLoading || !inputText.trim() || isListening}
+              disabled={isLoading || !inputText.trim() || isListening || isTalking}
               style={{
-                background: `linear-gradient(135deg, ${avatar.color}, ${avatar.glow})`,
+                background: `linear-gradient(135deg, ${AVATAR.color}, ${AVATAR.glow})`,
                 border: 'none', borderRadius: '12px', color: '#fff',
                 width: '44px', cursor: 'pointer', fontSize: '18px',
-                opacity: isLoading || !inputText.trim() ? 0.4 : 1,
+                opacity: (isLoading || !inputText.trim()) ? 0.4 : 1,
               }}
-            >
-              ➤
-            </button>
+            >➤</button>
           </div>
         </div>
       </div>
 
       <style>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.5; transform: scale(1.3); }
-        }
+        @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(1.4)} }
+        textarea::placeholder { color: #555; }
+        textarea::-webkit-scrollbar { width: 4px; }
+        textarea::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
       `}</style>
     </div>
   )

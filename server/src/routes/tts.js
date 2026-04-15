@@ -1,51 +1,55 @@
 'use strict';
 
 const { Router } = require('express');
-const { getOpenAI } = require('../utils/openai');
-
 const router = Router();
 
+const ELEVENLABS_URL = 'https://api.elevenlabs.io/v1/text-to-speech';
+// Adam — eleven_multilingual_v2 male voice (auto-detects language)
+const DEFAULT_VOICE_ID = 'pNInz6obpgDQGcFmaJgB';
+
 router.post('/', async (req, res) => {
-  const ALLOWED_MODELS = ['tts-1', 'tts-1-hd'];
-  const ALLOWED_VOICES = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'];
+  const { text } = req.body;
 
-  const { text, model: rawModel = 'tts-1', voice: rawVoice = 'alloy' } = req.body;
-
-  if (!text) {
-    return res.status(400).json({ error: 'Text is required' });
-  }
-  if (typeof text !== 'string' || text.length > 2000) {
-    return res.status(400).json({ error: 'Text must be a string under 2000 characters' });
+  if (!text || typeof text !== 'string' || text.length > 2000) {
+    return res.status(400).json({ error: 'Text is required and must be under 2000 characters' });
   }
 
-  const model = ALLOWED_MODELS.includes(rawModel) ? rawModel : 'tts-1';
-  const voice = ALLOWED_VOICES.includes(rawVoice) ? rawVoice : 'alloy';
+  const apiKey  = process.env.ELEVENLABS_API_KEY;
+  const voiceId = process.env.ELEVENLABS_VOICE_ID || DEFAULT_VOICE_ID;
 
-  const openai = getOpenAI();
-  if (!openai) {
-    return res.status(503).json({
-      error: 'AI service not configured',
-      message: 'Set OPENAI_API_KEY to enable voice synthesis.',
-    });
+  if (!apiKey) {
+    return res.status(503).json({ error: 'ElevenLabs API key not configured. Set ELEVENLABS_API_KEY.' });
   }
 
   try {
-    const mp3 = await openai.audio.speech.create({
-      model: model,
-      voice: voice,
-      input: text,
+    const response = await fetch(`${ELEVENLABS_URL}/${voiceId}`, {
+      method: 'POST',
+      headers: {
+        'xi-api-key':   apiKey,
+        'Content-Type': 'application/json',
+        'Accept':       'audio/mpeg',
+      },
+      body: JSON.stringify({
+        text,
+        model_id: 'eleven_multilingual_v2',
+        voice_settings: {
+          stability:        0.5,
+          similarity_boost: 0.75,
+        },
+      }),
     });
 
-    const buffer = Buffer.from(await mp3.arrayBuffer());
+    if (!response.ok) {
+      const err = await response.text();
+      console.error('[tts] ElevenLabs error:', err);
+      return res.status(500).json({ error: 'Voice synthesis failed' });
+    }
 
-    res.set({
-      'Content-Type': 'audio/mpeg',
-      'Content-Length': buffer.length,
-    });
-
+    const buffer = Buffer.from(await response.arrayBuffer());
+    res.set({ 'Content-Type': 'audio/mpeg', 'Content-Length': buffer.length });
     res.send(buffer);
   } catch (err) {
-    console.error('[tts] OpenAI error:', err.message);
+    console.error('[tts] Error:', err.message);
     res.status(500).json({ error: 'Voice synthesis failed' });
   }
 });
