@@ -128,7 +128,7 @@ Current date/time: ${t} (${tz}).`
       dc.onerror = () => setStatus('error')
 
       const offer = await pc.createOffer(); await pc.setLocalDescription(offer)
-      const sdp = await fetch('https://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17', {
+      const sdp = await fetch('https://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview', {
         method:'POST', headers:{ 'Authorization':`Bearer ${token}`, 'Content-Type':'application/sdp' }, body: offer.sdp,
       })
       if (!sdp.ok) throw new Error('WebRTC handshake failed')
