@@ -82,6 +82,7 @@ const authLimiter = (process.env.NODE_ENV === 'test') ? (req, res, next) => next
   max: 15,                   // 15 attempts per window
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => req.method !== 'POST',
   message: { error: 'Too many authentication attempts. Please try again in 15 minutes.' },
 });
 
