@@ -326,12 +326,12 @@ test.describe('Payments', () => {
     expect(res.status()).toBe(200);
   });
 
-  test('POST /api/payments/webhook returns 503 without Stripe config', async ({ request }) => {
+  test('POST /api/payments/webhook returns 400 with invalid signature', async ({ request }) => {
     const res = await request.post(`${BASE}/api/payments/webhook`, {
-      headers: { 'Content-Type': 'application/json', 'stripe-signature': 'test' },
+      headers: { 'Content-Type': 'application/json', 'stripe-signature': 'invalid' },
       data: {},
     });
-    expect(res.status()).toBe(503);
+    expect(res.status()).toBe(400);
   });
 });
 
