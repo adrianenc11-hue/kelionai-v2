@@ -1,8 +1,7 @@
-import { Canvas } from '@react-three/fiber'
-import { OrbitControls, Environment } from '@react-three/drei'
+import { Canvas, useFrame } from '@react-three/fiber'
+import { OrbitControls, useGLTF } from '@react-three/drei'
 import { Suspense, useState, useRef, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { AvatarModelDebug, DebugPanel } from './AvatarDebug'
 import { getCsrfToken } from '../lib/api'
 import { useLipSync } from '../lib/lipSync'
 
@@ -14,6 +13,84 @@ const AVATARS = {
     color: '#7c3aed',
     glow: '#a855f7',
   },
+}
+
+const ARM_DOWN_L = { x: 0, y: 0, z: 1.4 }
+const ARM_DOWN_R = { x: 0, y: 0, z: -1.4 }
+const FOREARM    = { x: 0.3, y: 0, z: 0 }
+
+function KelionModel({ modelPath, mouthOpen = 0 }) {
+  const { scene } = useGLTF(modelPath)
+  const bonesRef = useRef({})
+  const morphsRef = useRef([])
+
+  useEffect(() => {
+    const bones = {}
+    const morphs = []
+    scene.traverse((obj) => {
+      if (obj.isBone || obj.type === 'Bone') bones[obj.name] = obj
+      if (obj.isSkinnedMesh && obj.skeleton) {
+        obj.skeleton.bones.forEach(b => { bones[b.name] = b })
+      }
+      if ((obj.isMesh || obj.isSkinnedMesh) && obj.morphTargetDictionary) {
+        morphs.push(obj)
+      }
+    })
+    bonesRef.current = bones
+    morphsRef.current = morphs
+
+    const setRot = (names, x, y, z) => {
+      for (const n of names) {
+        if (bones[n]) { bones[n].rotation.set(x, y, z); break }
+      }
+    }
+    setRot(['LeftArm', 'LeftUpperArm'],   ARM_DOWN_L.x, ARM_DOWN_L.y, ARM_DOWN_L.z)
+    setRot(['RightArm', 'RightUpperArm'], ARM_DOWN_R.x, ARM_DOWN_R.y, ARM_DOWN_R.z)
+    setRot(['LeftForeArm'],               FOREARM.x, FOREARM.y, FOREARM.z)
+    setRot(['RightForeArm'],              FOREARM.x, FOREARM.y, FOREARM.z)
+  }, [scene])
+
+  useFrame((state) => {
+    const b = bonesRef.current
+    if (!b) return
+
+    // Enforce arm positions every frame
+    const set = (names, rot) => {
+      for (const n of names) {
+        if (b[n]) { b[n].rotation.x = rot.x; b[n].rotation.y = rot.y; b[n].rotation.z = rot.z; break }
+      }
+    }
+    set(['LeftArm', 'LeftUpperArm'],   ARM_DOWN_L)
+    set(['RightArm', 'RightUpperArm'], ARM_DOWN_R)
+    set(['LeftForeArm'],               FOREARM)
+    set(['RightForeArm'],              FOREARM)
+
+    // Idle breathing
+    const t = state.clock.getElapsedTime()
+    const spine = b['Spine1'] || b['Spine']
+    if (spine) {
+      spine.rotation.z = Math.sin(t * 0.5) * 0.02
+      spine.rotation.x = Math.sin(t * 0.8) * 0.01
+    }
+
+    // LipSync
+    const jaw = b['Jaw'] || b['mixamorigJaw']
+    if (jaw) jaw.rotation.x = mouthOpen * 0.2
+    for (const mesh of morphsRef.current) {
+      const dict = mesh.morphTargetDictionary
+      if (!dict) continue
+      const idx = dict['mouthOpen'] ?? dict['viseme_AA'] ?? dict['jawOpen']
+      if (idx !== undefined) mesh.morphTargetInfluences[idx] = mouthOpen
+    }
+  })
+
+  return (
+    <primitive
+      object={scene}
+      scale={2.15}
+      position={[0.170, -1.800, 0.460]}
+    />
+  )
 }
 
 export default function VoiceChat() {
@@ -31,14 +108,6 @@ export default function VoiceChat() {
   const [isLoading, setIsLoading] = useState(false)
   const [transcript, setTranscript] = useState('')
 
-  // Debug state
-  const [showDebug, setShowDebug] = useState(false)
-  const [debugConfig, setDebugConfig] = useState({
-    scale: 2.15, posX: 0.170, posY: -1.800, posZ: 0.460,
-    leftArm: { x: 1.218, y: 0.000, z: 0.000 },
-    rightArm: { x: 1.218, y: 0.000, z: 0.000 },
-  })
-  const [boneNames, setBoneNames] = useState([])
 
   const recognitionRef = useRef(null)
   const startListeningRef = useRef(null)
@@ -279,12 +348,7 @@ export default function VoiceChat() {
           <pointLight position={[0, 2, 2]} intensity={isTalking ? 2 : 0.5} color={avatar.glow} />
           <Suspense fallback={null}>
             <hemisphereLight skyColor="#b1e1ff" groundColor="#000000" intensity={0.6} />
-            <AvatarModelDebug
-              modelPath={avatar.model}
-              debugConfig={debugConfig}
-              mouthOpen={mouthOpen}
-              onBonesReady={setBoneNames}
-            />
+            <KelionModel modelPath={avatar.model} mouthOpen={mouthOpen} />
           </Suspense>
           <OrbitControls
             enableZoom={true}
@@ -324,15 +388,6 @@ export default function VoiceChat() {
           🖱 Scroll = zoom · Drag = rotate
         </div>
 
-
-        {/* Debug Panel */}
-        <DebugPanel
-          visible={showDebug}
-          avatarColor={avatar.color}
-          avatarGlow={avatar.glow}
-          onConfigChange={setDebugConfig}
-          boneNames={boneNames}
-        />
 
         {/* Avatar name + talking indicator */}
         <div style={{
