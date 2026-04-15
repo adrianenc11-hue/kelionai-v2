@@ -15,9 +15,8 @@ const AVATARS = {
   },
 }
 
-const ARM_DOWN_L = { x: 0, y: 0, z: 1.4 }
-const ARM_DOWN_R = { x: 0, y: 0, z: -1.4 }
-const FOREARM    = { x: 0.3, y: 0, z: 0 }
+const ARM_ROT     = { x: 1.3, y: 0.0, z: 0.15 }
+const FOREARM_ROT = { x: 0.4, y: 0.0, z: 0.0 }
 
 function KelionModel({ modelPath, mouthOpen = 0 }) {
   const { scene } = useGLTF(modelPath)
@@ -44,34 +43,25 @@ function KelionModel({ modelPath, mouthOpen = 0 }) {
         if (bones[n]) { bones[n].rotation.set(x, y, z); break }
       }
     }
-    setRot(['LeftArm', 'LeftUpperArm'],   ARM_DOWN_L.x, ARM_DOWN_L.y, ARM_DOWN_L.z)
-    setRot(['RightArm', 'RightUpperArm'], ARM_DOWN_R.x, ARM_DOWN_R.y, ARM_DOWN_R.z)
-    setRot(['LeftForeArm'],               FOREARM.x, FOREARM.y, FOREARM.z)
-    setRot(['RightForeArm'],              FOREARM.x, FOREARM.y, FOREARM.z)
+    setRot(['LeftArm',  'LeftUpperArm'],   ARM_ROT.x,  ARM_ROT.y,  ARM_ROT.z)
+    setRot(['RightArm', 'RightUpperArm'],  ARM_ROT.x, -ARM_ROT.y, -ARM_ROT.z)
+    setRot(['LeftForeArm'],                FOREARM_ROT.x,  FOREARM_ROT.y,  FOREARM_ROT.z)
+    setRot(['RightForeArm'],               FOREARM_ROT.x, -FOREARM_ROT.y, -FOREARM_ROT.z)
   }, [scene])
 
   useFrame((state) => {
     const b = bonesRef.current
     if (!b) return
 
-    // Enforce arm positions every frame
-    const set = (names, rot) => {
+    const set = (names, x, y, z) => {
       for (const n of names) {
-        if (b[n]) { b[n].rotation.x = rot.x; b[n].rotation.y = rot.y; b[n].rotation.z = rot.z; break }
+        if (b[n]) { b[n].rotation.x = x; b[n].rotation.y = y; b[n].rotation.z = z; break }
       }
     }
-    set(['LeftArm', 'LeftUpperArm'],   ARM_DOWN_L)
-    set(['RightArm', 'RightUpperArm'], ARM_DOWN_R)
-    set(['LeftForeArm'],               FOREARM)
-    set(['RightForeArm'],              FOREARM)
-
-    // Idle breathing
-    const t = state.clock.getElapsedTime()
-    const spine = b['Spine1'] || b['Spine']
-    if (spine) {
-      spine.rotation.z = Math.sin(t * 0.5) * 0.02
-      spine.rotation.x = Math.sin(t * 0.8) * 0.01
-    }
+    set(['LeftArm',  'LeftUpperArm'],  ARM_ROT.x,  ARM_ROT.y,  ARM_ROT.z)
+    set(['RightArm', 'RightUpperArm'], ARM_ROT.x, -ARM_ROT.y, -ARM_ROT.z)
+    set(['LeftForeArm'],               FOREARM_ROT.x,  FOREARM_ROT.y,  FOREARM_ROT.z)
+    set(['RightForeArm'],              FOREARM_ROT.x, -FOREARM_ROT.y, -FOREARM_ROT.z)
 
     // LipSync
     const jaw = b['Jaw'] || b['mixamorigJaw']
@@ -85,11 +75,7 @@ function KelionModel({ modelPath, mouthOpen = 0 }) {
   })
 
   return (
-    <primitive
-      object={scene}
-      scale={2.2}
-      position={[0, -2.1, 0]}
-    />
+    <primitive object={scene} scale={1.6} position={[0, -1.6, 0]} rotation={[0, 0, 0]} />
   )
 }
 
@@ -97,7 +83,7 @@ export default function VoiceChat() {
   const { avatarId } = useParams()
   const navigate = useNavigate()
   const avatar = AVATARS[avatarId] || AVATARS.kelion
-  const onBack = () => navigate('/dashboard')
+  const onBack = () => navigate('/')
 
   const [messages, setMessages] = useState([
     { role: 'assistant', content: `Hi! I'm ${avatar.name}. How can I help you?` }
@@ -342,21 +328,18 @@ export default function VoiceChat() {
       <video ref={videoRef} autoPlay playsInline muted style={{ display: 'none' }} />
       {/* Avatar 3D */}
       <div style={{ flex: 1, position: 'relative' }}>
-        <Canvas camera={{ position: [0, 0.4, 3.2], fov: 38 }}>
-          <ambientLight intensity={0.4} />
+        <Canvas camera={{ position: [0, 0.3, 3.5], fov: 45 }} style={{ width: '100%', height: '100%' }} gl={{ antialias: true }}>
+          <color attach="background" args={['#0a0a0f']} />
+          <ambientLight intensity={0.5} />
           <directionalLight position={[2, 4, 2]} intensity={1.5} />
-          <pointLight position={[0, 2, 2]} intensity={isTalking ? 2 : 0.5} color={avatar.glow} />
+          <pointLight position={[0, 1, 2]} intensity={isTalking ? 2 : 0.8} color={avatar.glow} />
           <Suspense fallback={null}>
             <hemisphereLight skyColor="#b1e1ff" groundColor="#000000" intensity={0.6} />
             <KelionModel modelPath={avatar.model} mouthOpen={mouthOpen} />
           </Suspense>
-          <OrbitControls
-            enableZoom={false}
-            enablePan={false}
-            minPolarAngle={Math.PI / 4}
-            maxPolarAngle={Math.PI / 1.8}
-            minAzimuthAngle={-Math.PI / 5}
-            maxAzimuthAngle={Math.PI / 5}
+          <OrbitControls enableZoom={false} enablePan={false}
+            minPolarAngle={Math.PI / 4} maxPolarAngle={Math.PI / 1.8}
+            minAzimuthAngle={-Math.PI / 5} maxAzimuthAngle={Math.PI / 5}
           />
         </Canvas>
 
