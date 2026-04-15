@@ -41,17 +41,9 @@ module.exports = {
   isProduction: optional('NODE_ENV', 'development') === 'production',
 
   google: {
-    clientId:     isProd ? required('GOOGLE_CLIENT_ID') : optional('GOOGLE_CLIENT_ID'),
-    clientSecret: isProd ? required('GOOGLE_CLIENT_SECRET') : optional('GOOGLE_CLIENT_SECRET'),
-    redirectUri:  optional('GOOGLE_REDIRECT_URI',
-      optional('NODE_ENV') === 'production'
-        ? 'https://kelionai.app/auth/google/callback'
-        : 'http://localhost:3001/auth/google/callback'
-    ),
-    authEndpoint:     'https://accounts.google.com/o/oauth2/v2/auth',
-    tokenEndpoint:    'https://oauth2.googleapis.com/token',
-    userInfoEndpoint: 'https://openidconnect.googleapis.com/v1/userinfo',
-    scope: 'openid email profile',
+    clientId:     optional('GOOGLE_CLIENT_ID'),
+    clientSecret: optional('GOOGLE_CLIENT_SECRET'),
+    redirectUri:  optional('GOOGLE_REDIRECT_URI', ''),
   },
 
   session: {
