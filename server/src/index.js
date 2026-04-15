@@ -9,8 +9,9 @@ const rateLimit = require('express-rate-limit');
 
 const config = require('./config');
 const { csrfSeed } = require('./middleware/csrf');
-const chatRouter = require('./routes/chat');
-const ttsRouter  = require('./routes/tts');
+const chatRouter     = require('./routes/chat');
+const ttsRouter      = require('./routes/tts');
+const realtimeRouter = require('./routes/realtime');
 
 const app = express();
 app.disable('x-powered-by');
@@ -70,8 +71,9 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(csrfSeed);
 
-app.use('/api/chat', chatLimiter, chatRouter);
-app.use('/api/tts',  chatLimiter, ttsRouter);
+app.use('/api/chat',     chatLimiter, chatRouter);
+app.use('/api/tts',      chatLimiter, ttsRouter);
+app.use('/api/realtime', chatLimiter, realtimeRouter);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok', ts: new Date().toISOString() }));
 app.get('/ping',   (_req, res) => res.send('<h1>PONG - Server is alive and reached!</h1>'));
