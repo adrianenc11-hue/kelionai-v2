@@ -426,48 +426,41 @@ test.describe('CSRF', () => {
     expect(cookies).toContain('kelion.csrf');
   });
 });
-import { test, expect } from '@playwright/test';
-test('Real UI login flow', async ({ page }) => {
-  await page.goto('https://kelionai.app/login');
-  await page.fill('input[type="email"]', 'realtest1@test.kelionai.app');
-  await page.fill('input[type="password"]', 'Test1234!');
-  await page.click('button[type="submit"]');
-  await page.waitForURL(/dashboard|chat/, { timeout: 10000 });
-  await expect(page).toHaveURL(/dashboard|chat/);
-});
-import { test, expect } from '@playwright/test';
-test('Login and access protected pages', async ({ page }) => {
-  // Login
-  await page.goto('https://kelionai.app/login');
-  await page.fill('input[type="email"]', 'realtest1@test.kelionai.app');
-  await page.fill('input[type="password"]', 'Test1234!');
-  await page.click('button[type="submit"]');
-  await page.waitForURL(/dashboard|chat/, { timeout: 10000 });
-  
-  // Check dashboard
-  await page.goto('https://kelionai.app/dashboard');
-  await expect(page.locator('text=/dashboard|welcome|chat/i').first()).toBeVisible();
-  
-  // Check profile
-  await page.goto('https://kelionai.app/profile');
-  await expect(page.locator('text=/profile|realtest1/i').first()).toBeVisible();
-  
-  // Check chat
-  await page.goto('https://kelionai.app/chat');
-  await expect(page.locator('text=/kelion|kira|avatar/i').first()).toBeVisible();
-});
-import { test, expect } from '@playwright/test';
-test('Real UI register flow', async ({ page }) => {
-  const email = 'uireg_' + Date.now() + '@test.kelionai.app';
-  await page.goto('https://kelionai.app/login');
-  // Click register tab/button
-  await page.click('text=/register|create account|sign up/i');
-  await page.waitForSelector('input[name="name"], input[placeholder*="name" i]', { timeout: 5000 });
-  // Fill form
-  await page.fill('input[type="email"]', email);
-  await page.fill('input[type="password"]', 'Test1234!');
-  await page.fill('input[name="name"], input[placeholder*="name" i]', 'UI Register Test');
-  await page.click('button[type="submit"]');
-  await page.waitForURL(/dashboard|chat/, { timeout: 10000 });
-  await expect(page).toHaveURL(/dashboard|chat/);
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 12. REAL UI FLOWS
+// ═══════════════════════════════════════════════════════════════════════════
+test.describe('Real UI flows', () => {
+  test('UI register flow', async ({ page }) => {
+    const email = `uireg_${Date.now()}@test.kelionai.app`;
+    await page.goto(`${BASE}/login`);
+    await page.click('text=/register|create account|sign up/i');
+    await page.waitForSelector('input[name="name"], input[placeholder*="name" i]', { timeout: 5000 });
+    await page.fill('input[type="email"]', email);
+    await page.fill('input[type="password"]', 'Test1234!');
+    await page.fill('input[name="name"], input[placeholder*="name" i]', 'UI Test');
+    await page.click('button[type="submit"]');
+    await page.waitForURL(/dashboard|chat/, { timeout: 10000 });
+  });
+
+  test('UI login and access protected pages', async ({ page }) => {
+    const email = `uilogin_${Date.now()}@test.kelionai.app`;
+    // Register first via API
+    await page.request.post(`${BASE}/auth/local/register`, {
+      data: { email, password: 'Test1234!', name: 'UI Login' },
+    });
+    // Login via UI
+    await page.goto(`${BASE}/login`);
+    await page.fill('input[type="email"]', email);
+    await page.fill('input[type="password"]', 'Test1234!');
+    await page.click('button[type="submit"]');
+    await page.waitForURL(/dashboard|chat/, { timeout: 10000 });
+    // Access protected pages
+    await page.goto(`${BASE}/dashboard`);
+    await expect(page.locator('text=/dashboard|welcome|chat/i').first()).toBeVisible();
+    await page.goto(`${BASE}/profile`);
+    await expect(page.locator('input[type="text"]').first()).toBeVisible();
+    await page.goto(`${BASE}/chat`);
+    await expect(page.locator('text=/kelion|kira|avatar/i').first()).toBeVisible();
+  });
 });
