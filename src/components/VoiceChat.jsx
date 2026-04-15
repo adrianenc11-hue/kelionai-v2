@@ -14,13 +14,6 @@ const AVATARS = {
     color: '#7c3aed',
     glow: '#a855f7',
   },
-  kira: {
-    id: 'kira',
-    name: 'Kira',
-    model: '/kira-rpm.glb',
-    color: '#ec4899',
-    glow: '#f472b6',
-  },
 }
 
 export default function VoiceChat() {
@@ -102,10 +95,7 @@ export default function VoiceChat() {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
-        body: JSON.stringify({ 
-          text, 
-          voice: avatar.id === 'kira' ? 'nova' : 'alloy' 
-        }),
+        body: JSON.stringify({ text, voice: 'alloy' }),
       })
 
       if (!response.ok) throw new Error('TTS request failed')

@@ -283,7 +283,7 @@ export default function AvatarSelect() {
             ))}
           </div>
 
-          {/* Avatar buttons */}
+          {/* Avatar button */}
           <div style={{ display: 'flex', gap: '12px' }}>
             <button
               onClick={() => navigate('/chat/kelion')}
@@ -300,22 +300,6 @@ export default function AvatarSelect() {
               }}
             >
               Talk to Kelion →
-            </button>
-            <button
-              onClick={() => navigate('/chat/kira')}
-              onMouseEnter={() => setHoverBtn('kira')}
-              onMouseLeave={() => setHoverBtn(false)}
-              style={{
-                background: hoverBtn === 'kira' ? '#db2777' : '#ec4899',
-                border: 'none', borderRadius: '12px', color: '#fff',
-                padding: '14px 28px', fontSize: '15px', fontWeight: '600',
-                cursor: 'pointer', letterSpacing: '0.2px',
-                transition: 'all 0.15s ease',
-                boxShadow: hoverBtn === 'kira' ? '0 8px 24px rgba(236,72,153,0.5)' : '0 4px 16px rgba(236,72,153,0.3)',
-                transform: hoverBtn === 'kira' ? 'translateY(-1px)' : 'translateY(0)',
-              }}
-            >
-              Talk to Kira →
             </button>
           </div>
         </div>
