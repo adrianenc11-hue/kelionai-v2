@@ -79,7 +79,7 @@ app.use(
 // ---------------------------------------------------------------------------
 const authLimiter = (process.env.NODE_ENV === 'test') ? (req, res, next) => next() : rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 15,                   // 15 attempts per window
+  max: 50,                   // 50 attempts per window
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many authentication attempts. Please try again in 15 minutes.' },
