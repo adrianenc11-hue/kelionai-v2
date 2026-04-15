@@ -2,7 +2,6 @@ import { Suspense, useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls, Environment, useGLTF } from '@react-three/drei'
-import { getCsrfToken } from '../lib/api'
 
 // ── Fingerprint anti-abuse ──────────────────────────────────────────────────
 function getFingerprint() {

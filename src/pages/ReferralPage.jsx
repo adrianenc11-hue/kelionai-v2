@@ -1,11 +1,17 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { api } from '../lib/api'
 
 export default function ReferralPage() {
-  const { user } = useAuth()
+  const { user, loading } = useAuth()
   const navigate = useNavigate()
+
+  useEffect(() => {
+    if (!loading && !user) navigate('/login')
+  }, [loading, user, navigate])
+
+  if (loading || !user) return null
   const [code, setCode]       = useState(null)
   const [expires, setExpires] = useState(null)
   const [loading, setLoading] = useState(false)

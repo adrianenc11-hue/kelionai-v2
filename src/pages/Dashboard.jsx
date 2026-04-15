@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -16,13 +17,14 @@ const TIER_LABELS = {
 }
 
 export default function Dashboard() {
-  const { user, logout, isAdmin } = useAuth()
+  const { user, logout, isAdmin, loading } = useAuth()
   const navigate = useNavigate()
 
-  if (!user) {
-    navigate('/login')
-    return null
-  }
+  useEffect(() => {
+    if (!loading && !user) navigate('/login')
+  }, [loading, user, navigate])
+
+  if (loading || !user) return null
 
   const tier    = user.subscription_tier || 'free'
   const colors  = TIER_COLORS[tier] || TIER_COLORS.free
@@ -86,7 +88,7 @@ export default function Dashboard() {
             </button>
           ))}
           <button
-            onClick={async () => { await logout(); navigate('/') }}
+            onClick={async () => { await logout(); navigate('/login') }}
             style={{
               background: 'rgba(220,38,38,0.15)', border: '1px solid rgba(220,38,38,0.3)',
               color: '#fca5a5', padding: '8px 14px', borderRadius: '10px',

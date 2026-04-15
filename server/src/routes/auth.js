@@ -147,6 +147,7 @@ router.get('/me', requireAuth, async (req, res) => {
     role:                    u.role || 'user',
     subscription_tier:       tier,
     subscription_status:     u.subscription_status || 'active',
+    subscription_expires_at: u.subscription_expires_at || null,
     created_at:              u.created_at,
     usage: {
       today:       usedToday,
