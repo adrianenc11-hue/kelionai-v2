@@ -1,10 +1,9 @@
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, Environment } from '@react-three/drei'
 import { Suspense, useState, useRef, useEffect, useCallback } from 'react'
-import { useParams, useNavigate, Navigate } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { AvatarModelDebug, DebugPanel } from './AvatarDebug'
 import { getCsrfToken } from '../lib/api'
-import { useAuth } from '../contexts/AuthContext'
 import { useLipSync } from '../lib/lipSync'
 
 const AVATARS = {
@@ -27,7 +26,6 @@ const AVATARS = {
 export default function VoiceChat() {
   const { avatarId } = useParams()
   const navigate = useNavigate()
-  const { user, loading } = useAuth()
   const avatar = AVATARS[avatarId] || AVATARS.kelion
   const onBack = () => navigate('/dashboard')
 
@@ -278,9 +276,6 @@ export default function VoiceChat() {
       sendMessage(inputText)
     }
   }
-
-  if (loading) return null
-  if (!user) return <Navigate to="/login" replace />
 
   return (
     <div style={{ width: '100vw', height: '100vh', display: 'flex', background: '#0a0a0f' }}>

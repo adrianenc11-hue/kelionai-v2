@@ -451,6 +451,7 @@ test.describe('Real UI flows', () => {
     });
     // Login via UI
     await page.goto(`${BASE}/login`);
+    await page.locator('button[type="submit"]').waitFor({ state: 'visible' });
     await page.fill('input[type="email"]', email);
     await page.fill('input[type="password"]', 'Test1234!');
     await page.click('button[type="submit"]');

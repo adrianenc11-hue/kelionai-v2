@@ -1,8 +1,7 @@
 import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls, useGLTF, Environment } from '@react-three/drei'
 import { Suspense, useRef, useState, useEffect } from 'react'
-import { useNavigate, Navigate } from 'react-router-dom'
-import { useAuth } from '../contexts/AuthContext'
+import { useNavigate } from 'react-router-dom'
 
 const KELION = {
   id: 'kelion',
@@ -133,15 +132,11 @@ function ArmPanel({ armRot, forearmRot, onChange, onSave, onClose }) {
 
 export default function AvatarSelect() {
   const navigate = useNavigate()
-  const { user, loading } = useAuth()
   const saved = (() => { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) } catch { return null } })()
   const [armRot, setArmRot]         = useState(saved?.arm     || { ...DEFAULT_ARM })
   const [forearmRot, setForearmRot] = useState(saved?.forearm || { ...DEFAULT_FOREARM })
   const [showPanel, setShowPanel]   = useState(false)
   const [hoverBtn, setHoverBtn]     = useState(false)
-
-  if (loading) return null
-  if (!user) return <Navigate to="/login" replace />
 
   const handleSave = (arm, forearm) => {
     setArmRot(arm)

@@ -1,10 +1,6 @@
 'use strict';
 
 const { Router } = require('express');
-const { requireAuth } = require('../middleware/auth');
-const { csrfProtection } = require('../middleware/csrf');
-const { checkSubscription } = require('../middleware/subscription');
-
 const { getOpenAI } = require('../utils/openai');
 
 const router = Router();
@@ -14,14 +10,10 @@ const SYSTEM_PROMPTS = {
   kira:   'You are Kira, a friendly and enthusiastic female AI assistant. Detect the language the user is writing in and always respond in that same language. Be warm and direct. Personality: cheerful, creative, energetic.',
 };
 
-const MAX_MESSAGE_LENGTH = 4000;   // chars per message
-const MAX_MESSAGES_COUNT = 40;     // history depth
+const MAX_MESSAGE_LENGTH = 4000;
+const MAX_MESSAGES_COUNT = 40;
 
-
-// ---------------------------------------------------------------------------
-// POST /api/chat
-// ---------------------------------------------------------------------------
-router.post('/', requireAuth, csrfProtection, checkSubscription, async (req, res) => {
+router.post('/', async (req, res) => {
   const { messages = [], avatar = 'kelion' } = req.body;
 
   if (!Array.isArray(messages)) {
@@ -36,8 +28,6 @@ router.post('/', requireAuth, csrfProtection, checkSubscription, async (req, res
     });
   }
 
-  // Sanitize: only allow 'user' and 'assistant' roles — never 'system'
-  // Strip messages that are too long or have invalid role
   const sanitized = messages
     .filter(m => m && typeof m === 'object' && ['user', 'assistant'].includes(m.role))
     .slice(-MAX_MESSAGES_COUNT)
@@ -83,9 +73,7 @@ router.post('/', requireAuth, csrfProtection, checkSubscription, async (req, res
   }
 });
 
-// ---------------------------------------------------------------------------
-// POST /api/chat/demo — anonymous demo chat (rate-limited, no auth)
-// ---------------------------------------------------------------------------
+// Demo endpoint (kept for landing page demo chat)
 router.post('/demo', async (req, res) => {
   const { messages = [] } = req.body;
 

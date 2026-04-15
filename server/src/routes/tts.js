@@ -1,20 +1,11 @@
 'use strict';
 
 const { Router } = require('express');
-const { requireAuth } = require('../middleware/auth');
-const { csrfProtection } = require('../middleware/csrf');
-const { checkSubscription } = require('../middleware/subscription');
+const { getOpenAI } = require('../utils/openai');
 
 const router = Router();
 
-const { getOpenAI } = require('../utils/openai');
-
-/**
- * POST /api/tts
- * Converts text to speech using OpenAI's TTS-1 model.
- * Returns the audio file directly as a stream.
- */
-router.post('/', requireAuth, csrfProtection, checkSubscription, async (req, res) => {
+router.post('/', async (req, res) => {
   const ALLOWED_MODELS = ['tts-1', 'tts-1-hd'];
   const ALLOWED_VOICES = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'];
 
@@ -32,9 +23,9 @@ router.post('/', requireAuth, csrfProtection, checkSubscription, async (req, res
 
   const openai = getOpenAI();
   if (!openai) {
-    return res.status(503).json({ 
+    return res.status(503).json({
       error: 'AI service not configured',
-      message: 'Set OPENAI_API_KEY to enable voice synthesis.' 
+      message: 'Set OPENAI_API_KEY to enable voice synthesis.',
     });
   }
 
@@ -46,7 +37,7 @@ router.post('/', requireAuth, csrfProtection, checkSubscription, async (req, res
     });
 
     const buffer = Buffer.from(await mp3.arrayBuffer());
-    
+
     res.set({
       'Content-Type': 'audio/mpeg',
       'Content-Length': buffer.length,
