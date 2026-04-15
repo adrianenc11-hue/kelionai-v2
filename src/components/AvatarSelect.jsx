@@ -1,7 +1,7 @@
 import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls, useGLTF, Environment } from '@react-three/drei'
 import { Suspense, useRef, useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Navigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 
 const KELION = {
@@ -135,11 +135,8 @@ export default function AvatarSelect() {
   const navigate = useNavigate()
   const { user, loading } = useAuth()
 
-  useEffect(() => {
-    if (!loading && !user) navigate('/login')
-  }, [loading, user, navigate])
-
-  if (loading || !user) return null
+  if (loading) return null
+  if (!user) return <Navigate to="/login" replace />
   const saved = (() => { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) } catch { return null } })()
   const [armRot, setArmRot]         = useState(saved?.arm     || { ...DEFAULT_ARM })
   const [forearmRot, setForearmRot] = useState(saved?.forearm || { ...DEFAULT_FOREARM })

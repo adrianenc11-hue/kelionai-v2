@@ -1,5 +1,4 @@
-import { useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Navigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 
 const TIER_COLORS = {
@@ -20,11 +19,8 @@ export default function Dashboard() {
   const { user, logout, isAdmin, loading } = useAuth()
   const navigate = useNavigate()
 
-  useEffect(() => {
-    if (!loading && !user) navigate('/login')
-  }, [loading, user, navigate])
-
-  if (loading || !user) return null
+  if (loading) return null
+  if (!user) return <Navigate to="/login" replace />
 
   const tier    = user.subscription_tier || 'free'
   const colors  = TIER_COLORS[tier] || TIER_COLORS.free

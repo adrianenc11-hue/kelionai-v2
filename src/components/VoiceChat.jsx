@@ -1,7 +1,7 @@
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, Environment } from '@react-three/drei'
 import { Suspense, useState, useRef, useEffect, useCallback } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, Navigate } from 'react-router-dom'
 import { AvatarModelDebug, DebugPanel } from './AvatarDebug'
 import { getCsrfToken } from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
@@ -279,11 +279,8 @@ export default function VoiceChat() {
     }
   }
 
-  useEffect(() => {
-    if (!loading && !user) navigate('/login')
-  }, [loading, user, navigate])
-
-  if (loading || !user) return null
+  if (loading) return null
+  if (!user) return <Navigate to="/login" replace />
 
   return (
     <div style={{ width: '100vw', height: '100vh', display: 'flex', background: '#0a0a0f' }}>
