@@ -324,21 +324,6 @@ export default function VoiceChat() {
           🖱 Scroll = zoom · Drag = rotate
         </div>
 
-        {/* Debug toggle button */}
-        <button
-          onClick={() => setShowDebug(v => !v)}
-          style={{
-            position: 'absolute', top: '20px', right: '20px',
-            background: showDebug
-              ? `linear-gradient(135deg, ${avatar.color}, ${avatar.glow})`
-              : 'rgba(255,255,255,0.1)',
-            border: `1px solid ${showDebug ? avatar.glow : 'rgba(255,255,255,0.2)'}`,
-            color: '#fff', padding: '8px 14px', borderRadius: '20px',
-            cursor: 'pointer', fontSize: '13px', backdropFilter: 'blur(10px)',
-          }}
-        >
-          {showDebug ? '✕ Debug' : '🔧 Debug'}
-        </button>
 
         {/* Debug Panel */}
         <DebugPanel
