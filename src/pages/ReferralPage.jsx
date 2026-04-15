@@ -4,11 +4,8 @@ import { useAuth } from '../contexts/AuthContext'
 import { api } from '../lib/api'
 
 export default function ReferralPage() {
-  const { user, loading } = useAuth()
+  const { user, loading: authLoading } = useAuth()
   const navigate = useNavigate()
-
-  if (loading) return null
-  if (!user) return <Navigate to="/login" replace />
   const [code, setCode]       = useState(null)
   const [expires, setExpires] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -20,6 +17,9 @@ export default function ReferralPage() {
   const [applyMsg, setApplyMsg]       = useState(null)
   const [applyError, setApplyError]   = useState(null)
   const [applying, setApplying]       = useState(false)
+
+  if (authLoading) return null
+  if (!user) return <Navigate to="/login" replace />
 
   const generateCode = async () => {
     setLoading(true)

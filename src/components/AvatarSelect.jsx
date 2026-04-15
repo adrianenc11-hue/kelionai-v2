@@ -134,14 +134,14 @@ function ArmPanel({ armRot, forearmRot, onChange, onSave, onClose }) {
 export default function AvatarSelect() {
   const navigate = useNavigate()
   const { user, loading } = useAuth()
-
-  if (loading) return null
-  if (!user) return <Navigate to="/login" replace />
   const saved = (() => { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) } catch { return null } })()
   const [armRot, setArmRot]         = useState(saved?.arm     || { ...DEFAULT_ARM })
   const [forearmRot, setForearmRot] = useState(saved?.forearm || { ...DEFAULT_FOREARM })
   const [showPanel, setShowPanel]   = useState(false)
   const [hoverBtn, setHoverBtn]     = useState(false)
+
+  if (loading) return null
+  if (!user) return <Navigate to="/login" replace />
 
   const handleSave = (arm, forearm) => {
     setArmRot(arm)
