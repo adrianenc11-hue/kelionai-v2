@@ -125,9 +125,8 @@ export default function VoiceChat() {
     } catch { return null }
   }, [])
 
-  // ── Geolocation (once on mount) ──────────────────────────────────────────────
+  // ── Geolocation (once on mount, no camera yet) ──────────────────────────────
   useEffect(() => {
-    startCamera()
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => { coordsRef.current = { lat: pos.coords.latitude, lon: pos.coords.longitude } },
@@ -135,7 +134,7 @@ export default function VoiceChat() {
       )
     }
     return () => stopCamera()
-  }, [startCamera, stopCamera])
+  }, [stopCamera])
 
   // ── ElevenLabs TTS ──────────────────────────────────────────────────────────
   const speak = useCallback(async (text) => {
@@ -231,6 +230,7 @@ export default function VoiceChat() {
   const startListening = useCallback(() => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition
     if (!SR) return
+    startCamera()  // pornește camera + mic împreună
     const rec = new SR()
     rec.lang = navigator.language || 'en-US'
     rec.continuous = true; rec.interimResults = true
@@ -255,7 +255,8 @@ export default function VoiceChat() {
   const stopListening = useCallback(() => {
     if (recognitionRef.current) { const r = recognitionRef.current; recognitionRef.current = null; r.stop() }
     setIsListening(false)
-  }, [])
+    stopCamera()
+  }, [stopCamera])
 
   const lastAssistant = [...messages].reverse().find(m => m.role === 'assistant')
   const lastUser      = [...messages].reverse().find(m => m.role === 'user')
