@@ -198,7 +198,8 @@ test.describe('Local auth', () => {
 
   test('Duplicate register returns 409', async ({ request }) => {
     const email = `dup_${Date.now()}@test.kelionai.app`;
-    await apiPost(request, '/auth/local/register', { email, password: 'Test1234!', name: 'First' });
+    const first = await apiPost(request, '/auth/local/register', { email, password: 'Test1234!', name: 'First' });
+    expect(first.status()).toBe(201);
     const res = await apiPost(request, '/auth/local/register', { email, password: 'Test1234!', name: 'Second' });
     expect(res.status()).toBe(409);
   });
