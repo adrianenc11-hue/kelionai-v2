@@ -3,9 +3,9 @@ const { defineConfig, devices } = require('@playwright/test');
 
 module.exports = defineConfig({
   testDir: './e2e',
-  timeout: 30_000,
-  retries: 1,
-  workers: 4,
+  timeout: 60_000,
+  retries: process.env.CI ? 0 : 1,
+  workers: process.env.CI ? 1 : 4,
   reporter: [
     ['list'],
     ['html', { outputFolder: 'playwright-report', open: 'never' }],

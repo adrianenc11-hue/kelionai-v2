@@ -20,6 +20,7 @@ const ttsRouter           = require('./routes/tts');
 const referralRouter      = require('./routes/referral');
 
 const app = express();
+app.disable('x-powered-by');
 
 const distPath = path.resolve(__dirname, '../../dist');
 const fs = require('fs');
@@ -37,7 +38,7 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc:  ["'self'", "'unsafe-inline'", "https://js.stripe.com", "blob:"],
+        scriptSrc:  ["'self'", "'unsafe-inline'", "'wasm-unsafe-eval'", "https://js.stripe.com", "blob:"],
         styleSrc:   ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         fontSrc:    ["'self'", "https://fonts.gstatic.com"],
         imgSrc:     ["'self'", "data:", "blob:", "https:"],

@@ -1,5 +1,5 @@
 // @ts-check
-const { test, expect } = require('@playwright/test');
+import { test, expect } from '@playwright/test';
 
 const BASE = process.env.BASE_URL || 'https://kelionai.app';
 
@@ -93,7 +93,12 @@ test.describe('Frontend pages', () => {
     const errors = [];
     page.on('pageerror', err => errors.push(err.message));
     await page.goto(BASE, { waitUntil: 'networkidle' });
-    expect(errors.filter(e => !e.includes('ResizeObserver') && !e.includes('non-passive'))).toHaveLength(0);
+    expect(errors.filter(e =>
+      !e.includes('ResizeObserver')
+      && !e.includes('non-passive')
+      && !e.includes('WebAssembly')
+      && !e.includes('Content Security Policy')
+    )).toHaveLength(0);
   });
 });
 

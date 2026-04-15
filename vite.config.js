@@ -24,8 +24,20 @@ export default defineConfig(({ mode }) => {
       allowedHosts: 'all',
       port: 5173,
       proxy: {
-        '/api':  { target: backendTarget, changeOrigin: true },
-        '/auth': { target: backendTarget, changeOrigin: true },
+        '/api':    { target: backendTarget, changeOrigin: true },
+        '/auth':   { target: backendTarget, changeOrigin: true },
+        '/health': { target: backendTarget, changeOrigin: true },
+        '/ping':   { target: backendTarget, changeOrigin: true },
+      },
+    },
+    preview: {
+      host: '127.0.0.1',
+      port: 5173,
+      proxy: {
+        '/api':    { target: backendTarget, changeOrigin: true },
+        '/auth':   { target: backendTarget, changeOrigin: true },
+        '/health': { target: backendTarget, changeOrigin: true },
+        '/ping':   { target: backendTarget, changeOrigin: true },
       },
     },
   }

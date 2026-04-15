@@ -9,19 +9,19 @@
     "preview": "vite preview",
     "server:install": "cd server && npm install",
     "server:dev": "cd server && npm run dev",
-    "server:start": "npm run build && cd server && mkdir -p data && chmod -R 777 data && npm start"
+    "server:start": "npm run build && cd server && mkdir -p data && chmod -R 777 data && npm start",
+    "test:e2e": "playwright test --config playwright.config.cjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.5.0",
-    "@stripe/stripe-js": "^9.1.0",
-    "puppeteer": "^24.40.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.14.0",
     "three": "^0.183.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.5.3",

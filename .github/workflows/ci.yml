@@ -17,7 +17,7 @@ jobs:
           node-version: '22'
           cache: 'npm'
           cache-dependency-path: server/package-lock.json
-      - run: cd server && npm install
+      - run: cd server && npm ci
       - run: cd server && npm test
 
   test-frontend:
@@ -29,5 +29,45 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
-      - run: npm install
+      - run: npm ci
       - run: npm run build
+
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CI: true
+      BASE_URL: http://127.0.0.1:5173
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - run: cd server && npm ci
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - name: Start API
+        run: |
+          cd server
+          export NODE_ENV=test PORT=3001 DB_PATH=/tmp/kelion-ci.db
+          export JWT_SECRET=test-jwt-secret-at-least-32-chars-long!!
+          export SESSION_SECRET=test-session-secret-32chars-long!!
+          export GOOGLE_CLIENT_ID=ci.apps.googleusercontent.com
+          export GOOGLE_CLIENT_SECRET=ci-secret
+          nohup node src/index.js > /tmp/api.log 2>&1 & echo $! > /tmp/api.pid
+      - name: Wait API
+        run: for i in $(seq 1 60); do curl -sf http://127.0.0.1:3001/health && exit 0; sleep 1; done; cat /tmp/api.log; exit 1
+      - name: Preview
+        run: nohup npx vite preview --host 127.0.0.1 --port 5173 > /tmp/vite.log 2>&1 & echo $! > /tmp/vite.pid
+      - name: Wait preview
+        run: for i in $(seq 1 60); do curl -sf http://127.0.0.1:5173/ && exit 0; sleep 1; done; cat /tmp/vite.log; exit 1
+      - run: npm run test:e2e
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

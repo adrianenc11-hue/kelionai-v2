@@ -36,6 +36,9 @@ function csrfSeed(req, res, next) {
 function csrfProtection(req, res, next) {
   if (process.env.NODE_ENV === 'test') return next();
 
+  const authHeader = req.headers.authorization || '';
+  if (authHeader.startsWith('Bearer ')) return next();
+
   if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method)) {
     const cookieToken = req.cookies[CSRF_COOKIE];
     const headerToken = req.headers[CSRF_HEADER];

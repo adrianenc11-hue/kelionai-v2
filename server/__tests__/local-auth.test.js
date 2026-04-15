@@ -40,6 +40,7 @@ describe('POST /auth/local/register', () => {
   it('409 on duplicate email',          async () => { const e=unique(); await reg({email:e}); expect((await reg({email:e})).status).toBe(409); });
   it('sets HttpOnly cookie',            async () => { const r=await reg(); expect(r.headers['set-cookie']?.some(c=>c.includes('kelion.token')&&c.includes('HttpOnly'))).toBe(true); });
   it('role defaults to user',           async () => { const r=await reg(); expect(r.body.user.role).toBe('user'); });
+  it('returns JWT token in body',      async () => { const r=await reg(); expect(r.body.token).toBeTruthy(); expect(typeof r.body.token).toBe('string'); });
 });
 
 describe('POST /auth/local/login', () => {
