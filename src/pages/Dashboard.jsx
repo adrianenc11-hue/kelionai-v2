@@ -88,7 +88,7 @@ export default function Dashboard() {
             </button>
           ))}
           <button
-            onClick={async () => { await logout(); navigate('/login') }}
+            onClick={() => logout()}
             style={{
               background: 'rgba(220,38,38,0.15)', border: '1px solid rgba(220,38,38,0.3)',
               color: '#fca5a5', padding: '8px 14px', borderRadius: '10px',

@@ -93,7 +93,8 @@ export function AuthProvider({ children }) {
       await api.post('/auth/logout', {})
     } catch (_) {}
     setUser(null)
-  }, [])
+    navigate('/login')
+  }, [navigate])
 
   const refreshUser = fetchMe
 
