@@ -34,9 +34,9 @@ export default function VoiceChat() {
   // Debug state
   const [showDebug, setShowDebug] = useState(false)
   const [debugConfig, setDebugConfig] = useState({
-    scale: 1.8, posX: 0, posY: -1.8, posZ: 0,
-    leftArm: { x: 0, y: 0, z: 0 },
-    rightArm: { x: 0, y: 0, z: 0 },
+    scale: 2.15, posX: 0.170, posY: -1.800, posZ: 0.460,
+    leftArm: { x: 1.218, y: 0.000, z: 0.000 },
+    rightArm: { x: 1.218, y: 0.000, z: 0.000 },
   })
   const [boneNames, setBoneNames] = useState([])
 
