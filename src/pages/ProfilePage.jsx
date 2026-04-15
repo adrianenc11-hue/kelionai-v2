@@ -13,16 +13,20 @@ const TIER_COLORS = {
 export default function ProfilePage() {
   const { user, refreshUser, loading } = useAuth()
   const navigate = useNavigate()
+  const [name, setName]     = useState('')
+  const [saving, setSaving] = useState(false)
+  const [msg, setMsg]       = useState(null)
+  const [msgType, setMsgType] = useState('success')
 
   useEffect(() => {
     if (!loading && !user) navigate('/login')
   }, [loading, user, navigate])
 
+  useEffect(() => {
+    if (user?.name) setName(user.name)
+  }, [user?.name])
+
   if (loading || !user) return null
-  const [name, setName]     = useState(user?.name || '')
-  const [saving, setSaving] = useState(false)
-  const [msg, setMsg]       = useState(null)
-  const [msgType, setMsgType] = useState('success')
 
   const tier   = user.subscription_tier || 'free'
   const colors = TIER_COLORS[tier] || TIER_COLORS.free

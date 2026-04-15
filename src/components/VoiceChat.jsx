@@ -154,8 +154,6 @@ export default function VoiceChat() {
     setInputText('')
     setTranscript('')
 
-    const frame = captureFrame()
-
     try {
       let assistantText = ''
       setMessages(prev => [...prev, { role: 'assistant', content: '' }])
@@ -164,7 +162,7 @@ export default function VoiceChat() {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
-        body: JSON.stringify({ messages: newMessages, avatar: avatar.id, frame }),
+        body: JSON.stringify({ messages: newMessages, avatar: avatar.id }),
       })
 
       if (!response.ok) {

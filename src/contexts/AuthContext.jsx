@@ -37,6 +37,16 @@ export function AuthProvider({ children }) {
       setLoading(false)
       return
     }
+    const payment = params.get('payment')
+    if (payment) {
+      const url = new URL(window.location.href)
+      url.searchParams.delete('payment')
+      window.history.replaceState({}, '', url.toString())
+      if (payment === 'success') {
+        fetchMe().then(() => navigate('/dashboard'))
+        return
+      }
+    }
     fetchMe()
   }, [fetchMe])
 

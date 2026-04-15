@@ -109,10 +109,11 @@ router.get('/google/callback', async (req, res) => {
     
     res.cookie('kelion.token', appToken, {
       httpOnly: true,
-      secure: true, // Always true since we have SSL
+      secure:   config.cookie.secure,
       sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      path: '/',
+      domain:   config.cookie.domain || undefined,
+      maxAge:   7 * 24 * 60 * 60 * 1000,
+      path:     '/',
     });
 
     console.log(`[auth/callback] Cookie set. Redirecting to: ${config.appBaseUrl}/chat`);
