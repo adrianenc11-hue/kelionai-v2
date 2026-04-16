@@ -188,15 +188,22 @@ app.get('/api/realtime/trial-token', async (req, res) => {
   if (!apiKey) return res.status(503).json({ error: 'Not configured' });
 
   try {
+    const avatar = req.query.avatar || 'kelion';
+    const voice = avatar === 'kira'
+      ? (process.env.OPENAI_VOICE_KIRA || 'shimmer')
+      : (process.env.OPENAI_VOICE_KELION || 'ash');
     const r = await fetch('https://api.openai.com/v1/realtime/sessions', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'gpt-4o-realtime-preview', voice: 'alloy' }),
+      body: JSON.stringify({
+        model: process.env.OPENAI_REALTIME_MODEL || 'gpt-4o-realtime-preview',
+        voice,
+      }),
     });
     if (!r.ok) return res.status(500).json({ error: 'Failed to create session' });
     const data = await r.json();
     trialTokens.set(ip, now);
-    res.json({ token: data.client_secret.value, expiresAt: data.client_secret.expires_at, trial: true });
+    res.json({ token: data.client_secret.value, expiresAt: data.client_secret.expires_at, trial: true, voice });
   } catch (err) {
     res.status(500).json({ error: 'Failed to create session' });
   }

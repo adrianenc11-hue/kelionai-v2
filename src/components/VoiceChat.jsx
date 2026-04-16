@@ -86,9 +86,11 @@ export default function VoiceChat({ avatar: avatarProp }) {
     const now = new Date()
     const t = now.toLocaleString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric', hour:'2-digit', minute:'2-digit', second:'2-digit', timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone })
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+    const lang = navigator.language || 'en'
     return `You are Kelion, a friendly and intelligent AI assistant. Calm, professional, empathetic.
-Always respond in the same language the user speaks.
-Be concise and natural — you are speaking out loud.
+IMPORTANT: Detect the language the user speaks and ALWAYS reply in that SAME language. If the user speaks Romanian, you MUST reply in Romanian. If the user speaks English, reply in English. Never switch languages unless the user does.
+The user's browser language is: ${lang}.
+Be concise and natural — you are speaking out loud, keep responses short (1-3 sentences).
 Current date/time: ${t} (${tz}).`
   }
 
@@ -121,12 +123,12 @@ Current date/time: ${t} (${tz}).`
     try {
       // Try auth token first, fallback to trial token
       let tokenData
-      let r = await fetch('/api/realtime/token', { credentials:'include' })
+      let r = await fetch(`/api/realtime/token?avatar=${encodeURIComponent(avatar)}`, { credentials:'include' })
       if (r.ok) {
         tokenData = await r.json()
       } else {
         // Not logged in — use free trial
-        r = await fetch('/api/realtime/trial-token', { credentials:'include' })
+        r = await fetch(`/api/realtime/trial-token?avatar=${encodeURIComponent(avatar)}`, { credentials:'include' })
         if (!r.ok) {
           const err = await r.json().catch(() => ({}))
           throw new Error(err.error || 'Nu s-a putut obține token-ul')
@@ -162,8 +164,9 @@ Current date/time: ${t} (${tz}).`
       const dc = pc.createDataChannel('oai-events'); dcRef.current = dc
       dc.onopen = () => {
         dc.send(JSON.stringify({ type:'session.update', session: {
-          instructions: buildInstructions(), voice:'alloy', modalities:['text','audio'],
-          turn_detection: { type:'server_vad', threshold:0.5, prefix_padding_ms:300, silence_duration_ms:600 },
+          instructions: buildInstructions(),
+          modalities:['text','audio'],
+          turn_detection: { type:'server_vad', threshold:0.3, prefix_padding_ms:500, silence_duration_ms:1000 },
           input_audio_transcription: { model:'whisper-1' },
         }}))
         setStatus('listening')

@@ -5,6 +5,11 @@ const router = Router();
 
 // Returns a short-lived ephemeral token so the browser can connect
 // directly to OpenAI Realtime API via WebRTC without exposing the main API key.
+function pickVoice(avatar) {
+  if (avatar === 'kira') return process.env.OPENAI_VOICE_KIRA || 'shimmer';
+  return process.env.OPENAI_VOICE_KELION || 'ash';
+}
+
 router.get('/token', async (req, res) => {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
@@ -12,6 +17,8 @@ router.get('/token', async (req, res) => {
   }
 
   try {
+    const avatar = req.query.avatar || 'kelion';
+    const voice = pickVoice(avatar);
     const r = await fetch('https://api.openai.com/v1/realtime/sessions', {
       method: 'POST',
       headers: {
@@ -19,8 +26,8 @@ router.get('/token', async (req, res) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-realtime-preview',
-        voice: 'alloy',
+        model: process.env.OPENAI_REALTIME_MODEL || 'gpt-4o-realtime-preview',
+        voice,
       }),
     });
 
@@ -34,6 +41,7 @@ router.get('/token', async (req, res) => {
     res.json({
       token:     data.client_secret.value,
       expiresAt: data.client_secret.expires_at,
+      voice,
     });
   } catch (err) {
     console.error('[realtime] Error:', err.message);
