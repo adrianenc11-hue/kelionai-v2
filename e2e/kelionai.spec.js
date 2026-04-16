@@ -460,12 +460,17 @@ test.describe('Real UI flows', () => {
     await expect(page.locator(`text=${email}`).or(page.locator('text=E2E User'))).toBeVisible({ timeout: 10000 });
   });
 
-  test('UI login flow via modal', async ({ page }) => {
+  test('UI login flow via modal', async ({ browser }) => {
+    // Use a fresh context so no cookies leak from prior tests
+    const context = await browser.newContext();
+    const page = await context.newPage();
     const email = `uilogin_${Date.now()}@test.kelionai.app`;
-    // Register via API first
+    // Register via API (page.request shares cookies with context,
+    // so the Set-Cookie from register auto-logs the user in — clear after)
     await page.request.post(`${BASE}/auth/local/register`, {
       data: { email, password: 'Test12345!', name: 'UI Login' },
     });
+    await page.context().clearCookies();
     await page.goto(BASE);
     await page.click('button:has-text("Login")');
     await page.waitForSelector('input[type="email"]', { timeout: 5000 });
@@ -474,5 +479,6 @@ test.describe('Real UI flows', () => {
     await page.click('button[type="submit"]');
     // After login the modal should close and user info should appear
     await expect(page.locator('text=UI Login').or(page.locator(`text=${email}`))).toBeVisible({ timeout: 10000 });
+    await context.close();
   });
 });
