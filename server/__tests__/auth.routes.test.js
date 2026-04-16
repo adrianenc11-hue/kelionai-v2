@@ -19,6 +19,7 @@ process.env.DB_PATH = ':memory:'; // not used by supertest directly
 
 // Mock the DB module so better-sqlite3 native binary is never loaded in tests
 jest.mock('../src/db', () => ({
+  initDb: jest.fn(() => Promise.resolve()),
   upsertUser: jest.fn((profile) => Promise.resolve({
     id: 'mock-user-id',
     google_id: profile.googleId,
@@ -48,6 +49,22 @@ jest.mock('../src/db', () => ({
   createReferralCode: jest.fn(() => Promise.resolve({ code: 'TEST1234', expires_at: new Date().toISOString() })),
   findReferralCode: jest.fn(() => Promise.resolve(null)),
   useReferralCode: jest.fn(() => Promise.resolve()),
+  getUserById: jest.fn((id) => Promise.resolve(
+    id === 'mock-user-id'
+      ? { id, email: 'test@example.com', name: 'Test User', role: 'user', subscription_tier: 'free', subscription_status: 'active' }
+      : null
+  )),
+  getUserByEmail: jest.fn(() => Promise.resolve(null)),
+  getUserByGoogleId: jest.fn(() => Promise.resolve(null)),
+  updateUser: jest.fn((id, data) => Promise.resolve({ id, ...data })),
+  getAllUsers: jest.fn(() => Promise.resolve([])),
+  deleteUser: jest.fn(() => Promise.resolve()),
+  sanitizeUser: jest.fn((u) => { if (!u) return u; const c = { ...u }; delete c.password_hash; return c; }),
+  insertUser: jest.fn(({ email, password_hash, name }) => Promise.resolve({
+    id: 'mock-user-id', email, name, password_hash, role: 'user',
+    subscription_tier: 'free', subscription_status: 'active',
+    created_at: new Date().toISOString(),
+  })),
 }));
 
 // Also mock Google utils since we don't hit real Google

@@ -25,6 +25,7 @@ process.env.DB_PATH = path.join(os.tmpdir(), `kelion-cb-test-${process.pid}.db`)
 // Mock the DB module
 // ---------------------------------------------------------------------------
 const mockDb = {
+  initDb: jest.fn(() => Promise.resolve()),
   upsertUser: jest.fn((profile) => Promise.resolve({
     id: 'mock-user-id',
     ...profile,
@@ -34,6 +35,14 @@ const mockDb = {
   })),
   findByGoogleId: jest.fn(() => Promise.resolve(null)),
   findById: jest.fn((id) => Promise.resolve({
+    id,
+    email: 'me@example.com',
+    name: 'Me User',
+    role: 'user',
+    subscription_tier: 'free',
+    subscription_status: 'active',
+  })),
+  getUserById: jest.fn((id) => Promise.resolve({
     id,
     email: 'me@example.com',
     name: 'Me User',

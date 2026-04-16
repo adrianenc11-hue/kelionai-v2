@@ -22,6 +22,9 @@ router.get('/me', requireAuth, async (req, res) => {
     // Get today's date for usage reset check
     const today = new Date().toDateString();
     const usageToday = user.usage_reset_date === today ? user.usage_today : 0;
+    const tier = user.subscription_tier || 'free';
+    const plans = getPlans();
+    const plan = plans.find(p => p.id === tier) || plans.find(p => p.id === 'free');
 
     res.json({
       id: user.id,
@@ -33,6 +36,7 @@ router.get('/me', requireAuth, async (req, res) => {
       subscription_status: user.subscription_status,
       usage: {
         today: usageToday,
+        daily_limit: plan.dailyLimit,
         resetDate: user.usage_reset_date,
       },
       referral_code: user.referral_code,

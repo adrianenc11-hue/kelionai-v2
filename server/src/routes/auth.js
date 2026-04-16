@@ -4,16 +4,9 @@ const { Router } = require('express');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const config = require('../config');
-const { upsertUser, getUserById } = require('../db');
+const { upsertUser, getUserById, insertUser, findByEmail, sanitizeUser } = require('../db');
 const { signAppToken } = require('../middleware/auth');
-
-// Google OAuth utils (mock for now - will be implemented with real Google API)
-const generateState = () => crypto.randomBytes(16).toString('hex');
-const generatePKCE = () => {
-  const codeVerifier = crypto.randomBytes(32).toString('base64url');
-  const codeChallenge = crypto.createHash('sha256').update(codeVerifier).digest('base64url');
-  return { codeVerifier, codeChallenge };
-};
+const google = require('../utils/google');
 
 const router = Router();
 
@@ -25,38 +18,22 @@ const oauthStates = new Map();
  * Starts Google OAuth flow
  */
 router.get('/google/start', (req, res) => {
-  const mode = req.query.mode || 'web'; // 'web' or 'mobile'
-  const state = generateState();
-  const { codeVerifier, codeChallenge } = generatePKCE();
+  const mode = req.query.mode || 'web';
+  const state = google.generateState();
+  const { codeVerifier, codeChallenge } = google.generatePKCE();
 
-  // Store state with PKCE verifier
   oauthStates.set(state, {
     codeVerifier,
     mode,
-    expiresAt: Date.now() + 10 * 60 * 1000, // 10 minutes
+    expiresAt: Date.now() + 10 * 60 * 1000,
   });
 
-  // Build Google OAuth URL
-  const params = new URLSearchParams({
-    client_id: config.google.clientId,
-    redirect_uri: config.google.redirectUri,
-    response_type: 'code',
-    scope: 'openid email profile',
-    state,
-    code_challenge: codeChallenge,
-    code_challenge_method: 'S256',
-    access_type: 'offline',
-    prompt: 'consent',
-  });
+  // Store state and verifier in cookies for verification
+  const cookieOpts = { httpOnly: true, sameSite: 'lax', maxAge: 10 * 60 * 1000, path: '/' };
+  res.cookie('oauth_state', state, cookieOpts);
+  res.cookie('oauth_verifier', codeVerifier, cookieOpts);
 
-  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
-  
-  if (mode === 'mobile') {
-    // For mobile, return URL to open in browser
-    return res.json({ authUrl, state });
-  }
-
-  // For web, redirect
+  const authUrl = google.buildAuthUrl({ state, codeChallenge, mode });
   res.redirect(authUrl);
 });
 
@@ -65,85 +42,52 @@ router.get('/google/start', (req, res) => {
  * Google redirects here after user authentication
  */
 router.get('/google/callback', async (req, res) => {
+  let mode = 'web';
   try {
+    // Handle Google error response
+    if (req.query.error) {
+      const errorUrl = new URL(config.appBaseUrl);
+      errorUrl.searchParams.set('auth_error', req.query.error);
+      return res.redirect(errorUrl.toString());
+    }
+
     const { code, state } = req.query;
 
     if (!code || !state) {
       return res.status(400).json({ error: 'Missing code or state' });
     }
 
-    // Verify state
     const storedState = oauthStates.get(state);
     if (!storedState) {
       return res.status(400).json({ error: 'Invalid or expired state' });
     }
 
-    // Check expiration
     if (Date.now() > storedState.expiresAt) {
       oauthStates.delete(state);
       return res.status(400).json({ error: 'State expired' });
     }
 
+    mode = storedState.mode || 'web';
     oauthStates.delete(state);
 
-    // Exchange code for tokens (mock - implement with real Google API)
-    // In production: POST to https://oauth2.googleapis.com/token
-    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        code,
-        client_id: config.google.clientId,
-        client_secret: config.google.clientSecret,
-        redirect_uri: config.google.redirectUri,
-        grant_type: 'authorization_code',
-        code_verifier: storedState.codeVerifier,
-      }),
-    });
+    const tokens = await google.exchangeCode(code, storedState.codeVerifier);
+    const googleUser = await google.fetchUserInfo(tokens.access_token);
 
-    if (!tokenResponse.ok) {
-      const error = await tokenResponse.text();
-      console.error('[auth] Token exchange failed:', error);
-      return res.status(400).json({ error: 'Failed to exchange code' });
-    }
-
-    const tokens = await tokenResponse.json();
-
-    // Get user info from Google
-    const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-      headers: { Authorization: `Bearer ${tokens.access_token}` },
-    });
-
-    if (!userInfoResponse.ok) {
-      return res.status(400).json({ error: 'Failed to fetch user info' });
-    }
-
-    const googleUser = await userInfoResponse.json();
-
-    // Verify email
-    if (!googleUser.email_verified) {
-      return res.status(400).json({ error: 'Email not verified' });
-    }
-
-    // Upsert user in database
     const user = await upsertUser({
-      google_id: googleUser.id,
+      google_id: googleUser.googleId,
       email: googleUser.email,
       name: googleUser.name,
       picture: googleUser.picture,
     });
 
-    if (storedState.mode === 'mobile') {
-      // Mobile: return JWT token
+    if (mode === 'mobile') {
       const token = signAppToken(user);
-      return res.json({ 
+      return res.json({
         token,
         user: { id: user.id, email: user.email, name: user.name },
       });
     }
 
-    // Web: Set session cookie and redirect to frontend
-    // Note: express-session is not configured, so we'll use JWT in cookie
     const sessionToken = signAppToken(user);
     
     res.cookie('kelion.token', sessionToken, {
@@ -158,7 +102,13 @@ router.get('/google/callback', async (req, res) => {
     res.redirect(config.appBaseUrl);
   } catch (err) {
     console.error('[auth] Callback error:', err.message);
-    res.status(500).json({ error: 'Authentication failed' });
+    if (mode === 'mobile') {
+      return res.status(500).json({ error: 'Authentication failed' });
+    }
+    // Web: redirect with error
+    const errorUrl = new URL(config.appBaseUrl);
+    errorUrl.searchParams.set('auth_error', err.message || 'Authentication failed');
+    return res.redirect(errorUrl.toString());
   }
 });
 
@@ -208,6 +158,102 @@ router.get('/me', async (req, res) => {
     }
     console.error('[auth] /me error:', err.message);
     res.status(500).json({ error: 'Failed to get user info' });
+  }
+});
+
+/**
+ * POST /auth/local/register
+ * Register with email + password
+ */
+router.post('/local/register', async (req, res) => {
+  try {
+    const { email, password, name } = req.body || {};
+
+    if (!email) return res.status(400).json({ error: 'Email is required' });
+    if (!password) return res.status(400).json({ error: 'Password is required' });
+    if (!name || (typeof name === 'string' && name.trim().length < 2)) {
+      return res.status(400).json({ error: 'Name must be at least 2 characters' });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ error: 'Invalid email format' });
+    }
+
+    // Validate password strength
+    if (password.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+
+    // Check if email already exists
+    const existing = await findByEmail(email);
+    if (existing) {
+      return res.status(409).json({ error: 'Email already registered' });
+    }
+
+    // Hash password
+    const salt = crypto.randomBytes(16).toString('hex');
+    const password_hash = crypto.scryptSync(password, salt, 64).toString('hex') + ':' + salt;
+
+    const user = await insertUser({ email, password_hash, name });
+
+    const token = signAppToken(user);
+
+    res.cookie('kelion.token', token, {
+      httpOnly: true,
+      secure: config.isProduction,
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: '/',
+    });
+
+    const safeUser = sanitizeUser ? sanitizeUser(user) : user;
+    return res.status(201).json({ token, user: safeUser });
+  } catch (err) {
+    console.error('[auth] Register error:', err.message);
+    return res.status(500).json({ error: 'Registration failed' });
+  }
+});
+
+/**
+ * POST /auth/local/login
+ * Login with email + password
+ */
+router.post('/local/login', async (req, res) => {
+  try {
+    const { email, password } = req.body || {};
+
+    if (!email) return res.status(400).json({ error: 'Email is required' });
+    if (!password) return res.status(400).json({ error: 'Password is required' });
+
+    const user = await findByEmail(email);
+    if (!user || !user.password_hash) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    // Verify password
+    const [hash, salt] = user.password_hash.split(':');
+    const checkHash = crypto.scryptSync(password, salt, 64).toString('hex');
+    if (hash !== checkHash) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    const token = signAppToken(user);
+
+    res.cookie('kelion.token', token, {
+      httpOnly: true,
+      secure: config.isProduction,
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: '/',
+    });
+
+    const safeUser = sanitizeUser ? sanitizeUser(user) : user;
+    return res.status(200).json({ token, user: safeUser });
+  } catch (err) {
+    console.error('[auth] Login error:', err.message);
+    return res.status(500).json({ error: 'Login failed' });
   }
 });
 

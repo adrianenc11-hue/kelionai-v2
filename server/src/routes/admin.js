@@ -51,22 +51,20 @@ router.get('/users/:id', async (req, res) => {
     }
 
     res.json({
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        picture: user.picture,
-        role: user.role,
-        subscription_tier: user.subscription_tier,
-        subscription_status: user.subscription_status,
-        usage_today: user.usage_today,
-        usage_reset_date: user.usage_reset_date,
-        referral_code: user.referral_code,
-        referred_by: user.referred_by,
-        stripe_customer_id: user.stripe_customer_id,
-        created_at: user.created_at,
-        updated_at: user.updated_at,
-      },
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      picture: user.picture,
+      role: user.role,
+      subscription_tier: user.subscription_tier,
+      subscription_status: user.subscription_status,
+      usage_today: user.usage_today,
+      usage_reset_date: user.usage_reset_date,
+      referral_code: user.referral_code,
+      referred_by: user.referred_by,
+      stripe_customer_id: user.stripe_customer_id,
+      created_at: user.created_at,
+      updated_at: user.updated_at,
     });
   } catch (err) {
     console.error('[admin/users/:id] Error:', err.message);
@@ -109,13 +107,10 @@ router.put('/users/:id/subscription', async (req, res) => {
     }
 
     res.json({
-      message: 'Subscription updated',
-      user: {
-        id: updatedUser.id,
-        email: updatedUser.email,
-        subscription_tier: updatedUser.subscription_tier,
-        subscription_status: updatedUser.subscription_status,
-      },
+      id: updatedUser.id,
+      email: updatedUser.email,
+      subscription_tier: updatedUser.subscription_tier,
+      subscription_status: updatedUser.subscription_status,
     });
   } catch (err) {
     console.error('[admin/subscription] Error:', err.message);
@@ -143,12 +138,9 @@ router.put('/users/:id/role', async (req, res) => {
     }
 
     res.json({
-      message: 'Role updated',
-      user: {
-        id: updatedUser.id,
-        email: updatedUser.email,
-        role: updatedUser.role,
-      },
+      id: updatedUser.id,
+      email: updatedUser.email,
+      role: updatedUser.role,
     });
   } catch (err) {
     console.error('[admin/role] Error:', err.message);

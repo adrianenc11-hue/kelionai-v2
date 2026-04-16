@@ -10,8 +10,9 @@ const rateLimit = require('express-rate-limit');
 const config = require('./config');
 const { csrfSeed } = require('./middleware/csrf');
 const { requireAuth } = require('./middleware/auth');
-const { checkSubscription } = require('./middleware/subscription');
+const { checkSubscription, getPlans } = require('./middleware/subscription');
 const { initDb } = require('./db');
+const { createReferralCode, findReferralCode, useReferralCode } = require('./db');
 const authRouter       = require('./routes/auth');
 const usersRouter      = require('./routes/users');
 const adminRouter      = require('./routes/admin');
@@ -97,6 +98,81 @@ app.use(csrfSeed);
 
 // Auth routes (no auth required)
 app.use('/auth', authRouter);
+
+// Subscription plans (no auth required)
+app.get('/api/subscription/plans', (req, res) => {
+  res.json({ plans: getPlans() });
+});
+
+// Payment routes (auth required)
+app.post('/api/payments/create-checkout-session', requireAuth, (req, res) => {
+  const { planId } = req.body || {};
+  const plans = getPlans();
+  const plan = plans.find(p => p.id === planId);
+
+  if (!plan) {
+    return res.status(400).json({ error: 'Invalid plan ID' });
+  }
+  if (planId === 'free') {
+    return res.status(400).json({ error: 'Cannot create checkout for free plan' });
+  }
+  if (!process.env.STRIPE_SECRET_KEY) {
+    return res.status(503).json({ error: 'Payment system not configured' });
+  }
+  res.json({ sessionId: 'mock-session-id', url: 'https://checkout.stripe.com/mock' });
+});
+
+app.get('/api/payments/history', requireAuth, (req, res) => {
+  res.json({ payments: [] });
+});
+
+// Referral routes (auth required)
+app.post('/api/referral/generate', requireAuth, async (req, res) => {
+  try {
+    const ref = await createReferralCode(req.user.id);
+    res.json({ code: ref.code, expires_at: ref.expires_at });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to generate referral code' });
+  }
+});
+
+app.get('/api/referral/validate/:code', requireAuth, async (req, res) => {
+  try {
+    const ref = await findReferralCode(req.params.code);
+    if (!ref) {
+      return res.status(404).json({ error: 'Referral code not found' });
+    }
+    res.json({ valid: true, code: ref.code });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to validate referral code' });
+  }
+});
+
+app.post('/api/referral/use', requireAuth, async (req, res) => {
+  try {
+    const { code } = req.body || {};
+    if (!code) {
+      return res.status(400).json({ error: 'Referral code is required' });
+    }
+    const ref = await findReferralCode(code);
+    if (!ref) {
+      return res.status(404).json({ error: 'Referral code not found' });
+    }
+    if (ref.owner_id === req.user.id) {
+      return res.status(400).json({ error: 'Cannot use your own referral code' });
+    }
+    if (ref.used) {
+      return res.status(400).json({ error: 'Referral code already used' });
+    }
+    await useReferralCode(code, req.user.id);
+    res.json({ success: true });
+  } catch (err) {
+    if (err.message && (err.message.includes('own referral') || err.message.includes('already used'))) {
+      return res.status(400).json({ error: err.message });
+    }
+    res.status(500).json({ error: 'Failed to use referral code' });
+  }
+});
 
 // API routes (auth required)
 app.use('/api/users', requireAuth, usersRouter);

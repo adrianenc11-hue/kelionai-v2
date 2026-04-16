@@ -1,10 +1,20 @@
-﻿import sqlite3 from 'sqlite3';
-import { open } from 'sqlite';
+﻿'use strict';
+
+const path = require('path');
+const fs = require('fs');
+const sqlite3 = require('sqlite3');
+const { open } = require('sqlite');
 
 const dbPath = process.env.DB_PATH || './data/kelion.db';
 let db;
 
-export async function initDb() {
+async function initDb() {
+  // Ensure the directory exists
+  const dir = path.dirname(dbPath);
+  if (dir && dir !== '.' && !fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+
   db = await open({
     filename: dbPath,
     driver: sqlite3.Database
@@ -18,6 +28,7 @@ export async function initDb() {
       email TEXT NOT NULL,
       name TEXT,
       picture TEXT,
+      password_hash TEXT,
       role TEXT DEFAULT 'user',
       subscription_tier TEXT DEFAULT 'free',
       subscription_status TEXT DEFAULT 'active',
@@ -31,6 +42,12 @@ export async function initDb() {
     )
   `);
 
+  // Migration: add password_hash column if missing (for existing DBs)
+  const cols = await db.all("PRAGMA table_info(users)");
+  if (!cols.find(c => c.name === 'password_hash')) {
+    await db.exec('ALTER TABLE users ADD COLUMN password_hash TEXT');
+  }
+
   // Create index for faster lookups
   await db.exec('CREATE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id)');
   await db.exec('CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)');
@@ -39,21 +56,21 @@ export async function initDb() {
   return db;
 }
 
-export function getDb() { return db; }
+function getDb() { return db; }
 
-export async function getUserByGoogleId(googleId) {
+async function getUserByGoogleId(googleId) {
   return await db.get('SELECT * FROM users WHERE google_id = ?', [googleId]);
 }
 
-export async function getUserById(id) {
+async function getUserById(id) {
   return await db.get('SELECT * FROM users WHERE id = ?', [id]);
 }
 
-export async function getUserByEmail(email) {
+async function getUserByEmail(email) {
   return await db.get('SELECT * FROM users WHERE email = ?', [email]);
 }
 
-export async function createUser(data) { 
+async function createUser(data) { 
   const result = await db.run(
     'INSERT INTO users (google_id, email, name, picture, referral_code) VALUES (?, ?, ?, ?, ?)',
     [data.google_id, data.email, data.name, data.picture, data.referral_code || generateReferralCode()]
@@ -61,14 +78,14 @@ export async function createUser(data) {
   return { id: result.lastID, ...data };
 }
 
-export async function updateUser(id, data) {
+async function updateUser(id, data) {
   const fields = Object.keys(data).map(k => `${k} = ?`).join(', ');
   const values = Object.values(data);
   await db.run(`UPDATE users SET ${fields}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [...values, id]);
   return getUserById(id);
 }
 
-export async function upsertUser(data) {
+async function upsertUser(data) {
   const existing = await getUserByGoogleId(data.google_id);
   if (existing) {
     return await updateUser(existing.id, data);
@@ -76,7 +93,7 @@ export async function upsertUser(data) {
   return await createUser(data);
 }
 
-export async function incrementUsage(userId, minutes = 1) {
+async function incrementUsage(userId, minutes = 1) {
   const today = new Date().toDateString();
   const user = await getUserById(userId);
   
@@ -93,14 +110,119 @@ export async function incrementUsage(userId, minutes = 1) {
   return getUserById(userId);
 }
 
-export async function getAllUsers() {
+async function getAllUsers() {
   return await db.all('SELECT * FROM users ORDER BY created_at DESC');
 }
 
-export async function deleteUser(id) {
+async function deleteUser(id) {
   await db.run('DELETE FROM users WHERE id = ?', [id]);
+}
+
+async function insertUser({ email, password_hash, name, role = 'user' }) {
+  const existing = await getUserByEmail(email);
+  if (existing) return null;
+
+  const result = await db.run(
+    'INSERT INTO users (email, password_hash, name, role, referral_code) VALUES (?, ?, ?, ?, ?)',
+    [email, password_hash, name, role, generateReferralCode()]
+  );
+
+  return await getUserById(result.lastID);
+}
+
+async function findByEmail(email) {
+  return getUserByEmail(email);
+}
+
+async function findById(id) {
+  return getUserById(id);
+}
+
+async function findByGoogleId(googleId) {
+  return getUserByGoogleId(googleId);
+}
+
+async function findAll() {
+  return getAllUsers();
+}
+
+async function updateProfile(id, { name }) {
+  return updateUser(id, { name });
+}
+
+async function updateRole(id, role) {
+  return updateUser(id, { role });
+}
+
+async function updateSubscription(id, data) {
+  return updateUser(id, data);
+}
+
+async function updateStripeCustomerId(id, stripeCustomerId) {
+  return updateUser(id, { stripe_customer_id: stripeCustomerId });
+}
+
+async function findByStripeCustomerId(cid) {
+  return db.get('SELECT * FROM users WHERE stripe_customer_id = ?', [cid]);
+}
+
+async function getUsageToday(userId) {
+  const user = await getUserById(userId);
+  if (!user) return 0;
+  const today = new Date().toDateString();
+  if (user.usage_reset_date !== today) return 0;
+  return user.usage_today || 0;
+}
+
+async function createReferralCode(ownerId) {
+  const code = generateReferralCode();
+  return { code, owner_id: ownerId, expires_at: new Date(Date.now() + 30 * 86400000).toISOString() };
+}
+
+async function findReferralCode(code) {
+  return null; // Simplified — needs referral table
+}
+
+async function useReferralCode(code, userId) {
+  // Simplified — needs referral table
+}
+
+function sanitizeUser(user) {
+  if (!user) return user;
+  const clean = { ...user };
+  delete clean.password_hash;
+  return clean;
 }
 
 function generateReferralCode() {
   return 'REF' + Math.random().toString(36).substring(2, 8).toUpperCase();
 }
+
+module.exports = {
+  initDb,
+  getDb,
+  getUserByGoogleId,
+  getUserById,
+  getUserByEmail,
+  createUser,
+  updateUser,
+  upsertUser,
+  incrementUsage,
+  getAllUsers,
+  deleteUser,
+  insertUser,
+  findByEmail,
+  findById,
+  findByGoogleId,
+  findAll,
+  updateProfile,
+  updateRole,
+  updateSubscription,
+  updateStripeCustomerId,
+  findByStripeCustomerId,
+  getUsageToday,
+  createReferralCode,
+  findReferralCode,
+  useReferralCode,
+  sanitizeUser,
+};

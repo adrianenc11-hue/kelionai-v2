@@ -62,6 +62,14 @@ function createMockDb() {
       delete clean.password_hash;
       return clean;
     }),
+    initDb: jest.fn(() => Promise.resolve()),
+    // Aliases matching actual db module export names
+    getUserById:           jest.fn((id) => users.get(id) || null),
+    getUserByEmail:        jest.fn((email) => { for (const u of users.values()) if (u.email===email) return u; return null; }),
+    getUserByGoogleId:     jest.fn((gid) => { for (const u of users.values()) if (u.google_id===gid) return u; return null; }),
+    updateUser:            jest.fn((id, data) => { const u=users.get(id); if(!u) return null; Object.assign(u, data); return u; }),
+    getAllUsers:            jest.fn(() => Array.from(users.values())),
+    deleteUser:            jest.fn((id) => { users.delete(id); }),
     _users:    users,
     _referrals: referrals,
     _usage:    usage,

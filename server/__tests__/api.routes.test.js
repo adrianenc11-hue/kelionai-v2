@@ -25,6 +25,7 @@ const _users = new Map();
 let _idCounter = 1;
 
 const mockDb = {
+  initDb: jest.fn(() => Promise.resolve()),
   upsertUser: jest.fn(({ googleId, email, name, picture }) => {
     // Check if user exists by open_id (googleId)
     for (const [id, u] of _users) {
@@ -113,6 +114,35 @@ const mockDb = {
     const clean = { ...user };
     delete clean.password_hash;
     return clean;
+  }),
+  // Aliases for actual db module exports
+  getUserById: jest.fn((id) => {
+    return Promise.resolve(_users.get(Number(id)) || null);
+  }),
+  getUserByEmail: jest.fn((email) => {
+    for (const u of _users.values()) {
+      if (u.email === email) return Promise.resolve(u);
+    }
+    return Promise.resolve(null);
+  }),
+  getUserByGoogleId: jest.fn((googleId) => {
+    for (const u of _users.values()) {
+      if (u.open_id === googleId) return Promise.resolve(u);
+    }
+    return Promise.resolve(null);
+  }),
+  updateUser: jest.fn((id, data) => {
+    const user = _users.get(Number(id));
+    if (!user) return Promise.resolve(null);
+    Object.assign(user, data);
+    return Promise.resolve(user);
+  }),
+  getAllUsers: jest.fn(() => {
+    return Promise.resolve(Array.from(_users.values()));
+  }),
+  deleteUser: jest.fn((id) => {
+    _users.delete(Number(id));
+    return Promise.resolve();
   }),
 };
 

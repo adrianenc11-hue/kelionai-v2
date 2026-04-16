@@ -2,7 +2,7 @@
 
 const jwt = require('jsonwebtoken');
 const config = require('../config');
-const { getUserByGoogleId } = require('../db');
+const { getUserByGoogleId, findById } = require('../db');
 
 /**
  * Middleware pentru verificarea autentificării.
@@ -52,10 +52,19 @@ async function requireAuth(req, res, next) {
  * Middleware pentru verificarea rolului de admin.
  * Trebuie folosit DUPĂ requireAuth.
  */
-function requireAdmin(req, res, next) {
+async function requireAdmin(req, res, next) {
   if (!req.user) {
     return res.status(401).json({ error: 'Authentication required' });
   }
+
+  // Check admin status from DB (more reliable than JWT role)
+  try {
+    const dbUser = await findById(req.user.id);
+    if (dbUser && dbUser.role === 'admin') {
+      req.user.role = 'admin';
+      return next();
+    }
+  } catch (_) { /* fall through to other checks */ }
 
   const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
   
