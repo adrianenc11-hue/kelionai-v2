@@ -247,7 +247,7 @@ test.describe('Authenticated user', () => {
     expect(res.status()).toBe(200);
     const body = await res.json();
     expect(body.code).toBeTruthy();
-    expect(body.code.length).toBeGreaterThanOrEqual(6);
+    expect(body.code.length).toBe(8);
     expect(body.expires_at).toBeTruthy();
   });
 
@@ -255,8 +255,7 @@ test.describe('Authenticated user', () => {
     const gen = await request.post(`${BASE}/api/referral/generate`, { headers: { Authorization: `Bearer ${token}` } });
     const { code } = await gen.json();
     const res = await request.get(`${BASE}/api/referral/validate/${code}`, { headers: { Authorization: `Bearer ${token}` } });
-    // Production with old code may return 404 (findReferralCode stub); new code returns 200
-    expect([200, 404]).toContain(res.status());
+    expect(res.status()).toBe(200);
   });
 
   test('GET /api/referral/validate/INVALID returns 404', async ({ request }) => {
@@ -279,8 +278,7 @@ test.describe('Authenticated user', () => {
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       data: { code },
     });
-    // 400 = own code (new), 404 = code not found (old prod stub)
-    expect([400, 404]).toContain(res.status());
+    expect(res.status()).toBe(400);
   });
 
   test('POST /auth/logout returns 200', async ({ request }) => {
