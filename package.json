@@ -1,18 +1,18 @@
-{
+﻿{
   "name": "kelion-voice",
-  "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview",
     "server:install": "cd server && npm install",
     "server:dev": "cd server && npm run dev",
-    "server:start": "npm run build && cd server && mkdir -p data && chmod -R 777 data && npm start",
-    "test:e2e": "playwright test --config playwright.config.cjs"
+    "server:start": "npm run build && cd server && mkdir -p data && chmod -R 777 data && npm start"
   },
   "dependencies": {
+    "@google-cloud/text-to-speech": "^5.0.0",
+    "openai": "^4.0.0",
+    "node-fetch": "^3.0.0",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.5.0",
     "react": "^19.0.0",
@@ -21,14 +21,10 @@
     "three": "^0.183.2"
   },
   "devDependencies": {
-    "@playwright/test": "^1.59.1",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.5.3",
     "tailwindcss": "^3.4.17",
     "vite": "^6.3.1"
-  },
-  "engines": {
-    "node": ">=20.0.0"
   }
 }
