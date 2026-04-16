@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "kelion-server",
   "version": "1.0.0",
   "type": "module",
@@ -8,12 +8,13 @@
   },
   "dependencies": {
     "@google-cloud/text-to-speech": "^5.0.0",
-    "sqlite3": "^5.1.6",
     "cors": "^2.8.5",
     "express": "^4.18.0",
     "express-session": "^1.17.0",
     "jsonwebtoken": "^9.0.0",
+    "node-fetch": "^3.0.0",
     "openai": "^4.0.0",
-    "node-fetch": "^3.0.0"
+    "sqlite": "^5.1.1",
+    "sqlite3": "^5.1.6"
   }
 }
