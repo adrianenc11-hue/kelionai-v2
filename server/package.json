@@ -1,7 +1,6 @@
 {
   "name": "kelion-server",
   "version": "1.0.0",
-  "type": "module",
   "scripts": {
     "start": "node src/index.js",
     "dev": "node src/index.js",
