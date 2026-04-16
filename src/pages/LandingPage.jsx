@@ -72,6 +72,7 @@ export default function LandingPage() {
   const [refCode, setRefCode] = useState('')
   const [refInput, setRefInput] = useState('')
   const [refMsg, setRefMsg] = useState('')
+  const [selectedAvatar, setSelectedAvatar] = useState('kelion')
 
   useEffect(() => {
     api.get('/auth/me').then(u => {
@@ -123,7 +124,7 @@ export default function LandingPage() {
 
   function handleFreeTrial() {
     localStorage.setItem('kelion_free_trial', JSON.stringify({ start: Date.now(), limit: 15 * 60 * 1000 }))
-    navigate('/chat/kelion')
+    navigate(`/chat/${selectedAvatar}`)
   }
 
   const inp = {
@@ -286,7 +287,25 @@ export default function LandingPage() {
           </div>
 
           <div style={{ maxWidth: '380px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <button onClick={() => user ? navigate('/chat/kelion') : setModal('login')} style={{
+            {/* Avatar selector */}
+            <div style={{ display: 'flex', gap: '12px', marginBottom: '4px' }}>
+              {[
+                { id: 'kelion', label: 'Kelion', color: '#7c3aed', glow: '#a855f7', emoji: '🧑‍💻' },
+                { id: 'kira', label: 'Kira', color: '#ec4899', glow: '#f472b6', emoji: '👩‍💼' },
+              ].map(av => (
+                <button key={av.id} onClick={() => setSelectedAvatar(av.id)} style={{
+                  flex: 1, padding: '14px 12px', borderRadius: '12px', cursor: 'pointer',
+                  background: selectedAvatar === av.id ? `rgba(${av.id === 'kira' ? '236,72,153' : '124,58,237'},0.2)` : 'rgba(255,255,255,0.03)',
+                  border: selectedAvatar === av.id ? `2px solid ${av.glow}` : '2px solid rgba(255,255,255,0.08)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                  transition: 'all 0.2s',
+                }}>
+                  <span style={{ fontSize: '20px' }}>{av.emoji}</span>
+                  <span style={{ color: selectedAvatar === av.id ? av.glow : '#888', fontWeight: '700', fontSize: '15px' }}>{av.label}</span>
+                </button>
+              ))}
+            </div>
+            <button onClick={() => user ? navigate(`/chat/${selectedAvatar}`) : setModal('login')} style={{
               width: '100%',
               background: 'linear-gradient(135deg, #7c3aed, #a855f7)',
               border: 'none', borderRadius: '14px', color: '#fff',
