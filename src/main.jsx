@@ -6,7 +6,9 @@ import './index.css'
 
 import LandingPage from './pages/LandingPage'
 
-const VoiceChat = lazy(() => import('./components/VoiceChat'))
+const VoiceChat        = lazy(() => import('./components/VoiceChat'))
+const AdminPage        = lazy(() => import('./pages/AdminPage'))
+const ArmSettingsPage  = lazy(() => import('./pages/ArmSettingsPage'))
 
 function Loader() {
   return (
@@ -33,7 +35,10 @@ createRoot(document.getElementById('root')).render(
         <Suspense fallback={<Loader />}>
           <Routes>
             <Route path="/" element={<LandingPage />} />
-            <Route path="/chat/:avatarId" element={<VoiceChat />} />
+            <Route path="/chat" element={<VoiceChat />} />
+            <Route path="/chat/:avatar" element={<VoiceChat />} />
+            <Route path="/admin" element={<AdminPage />} />
+            <Route path="/arm-settings" element={<ArmSettingsPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>

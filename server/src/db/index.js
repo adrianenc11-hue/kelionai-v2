@@ -53,6 +53,23 @@ async function initDb() {
   await db.exec('CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)');
   await db.exec('CREATE INDEX IF NOT EXISTS idx_users_referral_code ON users(referral_code)');
 
+  // Referrals table — tracks issued referral codes and their usage
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS referrals (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      code TEXT NOT NULL UNIQUE,
+      owner_id INTEGER NOT NULL,
+      used INTEGER NOT NULL DEFAULT 0,
+      used_by INTEGER,
+      expires_at DATETIME NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (owner_id)  REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (used_by)   REFERENCES users(id) ON DELETE SET NULL
+    )
+  `);
+  await db.exec('CREATE INDEX IF NOT EXISTS idx_referrals_code ON referrals(code)');
+  await db.exec('CREATE INDEX IF NOT EXISTS idx_referrals_owner ON referrals(owner_id)');
+
   return db;
 }
 
@@ -175,16 +192,44 @@ async function getUsageToday(userId) {
 }
 
 async function createReferralCode(ownerId) {
-  const code = generateReferralCode();
-  return { code, owner_id: ownerId, expires_at: new Date(Date.now() + 30 * 86400000).toISOString() };
+  const expires_at = new Date(Date.now() + 30 * 86400000).toISOString();
+  // Retry on the rare UNIQUE collision
+  for (let i = 0; i < 5; i++) {
+    const code = generateShortCode();
+    try {
+      const result = await db.run(
+        'INSERT INTO referrals (code, owner_id, expires_at) VALUES (?, ?, ?)',
+        [code, ownerId, expires_at]
+      );
+      return { id: result.lastID, code, owner_id: ownerId, used: 0, used_by: null, expires_at };
+    } catch (err) {
+      if (!/UNIQUE/i.test(err.message || '')) throw err;
+    }
+  }
+  throw new Error('Failed to generate unique referral code');
 }
 
 async function findReferralCode(code) {
-  return null; // Simplified — needs referral table
+  if (!code) return null;
+  const row = await db.get('SELECT * FROM referrals WHERE code = ?', [code]);
+  return row || null;
 }
 
 async function useReferralCode(code, userId) {
-  // Simplified — needs referral table
+  const ref = await findReferralCode(code);
+  if (!ref) throw new Error('Referral code not found');
+  if (ref.used) throw new Error('Referral code already used');
+  if (ref.owner_id === userId) throw new Error('Cannot use your own referral code');
+  if (ref.expires_at && new Date(ref.expires_at).getTime() < Date.now()) {
+    throw new Error('Referral code expired');
+  }
+  await db.run(
+    'UPDATE referrals SET used = 1, used_by = ? WHERE code = ?',
+    [userId, code]
+  );
+  // Track on user profile as well
+  await db.run('UPDATE users SET referred_by = ? WHERE id = ?', [code, userId]);
+  return { ...ref, used: 1, used_by: userId };
 }
 
 function sanitizeUser(user) {
@@ -196,6 +241,14 @@ function sanitizeUser(user) {
 
 function generateReferralCode() {
   return 'REF' + Math.random().toString(36).substring(2, 8).toUpperCase();
+}
+
+// Short 8-char alphanumeric code used for referral transactions
+function generateShortCode() {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let out = '';
+  for (let i = 0; i < 8; i++) out += alphabet[Math.floor(Math.random() * alphabet.length)];
+  return out;
 }
 
 module.exports = {

@@ -11,7 +11,7 @@ const AVATARS = {
     glow:  '#a855f7',
   },
   kira: {
-    model: '/kira.glb', // Fallback to kelion if not exists
+    model: '/kira-rpm_54d82b66.glb',
     color: '#ec4899',
     glow: '#f472b6',
   },

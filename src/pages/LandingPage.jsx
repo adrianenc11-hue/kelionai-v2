@@ -352,7 +352,7 @@ export default function LandingPage() {
             {formError && <div style={errBox}>{formError}</div>}
             <input type="text" placeholder="Nume" value={formName} onChange={e => setFormName(e.target.value)} required style={inp} />
             <input type="email" placeholder="Email" value={formEmail} onChange={e => setFormEmail(e.target.value)} required style={inp} />
-            <input type="password" placeholder="Parolă (min 6 caractere)" value={formPass} onChange={e => setFormPass(e.target.value)} required minLength={6} style={{...inp, marginBottom: '20px'}} />
+            <input type="password" placeholder="Parolă (min 8 caractere)" value={formPass} onChange={e => setFormPass(e.target.value)} required minLength={8} style={{...inp, marginBottom: '20px'}} />
             <button type="submit" disabled={formLoading} style={{...btnPrimary, opacity: formLoading ? 0.7 : 1}}>
               {formLoading ? 'Se creează...' : 'Creează cont'}
             </button>
