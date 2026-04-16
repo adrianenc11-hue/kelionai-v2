@@ -79,6 +79,8 @@ export default function VoiceChat({ avatar: avatarProp }) {
   const pcRef     = useRef(null)
   const dcRef     = useRef(null)
   const streamRef = useRef(null)
+  const timerRef  = useRef(null)
+  const [timeLeft, setTimeLeft] = useState(null) // seconds left for trial
 
   const buildInstructions = () => {
     const now = new Date()
@@ -117,9 +119,39 @@ Current date/time: ${t} (${tz}).`
     if (pcRef.current) return
     setStatus('connecting'); setAiText(''); setUserText('')
     try {
-      const r = await fetch('/api/realtime/token', { credentials:'include' })
-      if (!r.ok) throw new Error('Token failed')
-      const { token } = await r.json()
+      // Try auth token first, fallback to trial token
+      let tokenData
+      let r = await fetch('/api/realtime/token', { credentials:'include' })
+      if (r.ok) {
+        tokenData = await r.json()
+      } else {
+        // Not logged in — use free trial
+        r = await fetch('/api/realtime/trial-token', { credentials:'include' })
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({}))
+          throw new Error(err.error || 'Nu s-a putut obține token-ul')
+        }
+        tokenData = await r.json()
+      }
+      const { token } = tokenData
+
+      // Start 15 min timer for trial
+      if (tokenData.trial) {
+        const trial = JSON.parse(localStorage.getItem('kelion_free_trial') || '{}')
+        const start = trial.start || Date.now()
+        const limit = 15 * 60 * 1000
+        if (!trial.start) localStorage.setItem('kelion_free_trial', JSON.stringify({ start, limit }))
+        const elapsed = Date.now() - start
+        const remaining = Math.max(0, Math.floor((limit - elapsed) / 1000))
+        if (remaining <= 0) { setStatus('error'); setAiText('Perioada de trial a expirat. Creează un cont pentru a continua.'); return }
+        setTimeLeft(remaining)
+        timerRef.current = setInterval(() => {
+          setTimeLeft(prev => {
+            if (prev <= 1) { clearInterval(timerRef.current); disconnect(); setAiText('Perioada de trial a expirat. Creează un cont!'); return 0 }
+            return prev - 1
+          })
+        }, 1000)
+      }
 
       const pc = new RTCPeerConnection(); pcRef.current = pc
       pc.ontrack = (e) => { if (audioRef.current) { audioRef.current.srcObject = e.streams[0]; audioRef.current.play().catch(()=>{}) } }
@@ -149,11 +181,12 @@ Current date/time: ${t} (${tz}).`
   }, [handleEvent])
 
   const disconnect = useCallback(() => {
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null }
     dcRef.current?.close(); pcRef.current?.close()
     streamRef.current?.getTracks().forEach(t=>t.stop())
     if (audioRef.current) audioRef.current.srcObject = null
     dcRef.current=null; pcRef.current=null; streamRef.current=null
-    setStatus('idle'); setAiText(''); setUserText('')
+    setStatus('idle'); setAiText(''); setUserText(''); setTimeLeft(null)
   }, [])
 
   useEffect(() => () => disconnect(), [disconnect])
@@ -184,6 +217,11 @@ Current date/time: ${t} (${tz}).`
           <OrbitControls enableZoom={false} enablePan={false} minPolarAngle={Math.PI/4} maxPolarAngle={Math.PI/1.8} minAzimuthAngle={-Math.PI/5} maxAzimuthAngle={Math.PI/5} />
         </Canvas>
         <button onClick={()=>{disconnect();navigate('/')}} style={{ position:'absolute',top:20,left:20, background:'rgba(255,255,255,0.1)',border:'1px solid rgba(255,255,255,0.2)', color:'#fff',padding:'8px 16px',borderRadius:20,cursor:'pointer',fontSize:14,backdropFilter:'blur(10px)' }}>← Back</button>
+        {timeLeft !== null && timeLeft > 0 && (
+          <div style={{ position:'absolute',top:20,right:20, background:'rgba(0,0,0,0.7)',backdropFilter:'blur(10px)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:12, padding:'8px 16px', color: timeLeft < 60 ? '#ef4444' : '#f59e0b', fontSize:14, fontWeight:700, fontFamily:'monospace' }}>
+            🆓 Trial: {Math.floor(timeLeft/60)}:{String(timeLeft%60).padStart(2,'0')}
+          </div>
+        )}
         <div style={{ position:'absolute',bottom:30,left:'50%',transform:'translateX(-50%)', display:'flex',alignItems:'center',gap:8, background:'rgba(0,0,0,0.65)',backdropFilter:'blur(12px)', padding:'8px 22px',borderRadius:30,border:`1px solid ${st.color}44` }}>
           <span style={{ width:8,height:8,borderRadius:'50%',background:st.color,flexShrink:0, animation:status!=='idle'?'pulse 1s infinite':'none',boxShadow:`0 0 8px ${st.color}` }} />
           <span style={{ color:st.color,fontWeight:600,fontSize:14 }}>{st.text}</span>

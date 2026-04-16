@@ -174,6 +174,34 @@ app.post('/api/referral/use', requireAuth, async (req, res) => {
   }
 });
 
+// Free trial token (no auth, rate limited per IP - 1 per day)
+const trialTokens = new Map(); // ip -> timestamp
+app.get('/api/realtime/trial-token', async (req, res) => {
+  const ip = req.ip || req.connection.remoteAddress;
+  const now = Date.now();
+  const last = trialTokens.get(ip);
+  if (last && (now - last) < 24 * 60 * 60 * 1000) {
+    return res.status(429).json({ error: 'Free trial: one session per day' });
+  }
+
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) return res.status(503).json({ error: 'Not configured' });
+
+  try {
+    const r = await fetch('https://api.openai.com/v1/realtime/sessions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'gpt-4o-realtime-preview', voice: 'alloy' }),
+    });
+    if (!r.ok) return res.status(500).json({ error: 'Failed to create session' });
+    const data = await r.json();
+    trialTokens.set(ip, now);
+    res.json({ token: data.client_secret.value, expiresAt: data.client_secret.expires_at, trial: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to create session' });
+  }
+});
+
 // API routes (auth required)
 app.use('/api/users', requireAuth, usersRouter);
 app.use('/api/admin', requireAuth, adminRouter);
