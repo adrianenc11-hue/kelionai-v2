@@ -1,4 +1,4 @@
-ï»¿import OpenAI from 'openai';
+import { OpenAI } from 'openai';
 import { getWorldContext } from './worldContext.js';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -11,41 +11,46 @@ export class AvatarBrain {
   }
 
   async think(userId, message, location) {
-    const context = await getWorldContext(location);
-    if (!memories.has(userId)) memories.set(userId, []);
-    const memory = memories.get(userId);
+    try {
+      const context = await getWorldContext(location);
+      if (!memories.has(userId)) memories.set(userId, []);
+      const memory = memories.get(userId);
 
-    const prompt = You are ${this.name}, .
-REAL WORLD: , , Â°C
-Reply in user language. Short (2-3 sentences).;
+      const prompt = You are , .
+Location: , Time: , Weather: C
+Reply in user language. Short.;
 
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        { role: 'system', content: prompt },
-        ...memory.slice(-6),
-        { role: 'user', content: message }
-      ],
-      max_tokens: 150
-    });
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          { role: 'system', content: prompt },
+          ...memory.slice(-6),
+          { role: 'user', content: message }
+        ],
+        max_tokens: 150
+      });
 
-    memory.push({ role: 'user', content: message });
-    memory.push({ role: 'assistant', content: response.choices[0].message.content });
+      memory.push({ role: 'user', content: message });
+      memory.push({ role: 'assistant', content: response.choices[0].message.content });
 
-    return {
-      text: response.choices[0].message.content,
-      language: detectLanguage(message)
-    };
+      return {
+        text: response.choices[0].message.content,
+        language: detectLanguage(message)
+      };
+    } catch (error) {
+      console.error('Brain error:', error);
+      return { text: 'Sorry, I cannot think now.', language: 'en' };
+    }
   }
 }
 
 function detectLanguage(text) {
-  if (/[ÄƒÃ¢Ã®È™È›]/i.test(text)) return 'ro';
-  if (/[Ã Ã¢Ã§Ã©Ã¨ÃªÃ«]/i.test(text)) return 'fr';
-  if (/[Ã¤Ã¶Ã¼ÃŸ]/i.test(text)) return 'de';
-  if (/[Ã¡Ã©Ã­Ã³ÃºÃ±]/i.test(text)) return 'es';
+  if (/[aâî??]/i.test(text)) return 'ro';
+  if (/[àâçéèêë]/i.test(text)) return 'fr';
+  if (/[äöüß]/i.test(text)) return 'de';
+  if (/[áéíóúñ]/i.test(text)) return 'es';
   return 'en';
 }
 
-export const kelionBrain = new AvatarBrain('Kelion', 'friendly, enthusiastic');
-export const kiraBrain = new AvatarBrain('Kira', 'professional, analytical');
+export const kelionBrain = new AvatarBrain('Kelion', 'friendly and enthusiastic');
+export const kiraBrain = new AvatarBrain('Kira', 'professional and analytical');
