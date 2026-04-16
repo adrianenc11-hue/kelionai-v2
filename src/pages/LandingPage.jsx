@@ -61,12 +61,38 @@ export default function LandingPage() {
   const navigate = useNavigate()
   const saved = getSavedArm()
   const [isAdmin, setIsAdmin] = useState(false)
+  const [user, setUser] = useState(null)
+  const [showLogin, setShowLogin] = useState(false)
+  const [loginEmail, setLoginEmail] = useState('')
+  const [loginPass, setLoginPass] = useState('')
+  const [loginError, setLoginError] = useState('')
+  const [loginLoading, setLoginLoading] = useState(false)
 
   useEffect(() => {
     api.get('/auth/me').then(u => {
-      if (u && u.role === 'admin') setIsAdmin(true)
+      if (u) { setUser(u); if (u.role === 'admin') setIsAdmin(true) }
     }).catch(() => {})
   }, [])
+
+  async function handleLogin(e) {
+    e.preventDefault()
+    setLoginError(''); setLoginLoading(true)
+    try {
+      const data = await api.post('/auth/local/login', { email: loginEmail, password: loginPass })
+      setUser(data.user)
+      if (data.user.role === 'admin') setIsAdmin(true)
+      setShowLogin(false)
+      // Re-check /auth/me to get server-computed admin role
+      api.get('/auth/me').then(u => { if (u && u.role === 'admin') setIsAdmin(true) }).catch(() => {})
+    } catch (err) {
+      setLoginError(err.message || 'Login failed')
+    } finally { setLoginLoading(false) }
+  }
+
+  async function handleLogout() {
+    try { await api.post('/auth/logout') } catch {}
+    setUser(null); setIsAdmin(false)
+  }
 
   return (
     <div style={{
@@ -91,6 +117,22 @@ export default function LandingPage() {
               borderRadius: '8px', color: '#a855f7', padding: '6px 14px', cursor: 'pointer',
               fontSize: '13px', fontWeight: '600',
             }}>⚙ Admin</button>
+          )}
+          {user ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ color: '#aaa', fontSize: '13px' }}>{user.name || user.email}</span>
+              <button onClick={handleLogout} style={{
+                background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
+                borderRadius: '8px', color: '#888', padding: '6px 14px', cursor: 'pointer',
+                fontSize: '13px', fontWeight: '500',
+              }}>Logout</button>
+            </div>
+          ) : (
+            <button onClick={() => setShowLogin(true)} style={{
+              background: 'linear-gradient(135deg, #7c3aed, #a855f7)',
+              border: 'none', borderRadius: '8px', color: '#fff', padding: '6px 18px',
+              cursor: 'pointer', fontSize: '13px', fontWeight: '600',
+            }}>Login</button>
           )}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 6px #22c55e' }} />
@@ -172,6 +214,47 @@ export default function LandingPage() {
           </div>
         </div>
       </div>
+
+      {showLogin && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 100,
+          background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }} onClick={() => setShowLogin(false)}>
+          <form onSubmit={handleLogin} onClick={e => e.stopPropagation()} style={{
+            background: '#16162a', border: '1px solid rgba(168,85,247,0.3)',
+            borderRadius: '16px', padding: '32px', width: '360px',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+          }}>
+            <h2 style={{
+              margin: '0 0 24px', fontSize: '22px', fontWeight: '800',
+              background: 'linear-gradient(135deg, #a855f7, #f472b6)',
+              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+            }}>Login</h2>
+            {loginError && <div style={{
+              background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)',
+              borderRadius: '8px', padding: '10px 14px', color: '#ef4444',
+              fontSize: '13px', marginBottom: '16px',
+            }}>{loginError}</div>}
+            <input type="email" placeholder="Email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} required style={{
+              width: '100%', padding: '12px 16px', borderRadius: '10px', fontSize: '14px',
+              background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)',
+              color: '#fff', outline: 'none', marginBottom: '12px', boxSizing: 'border-box',
+            }} />
+            <input type="password" placeholder="Parolă" value={loginPass} onChange={e => setLoginPass(e.target.value)} required style={{
+              width: '100%', padding: '12px 16px', borderRadius: '10px', fontSize: '14px',
+              background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)',
+              color: '#fff', outline: 'none', marginBottom: '20px', boxSizing: 'border-box',
+            }} />
+            <button type="submit" disabled={loginLoading} style={{
+              width: '100%', padding: '13px', borderRadius: '10px', border: 'none',
+              background: 'linear-gradient(135deg, #7c3aed, #a855f7)',
+              color: '#fff', fontSize: '15px', fontWeight: '700', cursor: loginLoading ? 'wait' : 'pointer',
+              opacity: loginLoading ? 0.7 : 1,
+            }}>{loginLoading ? 'Se conectează...' : 'Conectare'}</button>
+          </form>
+        </div>
+      )}
     </div>
   )
 }
