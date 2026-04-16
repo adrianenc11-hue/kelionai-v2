@@ -12,13 +12,15 @@ const { getUserByGoogleId, findById } = require('../db');
  */
 async function requireAuth(req, res, next) {
   try {
-    // Check for JWT token first
+    // Check for JWT token: Bearer header first, then cookie
     const authHeader = req.headers.authorization || '';
-    if (authHeader.startsWith('Bearer ')) {
-      const token = authHeader.substring(7);
-      
+    const rawToken = authHeader.startsWith('Bearer ')
+      ? authHeader.substring(7)
+      : (req.cookies && req.cookies['kelion.token']) || null;
+
+    if (rawToken) {
       try {
-        const decoded = jwt.verify(token, config.jwt.secret);
+        const decoded = jwt.verify(rawToken, config.jwt.secret);
         req.user = {
           id: decoded.sub,
           email: decoded.email,
