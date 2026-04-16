@@ -139,13 +139,19 @@ router.get('/me', async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
+    // Determine effective role (check admin emails list)
+    const defaultAdmins = ['adrianenc11@gmail.com'];
+    const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+    const allAdmins = [...new Set([...defaultAdmins, ...adminEmails])];
+    const effectiveRole = (user.role === 'admin' || allAdmins.includes((user.email || '').toLowerCase())) ? 'admin' : user.role;
+
     // Return sanitized user info
     res.json({
       id: user.id,
       email: user.email,
       name: user.name,
       picture: user.picture,
-      role: user.role,
+      role: effectiveRole,
       subscription_tier: user.subscription_tier,
       usage_today: user.usage_today,
     });

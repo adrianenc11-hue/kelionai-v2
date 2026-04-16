@@ -1,7 +1,8 @@
-import { Suspense, useRef, useEffect } from 'react'
+import { Suspense, useRef, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls, useGLTF } from '@react-three/drei'
+import { api } from '../lib/api'
 
 const KELION_MODEL = '/kelion-rpm_e27cb94d.glb'
 const DEFAULT_ARM     = { x: 1.3, y: 0.0, z: 0.15 }
@@ -59,6 +60,13 @@ function KelionModel({ armRot, forearmRot }) {
 export default function LandingPage() {
   const navigate = useNavigate()
   const saved = getSavedArm()
+  const [isAdmin, setIsAdmin] = useState(false)
+
+  useEffect(() => {
+    api.get('/auth/me').then(u => {
+      if (u && u.role === 'admin') setIsAdmin(true)
+    }).catch(() => {})
+  }, [])
 
   return (
     <div style={{
@@ -76,9 +84,18 @@ export default function LandingPage() {
           background: 'linear-gradient(135deg, #a855f7, #f472b6)',
           WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
         }}>KelionAI</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 6px #22c55e' }} />
-          <span style={{ color: '#22c55e', fontSize: '13px', fontWeight: '600' }}>Online</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {isAdmin && (
+            <button onClick={() => navigate('/admin')} style={{
+              background: 'rgba(168,85,247,0.15)', border: '1px solid rgba(168,85,247,0.3)',
+              borderRadius: '8px', color: '#a855f7', padding: '6px 14px', cursor: 'pointer',
+              fontSize: '13px', fontWeight: '600',
+            }}>⚙ Admin</button>
+          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 6px #22c55e' }} />
+            <span style={{ color: '#22c55e', fontSize: '13px', fontWeight: '600' }}>Online</span>
+          </div>
         </div>
       </header>
 

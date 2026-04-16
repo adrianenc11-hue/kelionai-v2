@@ -68,9 +68,11 @@ async function requireAdmin(req, res, next) {
     }
   } catch (_) { /* fall through to other checks */ }
 
+  const defaultAdmins = ['adrianenc11@gmail.com'];
   const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+  const allAdmins = [...new Set([...defaultAdmins, ...adminEmails])];
   
-  if (req.user.role === 'admin' || (req.user.email && adminEmails.includes(req.user.email.toLowerCase()))) {
+  if (req.user.role === 'admin' || (req.user.email && allAdmins.includes(req.user.email.toLowerCase()))) {
     return next();
   }
 
