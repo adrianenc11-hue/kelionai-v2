@@ -198,17 +198,17 @@ Current date/time: ${t} (${tz}).`
         <div style={{ flex:1,display:'flex',flexDirection:'column',justifyContent:'flex-end',padding:'24px 20px',gap:16 }}>
           {aiText ? (
             <div style={{ display:'flex',alignItems:'flex-start',gap:10 }}>
-              <div style={{ width:32,height:32,borderRadius:'50%',flexShrink:0, background:`linear-gradient(135deg,${AVATAR.color},${AVATAR.glow})`, display:'flex',alignItems:'center',justifyContent:'center', fontSize:14,fontWeight:700,color:'#fff' }}>K</div>
+              <div style={{ width:32,height:32,borderRadius:'50%',flexShrink:0, background:`linear-gradient(135deg,${config.color},${config.glow})`, display:'flex',alignItems:'center',justifyContent:'center', fontSize:14,fontWeight:700,color:'#fff' }}>K</div>
               <div style={{ flex:1,background:'rgba(255,255,255,0.07)',borderRadius:'4px 18px 18px 18px', padding:'14px 16px',color:'#e5e7eb',fontSize:15,lineHeight:1.6, border:'1px solid rgba(255,255,255,0.06)' }}>
                 {aiText}{status==='speaking'&&<span style={{opacity:0.4,marginLeft:4}}>▋</span>}
               </div>
             </div>
           ) : status==='idle' ? (
-            <div style={{ textAlign:'center',color:'#444',fontSize:14 }}>Press <b style={{color:AVATAR.glow}}>Start Chat</b> to begin</div>
+            <div style={{ textAlign:'center',color:'#444',fontSize:14 }}>Press <b style={{color:config.glow}}>Start Chat</b> to begin</div>
           ) : null}
           {userText ? (
             <div style={{ display:'flex',justifyContent:'flex-end' }}>
-              <div style={{ maxWidth:'80%',padding:'12px 16px',borderRadius:'18px 4px 18px 18px', fontSize:15,lineHeight:1.6,color:'#fff', background:`linear-gradient(135deg,${AVATAR.color},${AVATAR.glow})` }}>{userText}</div>
+              <div style={{ maxWidth:'80%',padding:'12px 16px',borderRadius:'18px 4px 18px 18px', fontSize:15,lineHeight:1.6,color:'#fff', background:`linear-gradient(135deg,${config.color},${config.glow})` }}>{userText}</div>
             </div>
           ) : null}
         </div>
@@ -217,8 +217,8 @@ Current date/time: ${t} (${tz}).`
             <button onClick={connect} disabled={status==='connecting'} style={{
               width:'100%',padding:15,borderRadius:14,border:'none',
               cursor:status==='connecting'?'wait':'pointer',
-              background:`linear-gradient(135deg,${AVATAR.color},${AVATAR.glow})`,
-              color:'#fff',fontSize:16,fontWeight:700,boxShadow:`0 0 24px ${AVATAR.glow}44`,
+              background:`linear-gradient(135deg,${config.color},${config.glow})`,
+              color:'#fff',fontSize:16,fontWeight:700,boxShadow:`0 0 24px ${config.glow}44`,
               opacity:status==='connecting'?0.7:1,
             }}>{status==='connecting'?'⏳ Connecting…':status==='error'?'🔄 Retry':'🎤 Start Chat'}</button>
           ) : (
@@ -235,7 +235,7 @@ Current date/time: ${t} (${tz}).`
                 placeholder="Or type here… (Enter = send)" rows={2}
                 style={{ flex:1,background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)',borderRadius:12, color:'#fff',padding:'10px 14px',fontSize:14, resize:'none',outline:'none',fontFamily:'inherit' }} />
               <button onClick={()=>sendText(inputText)} disabled={!inputText.trim()} style={{
-                background:`linear-gradient(135deg,${AVATAR.color},${AVATAR.glow})`,
+                background:`linear-gradient(135deg,${config.color},${config.glow})`,
                 border:'none',borderRadius:12,color:'#fff',width:44,cursor:'pointer',fontSize:18,
                 opacity:!inputText.trim()?0.4:1,
               }}>➤</button>
