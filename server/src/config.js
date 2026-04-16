@@ -64,7 +64,7 @@ module.exports = {
     optional('NODE_ENV') === 'production' ? 'https://kelionai.app' : 'http://localhost:3001'
   ),
 
-  corsOrigins: optional('CORS_ORIGINS', 'https://kelionai.app,https://kelionai-v2-production.up.railway.app,http://localhost:5173')
+  corsOrigins: optional('CORS_ORIGINS', 'https://kelionai.app,https://www.kelionai.app,http://localhost:5173,http://localhost:3001')
     .split(',').map(o => o.trim()).filter(Boolean),
 
   cookie: {
