@@ -37,7 +37,7 @@ const SUBSCRIPTION_PLANS = {
  * Middleware pentru verificarea subscription-ului.
  * Verifică dacă utilizatorul are quota disponibilă.
  */
-async function checkSubscription(requiredPlan = 'free') {
+function checkSubscription(requiredPlan = 'free') {
   return async (req, res, next) => {
     try {
       const db = getDb();
