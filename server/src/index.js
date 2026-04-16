@@ -9,12 +9,36 @@ const rateLimit = require('express-rate-limit');
 
 const config = require('./config');
 const { csrfSeed } = require('./middleware/csrf');
-const chatRouter     = require('./routes/chat');
-const ttsRouter      = require('./routes/tts');
-const realtimeRouter = require('./routes/realtime');
+const { requireAuth } = require('./middleware/auth');
+const { checkSubscription } = require('./middleware/subscription');
+const { initDb } = require('./db');
+const authRouter       = require('./routes/auth');
+const usersRouter      = require('./routes/users');
+const adminRouter      = require('./routes/admin');
+const chatRouter       = require('./routes/chat');
+const ttsRouter        = require('./routes/tts');
+const realtimeRouter   = require('./routes/realtime');
 
 const app = express();
 app.disable('x-powered-by');
+
+// Initialize database
+initDb().then(() => {
+  console.log('[kelion-startup] Database initialized');
+}).catch(err => {
+  console.error('[kelion-startup] Database initialization failed:', err.message);
+});
+
+// Validate required API keys in production
+if (config.isProduction) {
+  const requiredKeys = ['OPENAI_API_KEY', 'ELEVENLABS_API_KEY'];
+  const missing = requiredKeys.filter(key => !process.env[key]);
+  
+  if (missing.length > 0) {
+    console.warn(`[kelion-startup] WARNING: Missing required API keys: ${missing.join(', ')}`);
+    console.warn('[kelion-startup] AI features will not work without these keys');
+  }
+}
 
 const distPath = path.resolve(__dirname, '../../dist');
 const fs = require('fs');
@@ -71,11 +95,50 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(csrfSeed);
 
-app.use('/api/chat',     chatLimiter, chatRouter);
-app.use('/api/tts',      chatLimiter, ttsRouter);
-app.use('/api/realtime', chatLimiter, realtimeRouter);
+// Auth routes (no auth required)
+app.use('/auth', authRouter);
 
-app.get('/health', (_req, res) => res.json({ status: 'ok', ts: new Date().toISOString() }));
+// API routes (auth required)
+app.use('/api/users', requireAuth, usersRouter);
+app.use('/api/admin', requireAuth, adminRouter);
+app.use('/api/chat', requireAuth, chatLimiter, checkSubscription(), chatRouter);
+app.use('/api/tts', requireAuth, chatLimiter, checkSubscription(), ttsRouter);
+app.use('/api/realtime', requireAuth, chatLimiter, realtimeRouter);
+
+// Health check with service status
+app.get('/health', async (_req, res) => {
+  const health = {
+    status: 'ok',
+    ts: new Date().toISOString(),
+    services: {
+      database: 'unknown',
+      openai: 'unknown',
+      elevenlabs: 'unknown',
+    },
+  };
+
+  // Check database
+  try {
+    const { getDb } = require('./db');
+    const db = getDb();
+    if (db) {
+      await db.get('SELECT 1');
+      health.services.database = 'connected';
+    } else {
+      health.services.database = 'disconnected';
+    }
+  } catch {
+    health.services.database = 'error';
+  }
+
+  // Check OpenAI
+  health.services.openai = process.env.OPENAI_API_KEY ? 'configured' : 'not configured';
+
+  // Check ElevenLabs
+  health.services.elevenlabs = process.env.ELEVENLABS_API_KEY ? 'configured' : 'not configured';
+
+  res.json(health);
+});
 app.get('/ping',   (_req, res) => res.send('<h1>PONG - Server is alive and reached!</h1>'));
 
 if (process.env.NODE_ENV === 'production') {
