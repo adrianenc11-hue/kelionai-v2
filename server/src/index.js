@@ -58,7 +58,7 @@ app.use(
         styleSrc:   ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         fontSrc:    ["'self'", "https://fonts.gstatic.com"],
         imgSrc:     ["'self'", "data:", "blob:", "https:"],
-        connectSrc: ["'self'", "https://api.openai.com", "wss://api.openai.com", "https://raw.githack.com", "https://*.githubusercontent.com", "blob:", "https:", "wss:"],
+        connectSrc: ["'self'", "https://api.openai.com", "wss://api.openai.com", "https://generativelanguage.googleapis.com", "wss://generativelanguage.googleapis.com", "https://raw.githack.com", "https://*.githubusercontent.com", "blob:", "https:", "wss:"],
         mediaSrc:   ["'self'", "blob:"],
         workerSrc:  ["'self'", "blob:"],
       },
