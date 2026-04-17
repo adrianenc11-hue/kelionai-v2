@@ -409,3 +409,44 @@ describe('POST /api/payments/create-checkout-session', () => {
     expect(res.status).toBe(503);
   });
 });
+
+// ---------------------------------------------------------------------------
+// GET /api/subscription/status
+// ---------------------------------------------------------------------------
+
+describe('GET /api/subscription/status', () => {
+  it('returns 401 when unauthenticated', async () => {
+    const res = await request(app).get('/api/subscription/status');
+    expect(res.status).toBe(401);
+  });
+
+  it('returns status, tier, and customerId for authenticated user', async () => {
+    const user  = await seedUser();
+    const token = makeToken(user);
+
+    const res = await request(app)
+      .get('/api/subscription/status')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('status');
+    expect(res.body).toHaveProperty('tier');
+    expect(res.body).toHaveProperty('customerId');
+    expect(typeof res.body.status).toBe('string');
+    expect(typeof res.body.tier).toBe('string');
+  });
+
+  it('returns active status and free tier for a new user', async () => {
+    const user  = await seedUser();
+    const token = makeToken(user);
+
+    const res = await request(app)
+      .get('/api/subscription/status')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('active');
+    expect(res.body.tier).toBe('free');
+    expect(res.body.customerId).toBeNull();
+  });
+});

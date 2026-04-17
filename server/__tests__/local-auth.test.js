@@ -36,6 +36,8 @@ describe('POST /auth/local/register', () => {
   it('400 missing name',                async () => { expect((await reg({name:undefined})).status).toBe(400); });
   it('400 invalid email format',        async () => { const r=await reg({email:'bad-email'}); expect(r.status).toBe(400); expect(r.body.error).toMatch(/email/i); });
   it('400 password too short',          async () => { const r=await reg({password:'abc'}); expect(r.status).toBe(400); expect(r.body.error).toMatch(/password/i); });
+  it('400 password missing uppercase',  async () => { const r=await reg({password:'nouppercase1'}); expect(r.status).toBe(400); expect(r.body.error).toMatch(/uppercase/i); });
+  it('400 password missing digit',      async () => { const r=await reg({password:'NoDigitHere'}); expect(r.status).toBe(400); expect(r.body.error).toMatch(/digit/i); });
   it('400 name too short',              async () => { expect((await reg({name:'X'})).status).toBe(400); });
   it('409 on duplicate email',          async () => { const e=unique(); await reg({email:e}); expect((await reg({email:e})).status).toBe(409); });
   it('sets HttpOnly cookie',            async () => { const r=await reg(); expect(r.headers['set-cookie']?.some(c=>c.includes('kelion.token')&&c.includes('HttpOnly'))).toBe(true); });
