@@ -1,7 +1,7 @@
 import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls, useGLTF } from '@react-three/drei'
 import { Suspense, useState, useRef, useEffect, useCallback } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useLipSync } from '../lib/lipSync'
 
 const AVATARS = {
@@ -9,11 +9,6 @@ const AVATARS = {
     model: '/kelion-rpm_e27cb94d.glb',
     color: '#7c3aed',
     glow:  '#a855f7',
-  },
-  kira: {
-    model: '/kira-rpm_54d82b66.glb',
-    color: '#ec4899',
-    glow: '#f472b6',
   },
 }
 
@@ -58,32 +53,28 @@ function AvatarModel({ avatar = 'kelion', mouthOpen = 0 }) {
 
 const ST = {
   idle:       { text: 'Kelion',        color: '#a855f7' },
-  connecting: { text: 'Connecting…',   color: '#f59e0b' },
-  listening:  { text: 'Listening…',    color: '#22c55e' },
-  thinking:   { text: 'Thinking…',     color: '#f59e0b' },
-  speaking:   { text: 'Speaking…',     color: '#a855f7' },
-  error:      { text: 'Error — retry', color: '#ef4444' },
+  connecting: { text: 'Se conectează…',   color: '#f59e0b' },
+  listening:  { text: 'Ascultă…',         color: '#22c55e' },
+  thinking:   { text: 'Gândește…',        color: '#f59e0b' },
+  speaking:   { text: 'Vorbește…',        color: '#a855f7' },
+  error:      { text: 'Eroare — reîncearcă', color: '#ef4444' },
 }
 
-export default function VoiceChat({ avatar: avatarProp }) {
-  const { avatar: avatarParam } = useParams()
+export default function VoiceChat() {
   const navigate = useNavigate()
-  const avatar = avatarProp || avatarParam || 'kelion'
-  const config = AVATARS[avatar] || AVATARS.kelion
+  const avatar = 'kelion'
+  const config = AVATARS.kelion
   const [status, setStatus]       = useState('idle')
   const [aiText, setAiText]       = useState('')
   const [userText, setUserText]   = useState('')
   const [inputText, setInputText] = useState('')
   const audioRef  = useRef(null)
-  const videoRef  = useRef(null)
-  const canvasRef = useRef(null)
   const mouthOpen = useLipSync(audioRef)
   const pcRef     = useRef(null)
   const dcRef     = useRef(null)
   const streamRef = useRef(null)
   const timerRef  = useRef(null)
   const [timeLeft, setTimeLeft] = useState(null) // seconds left for trial
-  const [hasCamera, setHasCamera] = useState(false)
 
   const buildInstructions = () => {
     const now = new Date()
@@ -91,11 +82,8 @@ export default function VoiceChat({ avatar: avatarProp }) {
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
     const lang = navigator.language || 'en'
     return `You are Kelion, a friendly and intelligent AI assistant. Calm, professional, empathetic.
-Language rules (strict):
-1. Detect the language of the MOST RECENT user utterance (voice or text) and reply ONLY in that language — voice AND on-screen transcript.
-2. If the user switches language at any turn, switch immediately on the next reply. Never keep the previous language.
-3. Never mix languages in a single response.
-4. If the latest message is ambiguous (one word, emoji, "ok"), keep the language of the previous user turn. For the very first message with no prior context, mirror the browser locale hint: ${lang}.
+IMPORTANT: Detect the language the user speaks and ALWAYS reply in that SAME language. If the user speaks Romanian, you MUST reply in Romanian. If the user speaks English, reply in English. Never switch languages unless the user does.
+The user's browser language is: ${lang}.
 Be concise and natural — you are speaking out loud, keep responses short (1-3 sentences).
 Current date/time: ${t} (${tz}).`
   }
@@ -113,7 +101,7 @@ Current date/time: ${t} (${tz}).`
       case 'input_audio_buffer.speech_started':
         setStatus('listening'); setUserText(''); break
       case 'input_audio_buffer.speech_stopped':
-        setStatus('thinking'); captureAndSendFrame(); break
+        setStatus('thinking'); break
       case 'response.created':
         setStatus('thinking'); setAiText(''); break
       case 'response.done':
@@ -121,24 +109,6 @@ Current date/time: ${t} (${tz}).`
       case 'error':
         console.error('[realtime]', evt.error); setStatus('error'); break
     }
-  }, [])
-
-  const captureAndSendFrame = useCallback(() => {
-    const v = videoRef.current; const dc = dcRef.current
-    if (!v || !dc || dc.readyState !== 'open') return
-    if (!v.videoWidth || !v.videoHeight) return
-    const c = canvasRef.current || document.createElement('canvas')
-    canvasRef.current = c
-    const W = 384
-    c.width = W; c.height = Math.round(v.videoHeight * W / v.videoWidth)
-    c.getContext('2d').drawImage(v, 0, 0, c.width, c.height)
-    const dataUrl = c.toDataURL('image/jpeg', 0.55)
-    try {
-      dc.send(JSON.stringify({
-        type: 'conversation.item.create',
-        item: { type: 'message', role: 'user', content: [{ type: 'input_image', image_url: dataUrl }] },
-      }))
-    } catch (_) {}
   }, [])
 
   const connect = useCallback(async () => {
@@ -182,24 +152,8 @@ Current date/time: ${t} (${tz}).`
       const pc = new RTCPeerConnection(); pcRef.current = pc
       pc.ontrack = (e) => { if (audioRef.current) { audioRef.current.srcObject = e.streams[0]; audioRef.current.play().catch(()=>{}) } }
 
-      let media
-      try {
-        media = await navigator.mediaDevices.getUserMedia({
-          audio: true,
-          video: { width:{ideal:640}, height:{ideal:480}, facingMode:'user' },
-        })
-        setHasCamera(media.getVideoTracks().length > 0)
-      } catch (_) {
-        media = await navigator.mediaDevices.getUserMedia({ audio: true })
-        setHasCamera(false)
-      }
-      streamRef.current = media
-      const audioTrack = media.getAudioTracks()[0]
-      if (audioTrack) pc.addTrack(audioTrack, media)
-      if (videoRef.current && media.getVideoTracks().length > 0) {
-        videoRef.current.srcObject = media
-        videoRef.current.play().catch(()=>{})
-      }
+      const mic = await navigator.mediaDevices.getUserMedia({ audio: true })
+      streamRef.current = mic; pc.addTrack(mic.getTracks()[0], mic)
 
       const dc = pc.createDataChannel('oai-events'); dcRef.current = dc
       dc.onopen = () => {
@@ -228,9 +182,8 @@ Current date/time: ${t} (${tz}).`
     dcRef.current?.close(); pcRef.current?.close()
     streamRef.current?.getTracks().forEach(t=>t.stop())
     if (audioRef.current) audioRef.current.srcObject = null
-    if (videoRef.current) { try { videoRef.current.pause() } catch (_){}; videoRef.current.srcObject = null }
     dcRef.current=null; pcRef.current=null; streamRef.current=null
-    setStatus('idle'); setAiText(''); setUserText(''); setTimeLeft(null); setHasCamera(false)
+    setStatus('idle'); setAiText(''); setUserText(''); setTimeLeft(null)
   }, [])
 
   useEffect(() => () => disconnect(), [disconnect])
@@ -248,15 +201,6 @@ Current date/time: ${t} (${tz}).`
   return (
     <div style={{ width:'100vw', height:'100vh', display:'flex', background:'#0a0a0f' }}>
       <audio ref={audioRef} style={{ display:'none' }} autoPlay />
-      <video ref={videoRef} playsInline muted style={{
-        position:'absolute', top:20, right:20, zIndex:5,
-        width: hasCamera ? 160 : 0, height: hasCamera ? 120 : 0,
-        borderRadius:12, objectFit:'cover', background:'#000',
-        border: hasCamera ? '2px solid rgba(168,85,247,0.5)' : 'none',
-        boxShadow: hasCamera ? '0 0 16px rgba(168,85,247,0.35)' : 'none',
-        display: hasCamera ? 'block' : 'none',
-      }} />
-      <canvas ref={canvasRef} style={{ display:'none' }} />
       <div style={{ flex:1, position:'relative' }}>
         <Canvas camera={{ position:[0,0.3,3.5], fov:45 }} style={{ width:'100%', height:'100%' }} gl={{ antialias:true }}>
           <color attach="background" args={['#0a0a0f']} />
@@ -269,7 +213,7 @@ Current date/time: ${t} (${tz}).`
           </Suspense>
           <OrbitControls enableZoom={false} enablePan={false} minPolarAngle={Math.PI/4} maxPolarAngle={Math.PI/1.8} minAzimuthAngle={-Math.PI/5} maxAzimuthAngle={Math.PI/5} />
         </Canvas>
-        <button onClick={()=>{disconnect();navigate('/')}} style={{ position:'absolute',top:20,left:20, background:'rgba(255,255,255,0.1)',border:'1px solid rgba(255,255,255,0.2)', color:'#fff',padding:'8px 16px',borderRadius:20,cursor:'pointer',fontSize:14,backdropFilter:'blur(10px)' }}>← Back</button>
+        <button onClick={()=>{disconnect();navigate('/')}} style={{ position:'absolute',top:20,left:20, background:'rgba(255,255,255,0.1)',border:'1px solid rgba(255,255,255,0.2)', color:'#fff',padding:'8px 16px',borderRadius:20,cursor:'pointer',fontSize:14,backdropFilter:'blur(10px)' }}>← Înapoi</button>
         {timeLeft !== null && timeLeft > 0 && (
           <div style={{ position:'absolute',top:20,right:20, background:'rgba(0,0,0,0.7)',backdropFilter:'blur(10px)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:12, padding:'8px 16px', color: timeLeft < 60 ? '#ef4444' : '#f59e0b', fontSize:14, fontWeight:700, fontFamily:'monospace' }}>
             🆓 Trial: {Math.floor(timeLeft/60)}:{String(timeLeft%60).padStart(2,'0')}
@@ -283,8 +227,8 @@ Current date/time: ${t} (${tz}).`
       <div style={{ width:400,display:'flex',flexDirection:'column', background:'rgba(0,0,0,0.35)',borderLeft:'1px solid rgba(255,255,255,0.07)' }}>
         <div style={{ padding:'16px 20px',borderBottom:'1px solid rgba(255,255,255,0.07)', display:'flex',alignItems:'center',gap:10,flexShrink:0 }}>
           <div style={{ width:10,height:10,borderRadius:'50%',background:config.glow,boxShadow:`0 0 8px ${config.glow}` }} />
-          <span style={{ fontWeight:600,color:'#fff',fontSize:15 }}>{avatar === 'kira' ? 'Kira' : 'Kelion'}</span>
-          <span style={{ marginLeft:'auto',fontSize:11,color:'#555' }}>🌍 any language</span>
+          <span style={{ fontWeight:600,color:'#fff',fontSize:15 }}>Kelion</span>
+          <span style={{ marginLeft:'auto',fontSize:11,color:'#555' }}>🌍 orice limbă</span>
         </div>
         <div style={{ flex:1,display:'flex',flexDirection:'column',justifyContent:'flex-end',padding:'24px 20px',gap:16 }}>
           {aiText ? (
@@ -295,7 +239,7 @@ Current date/time: ${t} (${tz}).`
               </div>
             </div>
           ) : status==='idle' ? (
-            <div style={{ textAlign:'center',color:'#444',fontSize:14 }}>Press <b style={{color:config.glow}}>Start Chat</b> to begin</div>
+            <div style={{ textAlign:'center',color:'#444',fontSize:14 }}>Apasă <b style={{color:config.glow}}>Pornește chat</b> pentru a începe</div>
           ) : null}
           {userText ? (
             <div style={{ display:'flex',justifyContent:'flex-end' }}>
@@ -311,19 +255,19 @@ Current date/time: ${t} (${tz}).`
               background:`linear-gradient(135deg,${config.color},${config.glow})`,
               color:'#fff',fontSize:16,fontWeight:700,boxShadow:`0 0 24px ${config.glow}44`,
               opacity:status==='connecting'?0.7:1,
-            }}>{status==='connecting'?'⏳ Connecting…':status==='error'?'🔄 Retry':'🎤 Start Chat'}</button>
+            }}>{status==='connecting'?'⏳ Se conectează…':status==='error'?'🔄 Reîncearcă':'🎤 Pornește chat'}</button>
           ) : (
             <button onClick={disconnect} style={{
               width:'100%',padding:15,borderRadius:14,border:'none',cursor:'pointer',
               background:'linear-gradient(135deg,#dc2626,#ef4444)',
               color:'#fff',fontSize:16,fontWeight:700,boxShadow:'0 0 20px rgba(220,38,38,0.4)',
-            }}>⏹ End Chat</button>
+            }}>⏹ Oprește chat</button>
           )}
           {live && (
             <div style={{ display:'flex',gap:8 }}>
               <textarea value={inputText} onChange={e=>setInputText(e.target.value)}
                 onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendText(inputText)} }}
-                placeholder="Or type here… (Enter = send)" rows={2}
+                placeholder="Sau scrie aici… (Enter = trimite)" rows={2}
                 style={{ flex:1,background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)',borderRadius:12, color:'#fff',padding:'10px 14px',fontSize:14, resize:'none',outline:'none',fontFamily:'inherit' }} />
               <button onClick={()=>sendText(inputText)} disabled={!inputText.trim()} style={{
                 background:`linear-gradient(135deg,${config.color},${config.glow})`,

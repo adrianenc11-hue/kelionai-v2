@@ -107,15 +107,29 @@ const BASE = 'https://kelionai.app';
     kelionGlb.status() === 200 && kelionCt.startsWith('model/'),
     'status=' + kelionGlb.status() + ' content-type=' + kelionCt);
 
-  // ---- 9. No old bundle with kira in it ----
+  // ---- 9. VoiceChat bundle sanity checks ----
   const landingHtml = await (await page.request.get(BASE + '/')).text();
-  const bundleMatch = landingHtml.match(/VoiceChat-[A-Za-z0-9_-]+\.js/);
-  if (bundleMatch) {
-    const bundleUrl = BASE + '/assets/' + bundleMatch[0];
+  // Main bundle is where the lazy-loaded VoiceChat chunk URL is referenced.
+  const indexMatch = landingHtml.match(/index-[A-Za-z0-9_-]+\.js/);
+  let mainBundleText = '';
+  if (indexMatch) {
+    mainBundleText = await (await page.request.get(BASE + '/assets/' + indexMatch[0])).text();
+  }
+  const vcMatch = mainBundleText.match(/VoiceChat-[A-Za-z0-9_-]+\.js/);
+  if (vcMatch) {
+    const bundleUrl = BASE + '/assets/' + vcMatch[0];
     const bundleText = await (await page.request.get(bundleUrl)).text();
     check('VoiceChat bundle has no Kira references',
-      !/kira/i.test(bundleText),
-      'bundle=' + bundleMatch[0] + ', size=' + bundleText.length);
+      !/\bkira\b/i.test(bundleText),
+      'bundle=' + vcMatch[0] + ', size=' + bundleText.length);
+    check('VoiceChat bundle requests video+audio (camera with mic)',
+      /video\s*:\s*\{/.test(bundleText) && /getUserMedia/.test(bundleText),
+      'size=' + bundleText.length);
+    check('VoiceChat bundle has strict language rules (no "default to Romanian")',
+      /Language rules/.test(bundleText) && !/default to Romanian/i.test(bundleText),
+      'has Language rules=' + /Language rules/.test(bundleText));
+  } else {
+    check('Could not locate VoiceChat chunk in main bundle', false, 'main=' + (indexMatch?.[0]||'?'));
   }
 
   // ---- Summary ----
