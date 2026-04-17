@@ -284,7 +284,7 @@ Current date/time: ${t} (${tz}).`
               </div>
             </div>
           ) : status==='idle' ? (
-            <div style={{ textAlign:'center',color:'#444',fontSize:14 }}>Apasu{0103} <b style={{color:config.glow}}>Porneu{015F}te chat</b> pentru a u{00EE}ncepe</div>
+            <div style={{ textAlign:'center',color:'#444',fontSize:14 }}>Apasă <b style={{color:config.glow}}>Pornește chat</b> pentru a începe</div>
           ) : null}
           {userText ? (
             <div style={{ display:'flex',justifyContent:'flex-end' }}>
