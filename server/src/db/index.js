@@ -42,10 +42,25 @@ async function initDb() {
     )
   `);
 
-  // Migration: add password_hash column if missing (for existing DBs)
+  // Additive migrations for existing DBs: list every column the code expects
+  // and ALTER TABLE for anything missing. Keep the list ordered by feature so
+  // it's easy to trace when a column was introduced.
   const cols = await db.all("PRAGMA table_info(users)");
-  if (!cols.find(c => c.name === 'password_hash')) {
-    await db.exec('ALTER TABLE users ADD COLUMN password_hash TEXT');
+  const has = name => cols.some(c => c.name === name);
+  const migrations = [
+    ['password_hash',           'TEXT'],
+    // Stripe subscription lifecycle
+    ['stripe_subscription_id',  'TEXT'],
+    ['current_period_end',      'INTEGER'],   // unix seconds
+    ['cancel_at_period_end',    'INTEGER DEFAULT 0'],
+    ['canceled_at',             'INTEGER'],   // unix seconds
+    // GDPR consent capture
+    ['terms_accepted_at',       'INTEGER'],
+  ];
+  for (const [name, type] of migrations) {
+    if (!has(name)) {
+      await db.exec(`ALTER TABLE users ADD COLUMN ${name} ${type}`);
+    }
   }
 
   // Create index for faster lookups
@@ -135,13 +150,13 @@ async function deleteUser(id) {
   await db.run('DELETE FROM users WHERE id = ?', [id]);
 }
 
-async function insertUser({ email, password_hash, name, role = 'user' }) {
+async function insertUser({ email, password_hash, name, role = 'user', terms_accepted_at = null }) {
   const existing = await getUserByEmail(email);
   if (existing) return null;
 
   const result = await db.run(
-    'INSERT INTO users (email, password_hash, name, role, referral_code) VALUES (?, ?, ?, ?, ?)',
-    [email, password_hash, name, role, generateReferralCode()]
+    'INSERT INTO users (email, password_hash, name, role, referral_code, terms_accepted_at) VALUES (?, ?, ?, ?, ?, ?)',
+    [email, password_hash, name, role, generateReferralCode(), terms_accepted_at]
   );
 
   return await getUserById(result.lastID);
@@ -181,6 +196,29 @@ async function updateStripeCustomerId(id, stripeCustomerId) {
 
 async function findByStripeCustomerId(cid) {
   return db.get('SELECT * FROM users WHERE stripe_customer_id = ?', [cid]);
+}
+
+async function findByStripeSubscriptionId(sid) {
+  return db.get('SELECT * FROM users WHERE stripe_subscription_id = ?', [sid]);
+}
+
+// Persist Stripe-side lifecycle fields on the user row. Only the provided
+// keys are written; everything else stays untouched.
+async function updateStripeSubscription(userId, fields) {
+  const allowed = [
+    'stripe_subscription_id',
+    'current_period_end',
+    'cancel_at_period_end',
+    'canceled_at',
+    'subscription_status',
+    'subscription_tier',
+  ];
+  const patch = {};
+  for (const k of allowed) {
+    if (fields[k] !== undefined) patch[k] = fields[k];
+  }
+  if (Object.keys(patch).length === 0) return;
+  return updateUser(userId, patch);
 }
 
 async function getUsageToday(userId) {
@@ -273,6 +311,8 @@ module.exports = {
   updateSubscription,
   updateStripeCustomerId,
   findByStripeCustomerId,
+  findByStripeSubscriptionId,
+  updateStripeSubscription,
   getUsageToday,
   createReferralCode,
   findReferralCode,

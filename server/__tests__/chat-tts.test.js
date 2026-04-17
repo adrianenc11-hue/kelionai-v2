@@ -25,7 +25,7 @@ const unique = () => `ct_${Date.now()}_${Math.random().toString(36).slice(2)}@te
 
 async function createUser() {
   const r = await request(app).post('/auth/local/register')
-    .send({ email: unique(), password: 'ValidPass123!', name: 'CT User' });
+    .send({ email: unique(), password: 'ValidPass123!', name: 'CT User', acceptTerms: true });
   const id = r.body.user.id;
   const token = jwt.sign({ sub: id, email: r.body.user.email, name: 'CT User' },
     process.env.JWT_SECRET, { expiresIn: '1h' });

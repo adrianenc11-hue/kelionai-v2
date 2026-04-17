@@ -22,12 +22,13 @@ function createMockDb() {
         last_login_at: new Date().toISOString() };
       users.set(id, user); return user;
     }),
-    insertUser: jest.fn(({ email, password_hash, name, role='user' }) => {
+    insertUser: jest.fn(({ email, password_hash, name, role='user', terms_accepted_at=null }) => {
       for (const u of users.values()) if (u.email === email) return null;
       const id = `uid-${counter++}`;
       const user = { id, google_id: null, email, name, password_hash, role,
         subscription_tier: 'free', subscription_status: 'active',
         subscription_expires_at: null, stripe_customer_id: null,
+        terms_accepted_at,
         created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
       users.set(id, user); return user;
     }),
@@ -40,6 +41,14 @@ function createMockDb() {
     updateSubscription:   jest.fn((id, data)   => { const u=users.get(id); if(!u) return null; Object.assign(u,data); return u; }),
     updateStripeCustomerId: jest.fn((id,cid)   => { const u=users.get(id); if(u) u.stripe_customer_id=cid; }),
     findByStripeCustomerId: jest.fn((cid)      => { for(const u of users.values()) if(u.stripe_customer_id===cid) return u; return null; }),
+    findByStripeSubscriptionId: jest.fn((sid)  => { for(const u of users.values()) if(u.stripe_subscription_id===sid) return u; return null; }),
+    updateStripeSubscription: jest.fn((id, fields) => {
+      const u = users.get(id); if (!u) return null;
+      for (const k of ['stripe_subscription_id','current_period_end','cancel_at_period_end','canceled_at','subscription_status','subscription_tier']) {
+        if (fields[k] !== undefined) u[k] = fields[k];
+      }
+      return u;
+    }),
     getUsageToday:        jest.fn((uid)   => usage.get(uid)||0),
     incrementUsage:       jest.fn((uid)   => usage.set(uid,(usage.get(uid)||0)+1)),
     createReferralCode:   jest.fn((ownerId) => {

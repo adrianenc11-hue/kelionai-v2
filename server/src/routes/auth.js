@@ -173,12 +173,18 @@ router.get('/me', async (req, res) => {
  */
 router.post('/local/register', async (req, res) => {
   try {
-    const { email, password, name } = req.body || {};
+    const { email, password, name, acceptTerms } = req.body || {};
 
     if (!email) return res.status(400).json({ error: 'Email is required' });
     if (!password) return res.status(400).json({ error: 'Password is required' });
     if (!name || (typeof name === 'string' && name.trim().length < 2)) {
       return res.status(400).json({ error: 'Name must be at least 2 characters' });
+    }
+    // GDPR: users must explicitly opt in to Terms + Privacy before account
+    // creation. The timestamp is persisted on the user row (terms_accepted_at)
+    // so legal can prove consent was collected.
+    if (acceptTerms !== true) {
+      return res.status(400).json({ error: 'You must accept the Terms and Privacy Policy' });
     }
 
     // Validate email format
@@ -202,7 +208,12 @@ router.post('/local/register', async (req, res) => {
     const salt = crypto.randomBytes(16).toString('hex');
     const password_hash = crypto.scryptSync(password, salt, 64).toString('hex') + ':' + salt;
 
-    const user = await insertUser({ email, password_hash, name });
+    const user = await insertUser({
+      email,
+      password_hash,
+      name,
+      terms_accepted_at: Math.floor(Date.now() / 1000),
+    });
 
     const token = signAppToken(user);
 

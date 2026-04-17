@@ -25,7 +25,7 @@ const unique = () => `la_${Date.now()}_${Math.random().toString(36).slice(2)}@te
 
 async function reg(overrides = {}) {
   return request(app).post('/auth/local/register').send(
-    { email: unique(), password: 'ValidPass123!', name: 'Test User', ...overrides }
+    { email: unique(), password: 'ValidPass123!', name: 'Test User', acceptTerms: true, ...overrides }
   );
 }
 
@@ -38,6 +38,8 @@ describe('POST /auth/local/register', () => {
   it('400 password too short',          async () => { const r=await reg({password:'abc'}); expect(r.status).toBe(400); expect(r.body.error).toMatch(/password/i); });
   it('400 name too short',              async () => { expect((await reg({name:'X'})).status).toBe(400); });
   it('409 on duplicate email',          async () => { const e=unique(); await reg({email:e}); expect((await reg({email:e})).status).toBe(409); });
+  it('400 when acceptTerms missing',    async () => { const r=await reg({acceptTerms:undefined}); expect(r.status).toBe(400); expect(r.body.error).toMatch(/terms|privacy/i); });
+  it('400 when acceptTerms is false',   async () => { const r=await reg({acceptTerms:false});     expect(r.status).toBe(400); });
   it('sets HttpOnly cookie',            async () => { const r=await reg(); expect(r.headers['set-cookie']?.some(c=>c.includes('kelion.token')&&c.includes('HttpOnly'))).toBe(true); });
   it('role defaults to user',           async () => { const r=await reg(); expect(r.body.user.role).toBe('user'); });
   it('returns JWT token in body',      async () => { const r=await reg(); expect(r.body.token).toBeTruthy(); expect(typeof r.body.token).toBe('string'); });

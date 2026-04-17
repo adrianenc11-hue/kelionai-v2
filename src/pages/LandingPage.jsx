@@ -69,15 +69,28 @@ export default function LandingPage() {
   const [formError, setFormError] = useState('')
   const [formLoading, setFormLoading] = useState(false)
   const [plans, setPlans] = useState([])
+  const [plansLoading, setPlansLoading] = useState(false)
+  const [sub, setSub] = useState(null)         // server-side subscription snapshot
+  const [subBusy, setSubBusy] = useState(false)
   const [refCode, setRefCode] = useState('')
   const [refInput, setRefInput] = useState('')
   const [refMsg, setRefMsg] = useState('')
+  const [selectedAvatar, setSelectedAvatar] = useState('kelion')
+  const [acceptTerms, setAcceptTerms] = useState(false)
 
   useEffect(() => {
     api.get('/auth/me').then(u => {
       if (u) { setUser(u); if (u.role === 'admin') setIsAdmin(true) }
     }).catch(() => {})
   }, [])
+
+  // Refresh subscription status whenever we have a logged-in user or return
+  // from the Stripe checkout page.
+  async function refreshSubscription() {
+    try { const s = await api.get('/api/subscription/status'); setSub(s) }
+    catch { setSub(null) }
+  }
+  useEffect(() => { if (user) refreshSubscription() }, [user])
 
   function resetForm() { setFormEmail(''); setFormPass(''); setFormName(''); setFormError('') }
 
@@ -93,9 +106,15 @@ export default function LandingPage() {
 
   async function handleRegister(e) {
     e.preventDefault(); setFormError(''); setFormLoading(true)
+    if (!acceptTerms) {
+      setFormError('Trebuie să accepți Termenii și Politica de confidențialitate.')
+      setFormLoading(false); return
+    }
     try {
-      const data = await api.post('/auth/local/register', { email: formEmail, password: formPass, name: formName })
-      setUser(data.user); setModal(null); resetForm()
+      const data = await api.post('/auth/local/register', {
+        email: formEmail, password: formPass, name: formName, acceptTerms: true,
+      })
+      setUser(data.user); setModal(null); resetForm(); setAcceptTerms(false)
       api.get('/auth/me').then(u => { if (u?.role === 'admin') setIsAdmin(true) }).catch(() => {})
     } catch (err) { setFormError(err.message || 'Înregistrare eșuată') }
     finally { setFormLoading(false) }
@@ -107,8 +126,35 @@ export default function LandingPage() {
   }
 
   async function openPlans() {
-    setModal('plans')
-    try { const d = await api.get('/api/subscription/plans'); setPlans(d.plans || []) } catch {}
+    setModal('plans'); setPlansLoading(true)
+    try { const d = await api.get('/api/subscription/plans'); setPlans(d.plans || []) }
+    catch {}
+    finally { setPlansLoading(false) }
+    if (user) refreshSubscription()
+  }
+
+  async function openBillingPortal() {
+    setSubBusy(true)
+    try {
+      const d = await api.post('/api/payments/portal', { returnUrl: window.location.origin + '/' })
+      if (d?.url) window.location.href = d.url
+    } catch (e) { alert(e.message || 'Nu am putut deschide portalul Stripe') }
+    finally { setSubBusy(false) }
+  }
+
+  async function cancelSubscription() {
+    if (!confirm('Sigur vrei să anulezi abonamentul? Rămâi cu acces până la sfârșitul perioadei plătite.')) return
+    setSubBusy(true)
+    try { await api.post('/api/subscription/cancel'); await refreshSubscription() }
+    catch (e) { alert(e.message || 'Anulare eșuată') }
+    finally { setSubBusy(false) }
+  }
+
+  async function resumeSubscription() {
+    setSubBusy(true)
+    try { await api.post('/api/subscription/resume'); await refreshSubscription() }
+    catch (e) { alert(e.message || 'Reluare eșuată') }
+    finally { setSubBusy(false) }
   }
 
   async function generateRef() {
@@ -123,7 +169,7 @@ export default function LandingPage() {
 
   function handleFreeTrial() {
     localStorage.setItem('kelion_free_trial', JSON.stringify({ start: Date.now(), limit: 15 * 60 * 1000 }))
-    navigate('/chat')
+    navigate(`/chat/${selectedAvatar}`)
   }
 
   const inp = {
@@ -201,7 +247,7 @@ export default function LandingPage() {
                 background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)',
                 borderRadius: '8px', color: '#ef4444', padding: '6px 14px', cursor: 'pointer',
                 fontSize: '13px', fontWeight: '600',
-              }}>Deconectare</button>
+              }}>Logout</button>
             </div>
           ) : (
             <div style={{ display: 'flex', gap: '8px' }}>
@@ -209,7 +255,7 @@ export default function LandingPage() {
                 background: 'linear-gradient(135deg, #7c3aed, #a855f7)',
                 border: 'none', borderRadius: '8px', color: '#fff', padding: '6px 18px',
                 cursor: 'pointer', fontSize: '13px', fontWeight: '600',
-              }}>Conectare</button>
+              }}>Login</button>
               <button onClick={() => { resetForm(); setModal('register') }} style={{
                 background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)',
                 borderRadius: '8px', color: '#ccc', padding: '6px 14px', cursor: 'pointer',
@@ -254,7 +300,7 @@ export default function LandingPage() {
           borderLeft: '1px solid rgba(255,255,255,0.06)',
         }}>
           <div style={{ color: '#a855f7', fontSize: '12px', fontWeight: '700', letterSpacing: '3px', marginBottom: '16px', textTransform: 'uppercase' }}>
-            ASISTENTUL TĂU AI
+            YOUR AI ASSISTANT
           </div>
           <h1 style={{
             fontSize: '64px', fontWeight: '900', margin: '0 0 20px',
@@ -262,13 +308,14 @@ export default function LandingPage() {
             WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', lineHeight: '1.1',
           }}>Kelion</h1>
           <p style={{ color: '#888', fontSize: '17px', lineHeight: '1.7', margin: '0 0 32px', maxWidth: '380px' }}>
-            Inteligent, empatic și mereu disponibil. Vorbește natural — Kelion înțelege, răspunde și te ajută în timp real.
+            Intelligent, empathetic and always available. Speak naturally — Kelion understands, responds and helps you in real time.
           </p>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '36px' }}>
             {[
-              { icon: '🎙', title: 'Voce naturală', desc: 'Detectare automată a vocii în orice limbă' },
-              { icon: '🌍', title: 'Orice limbă', desc: 'Răspuns vocal nativ în limba ta' },
+              { icon: '🎙', title: 'Natural Voice', desc: 'Automatic voice detection in any language' },
+              { icon: '👁', title: 'AI Vision', desc: 'Sees and understands your context' },
+              { icon: '🌍', title: 'Any Language', desc: 'Native voice response in your language' },
             ].map(f => (
               <div key={f.title} style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                 <div style={{
@@ -285,14 +332,32 @@ export default function LandingPage() {
           </div>
 
           <div style={{ maxWidth: '380px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <button onClick={() => user ? navigate('/chat') : setModal('login')} style={{
+            {/* Avatar selector */}
+            <div style={{ display: 'flex', gap: '12px', marginBottom: '4px' }}>
+              {[
+                { id: 'kelion', label: 'Kelion', color: '#7c3aed', glow: '#a855f7', emoji: '🧑‍💻' },
+                { id: 'kira', label: 'Kira', color: '#ec4899', glow: '#f472b6', emoji: '👩‍💼' },
+              ].map(av => (
+                <button key={av.id} onClick={() => setSelectedAvatar(av.id)} style={{
+                  flex: 1, padding: '14px 12px', borderRadius: '12px', cursor: 'pointer',
+                  background: selectedAvatar === av.id ? `rgba(${av.id === 'kira' ? '236,72,153' : '124,58,237'},0.2)` : 'rgba(255,255,255,0.03)',
+                  border: selectedAvatar === av.id ? `2px solid ${av.glow}` : '2px solid rgba(255,255,255,0.08)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                  transition: 'all 0.2s',
+                }}>
+                  <span style={{ fontSize: '20px' }}>{av.emoji}</span>
+                  <span style={{ color: selectedAvatar === av.id ? av.glow : '#888', fontWeight: '700', fontSize: '15px' }}>{av.label}</span>
+                </button>
+              ))}
+            </div>
+            <button onClick={() => user ? navigate(`/chat/${selectedAvatar}`) : setModal('login')} style={{
               width: '100%',
               background: 'linear-gradient(135deg, #7c3aed, #a855f7)',
               border: 'none', borderRadius: '14px', color: '#fff',
               padding: '16px 32px', fontSize: '17px', fontWeight: '700',
               cursor: 'pointer', boxShadow: '0 8px 30px rgba(168,85,247,0.4)',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
-            }}>▶ Pornește chat</button>
+            }}>▶ Start Chat</button>
             {!user && (
               <button onClick={handleFreeTrial} style={{
                 width: '100%', background: 'rgba(255,255,255,0.04)',
@@ -332,8 +397,19 @@ export default function LandingPage() {
             {formError && <div style={errBox}>{formError}</div>}
             <input type="text" placeholder="Nume" value={formName} onChange={e => setFormName(e.target.value)} required style={inp} />
             <input type="email" placeholder="Email" value={formEmail} onChange={e => setFormEmail(e.target.value)} required style={inp} />
-            <input type="password" placeholder="Parolă (min 8 caractere)" value={formPass} onChange={e => setFormPass(e.target.value)} required minLength={8} style={{...inp, marginBottom: '20px'}} />
-            <button type="submit" disabled={formLoading} style={{...btnPrimary, opacity: formLoading ? 0.7 : 1}}>
+            <input type="password" placeholder="Parolă (min 8 caractere)" value={formPass} onChange={e => setFormPass(e.target.value)} required minLength={8} style={inp} />
+            <label style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', margin: '4px 0 18px', color: '#aaa', fontSize: '12px', lineHeight: 1.5 }}>
+              <input type="checkbox" checked={acceptTerms} onChange={e => setAcceptTerms(e.target.checked)} required style={{ marginTop: '3px' }} />
+              <span>
+                Am citit și sunt de acord cu{' '}
+                <a href="/terms" target="_blank" rel="noopener" style={{ color: '#a855f7' }}>Termenii</a>
+                ,{' '}
+                <a href="/privacy" target="_blank" rel="noopener" style={{ color: '#a855f7' }}>Politica de confidențialitate</a>
+                {' '}și{' '}
+                <a href="/refund" target="_blank" rel="noopener" style={{ color: '#a855f7' }}>Politica de rambursare</a>.
+              </span>
+            </label>
+            <button type="submit" disabled={formLoading || !acceptTerms} style={{...btnPrimary, opacity: (formLoading || !acceptTerms) ? 0.5 : 1}}>
               {formLoading ? 'Se creează...' : 'Creează cont'}
             </button>
             <div style={{ textAlign: 'center', marginTop: '16px' }}>
@@ -347,47 +423,101 @@ export default function LandingPage() {
       {/* PLANS MODAL */}
       {modal === 'plans' && (
         <div style={modalBg} onClick={() => setModal(null)}>
-          <div onClick={e => e.stopPropagation()} style={{...card, width: '700px'}}>
+          <div onClick={e => e.stopPropagation()} style={{...card, width: '720px'}}>
             <h2 style={modalTitle}>Planuri & Abonamente</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
-              {(plans.length ? plans : [
-                { id: 'free', name: 'Free', price: 0, dailyLimit: 10, features: ['10 mesaje/zi', 'Avatare standard'] },
-                { id: 'basic', name: 'Basic', price: 9.99, dailyLimit: 60, features: ['60 mesaje/zi', 'Toate avatarele', 'Suport prioritar'] },
-                { id: 'premium', name: 'Premium', price: 29.99, dailyLimit: 180, features: ['180 mesaje/zi', 'Avatare custom', 'Funcții avansate'] },
-                { id: 'enterprise', name: 'Enterprise', price: 99.99, dailyLimit: null, features: ['Nelimitat', 'Integrări custom', 'Suport dedicat'] },
-              ]).map(p => {
-                const isActive = user?.subscription_tier === p.id
-                return (
-                  <div key={p.id} style={{
-                    background: isActive ? 'rgba(168,85,247,0.1)' : 'rgba(255,255,255,0.03)',
-                    border: isActive ? '2px solid #a855f7' : '1px solid rgba(255,255,255,0.08)',
-                    borderRadius: '12px', padding: '20px',
-                  }}>
-                    <div style={{ fontSize: '16px', fontWeight: '700', color: '#fff', marginBottom: '4px' }}>{p.name}</div>
-                    <div style={{ fontSize: '28px', fontWeight: '800', color: '#a855f7', marginBottom: '12px' }}>
-                      {p.price === 0 ? 'Gratuit' : `$${p.price}`}
-                      {p.price > 0 && <span style={{ fontSize: '13px', color: '#666' }}>/lună</span>}
+
+            {sub && sub.status === 'past_due' && (
+              <div style={{ ...errBox, color: '#f59e0b', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)' }}>
+                Plata ultimei facturi a eșuat. Actualizează metoda de plată pentru a evita suspendarea.
+                <button onClick={openBillingPortal} disabled={subBusy} style={{ ...linkBtn, marginLeft: '8px', color: '#f59e0b' }}>Actualizează card →</button>
+              </div>
+            )}
+            {sub && sub.cancelAtPeriodEnd && sub.currentPeriodEnd && (
+              <div style={{ background: 'rgba(251,146,60,0.08)', border: '1px solid rgba(251,146,60,0.25)', borderRadius: '8px', padding: '10px 14px', color: '#fb923c', fontSize: '13px', marginBottom: '16px' }}>
+                Abonamentul a fost anulat. Rămâi cu acces până la {new Date(sub.currentPeriodEnd * 1000).toLocaleDateString('ro-RO')}.
+                <button onClick={resumeSubscription} disabled={subBusy} style={{ ...linkBtn, marginLeft: '8px', color: '#fb923c' }}>Reactivează →</button>
+              </div>
+            )}
+
+            {plansLoading && plans.length === 0 ? (
+              <div style={{ textAlign: 'center', color: '#666', padding: '32px 0', fontSize: '14px' }}>Se încarcă planurile...</div>
+            ) : plans.length === 0 ? (
+              <div style={{ textAlign: 'center', color: '#666', padding: '32px 0', fontSize: '14px' }}>Nu sunt planuri disponibile momentan.</div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
+                {plans.map(p => {
+                  const isActive = sub?.tier === p.id || user?.subscription_tier === p.id
+                  const hasPrice = typeof p.price === 'number'
+                  return (
+                    <div key={p.id} style={{
+                      background: isActive ? 'rgba(168,85,247,0.1)' : 'rgba(255,255,255,0.03)',
+                      border: isActive ? '2px solid #a855f7' : '1px solid rgba(255,255,255,0.08)',
+                      borderRadius: '12px', padding: '20px',
+                    }}>
+                      <div style={{ fontSize: '16px', fontWeight: '700', color: '#fff', marginBottom: '4px' }}>{p.name}</div>
+                      <div style={{ fontSize: '28px', fontWeight: '800', color: '#a855f7', marginBottom: '12px' }}>
+                        {!p.priceEnv ? 'Gratuit' : hasPrice
+                          ? `${(p.currency || 'usd').toUpperCase()} ${p.price}`
+                          : '—'}
+                        {p.priceEnv && hasPrice && p.interval && (
+                          <span style={{ fontSize: '13px', color: '#666' }}>/{p.interval === 'month' ? 'lună' : p.interval}</span>
+                        )}
+                      </div>
+                      <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 16px' }}>
+                        {(p.features || []).map(f => (
+                          <li key={f} style={{ color: '#aaa', fontSize: '13px', padding: '3px 0' }}>✓ {f}</li>
+                        ))}
+                      </ul>
+                      {isActive ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <div style={{ textAlign: 'center', color: '#a855f7', fontSize: '13px', fontWeight: '600' }}>
+                            Planul tău actual
+                            {sub?.currentPeriodEnd && !sub.cancelAtPeriodEnd && (
+                              <div style={{ color: '#666', fontSize: '11px', fontWeight: '400', marginTop: '2px' }}>
+                                Se reînnoiește pe {new Date(sub.currentPeriodEnd * 1000).toLocaleDateString('ro-RO')}
+                              </div>
+                            )}
+                          </div>
+                          {sub?.stripeSubscriptionId && (
+                            <div style={{ display: 'flex', gap: '6px' }}>
+                              <button onClick={openBillingPortal} disabled={subBusy} style={{
+                                flex: 1, padding: '8px', borderRadius: '8px', fontSize: '12px', fontWeight: '600',
+                                background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
+                                color: '#ccc', cursor: subBusy ? 'wait' : 'pointer',
+                              }}>Gestionează</button>
+                              {sub.cancelAtPeriodEnd ? (
+                                <button onClick={resumeSubscription} disabled={subBusy} style={{
+                                  flex: 1, padding: '8px', borderRadius: '8px', fontSize: '12px', fontWeight: '600',
+                                  background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)',
+                                  color: '#22c55e', cursor: subBusy ? 'wait' : 'pointer',
+                                }}>Reactivează</button>
+                              ) : (
+                                <button onClick={cancelSubscription} disabled={subBusy} style={{
+                                  flex: 1, padding: '8px', borderRadius: '8px', fontSize: '12px', fontWeight: '600',
+                                  background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)',
+                                  color: '#ef4444', cursor: subBusy ? 'wait' : 'pointer',
+                                }}>Anulează</button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ) : p.priceEnv ? (
+                        <button onClick={async () => {
+                          if (!user) { setModal('register'); return }
+                          try {
+                            const d = await api.post('/api/payments/create-checkout-session', { planId: p.id })
+                            if (d.url) window.location.href = d.url
+                          } catch (e) { alert(e.message) }
+                        }} disabled={!p.stripePriceId} style={{
+                          ...btnPrimary, padding: '10px', fontSize: '13px',
+                          opacity: p.stripePriceId ? 1 : 0.5,
+                        }}>{p.stripePriceId ? 'Cumpără' : 'Indisponibil'}</button>
+                      ) : null}
                     </div>
-                    <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 16px' }}>
-                      {(p.features || []).map(f => (
-                        <li key={f} style={{ color: '#aaa', fontSize: '13px', padding: '3px 0' }}>✓ {f}</li>
-                      ))}
-                    </ul>
-                    {isActive ? (
-                      <div style={{ textAlign: 'center', color: '#a855f7', fontSize: '13px', fontWeight: '600' }}>Planul tău actual</div>
-                    ) : p.id !== 'free' ? (
-                      <button onClick={async () => {
-                        if (!user) { setModal('register'); return }
-                        try {
-                          const d = await api.post('/api/payments/create-checkout-session', { planId: p.id })
-                          if (d.url) window.location.href = d.url
-                        } catch (e) { alert(e.message) }
-                      }} style={{...btnPrimary, padding: '10px', fontSize: '13px'}}>Cumpără</button>
-                    ) : null}
-                  </div>
-                )
-              })}
-            </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -432,6 +562,18 @@ export default function LandingPage() {
           </div>
         </div>
       )}
+
+      <footer style={{
+        position: 'absolute', bottom: 0, left: 0, right: 0,
+        padding: '10px 40px', display: 'flex', justifyContent: 'center', gap: '18px',
+        fontSize: '11px', color: '#555', pointerEvents: 'none',
+      }}>
+        <a href="/terms"   style={{ color: '#666', textDecoration: 'none', pointerEvents: 'auto' }}>Termeni</a>
+        <a href="/privacy" style={{ color: '#666', textDecoration: 'none', pointerEvents: 'auto' }}>Confidențialitate</a>
+        <a href="/refund"  style={{ color: '#666', textDecoration: 'none', pointerEvents: 'auto' }}>Rambursări</a>
+        <a href="/cookies" style={{ color: '#666', textDecoration: 'none', pointerEvents: 'auto' }}>Cookies</a>
+        <span>© {new Date().getFullYear()} KelionAI</span>
+      </footer>
     </div>
   )
 }

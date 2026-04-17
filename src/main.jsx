@@ -9,6 +9,7 @@ import LandingPage from './pages/LandingPage'
 const VoiceChat        = lazy(() => import('./components/VoiceChat'))
 const AdminPage        = lazy(() => import('./pages/AdminPage'))
 const ArmSettingsPage  = lazy(() => import('./pages/ArmSettingsPage'))
+const LegalPage        = lazy(() => import('./pages/LegalPage'))
 
 function Loader() {
   return (
@@ -39,6 +40,10 @@ createRoot(document.getElementById('root')).render(
             <Route path="/chat/:avatar" element={<Navigate to="/chat" replace />} />
             <Route path="/admin" element={<AdminPage />} />
             <Route path="/arm-settings" element={<ArmSettingsPage />} />
+            <Route path="/terms"   element={<LegalPage slug="terms"   />} />
+            <Route path="/privacy" element={<LegalPage slug="privacy" />} />
+            <Route path="/refund"  element={<LegalPage slug="refund"  />} />
+            <Route path="/cookies" element={<LegalPage slug="cookies" />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>

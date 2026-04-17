@@ -15,7 +15,8 @@ const { initDb } = require('./db');
 const {
   createReferralCode, findReferralCode, useReferralCode,
   findById, updateSubscription, updateStripeCustomerId,
-  findByStripeCustomerId, getUsageToday,
+  findByStripeCustomerId, findByStripeSubscriptionId,
+  updateStripeSubscription, getUsageToday,
 } = require('./db');
 const authRouter       = require('./routes/auth');
 const usersRouter      = require('./routes/users');
@@ -147,22 +148,86 @@ app.post('/api/payments/webhook', express.raw({ type: 'application/json' }), asy
           if (session.customer) {
             await updateStripeCustomerId(userId, session.customer);
           }
+          if (session.subscription) {
+            await updateStripeSubscription(userId, { stripe_subscription_id: session.subscription });
+          }
         }
         break;
       }
-      case 'customer.subscription.updated':
-      case 'customer.subscription.deleted': {
+
+      case 'customer.subscription.created':
+      case 'customer.subscription.updated': {
         const sub = event.data.object;
-        const user = await findByStripeCustomerId(sub.customer);
+        const user = (sub.id && await findByStripeSubscriptionId(sub.id))
+                  || await findByStripeCustomerId(sub.customer);
         if (user) {
           const active = sub.status === 'active' || sub.status === 'trialing';
-          await updateSubscription(user.id, {
-            subscription_status: active ? 'active' : sub.status,
-            subscription_tier:   active ? user.subscription_tier : 'free',
+          await updateStripeSubscription(user.id, {
+            stripe_subscription_id: sub.id,
+            subscription_status:    sub.status,
+            current_period_end:     sub.current_period_end || null,
+            cancel_at_period_end:   sub.cancel_at_period_end ? 1 : 0,
+            canceled_at:            sub.canceled_at || null,
+            // Only drop the tier back to 'free' on hard termination, not on
+            // past_due / unpaid / pending_cancel — those keep access while
+            // Stripe retries the card.
+            subscription_tier: active ? user.subscription_tier : user.subscription_tier,
           });
         }
         break;
       }
+
+      case 'customer.subscription.deleted': {
+        const sub = event.data.object;
+        const user = (sub.id && await findByStripeSubscriptionId(sub.id))
+                  || await findByStripeCustomerId(sub.customer);
+        if (user) {
+          await updateStripeSubscription(user.id, {
+            subscription_status: 'canceled',
+            subscription_tier:   'free',
+            canceled_at:         Math.floor(Date.now() / 1000),
+            cancel_at_period_end: 0,
+          });
+        }
+        break;
+      }
+
+      case 'invoice.paid': {
+        // A renewal payment succeeded (or the first invoice at checkout).
+        // Push the new period end so the UI stops showing stale dates.
+        const inv = event.data.object;
+        const subId = inv.subscription;
+        if (subId) {
+          const user = await findByStripeSubscriptionId(subId)
+                    || await findByStripeCustomerId(inv.customer);
+          if (user) {
+            const line = (inv.lines && inv.lines.data && inv.lines.data[0]) || {};
+            const periodEnd = (line.period && line.period.end) || null;
+            await updateStripeSubscription(user.id, {
+              subscription_status: 'active',
+              current_period_end:  periodEnd,
+            });
+          }
+        }
+        break;
+      }
+
+      case 'invoice.payment_failed': {
+        // Card declined on renewal. Keep the user on their plan (Stripe Smart
+        // Retries will try again automatically) but flag past_due so the UI
+        // can show a banner inviting them to update their card.
+        const inv = event.data.object;
+        const subId = inv.subscription;
+        if (subId) {
+          const user = await findByStripeSubscriptionId(subId)
+                    || await findByStripeCustomerId(inv.customer);
+          if (user) {
+            await updateStripeSubscription(user.id, { subscription_status: 'past_due' });
+          }
+        }
+        break;
+      }
+
       default:
         break;
     }
@@ -182,8 +247,46 @@ app.use(csrfSeed);
 app.use('/auth', authRouter);
 
 // Subscription plans (no auth required)
-app.get('/api/subscription/plans', (req, res) => {
-  res.json({ plans: getPlans() });
+// Public plan catalogue. Enriches each paid plan with live price/currency/
+// interval from Stripe so the UI never has to hard-code those values. The
+// response is cached in-memory for PLANS_CACHE_TTL_MS to avoid a Stripe call
+// on every page load.
+const PLANS_CACHE_TTL_MS = 60 * 1000;
+let _plansCache = null;
+async function buildPlansPayload() {
+  const stripe = getStripe();
+  const plans  = getPlans();
+  if (!stripe) return plans;
+
+  const enriched = await Promise.all(plans.map(async (plan) => {
+    if (!plan.stripePriceId) return plan;
+    try {
+      const price = await stripe.prices.retrieve(plan.stripePriceId);
+      return {
+        ...plan,
+        price:    (price.unit_amount ?? 0) / 100,
+        currency: price.currency,
+        interval: price.recurring?.interval || null,
+      };
+    } catch (err) {
+      console.warn(`[plans] stripe.prices.retrieve(${plan.stripePriceId}) failed: ${err.message}`);
+      return plan;
+    }
+  }));
+  return enriched;
+}
+
+app.get('/api/subscription/plans', async (req, res) => {
+  try {
+    const now = Date.now();
+    if (!_plansCache || (now - _plansCache.at) > PLANS_CACHE_TTL_MS) {
+      _plansCache = { at: now, data: await buildPlansPayload() };
+    }
+    res.json({ plans: _plansCache.data });
+  } catch (err) {
+    console.error('[plans] build failed:', err.message);
+    res.json({ plans: getPlans() });
+  }
 });
 
 // Payment routes (auth required).
@@ -250,6 +353,89 @@ app.get('/api/payments/history', requireAuth, (req, res) => {
   res.json({ payments: [] });
 });
 
+// Stripe Billing Portal session — one-click self-service for payment method,
+// invoices, plan changes and cancellations. Requires an existing
+// stripe_customer_id on the user (set once the first checkout completes).
+app.post('/api/payments/portal', requireAuth, async (req, res) => {
+  const stripe = getStripe();
+  if (!stripe) return res.status(503).json({ error: 'Payment system not configured' });
+
+  const user = await findById(req.user.id);
+  if (!user?.stripe_customer_id) {
+    return res.status(400).json({ error: 'No Stripe customer yet; complete a purchase first' });
+  }
+
+  try {
+    const base = `${req.protocol}://${req.get('host')}`;
+    const session = await stripe.billingPortal.sessions.create({
+      customer:   user.stripe_customer_id,
+      return_url: req.body?.returnUrl || `${base}/`,
+    });
+    res.json({ url: session.url });
+  } catch (err) {
+    console.error('[stripe] portal error:', err.message);
+    res.status(500).json({ error: 'Failed to open billing portal', detail: err.message });
+  }
+});
+
+// Mark the current subscription to be cancelled at the end of the paid
+// period. The user keeps access until `current_period_end`; Stripe fires
+// `customer.subscription.deleted` when the period expires.
+app.post('/api/subscription/cancel', requireAuth, async (req, res) => {
+  const stripe = getStripe();
+  if (!stripe) return res.status(503).json({ error: 'Payment system not configured' });
+
+  const user = await findById(req.user.id);
+  if (!user?.stripe_subscription_id) {
+    return res.status(400).json({ error: 'No active subscription to cancel' });
+  }
+
+  try {
+    const sub = await stripe.subscriptions.update(user.stripe_subscription_id, {
+      cancel_at_period_end: true,
+    });
+    await updateStripeSubscription(user.id, {
+      cancel_at_period_end: 1,
+      current_period_end:   sub.current_period_end || null,
+      canceled_at:          Math.floor(Date.now() / 1000),
+    });
+    res.json({
+      ok: true,
+      cancelAtPeriodEnd: true,
+      currentPeriodEnd:  sub.current_period_end || null,
+    });
+  } catch (err) {
+    console.error('[stripe] cancel error:', err.message);
+    res.status(500).json({ error: 'Failed to cancel subscription', detail: err.message });
+  }
+});
+
+// Undo a pending cancellation (user keeps the subscription active).
+app.post('/api/subscription/resume', requireAuth, async (req, res) => {
+  const stripe = getStripe();
+  if (!stripe) return res.status(503).json({ error: 'Payment system not configured' });
+
+  const user = await findById(req.user.id);
+  if (!user?.stripe_subscription_id) {
+    return res.status(400).json({ error: 'No subscription to resume' });
+  }
+
+  try {
+    const sub = await stripe.subscriptions.update(user.stripe_subscription_id, {
+      cancel_at_period_end: false,
+    });
+    await updateStripeSubscription(user.id, {
+      cancel_at_period_end: 0,
+      current_period_end:   sub.current_period_end || null,
+      canceled_at:          null,
+    });
+    res.json({ ok: true, cancelAtPeriodEnd: false });
+  } catch (err) {
+    console.error('[stripe] resume error:', err.message);
+    res.status(500).json({ error: 'Failed to resume subscription', detail: err.message });
+  }
+});
+
 // Current subscription snapshot for the authenticated user.
 app.get('/api/subscription/status', requireAuth, async (req, res) => {
   try {
@@ -267,7 +453,11 @@ app.get('/api/subscription/status', requireAuth, async (req, res) => {
         stripePriceId: getStripePriceId(plan.id),
       },
       usage: { today: usageToday, dailyLimit: plan.dailyLimit },
-      stripeCustomerId: user.stripe_customer_id || null,
+      stripeCustomerId:     user.stripe_customer_id     || null,
+      stripeSubscriptionId: user.stripe_subscription_id || null,
+      currentPeriodEnd:     user.current_period_end     || null,
+      cancelAtPeriodEnd:    !!user.cancel_at_period_end,
+      canceledAt:           user.canceled_at            || null,
     });
   } catch (err) {
     console.error('[subscription/status] error:', err.message);
