@@ -48,7 +48,12 @@ if (typeof window !== 'undefined') {
   window.addEventListener('beforeunload', () => { stopAllStreams() })
   window.addEventListener('pagehide', () => { stopAllStreams() })
   // Expose for test tooling (Playwright acceptance script reads this).
+  // Expose `registerStream` too so the `logout-media` acceptance script
+  // (which opens its own getUserMedia stream in the page context) can plug
+  // that stream into the app's registry. Without this, `stopAllStreams()`
+  // in `handleLogout` has nothing to iterate and the acceptance test fails.
   window.__kelionMedia = {
+    registerStream,
     stopAllStreams,
     countActiveTracks,
   }
