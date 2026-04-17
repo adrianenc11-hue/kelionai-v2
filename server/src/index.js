@@ -10,7 +10,7 @@ const rateLimit = require('express-rate-limit');
 const config = require('./config');
 const { csrfSeed } = require('./middleware/csrf');
 const { requireAuth } = require('./middleware/auth');
-const { checkSubscription, getPlans, SUBSCRIPTION_PLANS } = require('./middleware/subscription');
+const { checkSubscription, getPlans, getStripePriceId, SUBSCRIPTION_PLANS } = require('./middleware/subscription');
 const { initDb } = require('./db');
 const {
   createReferralCode, findReferralCode, useReferralCode,
@@ -36,9 +36,14 @@ function getStripe() {
   return _stripe;
 }
 
-// Trial length cap for the free-trial realtime session. Enforced on our side
-// regardless of what the upstream provider returns.
-const TRIAL_MAX_MS = 15 * 60 * 1000;
+// Trial length cap for the free-trial realtime session (configurable via
+// TRIAL_MAX_SECONDS). Enforced on our side regardless of upstream values.
+const TRIAL_MAX_MS = config.trial.maxSeconds * 1000;
+
+// Avatar catalogue loaded from server/config/avatars.json. Voice ids are
+// resolved from env variables at request time so they can be tuned without a
+// code change.
+const avatarsConfig = require('../config/avatars.json');
 
 const app = express();
 app.disable('x-powered-by');
@@ -182,7 +187,8 @@ app.get('/api/subscription/plans', (req, res) => {
 });
 
 // Payment routes (auth required).
-// Uses Stripe Checkout with inline price_data — no pre-created Price IDs required.
+// Uses pre-created Stripe Price IDs (STRIPE_PRICE_<PLAN> env vars). Prices,
+// currency, and billing interval live in the Stripe Dashboard — never here.
 app.post('/api/payments/create-checkout-session', requireAuth, async (req, res) => {
   const { planId, successUrl, cancelUrl } = req.body || {};
   const plan = SUBSCRIPTION_PLANS[planId];
@@ -199,6 +205,14 @@ app.post('/api/payments/create-checkout-session', requireAuth, async (req, res) 
     return res.status(503).json({ error: 'Payment system not configured' });
   }
 
+  const priceId = getStripePriceId(planId);
+  if (!priceId) {
+    return res.status(503).json({
+      error: 'Stripe price not configured for this plan',
+      detail: `set ${plan.priceEnv} to the Stripe Price ID (price_...) for '${planId}'`,
+    });
+  }
+
   try {
     const user = await findById(req.user.id);
     const base = `${req.protocol}://${req.get('host')}`;
@@ -210,18 +224,7 @@ app.post('/api/payments/create-checkout-session', requireAuth, async (req, res) 
       payment_method_types: ['card'],
       customer: user?.stripe_customer_id || undefined,
       customer_email: user?.stripe_customer_id ? undefined : (user?.email || req.user.email),
-      line_items: [{
-        quantity: 1,
-        price_data: {
-          currency: (process.env.STRIPE_CURRENCY || 'usd').toLowerCase(),
-          product_data: {
-            name: `Kelion ${plan.name}`,
-            description: plan.features.join(' • '),
-          },
-          unit_amount: Math.round(plan.price * 100),
-          recurring: { interval: plan.interval || 'month' },
-        },
-      }],
+      line_items: [{ price: priceId, quantity: 1 }],
       success_url: success,
       cancel_url: cancel,
       metadata: {
@@ -258,7 +261,11 @@ app.get('/api/subscription/status', requireAuth, async (req, res) => {
     res.json({
       tier,
       status: user.subscription_status || 'active',
-      plan: { id: plan.id, name: plan.name, price: plan.price, interval: plan.interval },
+      plan: {
+        id: plan.id,
+        name: plan.name,
+        stripePriceId: getStripePriceId(plan.id),
+      },
       usage: { today: usageToday, dailyLimit: plan.dailyLimit },
       stripeCustomerId: user.stripe_customer_id || null,
     });
@@ -268,22 +275,19 @@ app.get('/api/subscription/status', requireAuth, async (req, res) => {
   }
 });
 
-// Available avatars. Static list for now; kept as an endpoint so the client
-// can discover voices/models without hard-coding them.
+// Available avatars. Catalogue lives in server/config/avatars.json; voice
+// ids come from the env variables referenced there so the client can
+// discover the full mapping without any hard-coded identifier here.
 app.get('/api/avatars', (req, res) => {
-  res.json({
-    avatars: [
-      {
-        id: 'kelion',
-        name: 'Kelion',
-        gender: 'male',
-        description: 'Calm, professional male voice assistant.',
-        model: '/models/kelion.glb',
-        voice: process.env.OPENAI_VOICE_KELION || 'ash',
-        geminiVoice: process.env.GEMINI_LIVE_VOICE_KELION || 'Kore',
-      },
-    ],
+  const list = (avatarsConfig.avatars || []).map(a => {
+    const { voiceEnv, geminiVoiceEnv, ...rest } = a;
+    return {
+      ...rest,
+      voice: voiceEnv ? (process.env[voiceEnv] || null) : null,
+      geminiVoice: geminiVoiceEnv ? (process.env[geminiVoiceEnv] || null) : null,
+    };
   });
+  res.json({ avatars: list });
 });
 
 // Referral routes (auth required)
@@ -348,12 +352,12 @@ app.get('/api/realtime/trial-token', async (req, res) => {
   if (!apiKey) return res.status(503).json({ error: 'Not configured' });
 
   try {
-    const voice = process.env.OPENAI_VOICE_KELION || 'ash';
+    const voice = config.openai.voiceKelion;
     const r = await fetch('https://api.openai.com/v1/realtime/sessions', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: process.env.OPENAI_REALTIME_MODEL || 'gpt-4o-realtime-preview',
+        model: config.openai.realtimeModel,
         voice,
       }),
     });

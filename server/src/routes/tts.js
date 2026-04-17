@@ -1,14 +1,11 @@
 'use strict';
 
 const { Router } = require('express');
+const config = require('../config');
 const router = Router();
 
-const ELEVENLABS_URL          = 'https://api.elevenlabs.io/v1/text-to-speech';
-const DEFAULT_ELEVENLABS_VOICE = 'pNInz6obpgDQGcFmaJgB'; // Adam
-
-const GEMINI_TTS_BASE        = 'https://generativelanguage.googleapis.com/v1beta/models';
-const DEFAULT_GEMINI_TTS_MODEL = 'gemini-3.1-flash-tts-preview';
-const DEFAULT_GEMINI_VOICE     = 'Kore';
+const ELEVENLABS_URL   = 'https://api.elevenlabs.io/v1/text-to-speech';
+const GEMINI_TTS_BASE  = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 // Gemini TTS returns raw PCM (24kHz, 16-bit, mono). Wrap in a WAV container
 // so browsers can play it directly from <audio src>.
@@ -35,8 +32,8 @@ function pcmToWav(pcmBuffer, sampleRate = 24000, numChannels = 1, bitsPerSample 
 
 async function synthesizeGemini(text) {
   const apiKey = process.env.GEMINI_API_KEY;
-  const model  = process.env.GEMINI_TTS_MODEL || DEFAULT_GEMINI_TTS_MODEL;
-  const voice  = process.env.GEMINI_TTS_VOICE_KELION || DEFAULT_GEMINI_VOICE;
+  const model  = config.gemini.ttsModel;
+  const voice  = config.gemini.ttsVoiceKelion;
 
   const url = `${GEMINI_TTS_BASE}/${encodeURIComponent(model)}:generateContent`;
   const r = await fetch(url, {
@@ -64,7 +61,8 @@ async function synthesizeGemini(text) {
 
 async function synthesizeElevenLabs(text) {
   const apiKey  = process.env.ELEVENLABS_API_KEY;
-  const voiceId = process.env.ELEVENLABS_VOICE_ID || DEFAULT_ELEVENLABS_VOICE;
+  const voiceId = process.env.ELEVENLABS_VOICE_ID;
+  if (!voiceId) throw new Error('ELEVENLABS_VOICE_ID not configured');
   const r = await fetch(`${ELEVENLABS_URL}/${voiceId}`, {
     method: 'POST',
     headers: { 'xi-api-key': apiKey, 'Content-Type': 'application/json', 'Accept': 'audio/mpeg' },

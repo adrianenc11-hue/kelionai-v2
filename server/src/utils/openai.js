@@ -14,14 +14,9 @@
 let _geminiClient = null;
 let _openaiClient = null;
 
+const config = require('../config');
+
 const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/openai/';
-const DEFAULT_GEMINI_CHAT_MODEL = process.env.GEMINI_CHAT_MODEL || 'gemini-2.5-flash';
-const GEMINI_FALLBACK_MODELS = [
-  DEFAULT_GEMINI_CHAT_MODEL,
-  'gemini-2.5-flash',
-  'gemini-2.0-flash',
-];
-const DEFAULT_OPENAI_CHAT_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 
 function getGeminiClient() {
   if (_geminiClient) return _geminiClient;
@@ -55,25 +50,27 @@ function getProvider() {
 function getDefaultChatModel() {
   const explicit = process.env.AI_MODEL;
   if (explicit) return explicit;
-  return getProvider() === 'gemini' ? DEFAULT_GEMINI_CHAT_MODEL : DEFAULT_OPENAI_CHAT_MODEL;
+  return getProvider() === 'gemini' ? config.gemini.chatModel : config.openai.model;
 }
 
 // Ordered list of (client, provider, model) candidates to try in sequence.
-// Callers iterate until one succeeds. Gemini preview models first (fastest),
-// then stable Gemini, then OpenAI as a hard fallback when Gemini is down.
+// Callers iterate until one succeeds. Gemini primary + fallbacks first
+// (ordered by GEMINI_CHAT_MODEL + GEMINI_CHAT_FALLBACKS), then OpenAI as a
+// hard fallback when Gemini is down.
 function getChatProviderChain() {
   const chain = [];
   const gem = getGeminiClient();
   if (gem) {
     const seen = new Set();
-    for (const model of GEMINI_FALLBACK_MODELS) {
+    const candidates = [config.gemini.chatModel, ...config.gemini.chatFallbacks];
+    for (const model of candidates) {
       if (!model || seen.has(model)) continue;
       seen.add(model);
       chain.push({ client: gem, provider: 'gemini', model });
     }
   }
   const oa = getOpenAIClient();
-  if (oa) chain.push({ client: oa, provider: 'openai', model: DEFAULT_OPENAI_CHAT_MODEL });
+  if (oa) chain.push({ client: oa, provider: 'openai', model: config.openai.model });
   return chain;
 }
 

@@ -1,0 +1,14 @@
+{
+  "_note": "Avatar catalogue. voiceEnv/geminiVoiceEnv point at env variables that hold the actual voice id/name, so voice mappings can be changed without a deploy.",
+  "avatars": [
+    {
+      "id": "kelion",
+      "name": "Kelion",
+      "gender": "male",
+      "description": "Calm, professional male voice assistant.",
+      "model": "/models/kelion.glb",
+      "voiceEnv": "OPENAI_VOICE_KELION",
+      "geminiVoiceEnv": "GEMINI_LIVE_VOICE_KELION"
+    }
+  ]
+}

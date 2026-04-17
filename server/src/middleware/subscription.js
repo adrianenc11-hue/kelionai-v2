@@ -1,45 +1,19 @@
 'use strict';
 
 const { findById, getUsageToday, incrementUsage } = require('../db');
+const rawPlans = require('../../config/plans.json');
 
-/**
- * Subscription tiers with daily limits.
- * null = unlimited
- */
-const SUBSCRIPTION_PLANS = {
-  free: {
-    id: 'free',
-    name: 'Free',
-    price: 0,
-    interval: null,
-    dailyLimit: 10,
-    features: ['Basic voice chat', 'Standard avatars'],
-  },
-  basic: {
-    id: 'basic',
-    name: 'Basic',
-    price: 9.99,
-    interval: 'month',
-    dailyLimit: 60,
-    features: ['Extended voice chat', 'All avatars', 'Priority support'],
-  },
-  premium: {
-    id: 'premium',
-    name: 'Premium',
-    price: 29.99,
-    interval: 'month',
-    dailyLimit: 180,
-    features: ['Unlimited voice chat', 'Custom avatars', 'Advanced features', 'Priority support'],
-  },
-  enterprise: {
-    id: 'enterprise',
-    name: 'Enterprise',
-    price: 99.99,
-    interval: 'month',
-    dailyLimit: null,
-    features: ['Everything in Premium', 'Custom integrations', 'Dedicated support'],
-  },
-};
+// Plan catalogue loaded from server/config/plans.json. Prices live in Stripe
+// Dashboard; each paid plan's `priceEnv` names the env variable that holds
+// its Stripe Price ID (price_...). Daily limits and feature lists are
+// app-level metadata and stay here because Stripe does not model them.
+const SUBSCRIPTION_PLANS = Object.freeze(
+  Object.fromEntries(
+    Object.entries(rawPlans)
+      .filter(([key]) => !key.startsWith('_'))
+      .map(([key, plan]) => [key, Object.freeze({ ...plan })])
+  )
+);
 
 /**
  * Middleware pentru verificarea subscription-ului.
@@ -102,15 +76,26 @@ function checkSubscription(requiredPlan = 'free') {
   };
 }
 
-/**
- * Get available subscription plans.
- */
+// Return the Stripe Price ID configured for a plan, or null for free/missing.
+function getStripePriceId(planId) {
+  const plan = SUBSCRIPTION_PLANS[planId];
+  if (!plan || !plan.priceEnv) return null;
+  return process.env[plan.priceEnv] || null;
+}
+
+// Public plan catalogue for the UI. Includes the plan metadata plus the
+// configured Stripe Price ID when available so the client can route users
+// straight to checkout without another round-trip.
 function getPlans() {
-  return Object.values(SUBSCRIPTION_PLANS);
+  return Object.values(SUBSCRIPTION_PLANS).map(plan => ({
+    ...plan,
+    stripePriceId: plan.priceEnv ? (process.env[plan.priceEnv] || null) : null,
+  }));
 }
 
 module.exports = {
   checkSubscription,
   getPlans,
+  getStripePriceId,
   SUBSCRIPTION_PLANS,
 };

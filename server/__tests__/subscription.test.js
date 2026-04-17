@@ -37,8 +37,10 @@ describe('GET /api/subscription/plans', () => {
   it('200 without auth',                     async () => { expect((await request(app).get('/api/subscription/plans')).status).toBe(200); });
   it('returns array of plans',               async () => { const r=await request(app).get('/api/subscription/plans'); expect(Array.isArray(r.body.plans)).toBe(true); });
   it('has exactly 4 plans',                  async () => { const r=await request(app).get('/api/subscription/plans'); expect(r.body.plans).toHaveLength(4); });
-  it('free plan — price 0, dailyLimit 10',   async () => { const r=await request(app).get('/api/subscription/plans'); const f=r.body.plans.find(p=>p.id==='free'); expect(f.price).toBe(0); expect(f.dailyLimit).toBe(10); });
-  it('basic plan — $9.99/month',             async () => { const r=await request(app).get('/api/subscription/plans'); const b=r.body.plans.find(p=>p.id==='basic'); expect(b.price).toBe(9.99); expect(b.interval).toBe('month'); });
+  it('free plan — dailyLimit 10, no Stripe price',
+    async () => { const r=await request(app).get('/api/subscription/plans'); const f=r.body.plans.find(p=>p.id==='free'); expect(f.dailyLimit).toBe(10); expect(f.priceEnv).toBeUndefined(); expect(f.stripePriceId).toBeNull(); });
+  it('basic plan — points at STRIPE_PRICE_BASIC env var',
+    async () => { const r=await request(app).get('/api/subscription/plans'); const b=r.body.plans.find(p=>p.id==='basic'); expect(b.priceEnv).toBe('STRIPE_PRICE_BASIC'); expect(b).not.toHaveProperty('price'); expect(b).not.toHaveProperty('interval'); });
   it('enterprise — null dailyLimit',         async () => { const r=await request(app).get('/api/subscription/plans'); expect(r.body.plans.find(p=>p.id==='enterprise').dailyLimit).toBeNull(); });
   it('all plans have features array',        async () => { const r=await request(app).get('/api/subscription/plans'); r.body.plans.forEach(p=>expect(Array.isArray(p.features)).toBe(true)); });
 });

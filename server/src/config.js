@@ -23,6 +23,8 @@ const required = (name) => {
 };
 
 const optional = (name, fallback = '') => process.env[name] || fallback;
+const csv = (name, fallback = '') =>
+  (process.env[name] || fallback).split(',').map(s => s.trim()).filter(Boolean);
 
 const isProd = (process.env.NODE_ENV || 'development') === 'production';
 const isTest = process.env.NODE_ENV === 'test';
@@ -82,19 +84,32 @@ module.exports = {
     apiKey:   optional('OPENAI_API_KEY'),
     baseUrl:  optional('OPENAI_BASE_URL', 'https://api.openai.com/v1'),
     model:    optional('OPENAI_MODEL', 'gpt-4o-mini'),
+    realtimeModel: optional('OPENAI_REALTIME_MODEL', 'gpt-4o-realtime-preview'),
+    voiceKelion: optional('OPENAI_VOICE_KELION', 'ash'),
   },
 
   gemini: {
     apiKey:       optional('GEMINI_API_KEY'),
-    chatModel:    optional('GEMINI_CHAT_MODEL', 'gemini-3-flash-preview'),
-    liveModel:    optional('GEMINI_LIVE_MODEL', 'gemini-3.1-flash-live-preview'),
-    ttsModel:     optional('GEMINI_TTS_MODEL', 'gemini-3.1-flash-tts-preview'),
+    chatModel:    optional('GEMINI_CHAT_MODEL', 'gemini-2.5-flash'),
+    chatFallbacks: csv('GEMINI_CHAT_FALLBACKS', 'gemini-2.5-flash,gemini-2.0-flash'),
+    liveModel:    optional('GEMINI_LIVE_MODEL', ''),
+    liveFallbacks: csv('GEMINI_LIVE_FALLBACKS',
+      'gemini-live-2.5-flash-preview,gemini-2.5-flash-preview-native-audio-dialog,gemini-2.0-flash-live-001'),
+    ttsModel:     optional('GEMINI_TTS_MODEL', 'gemini-2.5-flash-preview-tts'),
     ttsVoiceKelion: optional('GEMINI_TTS_VOICE_KELION', 'Kore'),
+    liveVoiceKelion: optional('GEMINI_LIVE_VOICE_KELION', 'Kore'),
   },
 
   stripe: {
     secretKey:     optional('STRIPE_SECRET_KEY'),
     publishableKey: optional('STRIPE_PUBLISHABLE_KEY'),
     webhookSecret: optional('STRIPE_WEBHOOK_SECRET'),
+    currency:      optional('STRIPE_CURRENCY', 'usd').toLowerCase(),
+  },
+
+  trial: {
+    // Hard cap on ephemeral voice-session tokens (both /token and
+    // /trial-token). Acceptance expects ~15 minutes.
+    maxSeconds: parseInt(optional('TRIAL_MAX_SECONDS', '900'), 10),
   },
 };

@@ -1,12 +1,11 @@
 'use strict';
 
 const { Router } = require('express');
+const config = require('../config');
 const router = Router();
 
-// Trial cap: all trial/realtime sessions are limited to 15 minutes on our side,
-// regardless of what the upstream provider returns. This matches the
-// advertised trial length in the product UI and acceptance tests.
-const TRIAL_MAX_MS = 15 * 60 * 1000;
+// Hard cap on realtime/trial token lifetime; configured via TRIAL_MAX_SECONDS.
+const TRIAL_MAX_MS = config.trial.maxSeconds * 1000;
 
 // Returns a short-lived ephemeral token so the browser can connect
 // directly to the real-time voice API without exposing the main API key.
@@ -21,7 +20,7 @@ router.get('/token', async (req, res) => {
   }
 
   try {
-    const voice = process.env.OPENAI_VOICE_KELION || 'ash';
+    const voice = config.openai.voiceKelion;
     const r = await fetch('https://api.openai.com/v1/realtime/sessions', {
       method: 'POST',
       headers: {
@@ -29,7 +28,7 @@ router.get('/token', async (req, res) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: process.env.OPENAI_REALTIME_MODEL || 'gpt-4o-realtime-preview',
+        model: config.openai.realtimeModel,
         voice,
       }),
     });
@@ -56,17 +55,14 @@ router.get('/token', async (req, res) => {
   }
 });
 
-// Ordered list of Gemini Live models to try. The API naming changes across
-// previews; the first one that works wins.
+// Ordered list of Gemini Live models to try. Sourced from
+// GEMINI_LIVE_MODEL (optional primary) + GEMINI_LIVE_FALLBACKS (CSV).
+// The API naming changes across previews; the first one that works wins.
 function geminiLiveModelCandidates() {
-  const env = process.env.GEMINI_LIVE_MODEL;
-  const defaults = [
-    'gemini-live-2.5-flash-preview',
-    'gemini-2.5-flash-preview-native-audio-dialog',
-    'gemini-2.0-flash-live-001',
-  ];
-  if (env) return [env, ...defaults.filter(m => m !== env)];
-  return defaults;
+  const primary = config.gemini.liveModel;
+  const list = [primary, ...config.gemini.liveFallbacks].filter(Boolean);
+  const seen = new Set();
+  return list.filter(m => (seen.has(m) ? false : (seen.add(m), true)));
 }
 
 // Gemini Live ephemeral token
@@ -77,7 +73,7 @@ router.get('/gemini-token', async (req, res) => {
     return res.status(503).json({ error: 'GEMINI_API_KEY not configured' });
   }
 
-  const voice = process.env.GEMINI_LIVE_VOICE_KELION || 'Kore';
+  const voice = config.gemini.liveVoiceKelion;
   const now = Date.now();
   const newSessionExpireTime = new Date(now + 60 * 1000).toISOString();
   const expireTime            = new Date(now + TRIAL_MAX_MS).toISOString();
