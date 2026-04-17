@@ -201,7 +201,7 @@ export default function LandingPage() {
                 background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)',
                 borderRadius: '8px', color: '#ef4444', padding: '6px 14px', cursor: 'pointer',
                 fontSize: '13px', fontWeight: '600',
-              }}>Logout</button>
+              }}>Deconectare</button>
             </div>
           ) : (
             <div style={{ display: 'flex', gap: '8px' }}>
@@ -209,7 +209,7 @@ export default function LandingPage() {
                 background: 'linear-gradient(135deg, #7c3aed, #a855f7)',
                 border: 'none', borderRadius: '8px', color: '#fff', padding: '6px 18px',
                 cursor: 'pointer', fontSize: '13px', fontWeight: '600',
-              }}>Login</button>
+              }}>Conectare</button>
               <button onClick={() => { resetForm(); setModal('register') }} style={{
                 background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)',
                 borderRadius: '8px', color: '#ccc', padding: '6px 14px', cursor: 'pointer',
@@ -254,7 +254,7 @@ export default function LandingPage() {
           borderLeft: '1px solid rgba(255,255,255,0.06)',
         }}>
           <div style={{ color: '#a855f7', fontSize: '12px', fontWeight: '700', letterSpacing: '3px', marginBottom: '16px', textTransform: 'uppercase' }}>
-            YOUR AI ASSISTANT
+            ASISTENTUL TĂU AI
           </div>
           <h1 style={{
             fontSize: '64px', fontWeight: '900', margin: '0 0 20px',
@@ -262,13 +262,13 @@ export default function LandingPage() {
             WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', lineHeight: '1.1',
           }}>Kelion</h1>
           <p style={{ color: '#888', fontSize: '17px', lineHeight: '1.7', margin: '0 0 32px', maxWidth: '380px' }}>
-            Intelligent, empathetic and always available. Speak naturally — Kelion understands, responds and helps you in real time.
+            Inteligent, empatic și mereu disponibil. Vorbește natural — Kelion înțelege, răspunde și te ajută în timp real.
           </p>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '36px' }}>
             {[
-              { icon: '🎙', title: 'Natural Voice', desc: 'Automatic voice detection in any language' },
-              { icon: '🌍', title: 'Any Language', desc: 'Native voice response in your language' },
+              { icon: '🎙', title: 'Voce naturală', desc: 'Detectare automată a vocii în orice limbă' },
+              { icon: '🌍', title: 'Orice limbă', desc: 'Răspuns vocal nativ în limba ta' },
             ].map(f => (
               <div key={f.title} style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                 <div style={{
@@ -292,7 +292,7 @@ export default function LandingPage() {
               padding: '16px 32px', fontSize: '17px', fontWeight: '700',
               cursor: 'pointer', boxShadow: '0 8px 30px rgba(168,85,247,0.4)',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
-            }}>▶ Start Chat</button>
+            }}>▶ Pornește chat</button>
             {!user && (
               <button onClick={handleFreeTrial} style={{
                 width: '100%', background: 'rgba(255,255,255,0.04)',
