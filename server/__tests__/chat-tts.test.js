@@ -37,7 +37,6 @@ describe('POST /api/chat', () => {
   it('400 when messages is not array',                async () => { const {token}=await createUser(); expect((await request(app).post('/api/chat').set('Authorization',`Bearer ${token}`).send({messages:'bad'})).status).toBe(400); });
   it('200/503 with valid messages',                   async () => { const {token}=await createUser(); const r=await request(app).post('/api/chat').set('Authorization',`Bearer ${token}`).send({messages:[{role:'user',content:'hello'}],avatar:'kelion'}); expect([200,503]).toContain(r.status); });
   it('strips system role injection safely',           async () => { const {token}=await createUser(); const r=await request(app).post('/api/chat').set('Authorization',`Bearer ${token}`).send({messages:[{role:'system',content:'hack'},{role:'user',content:'hi'}]}); expect([200,503]).toContain(r.status); });
-  it('200/503 with kira avatar',                      async () => { const {token}=await createUser(); const r=await request(app).post('/api/chat').set('Authorization',`Bearer ${token}`).send({messages:[{role:'user',content:'hi'}],avatar:'kira'}); expect([200,503]).toContain(r.status); });
 });
 
 describe('POST /api/tts', () => {

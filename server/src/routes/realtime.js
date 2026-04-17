@@ -9,16 +9,6 @@ const router = Router();
 // Two providers are supported:
 //  - OpenAI Realtime (WebRTC, model gpt-4o-realtime-preview)     → GET /token
 //  - Gemini Live     (WebSocket, model gemini-3.1-flash-live-*)  → GET /gemini-token
-function pickOpenAIVoice(avatar) {
-  if (avatar === 'kira') return process.env.OPENAI_VOICE_KIRA || 'shimmer';
-  return process.env.OPENAI_VOICE_KELION || 'ash';
-}
-
-function pickGeminiVoice(avatar) {
-  if (avatar === 'kira') return process.env.GEMINI_LIVE_VOICE_KIRA || 'Puck';
-  return process.env.GEMINI_LIVE_VOICE_KELION || 'Kore';
-}
-
 router.get('/token', async (req, res) => {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
@@ -26,8 +16,7 @@ router.get('/token', async (req, res) => {
   }
 
   try {
-    const avatar = req.query.avatar || 'kelion';
-    const voice = pickOpenAIVoice(avatar);
+    const voice = process.env.OPENAI_VOICE_KELION || 'ash';
     const r = await fetch('https://api.openai.com/v1/realtime/sessions', {
       method: 'POST',
       headers: {
@@ -67,8 +56,7 @@ router.get('/gemini-token', async (req, res) => {
   }
 
   try {
-    const avatar = req.query.avatar || 'kelion';
-    const voice = pickGeminiVoice(avatar);
+    const voice = process.env.GEMINI_LIVE_VOICE_KELION || 'Kore';
     const model = process.env.GEMINI_LIVE_MODEL || 'gemini-3.1-flash-live-preview';
 
     // New session starts valid for 1 minute; full session length up to 30 min.

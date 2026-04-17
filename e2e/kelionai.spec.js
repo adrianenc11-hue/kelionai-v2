@@ -66,23 +66,24 @@ test.describe('Frontend pages', () => {
     await page.goto(BASE);
     await expect(page.locator('text=KelionAI').first()).toBeVisible();
     await expect(page.locator('button:has-text("Start Chat")')).toBeVisible();
-    await expect(page.locator('button:has-text("Kelion")')).toBeVisible();
-    await expect(page.locator('button:has-text("Kira")')).toBeVisible();
+    await expect(page.locator('h1:has-text("Kelion")')).toBeVisible();
+    await expect(page.locator('button:has-text("Kira")')).toHaveCount(0);
     await expect(page.locator('button:has-text("Login")')).toBeVisible();
     await expect(page.locator('button:has-text("Planuri")')).toBeVisible();
   });
 
-  test('Chat page for kelion shows avatar name and Start Chat', async ({ page }) => {
-    await page.goto(`${BASE}/chat/kelion`);
-    await expect(page.locator('text=Kelion')).toBeVisible();
+  test('Chat page shows Kelion avatar and Start Chat', async ({ page }) => {
+    await page.goto(`${BASE}/chat`);
+    await expect(page.locator('text=Kelion').first()).toBeVisible();
     await expect(page.locator('button:has-text("Start Chat")')).toBeVisible();
     await expect(page.locator('text=← Back')).toBeVisible();
   });
 
-  test('Chat page for kira shows avatar name and Start Chat', async ({ page }) => {
+  test('Legacy /chat/kira and /chat/kelion redirect to /chat', async ({ page }) => {
     await page.goto(`${BASE}/chat/kira`);
-    await expect(page.locator('text=Kira')).toBeVisible();
-    await expect(page.locator('button:has-text("Start Chat")')).toBeVisible();
+    await expect(page).toHaveURL(BASE + '/chat');
+    await page.goto(`${BASE}/chat/kelion`);
+    await expect(page).toHaveURL(BASE + '/chat');
   });
 
   test('Admin page without auth redirects to landing', async ({ page }) => {

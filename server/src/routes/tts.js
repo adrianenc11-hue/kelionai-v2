@@ -33,12 +33,10 @@ function pcmToWav(pcmBuffer, sampleRate = 24000, numChannels = 1, bitsPerSample 
   return Buffer.concat([header, pcmBuffer]);
 }
 
-async function synthesizeGemini(text, avatar) {
+async function synthesizeGemini(text) {
   const apiKey = process.env.GEMINI_API_KEY;
   const model  = process.env.GEMINI_TTS_MODEL || DEFAULT_GEMINI_TTS_MODEL;
-  const voice  = avatar === 'kira'
-    ? (process.env.GEMINI_TTS_VOICE_KIRA   || 'Puck')
-    : (process.env.GEMINI_TTS_VOICE_KELION || DEFAULT_GEMINI_VOICE);
+  const voice  = process.env.GEMINI_TTS_VOICE_KELION || DEFAULT_GEMINI_VOICE;
 
   const url = `${GEMINI_TTS_BASE}/${encodeURIComponent(model)}:generateContent`;
   const r = await fetch(url, {
@@ -84,7 +82,7 @@ async function synthesizeElevenLabs(text) {
 }
 
 router.post('/', async (req, res) => {
-  const { text, avatar = 'kelion' } = req.body;
+  const { text } = req.body;
 
   if (!text || typeof text !== 'string' || text.length > 2000) {
     return res.status(400).json({ error: 'Text is required and must be under 2000 characters' });
@@ -98,7 +96,7 @@ router.post('/', async (req, res) => {
 
   try {
     if (hasGemini) {
-      const wav = await synthesizeGemini(text, avatar);
+      const wav = await synthesizeGemini(text);
       res.set({ 'Content-Type': 'audio/wav', 'Content-Length': wav.length });
       return res.send(wav);
     }

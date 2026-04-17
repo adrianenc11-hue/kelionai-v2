@@ -188,10 +188,7 @@ app.get('/api/realtime/trial-token', async (req, res) => {
   if (!apiKey) return res.status(503).json({ error: 'Not configured' });
 
   try {
-    const avatar = req.query.avatar || 'kelion';
-    const voice = avatar === 'kira'
-      ? (process.env.OPENAI_VOICE_KIRA || 'shimmer')
-      : (process.env.OPENAI_VOICE_KELION || 'ash');
+    const voice = process.env.OPENAI_VOICE_KELION || 'ash';
     const r = await fetch('https://api.openai.com/v1/realtime/sessions', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },

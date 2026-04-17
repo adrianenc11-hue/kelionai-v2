@@ -87,7 +87,6 @@ module.exports = {
     liveModel:    optional('GEMINI_LIVE_MODEL', 'gemini-3.1-flash-live-preview'),
     ttsModel:     optional('GEMINI_TTS_MODEL', 'gemini-3.1-flash-tts-preview'),
     ttsVoiceKelion: optional('GEMINI_TTS_VOICE_KELION', 'Kore'),
-    ttsVoiceKira:   optional('GEMINI_TTS_VOICE_KIRA',   'Puck'),
   },
 
   stripe: {

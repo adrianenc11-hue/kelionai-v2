@@ -1,28 +1,20 @@
 import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls, useGLTF } from '@react-three/drei'
 import { Suspense, useState, useRef, useEffect, useCallback } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useLipSync } from '../lib/lipSync'
 
-const AVATARS = {
-  kelion: {
-    model: '/kelion-rpm_e27cb94d.glb',
-    color: '#7c3aed',
-    glow:  '#a855f7',
-  },
-  kira: {
-    model: '/kira-rpm_54d82b66.glb',
-    color: '#ec4899',
-    glow: '#f472b6',
-  },
+const AVATAR = {
+  model: '/kelion-rpm_e27cb94d.glb',
+  color: '#7c3aed',
+  glow:  '#a855f7',
 }
 
 const ARM_ROT     = { x: 1.3, y: 0.0, z: 0.15 }
 const FOREARM_ROT = { x: 0.4, y: 0.0, z: 0.0 }
 
-function AvatarModel({ avatar = 'kelion', mouthOpen = 0 }) {
-  const config = AVATARS[avatar] || AVATARS.kelion
-  const { scene } = useGLTF(config.model)
+function AvatarModel({ mouthOpen = 0 }) {
+  const { scene } = useGLTF(AVATAR.model)
   const bonesRef = useRef({}); const morphsRef = useRef([])
   useEffect(() => {
     const bones = {}; const morphs = []
@@ -65,11 +57,9 @@ const ST = {
   error:      { text: 'Error — retry', color: '#ef4444' },
 }
 
-export default function VoiceChat({ avatar: avatarProp }) {
-  const { avatar: avatarParam } = useParams()
+export default function VoiceChat() {
   const navigate = useNavigate()
-  const avatar = avatarProp || avatarParam || 'kelion'
-  const config = AVATARS[avatar] || AVATARS.kelion
+  const config = AVATAR
   const [status, setStatus]       = useState('idle')
   const [aiText, setAiText]       = useState('')
   const [userText, setUserText]   = useState('')
@@ -123,12 +113,12 @@ Current date/time: ${t} (${tz}).`
     try {
       // Try auth token first, fallback to trial token
       let tokenData
-      let r = await fetch(`/api/realtime/token?avatar=${encodeURIComponent(avatar)}`, { credentials:'include' })
+      let r = await fetch('/api/realtime/token', { credentials:'include' })
       if (r.ok) {
         tokenData = await r.json()
       } else {
         // Not logged in — use free trial
-        r = await fetch(`/api/realtime/trial-token?avatar=${encodeURIComponent(avatar)}`, { credentials:'include' })
+        r = await fetch('/api/realtime/trial-token', { credentials:'include' })
         if (!r.ok) {
           const err = await r.json().catch(() => ({}))
           throw new Error(err.error || 'Nu s-a putut obține token-ul')
@@ -215,7 +205,7 @@ Current date/time: ${t} (${tz}).`
           <pointLight position={[0,1,2]} intensity={status==='speaking'?2:0.8} color={config.glow} />
           <Suspense fallback={null}>
             <hemisphereLight skyColor="#b1e1ff" groundColor="#000000" intensity={0.6} />
-            <AvatarModel avatar={avatar} mouthOpen={mouthOpen} />
+            <AvatarModel mouthOpen={mouthOpen} />
           </Suspense>
           <OrbitControls enableZoom={false} enablePan={false} minPolarAngle={Math.PI/4} maxPolarAngle={Math.PI/1.8} minAzimuthAngle={-Math.PI/5} maxAzimuthAngle={Math.PI/5} />
         </Canvas>
@@ -233,7 +223,7 @@ Current date/time: ${t} (${tz}).`
       <div style={{ width:400,display:'flex',flexDirection:'column', background:'rgba(0,0,0,0.35)',borderLeft:'1px solid rgba(255,255,255,0.07)' }}>
         <div style={{ padding:'16px 20px',borderBottom:'1px solid rgba(255,255,255,0.07)', display:'flex',alignItems:'center',gap:10,flexShrink:0 }}>
           <div style={{ width:10,height:10,borderRadius:'50%',background:config.glow,boxShadow:`0 0 8px ${config.glow}` }} />
-          <span style={{ fontWeight:600,color:'#fff',fontSize:15 }}>{avatar === 'kira' ? 'Kira' : 'Kelion'}</span>
+          <span style={{ fontWeight:600,color:'#fff',fontSize:15 }}>Kelion</span>
           <span style={{ marginLeft:'auto',fontSize:11,color:'#555' }}>🌍 any language</span>
         </div>
         <div style={{ flex:1,display:'flex',flexDirection:'column',justifyContent:'flex-end',padding:'24px 20px',gap:16 }}>
