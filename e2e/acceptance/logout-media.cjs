@@ -9,10 +9,14 @@
  * are held by the browser runtime, not the server.
  *
  * This script uses Playwright's bundled chromium to:
- *   1. Register a fresh account via the public API.
- *   2. Open the landing page with a valid session cookie (token injected).
+ *   1. Register a fresh account via Playwright's request context so the
+ *      session cookie lands in the browser's cookie jar.
+ *   2. Open the landing page — the app's fetch wrapper uses
+ *      `credentials: 'include'`, so it sees us as logged in.
  *   3. Instrument `navigator.mediaDevices.getUserMedia` so every returned
- *      MediaStream is kept in a page-global registry (`window.__acceptanceMedia`).
+ *      MediaStream is kept in a page-global registry (`window.__acceptanceStreams`)
+ *      and is also registered with the app's own `window.__kelionMedia` so
+ *      the in-app `stopAllStreams()` can actually stop it.
  *   4. Trigger `getUserMedia({ audio:true, video:true })` programmatically
  *      inside the page (identical call to what VoiceChat does) — permissions
  *      are granted via the browser context.
@@ -49,25 +53,8 @@ function pass(detail) {
     return fail('Playwright is not installed', e.message);
   }
 
-  // Step 1 — register a fresh user via the public API so we have a valid
-  // session to operate on. This is the same endpoint the UI would call.
   const email = `accept_logout_${Date.now()}_${Math.random().toString(36).slice(2, 6)}@example.com`;
   const password = 'AcceptLogout1234!';
-  const regRes = await fetch(BASE + '/auth/local/register', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    // Some production deployments still require an explicit Terms acceptance
-    // field; newer code ignores it. Include it so the script is robust across
-    // both versions.
-    body: JSON.stringify({ email, password, name: 'Logout Media', acceptTerms: true }),
-  });
-  if (regRes.status !== 201) {
-    const txt = await regRes.text().catch(() => '');
-    return fail('register did not return 201', 'status=' + regRes.status + ' body=' + txt);
-  }
-  const regBody = await regRes.json().catch(() => ({}));
-  const token = regBody?.token;
-  if (!token) return fail('register response did not contain a JWT token');
 
   const browser = await chromium.launch({
     headless: HEADLESS,
@@ -85,16 +72,30 @@ function pass(detail) {
   });
   await context.grantPermissions(['camera', 'microphone'], { origin });
 
+  // Step 1 — register a fresh user through Playwright's request context so
+  // the session cookie is persisted in the context cookie jar. The app
+  // authenticates browser requests via cookies (`credentials: 'include'`),
+  // so registering via Node's `fetch` would leave us unauthenticated once
+  // we navigate. Include `acceptTerms: true` for production builds that
+  // still require it.
+  const regRes = await context.request.post(BASE + '/auth/local/register', {
+    data: { email, password, name: 'Logout Media', acceptTerms: true },
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (regRes.status() !== 201) {
+    const txt = await regRes.text().catch(() => '');
+    await browser.close();
+    return fail('register did not return 201', 'status=' + regRes.status() + ' body=' + txt);
+  }
+
   const page = await context.newPage();
 
-  // Prime localStorage with the auth token so the app treats us as logged in
-  // on the next navigation. (The api helper falls back to Bearer auth when
-  // the token is present.)
-  await page.addInitScript((tok) => {
-    try { localStorage.setItem('token', tok); } catch {}
-    try { localStorage.setItem('auth_token', tok); } catch {}
-    // Instrument getUserMedia so we capture every stream returned to the
-    // page, even before VoiceChat mounts.
+  // Instrument getUserMedia so we capture every stream returned to the page,
+  // and also forward it to the app's media registry (when exposed). Without
+  // that forwarding, `handleLogout -> stopAllStreams()` has nothing in its
+  // `active` Set to iterate and the streams opened from the test would
+  // never actually be stopped by the app under test.
+  await page.addInitScript(() => {
     const orig = navigator.mediaDevices && navigator.mediaDevices.getUserMedia
       ? navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices)
       : null;
@@ -103,10 +104,15 @@ function pass(detail) {
       navigator.mediaDevices.getUserMedia = async (constraints) => {
         const s = await orig(constraints);
         try { window.__acceptanceStreams.push(s); } catch {}
+        try {
+          if (window.__kelionMedia && typeof window.__kelionMedia.registerStream === 'function') {
+            window.__kelionMedia.registerStream(s);
+          }
+        } catch {}
         return s;
       };
     }
-  }, token);
+  });
 
   try {
     await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 30_000 });

@@ -336,7 +336,7 @@ export default function LandingPage() {
             {formError && <div style={errBox}>{formError}</div>}
             <input type="text" placeholder="Name" value={formName} onChange={e => setFormName(e.target.value)} required style={inp} />
             <input type="email" placeholder="Email" value={formEmail} onChange={e => setFormEmail(e.target.value)} required style={inp} />
-            <input type="password" placeholder="Password (min 8 characters)" value={formPass} onChange={e => setFormPass(e.target.value)} required minLength={8} style={{...inp, marginBottom: '20px'}} />
+            <input type="password" placeholder="Password (min 8 chars, 1 uppercase + 1 digit)" value={formPass} onChange={e => setFormPass(e.target.value)} required minLength={8} pattern="(?=.*[A-Z])(?=.*\d).{8,}" title="Password must be at least 8 characters and include at least one uppercase letter and one digit" style={{...inp, marginBottom: '20px'}} />
             <button type="submit" disabled={formLoading} style={{...btnPrimary, opacity: formLoading ? 0.7 : 1}}>
               {formLoading ? 'Creating...' : 'Create account'}
             </button>

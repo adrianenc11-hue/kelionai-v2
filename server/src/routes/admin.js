@@ -82,7 +82,10 @@ router.put('/users/:id/subscription', async (req, res) => {
     const { subscription_tier, subscription_status } = req.body;
 
     const validTiers = ['free', 'basic', 'premium', 'enterprise'];
-    const validStatuses = ['active', 'cancelled', 'past_due', 'trialing'];
+    // Stripe uses US spelling ('canceled'); accept the British 'cancelled'
+    // too for backward compatibility with any older admin client. Webhook
+    // handler writes 'canceled' — that must be a valid value here.
+    const validStatuses = ['active', 'canceled', 'cancelled', 'past_due', 'trialing'];
 
     if (subscription_tier && !validTiers.includes(subscription_tier)) {
       return res.status(400).json({ error: 'Invalid subscription tier' });
