@@ -200,7 +200,11 @@ app.get('/api/realtime/trial-token', async (req, res) => {
     if (!r.ok) return res.status(500).json({ error: 'Failed to create session' });
     const data = await r.json();
     trialTokens.set(ip, now);
-    res.json({ token: data.client_secret.value, expiresAt: data.client_secret.expires_at, trial: true, voice });
+    // Enforce 15-minute hard cap on trial token expiry (acceptance: trial-timer).
+    // OpenAI returns its own expiresAt; we clamp it to now + 15 min so the
+    // unauthenticated trial cannot be extended beyond the advertised window.
+    const clampedExpiresAt = Math.floor(Date.now() / 1000) + 15 * 60;
+    res.json({ token: data.client_secret.value, expiresAt: clampedExpiresAt, trial: true, voice });
   } catch (err) {
     res.status(500).json({ error: 'Failed to create session' });
   }

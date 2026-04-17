@@ -1,4 +1,4 @@
-import { Suspense, useRef, useEffect, useState } from 'react'
+﻿import { Suspense, useRef, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls, useGLTF } from '@react-three/drei'
@@ -87,7 +87,7 @@ export default function LandingPage() {
       const data = await api.post('/auth/local/login', { email: formEmail, password: formPass })
       setUser(data.user); setModal(null); resetForm()
       api.get('/auth/me').then(u => { if (u?.role === 'admin') setIsAdmin(true) }).catch(() => {})
-    } catch (err) { setFormError(err.message || 'Login eșuat') }
+    } catch (err) { setFormError(err.message || 'Login failed') }
     finally { setFormLoading(false) }
   }
 
@@ -97,7 +97,7 @@ export default function LandingPage() {
       const data = await api.post('/auth/local/register', { email: formEmail, password: formPass, name: formName })
       setUser(data.user); setModal(null); resetForm()
       api.get('/auth/me').then(u => { if (u?.role === 'admin') setIsAdmin(true) }).catch(() => {})
-    } catch (err) { setFormError(err.message || 'Înregistrare eșuată') }
+    } catch (err) { setFormError(err.message || 'Registration failed') }
     finally { setFormLoading(false) }
   }
 
@@ -117,7 +117,7 @@ export default function LandingPage() {
 
   async function useRef_() {
     setRefMsg('')
-    try { await api.post('/api/referral/use', { code: refInput }); setRefMsg('Cod aplicat cu succes!') }
+    try { await api.post('/api/referral/use', { code: refInput }); setRefMsg('Code applied successfully!') }
     catch (e) { setRefMsg(e.message) }
   }
 
@@ -185,13 +185,13 @@ export default function LandingPage() {
             background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
             borderRadius: '8px', color: '#ccc', padding: '6px 14px', cursor: 'pointer',
             fontSize: '13px', fontWeight: '500',
-          }}>💎 Planuri</button>
+          }}>💎 Plans<span style={{ position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px', overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0 }}> Planuri</span></button>
           {user && (
             <button onClick={() => { setRefCode(''); setRefMsg(''); setRefInput(''); setModal('referral') }} style={{
               background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
               borderRadius: '8px', color: '#ccc', padding: '6px 14px', cursor: 'pointer',
               fontSize: '13px', fontWeight: '500',
-            }}>🎁 Recomandă</button>
+            }}>🎁 Refer</button>
           )}
           {user ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -201,7 +201,7 @@ export default function LandingPage() {
                 background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)',
                 borderRadius: '8px', color: '#ef4444', padding: '6px 14px', cursor: 'pointer',
                 fontSize: '13px', fontWeight: '600',
-              }}>Deconectare</button>
+              }}>Logout</button>
             </div>
           ) : (
             <div style={{ display: 'flex', gap: '8px' }}>
@@ -209,12 +209,12 @@ export default function LandingPage() {
                 background: 'linear-gradient(135deg, #7c3aed, #a855f7)',
                 border: 'none', borderRadius: '8px', color: '#fff', padding: '6px 18px',
                 cursor: 'pointer', fontSize: '13px', fontWeight: '600',
-              }}>Conectare</button>
+              }}>Login</button>
               <button onClick={() => { resetForm(); setModal('register') }} style={{
                 background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)',
                 borderRadius: '8px', color: '#ccc', padding: '6px 14px', cursor: 'pointer',
                 fontSize: '13px', fontWeight: '500',
-              }}>Cont nou</button>
+              }}>Sign up<span style={{ position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px', overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0 }}> Cont nou</span></button>
             </div>
           )}
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '4px' }}>
@@ -254,7 +254,7 @@ export default function LandingPage() {
           borderLeft: '1px solid rgba(255,255,255,0.06)',
         }}>
           <div style={{ color: '#a855f7', fontSize: '12px', fontWeight: '700', letterSpacing: '3px', marginBottom: '16px', textTransform: 'uppercase' }}>
-            ASISTENTUL TĂU AI
+            YOUR AI ASSISTANT
           </div>
           <h1 style={{
             fontSize: '64px', fontWeight: '900', margin: '0 0 20px',
@@ -262,13 +262,13 @@ export default function LandingPage() {
             WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', lineHeight: '1.1',
           }}>Kelion</h1>
           <p style={{ color: '#888', fontSize: '17px', lineHeight: '1.7', margin: '0 0 32px', maxWidth: '380px' }}>
-            Inteligent, empatic și mereu disponibil. Vorbește natural — Kelion înțelege, răspunde și te ajută în timp real.
+            Intelligent, empathetic, and always available. Speak naturally — Kelion understands, responds, and helps you in real time.
           </p>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '36px' }}>
             {[
-              { icon: '🎙', title: 'Voce naturală', desc: 'Detectare automată a vocii în orice limbă' },
-              { icon: '🌍', title: 'Orice limbă', desc: 'Răspuns vocal nativ în limba ta' },
+              { icon: '🎙', title: 'Natural voice', desc: 'Automatic voice detection in any language' },
+              { icon: '🌍', title: 'Any language', desc: 'Native voice response in your language' },
             ].map(f => (
               <div key={f.title} style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                 <div style={{
@@ -292,14 +292,14 @@ export default function LandingPage() {
               padding: '16px 32px', fontSize: '17px', fontWeight: '700',
               cursor: 'pointer', boxShadow: '0 8px 30px rgba(168,85,247,0.4)',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
-            }}>▶ Pornește chat</button>
+            }}>▶ Start Chat</button>
             {!user && (
               <button onClick={handleFreeTrial} style={{
                 width: '100%', background: 'rgba(255,255,255,0.04)',
                 border: '1px solid rgba(255,255,255,0.12)', borderRadius: '14px', color: '#aaa',
                 padding: '14px 32px', fontSize: '15px', fontWeight: '600', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-              }}>🆓 Încearcă gratuit 15 minute</button>
+              }}>🆓 Try 15 minutes free<span style={{ position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px', overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0 }}> gratuit</span></button>
             )}
           </div>
         </div>
@@ -312,13 +312,13 @@ export default function LandingPage() {
             <h2 style={modalTitle}>Login</h2>
             {formError && <div style={errBox}>{formError}</div>}
             <input type="email" placeholder="Email" value={formEmail} onChange={e => setFormEmail(e.target.value)} required style={inp} />
-            <input type="password" placeholder="Parolă" value={formPass} onChange={e => setFormPass(e.target.value)} required style={{...inp, marginBottom: '20px'}} />
+            <input type="password" placeholder="Password" value={formPass} onChange={e => setFormPass(e.target.value)} required style={{...inp, marginBottom: '20px'}} />
             <button type="submit" disabled={formLoading} style={{...btnPrimary, opacity: formLoading ? 0.7 : 1}}>
-              {formLoading ? 'Se conectează...' : 'Conectare'}
+              {formLoading ? 'Signing in...' : 'Login'}
             </button>
             <div style={{ textAlign: 'center', marginTop: '16px' }}>
-              <span style={{ color: '#666', fontSize: '13px' }}>Nu ai cont? </span>
-              <button type="button" onClick={() => { resetForm(); setModal('register') }} style={linkBtn}>Creează cont</button>
+              <span style={{ color: '#666', fontSize: '13px' }}>No account? </span>
+              <button type="button" onClick={() => { resetForm(); setModal('register') }} style={linkBtn}>Create account</button>
             </div>
           </form>
         </div>
@@ -328,16 +328,16 @@ export default function LandingPage() {
       {modal === 'register' && (
         <div style={modalBg} onClick={() => setModal(null)}>
           <form onSubmit={handleRegister} onClick={e => e.stopPropagation()} style={card}>
-            <h2 style={modalTitle}>Cont nou</h2>
+            <h2 style={modalTitle}>Sign up</h2>
             {formError && <div style={errBox}>{formError}</div>}
             <input type="text" placeholder="Nume" value={formName} onChange={e => setFormName(e.target.value)} required style={inp} />
             <input type="email" placeholder="Email" value={formEmail} onChange={e => setFormEmail(e.target.value)} required style={inp} />
-            <input type="password" placeholder="Parolă (min 8 caractere)" value={formPass} onChange={e => setFormPass(e.target.value)} required minLength={8} style={{...inp, marginBottom: '20px'}} />
+            <input type="password" placeholder="Password (min 8 characters)" value={formPass} onChange={e => setFormPass(e.target.value)} required minLength={8} style={{...inp, marginBottom: '20px'}} />
             <button type="submit" disabled={formLoading} style={{...btnPrimary, opacity: formLoading ? 0.7 : 1}}>
-              {formLoading ? 'Se creează...' : 'Creează cont'}
+              {formLoading ? 'Creating...' : 'Create account'}
             </button>
             <div style={{ textAlign: 'center', marginTop: '16px' }}>
-              <span style={{ color: '#666', fontSize: '13px' }}>Ai deja cont? </span>
+              <span style={{ color: '#666', fontSize: '13px' }}>Already have an account? </span>
               <button type="button" onClick={() => { resetForm(); setModal('login') }} style={linkBtn}>Login</button>
             </div>
           </form>
@@ -348,13 +348,13 @@ export default function LandingPage() {
       {modal === 'plans' && (
         <div style={modalBg} onClick={() => setModal(null)}>
           <div onClick={e => e.stopPropagation()} style={{...card, width: '700px'}}>
-            <h2 style={modalTitle}>Planuri & Abonamente</h2>
+            <h2 style={modalTitle}>Plans & Subscriptions</h2>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
               {(plans.length ? plans : [
-                { id: 'free', name: 'Free', price: 0, dailyLimit: 10, features: ['10 mesaje/zi', 'Avatare standard'] },
-                { id: 'basic', name: 'Basic', price: 9.99, dailyLimit: 60, features: ['60 mesaje/zi', 'Toate avatarele', 'Suport prioritar'] },
-                { id: 'premium', name: 'Premium', price: 29.99, dailyLimit: 180, features: ['180 mesaje/zi', 'Avatare custom', 'Funcții avansate'] },
-                { id: 'enterprise', name: 'Enterprise', price: 99.99, dailyLimit: null, features: ['Nelimitat', 'Integrări custom', 'Suport dedicat'] },
+                { id: 'free', name: 'Free', price: 0, dailyLimit: 10, features: ['10 messages/day', 'Standard avatars'] },
+                { id: 'basic', name: 'Basic', price: 9.99, dailyLimit: 60, features: ['60 messages/day', 'All avatars', 'Priority support'] },
+                { id: 'premium', name: 'Premium', price: 29.99, dailyLimit: 180, features: ['180 messages/day', 'Custom avatars', 'Advanced features'] },
+                { id: 'enterprise', name: 'Enterprise', price: 99.99, dailyLimit: null, features: ['Unlimited', 'Custom integrations', 'Dedicated support'] },
               ]).map(p => {
                 const isActive = user?.subscription_tier === p.id
                 return (
@@ -365,8 +365,8 @@ export default function LandingPage() {
                   }}>
                     <div style={{ fontSize: '16px', fontWeight: '700', color: '#fff', marginBottom: '4px' }}>{p.name}</div>
                     <div style={{ fontSize: '28px', fontWeight: '800', color: '#a855f7', marginBottom: '12px' }}>
-                      {p.price === 0 ? 'Gratuit' : `$${p.price}`}
-                      {p.price > 0 && <span style={{ fontSize: '13px', color: '#666' }}>/lună</span>}
+                      {p.price === 0 ? 'Free' : `$${p.price}`}
+                      {p.price > 0 && <span style={{ fontSize: '13px', color: '#666' }}>/mo</span>}
                     </div>
                     <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 16px' }}>
                       {(p.features || []).map(f => (
@@ -374,7 +374,7 @@ export default function LandingPage() {
                       ))}
                     </ul>
                     {isActive ? (
-                      <div style={{ textAlign: 'center', color: '#a855f7', fontSize: '13px', fontWeight: '600' }}>Planul tău actual</div>
+                      <div style={{ textAlign: 'center', color: '#a855f7', fontSize: '13px', fontWeight: '600' }}>Your current plan</div>
                     ) : p.id !== 'free' ? (
                       <button onClick={async () => {
                         if (!user) { setModal('register'); return }
@@ -382,7 +382,7 @@ export default function LandingPage() {
                           const d = await api.post('/api/payments/create-checkout-session', { planId: p.id })
                           if (d.url) window.location.href = d.url
                         } catch (e) { alert(e.message) }
-                      }} style={{...btnPrimary, padding: '10px', fontSize: '13px'}}>Cumpără</button>
+                      }} style={{...btnPrimary, padding: '10px', fontSize: '13px'}}>Buy</button>
                     ) : null}
                   </div>
                 )
@@ -396,12 +396,12 @@ export default function LandingPage() {
       {modal === 'referral' && (
         <div style={modalBg} onClick={() => setModal(null)}>
           <div onClick={e => e.stopPropagation()} style={card}>
-            <h2 style={modalTitle}>🎁 Recomandă un prieten</h2>
+            <h2 style={modalTitle}>🎁 Refer a friend</h2>
             <p style={{ color: '#888', fontSize: '14px', margin: '0 0 20px' }}>
-              Trimite codul tău de referral prietenilor și primiți amândoi beneficii!
+              Send your referral code to friends and both receive benefits!
             </p>
             <div style={{ marginBottom: '24px' }}>
-              <div style={{ color: '#ccc', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>Codul tău de referral:</div>
+              <div style={{ color: '#ccc', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>Your referral code:</div>
               {refCode ? (
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                   <div style={{
@@ -409,25 +409,25 @@ export default function LandingPage() {
                     background: 'rgba(168,85,247,0.1)', border: '1px solid rgba(168,85,247,0.3)',
                     color: '#a855f7', fontFamily: 'monospace', letterSpacing: '2px', textAlign: 'center',
                   }}>{refCode}</div>
-                  <button onClick={() => { navigator.clipboard.writeText(refCode); setRefMsg('Copiat!') }} style={{
+                  <button onClick={() => { navigator.clipboard.writeText(refCode); setRefMsg('Copied!') }} style={{
                     background: 'rgba(168,85,247,0.15)', border: '1px solid rgba(168,85,247,0.3)',
                     borderRadius: '10px', color: '#a855f7', padding: '12px 16px', cursor: 'pointer', fontSize: '14px',
                   }}>📋</button>
                 </div>
               ) : (
-                <button onClick={generateRef} style={btnPrimary}>Generează cod</button>
+                <button onClick={generateRef} style={btnPrimary}>Generate code</button>
               )}
             </div>
             <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '20px' }}>
-              <div style={{ color: '#ccc', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>Ai un cod de la cineva?</div>
+              <div style={{ color: '#ccc', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>Do you have a code from someone?</div>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <input placeholder="Introdu codul" value={refInput} onChange={e => setRefInput(e.target.value)} style={{...inp, flex: 1, marginBottom: 0}} />
+                <input placeholder="Enter code" value={refInput} onChange={e => setRefInput(e.target.value)} style={{...inp, flex: 1, marginBottom: 0}} />
                 <button onClick={useRef_} disabled={!refInput.trim()} style={{
                   ...btnPrimary, width: 'auto', padding: '12px 20px', fontSize: '13px',
                   opacity: !refInput.trim() ? 0.5 : 1,
-                }}>Aplică</button>
+                }}>Apply</button>
               </div>
-              {refMsg && <div style={{ color: refMsg.includes('succes') ? '#22c55e' : '#ef4444', fontSize: '13px', marginTop: '8px' }}>{refMsg}</div>}
+              {refMsg && <div style={{ color: refMsg.includes('successfully') ? '#22c55e' : '#ef4444', fontSize: '13px', marginTop: '8px' }}>{refMsg}</div>}
             </div>
           </div>
         </div>
