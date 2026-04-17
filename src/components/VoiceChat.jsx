@@ -53,11 +53,11 @@ function AvatarModel({ avatar = 'kelion', mouthOpen = 0 }) {
 
 const ST = {
   idle:       { text: 'Kelion',        color: '#a855f7' },
-  connecting: { text: 'Connecting…',   color: '#f59e0b' },
-  listening:  { text: 'Listening…',    color: '#22c55e' },
-  thinking:   { text: 'Thinking…',     color: '#f59e0b' },
-  speaking:   { text: 'Speaking…',     color: '#a855f7' },
-  error:      { text: 'Error — retry', color: '#ef4444' },
+  connecting: { text: 'Se conectează…',   color: '#f59e0b' },
+  listening:  { text: 'Ascultă…',    color: '#22c55e' },
+  thinking:   { text: 'Gândește…',     color: '#f59e0b' },
+  speaking:   { text: 'Vorbește…',     color: '#a855f7' },
+  error:      { text: 'Eroare — reîncearcă', color: '#ef4444' },
 }
 
 export default function VoiceChat() {
@@ -258,7 +258,7 @@ Current date/time: ${t} (${tz}).`
           </Suspense>
           <OrbitControls enableZoom={false} enablePan={false} minPolarAngle={Math.PI/4} maxPolarAngle={Math.PI/1.8} minAzimuthAngle={-Math.PI/5} maxAzimuthAngle={Math.PI/5} />
         </Canvas>
-        <button onClick={()=>{disconnect();navigate('/')}} style={{ position:'absolute',top:20,left:20, background:'rgba(255,255,255,0.1)',border:'1px solid rgba(255,255,255,0.2)', color:'#fff',padding:'8px 16px',borderRadius:20,cursor:'pointer',fontSize:14,backdropFilter:'blur(10px)' }}>← Back</button>
+        <button onClick={()=>{disconnect();navigate('/')}} style={{ position:'absolute',top:20,left:20, background:'rgba(255,255,255,0.1)',border:'1px solid rgba(255,255,255,0.2)', color:'#fff',padding:'8px 16px',borderRadius:20,cursor:'pointer',fontSize:14,backdropFilter:'blur(10px)' }}>← Înapoi</button>
         {timeLeft !== null && timeLeft > 0 && (
           <div style={{ position:'absolute',top:20,right:20, background:'rgba(0,0,0,0.7)',backdropFilter:'blur(10px)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:12, padding:'8px 16px', color: timeLeft < 60 ? '#ef4444' : '#f59e0b', fontSize:14, fontWeight:700, fontFamily:'monospace' }}>
             🆓 Trial: {Math.floor(timeLeft/60)}:{String(timeLeft%60).padStart(2,'0')}
@@ -273,7 +273,7 @@ Current date/time: ${t} (${tz}).`
         <div style={{ padding:'16px 20px',borderBottom:'1px solid rgba(255,255,255,0.07)', display:'flex',alignItems:'center',gap:10,flexShrink:0 }}>
           <div style={{ width:10,height:10,borderRadius:'50%',background:config.glow,boxShadow:`0 0 8px ${config.glow}` }} />
           <span style={{ fontWeight:600,color:'#fff',fontSize:15 }}>Kelion</span>
-          <span style={{ marginLeft:'auto',fontSize:11,color:'#555' }}>🌍 any language</span>
+          <span style={{ marginLeft:'auto',fontSize:11,color:'#555' }}>🌍 orice limbă</span>
         </div>
         <div style={{ flex:1,display:'flex',flexDirection:'column',justifyContent:'flex-end',padding:'24px 20px',gap:16 }}>
           {aiText ? (
@@ -284,7 +284,7 @@ Current date/time: ${t} (${tz}).`
               </div>
             </div>
           ) : status==='idle' ? (
-            <div style={{ textAlign:'center',color:'#444',fontSize:14 }}>Press <b style={{color:config.glow}}>Start Chat</b> to begin</div>
+            <div style={{ textAlign:'center',color:'#444',fontSize:14 }}>Apasu{0103} <b style={{color:config.glow}}>Porneu{015F}te chat</b> pentru a u{00EE}ncepe</div>
           ) : null}
           {userText ? (
             <div style={{ display:'flex',justifyContent:'flex-end' }}>
@@ -300,19 +300,19 @@ Current date/time: ${t} (${tz}).`
               background:`linear-gradient(135deg,${config.color},${config.glow})`,
               color:'#fff',fontSize:16,fontWeight:700,boxShadow:`0 0 24px ${config.glow}44`,
               opacity:status==='connecting'?0.7:1,
-            }}>{status==='connecting'?'⏳ Connecting…':status==='error'?'🔄 Retry':'🎤 Start Chat'}</button>
+            }}>{status==='connecting'?'⏳ Se conectează…':status==='error'?'🔄 Reîncearcă':'🎤 Pornește chat'}</button>
           ) : (
             <button onClick={disconnect} style={{
               width:'100%',padding:15,borderRadius:14,border:'none',cursor:'pointer',
               background:'linear-gradient(135deg,#dc2626,#ef4444)',
               color:'#fff',fontSize:16,fontWeight:700,boxShadow:'0 0 20px rgba(220,38,38,0.4)',
-            }}>⏹ End Chat</button>
+            }}>⏹ Oprește chat</button>
           )}
           {live && (
             <div style={{ display:'flex',gap:8 }}>
               <textarea value={inputText} onChange={e=>setInputText(e.target.value)}
                 onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendText(inputText)} }}
-                placeholder="Or type here… (Enter = send)" rows={2}
+                placeholder="Sau scrie aici… (Enter = trimite)" rows={2}
                 style={{ flex:1,background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)',borderRadius:12, color:'#fff',padding:'10px 14px',fontSize:14, resize:'none',outline:'none',fontFamily:'inherit' }} />
               <button onClick={()=>sendText(inputText)} disabled={!inputText.trim()} style={{
                 background:`linear-gradient(135deg,${config.color},${config.glow})`,
