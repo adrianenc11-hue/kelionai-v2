@@ -168,7 +168,11 @@ app.get('/api/subscription/status', requireAuth, async (req, res) => {
     const user = await findById(req.user.id);
     if (!user) return res.status(404).json({ error: 'User not found' });
     res.json({
-      status:     user.subscription_status || 'free',
+      // `subscription_status` stores Stripe-style values ('active', 'canceled',
+      // 'past_due', …). The DB default is 'active'; 'free' is a tier, not a
+      // status. Default to 'active' to avoid handing the client a semantically
+      // invalid status when the column is null.
+      status:     user.subscription_status || 'active',
       tier:       user.subscription_tier   || 'free',
       customerId: user.stripe_customer_id  || null,
     });

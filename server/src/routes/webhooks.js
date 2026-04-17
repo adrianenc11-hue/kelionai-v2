@@ -46,11 +46,16 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
         const sub = event.data.object;
         const user = await findByStripeCustomerId(sub.customer);
         if (user) {
-          const status = event.type === 'customer.subscription.deleted' ? 'canceled' : (sub.status || 'active');
-          await updateSubscription(user.id, {
-            subscription_status: status,
-          });
-          console.log(`[webhook] ${event.type} user=${user.id} status=${status}`);
+          const deleted = event.type === 'customer.subscription.deleted';
+          const status = deleted ? 'canceled' : (sub.status || 'active');
+          // `checkSubscription` middleware (server/src/middleware/subscription.js)
+          // gates features off `subscription_tier` alone. A canceled subscription
+          // must drop back to the free tier, otherwise the user keeps paid-tier
+          // quotas and features even after Stripe stops billing them.
+          const update = { subscription_status: status };
+          if (deleted) update.subscription_tier = 'free';
+          await updateSubscription(user.id, update);
+          console.log(`[webhook] ${event.type} user=${user.id} status=${status}${deleted ? ' tier=free' : ''}`);
         }
         break;
       }
