@@ -1,0 +1,37 @@
+# CODEOWNERS — who must approve changes to protected files.
+#
+# The owner of this repository is the only account allowed to approve
+# modifications to the rule-enforcement infrastructure. Any PR touching
+# these paths requires a review from @adrianenc11-hue.
+#
+# For this file to take effect, the owner must:
+#   1. Go to GitHub -> Settings -> Branches -> Branch protection rules
+#      for `master` (and/or `main`).
+#   2. Enable "Require a pull request before merging".
+#   3. Enable "Require review from Code Owners".
+#   4. Enable "Require status checks to pass before merging" and add
+#      the `rules-integrity` and `acceptance` workflows as required.
+#   5. Enable "Restrict who can push to matching branches" (optional but
+#      strongly recommended).
+#
+# Without branch protection, CODEOWNERS is advisory only.
+
+# Rule-enforcement core (cannot be changed without owner approval)
+/RULES.md                                   @adrianenc11-hue
+/RULES.sha256                               @adrianenc11-hue
+/.augment/rules.md                          @adrianenc11-hue
+/CODEOWNERS                                 @adrianenc11-hue
+/DELIVERY_CONTRACT.md                       @adrianenc11-hue
+
+# Verification and lock scripts (owner-only)
+/scripts/verify-rules-integrity.cjs         @adrianenc11-hue
+/scripts/verify-agent-report.cjs            @adrianenc11-hue
+/scripts/lock-rules.ps1                     @adrianenc11-hue
+/scripts/lock-rules.sh                      @adrianenc11-hue
+
+# CI workflows that enforce the rules (cannot be disabled without owner approval)
+/.github/workflows/rules-integrity.yml      @adrianenc11-hue
+/.github/workflows/acceptance.yml           @adrianenc11-hue
+
+# Acceptance criteria (the sole definition of "done"; cannot be weakened)
+/e2e/acceptance/                            @adrianenc11-hue

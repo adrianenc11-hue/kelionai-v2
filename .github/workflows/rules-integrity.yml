@@ -1,0 +1,53 @@
+name: rules-integrity
+
+# Verifies that RULES.md has not been modified without an authorized update
+# of RULES.sha256. Blocks every push and every PR on mismatch.
+#
+# This workflow must be marked as a required status check in the repository's
+# branch protection settings for `master` (and any other protected branches)
+# so that no code can be merged with altered rules.
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  pull_request:
+    branches:
+      - master
+      - main
+
+jobs:
+  verify-rules:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Verify RULES.md integrity (hash must match RULES.sha256)
+        run: node scripts/verify-rules-integrity.cjs
+
+      - name: Verify rule-enforcement files have not been removed
+        shell: bash
+        run: |
+          set -e
+          for f in RULES.md RULES.sha256 .augment/rules.md CODEOWNERS scripts/verify-rules-integrity.cjs scripts/verify-agent-report.cjs .github/workflows/rules-integrity.yml DELIVERY_CONTRACT.md; do
+            if [ ! -f "$f" ]; then
+              echo "Required enforcement file missing: $f"
+              exit 1
+            fi
+          done
+          echo "All enforcement files present."
+
+      - name: Verify .augment/rules.md references RULES.md and the verifier
+        shell: bash
+        run: |
+          set -e
+          grep -q "RULES.md" .augment/rules.md || { echo ".augment/rules.md does not reference RULES.md"; exit 1; }
+          grep -q "scripts/verify-rules-integrity.cjs" .augment/rules.md || { echo ".augment/rules.md does not reference the integrity script"; exit 1; }
+          echo ".augment/rules.md bootstrap is intact."
