@@ -104,6 +104,25 @@ app.get('/api/subscription/plans', (req, res) => {
   res.json({ plans: getPlans() });
 });
 
+// Subscription status for the current user.
+// Returns the minimal shape the acceptance script asserts on
+// (status / tier / customerId).
+app.get('/api/subscription/status', requireAuth, async (req, res) => {
+  try {
+    const { findById } = require('./db');
+    const user = await findById(req.user.id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json({
+      status:     user.subscription_status || 'free',
+      tier:       user.subscription_tier   || 'free',
+      customerId: user.stripe_customer_id  || null,
+    });
+  } catch (err) {
+    console.error('[subscription/status] Error:', err.message);
+    res.status(500).json({ error: 'Failed to read subscription status' });
+  }
+});
+
 // Payment routes (auth required)
 app.post('/api/payments/create-checkout-session', requireAuth, (req, res) => {
   const { planId } = req.body || {};
@@ -200,7 +219,12 @@ app.get('/api/realtime/trial-token', async (req, res) => {
     if (!r.ok) return res.status(500).json({ error: 'Failed to create session' });
     const data = await r.json();
     trialTokens.set(ip, now);
-    res.json({ token: data.client_secret.value, expiresAt: data.client_secret.expires_at, trial: true, voice });
+    // Cap trial session at 15 minutes locally. Upstream (OpenAI) token may
+    // have a shorter lifetime, but we return the product cap so the client
+    // UI can display an accurate countdown for the trial session.
+    const TRIAL_CAP_SECONDS = 15 * 60;
+    const expiresAt = Math.floor(now / 1000) + TRIAL_CAP_SECONDS;
+    res.json({ token: data.client_secret.value, expiresAt, trial: true, voice });
   } catch (err) {
     res.status(500).json({ error: 'Failed to create session' });
   }
