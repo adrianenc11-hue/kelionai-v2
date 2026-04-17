@@ -211,7 +211,10 @@ app.use('/api/users', requireAuth, usersRouter);
 app.use('/api/admin', requireAuth, adminRouter);
 app.use('/api/chat', requireAuth, chatLimiter, checkSubscription(), chatRouter);
 app.use('/api/tts', requireAuth, chatLimiter, checkSubscription(), ttsRouter);
-app.use('/api/realtime', requireAuth, chatLimiter, realtimeRouter);
+// Realtime router is PUBLIC in Stage 1 (no login/users/subs per product spec).
+// Rate limiting still applies to prevent abuse. Ephemeral-token endpoints only
+// hand back short-lived tokens; persona + config are baked in server-side.
+app.use('/api/realtime', chatLimiter, realtimeRouter);
 
 // Health check with service status
 app.get('/health', async (_req, res) => {
