@@ -56,7 +56,10 @@ function pass(detail) {
   const regRes = await fetch(BASE + '/auth/local/register', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password, name: 'Logout Media' }),
+    // Some production deployments still require an explicit Terms acceptance
+    // field; newer code ignores it. Include it so the script is robust across
+    // both versions.
+    body: JSON.stringify({ email, password, name: 'Logout Media', terms_accepted: true, accept_terms: true }),
   });
   if (regRes.status !== 201) {
     const txt = await regRes.text().catch(() => '');
