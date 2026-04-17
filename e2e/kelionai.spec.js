@@ -523,10 +523,11 @@ test.describe('UI flows', () => {
     }
   });
 
-  test('free trial navigates to /chat/kelion by default', async ({ page }) => {
+  test('free trial navigates to /chat', async ({ page }) => {
     await page.goto(BASE);
     await page.click('button:has-text("Try 15 minutes free")');
-    await expect(page).toHaveURL(/\/chat\/kelion/, { timeout: 10000 });
+    // /chat/:avatar routes redirect to /chat; landing on /chat proves the CTA works.
+    await expect(page).toHaveURL(/\/chat(\/|$)/, { timeout: 10000 });
   });
 
   test('register via modal creates account and shows user in header', async ({ page }) => {

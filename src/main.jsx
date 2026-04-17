@@ -36,7 +36,7 @@ createRoot(document.getElementById('root')).render(
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/chat" element={<VoiceChat />} />
-            <Route path="/chat/:avatar" element={<VoiceChat />} />
+            <Route path="/chat/:avatar" element={<Navigate to="/chat" replace />} />
             <Route path="/admin" element={<AdminPage />} />
             <Route path="/arm-settings" element={<ArmSettingsPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />

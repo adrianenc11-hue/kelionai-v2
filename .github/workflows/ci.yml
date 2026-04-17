@@ -50,6 +50,13 @@ jobs:
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - name: Start API
+        env:
+          # Forwarded from repo secrets so /health can report services.openai
+          # as "configured" and the chat SSE test can round-trip through the
+          # real provider. If either secret is missing the corresponding test
+          # will (correctly) fail — the secret is the source of truth.
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           cd server
           export NODE_ENV=test PORT=3001 DB_PATH=/tmp/kelion-ci.db

@@ -64,7 +64,11 @@ module.exports = {
     optional('NODE_ENV') === 'production' ? 'https://kelionai.app' : 'http://localhost:3001'
   ),
 
-  corsOrigins: optional('CORS_ORIGINS', 'https://kelionai.app,https://www.kelionai.app,http://localhost:5173,http://localhost:3001')
+  // CI runs Playwright against http://127.0.0.1:5173 (vite preview default
+  // host), so 127.0.0.1 variants must be in the allowlist for browser-side
+  // fetches through the proxy. Without them, cross-origin POSTs from the UI
+  // (e.g. register / login via modal) return "Internal server error".
+  corsOrigins: optional('CORS_ORIGINS', 'https://kelionai.app,https://www.kelionai.app,http://localhost:5173,http://localhost:3001,http://127.0.0.1:5173,http://127.0.0.1:3001')
     .split(',').map(o => o.trim()).filter(Boolean),
 
   cookie: {
