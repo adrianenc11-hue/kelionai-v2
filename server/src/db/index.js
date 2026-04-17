@@ -127,6 +127,40 @@ async function incrementUsage(userId, minutes = 1) {
   return getUserById(userId);
 }
 
+/**
+ * Atomic check-and-increment of daily usage.
+ * Returns true if increment succeeded (within limit), false if limit would be exceeded.
+ * Prevents race conditions on concurrent requests.
+ *
+ * @param {number} userId
+ * @param {number|null} dailyLimit - null or undefined means unlimited
+ * @param {number} minutes - amount to increment (default 1)
+ * @returns {Promise<boolean>}
+ */
+async function tryIncrementUsage(userId, dailyLimit, minutes = 1) {
+  const today = new Date().toDateString();
+
+  // Unlimited plan — just reset-or-increment atomically
+  if (dailyLimit == null) {
+    const sql = `UPDATE users
+                 SET usage_today = CASE WHEN usage_reset_date = ? THEN usage_today + ? ELSE ? END,
+                     usage_reset_date = ?
+                 WHERE id = ?`;
+    const res = await db.run(sql, [today, minutes, minutes, today, userId]);
+    return (res && (res.changes ?? res.rowCount ?? 0)) > 0;
+  }
+
+  // Limited plan — conditional atomic update.
+  // Allowed when: new day (reset) OR current + minutes <= limit
+  const sql = `UPDATE users
+               SET usage_today = CASE WHEN usage_reset_date = ? THEN usage_today + ? ELSE ? END,
+                   usage_reset_date = ?
+               WHERE id = ?
+                 AND (usage_reset_date != ? OR usage_today + ? <= ?)`;
+  const res = await db.run(sql, [today, minutes, minutes, today, userId, today, minutes, dailyLimit]);
+  return (res && (res.changes ?? res.rowCount ?? 0)) > 0;
+}
+
 async function getAllUsers() {
   return await db.all('SELECT * FROM users ORDER BY created_at DESC');
 }
@@ -261,6 +295,7 @@ module.exports = {
   updateUser,
   upsertUser,
   incrementUsage,
+  tryIncrementUsage,
   getAllUsers,
   deleteUser,
   insertUser,

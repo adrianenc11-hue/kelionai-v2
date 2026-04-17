@@ -3,6 +3,7 @@
 const { Router } = require('express');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
+const rateLimit = require('express-rate-limit');
 const config = require('../config');
 const { upsertUser, getUserById, insertUser, findByEmail, sanitizeUser } = require('../db');
 const { signAppToken } = require('../middleware/auth');
@@ -12,6 +13,16 @@ const router = Router();
 
 // In-memory state storage (use Redis in production)
 const oauthStates = new Map();
+
+// Rate limiter for local auth endpoints (skipped in test env to keep suite fast)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'rate_limited' },
+  ...(process.env.NODE_ENV === 'test' ? { skip: () => true } : {}),
+});
 
 /**
  * GET /auth/google/start
@@ -171,7 +182,7 @@ router.get('/me', async (req, res) => {
  * POST /auth/local/register
  * Register with email + password
  */
-router.post('/local/register', async (req, res) => {
+router.post('/local/register', authLimiter, async (req, res) => {
   try {
     const { email, password, name } = req.body || {};
 
@@ -187,9 +198,12 @@ router.post('/local/register', async (req, res) => {
       return res.status(400).json({ error: 'Invalid email format' });
     }
 
-    // Validate password strength
+    // Validate password strength (min length + complexity)
     if (password.length < 8) {
       return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+    if (!/[A-Z]/.test(password) || !/\d/.test(password)) {
+      return res.status(400).json({ error: 'Password must contain at least one uppercase letter and one digit' });
     }
 
     // Check if email already exists
@@ -226,7 +240,7 @@ router.post('/local/register', async (req, res) => {
  * POST /auth/local/login
  * Login with email + password
  */
-router.post('/local/login', async (req, res) => {
+router.post('/local/login', authLimiter, async (req, res) => {
   try {
     const { email, password } = req.body || {};
 

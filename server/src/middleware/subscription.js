@@ -1,6 +1,6 @@
 'use strict';
 
-const { findById, getUsageToday, incrementUsage } = require('../db');
+const { findById, getUsageToday, tryIncrementUsage } = require('../db');
 
 /**
  * Subscription tiers with daily limits.
@@ -76,9 +76,11 @@ function checkSubscription(requiredPlan = 'free') {
         });
       }
 
-      const usageToday = await getUsageToday(userId);
-
-      if (plan.dailyLimit !== null && usageToday >= plan.dailyLimit) {
+      // Atomic check-and-increment prevents race condition on concurrent requests.
+      // Returns false if limit would be exceeded.
+      const ok = await tryIncrementUsage(userId, plan.dailyLimit, 1);
+      if (!ok) {
+        const usageToday = await getUsageToday(userId);
         return res.status(429).json({
           error: 'Daily limit exceeded',
           dailyLimit: plan.dailyLimit,
@@ -87,10 +89,11 @@ function checkSubscription(requiredPlan = 'free') {
         });
       }
 
+      const usageAfter = await getUsageToday(userId);
       req.subscription = {
         tier,
         plan,
-        usageToday,
+        usageToday: usageAfter,
         dailyLimit: plan.dailyLimit,
       };
 

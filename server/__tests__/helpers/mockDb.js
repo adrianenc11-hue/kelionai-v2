@@ -42,6 +42,12 @@ function createMockDb() {
     findByStripeCustomerId: jest.fn((cid)      => { for(const u of users.values()) if(u.stripe_customer_id===cid) return u; return null; }),
     getUsageToday:        jest.fn((uid)   => usage.get(uid)||0),
     incrementUsage:       jest.fn((uid)   => usage.set(uid,(usage.get(uid)||0)+1)),
+    tryIncrementUsage:    jest.fn((uid, limit, minutes = 1) => {
+      const current = usage.get(uid) || 0;
+      if (limit != null && current + minutes > limit) return false;
+      usage.set(uid, current + minutes);
+      return true;
+    }),
     createReferralCode:   jest.fn((ownerId) => {
       const code = Math.random().toString(36).slice(2,10).toUpperCase();
       const ref  = { id: counter++, code, owner_id: ownerId, used: 0, used_by: null,
