@@ -238,14 +238,7 @@ Current date/time: ${t} (${tz}).`
     <div style={{ width:'100vw', height:'100vh', display:'flex', background:'#0a0a0f' }}>
       <audio ref={audioRef} style={{ display:'none' }} autoPlay />
       <canvas ref={canvasRef} style={{ display:'none' }} />
-      <video ref={videoRef} playsInline muted style={{
-        position:'absolute', bottom:20, right:20, zIndex:10,
-        width: hasCamera ? 160 : 0, height: hasCamera ? 120 : 0,
-        borderRadius:12, objectFit:'cover',
-        border: hasCamera ? '2px solid rgba(168,85,247,0.5)' : 'none',
-        boxShadow: hasCamera ? '0 0 16px rgba(168,85,247,0.35)' : 'none',
-        display: hasCamera ? 'block' : 'none',
-      }} />
+      <video ref={videoRef} playsInline muted style={{ display:'none' }} />
       <div style={{ flex:1, position:'relative' }}>
         <Canvas camera={{ position:[0,0.3,3.5], fov:45 }} style={{ width:'100%', height:'100%' }} gl={{ antialias:true }}>
           <color attach="background" args={['#0a0a0f']} />
