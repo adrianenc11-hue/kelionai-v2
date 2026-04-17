@@ -50,8 +50,17 @@ const BASE = 'https://kelionai.app';
   const aiVision = await page.getByText('AI Vision', { exact: false }).count();
   check('Landing has NO "AI Vision" feature', aiVision === 0, `count=${aiVision}`);
 
-  const startChatBtn = await page.locator('button:has-text("Start Chat")').count();
-  check('Landing has Start Chat button', startChatBtn > 0, `count=${startChatBtn}`);
+  const startChatBtn = await page.locator('button:has-text("Pornește chat")').count();
+  check('Landing has Romanian Pornește chat button', startChatBtn > 0, `count=${startChatBtn}`);
+
+  const roHero = await page.getByText('ASISTENTUL TĂU AI', { exact: false }).count();
+  check('Landing hero is in Romanian', roHero > 0, `count=${roHero}`);
+
+  const roTagline = await page.getByText('Inteligent, empatic', { exact: false }).count();
+  check('Landing tagline is in Romanian', roTagline > 0, `count=${roTagline}`);
+
+  const englishLeft = await page.getByText('YOUR AI ASSISTANT', { exact: false }).count();
+  check('Landing has NO English hero left', englishLeft === 0, `count=${englishLeft}`);
 
   // ---- 2. Legacy /chat/kira redirects to /chat ----
   await page.goto(`${BASE}/chat/kira`, { waitUntil: 'networkidle', timeout: 30000 });
@@ -61,10 +70,10 @@ const BASE = 'https://kelionai.app';
 
   // ---- 3. /chat page loads ----
   await page.goto(`${BASE}/chat`, { waitUntil: 'networkidle', timeout: 30000 });
-  const chatStart = await page.locator('button:has-text("Start Chat")').count();
-  check('/chat page has Start Chat button', chatStart > 0, `count=${chatStart}`);
-  const backBtn = await page.locator('text=← Back').count();
-  check('/chat page has Back button', backBtn > 0, `count=${backBtn}`);
+  const chatStart = await page.locator('button:has-text("Pornește chat")').count();
+  check('/chat page has Romanian Pornește chat button', chatStart > 0, `count=${chatStart}`);
+  const backBtn = await page.locator('text=← Înapoi').count();
+  check('/chat page has Romanian Înapoi button', backBtn > 0, `count=${backBtn}`);
   await page.screenshot({ path: path.join(shotDir, `_proof-${stamp}-03-chat.png`), fullPage: true });
 
   // ---- 4. /chat/kelion also redirects (legacy) ----
