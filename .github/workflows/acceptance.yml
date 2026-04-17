@@ -45,6 +45,17 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
+
+      # logout-media drives a real browser via Playwright to prove camera+mic
+      # tracks are released on logout. The other acceptance scripts only use
+      # node-fetch, so we install deps and the chromium browser only for the
+      # capability that needs them.
+      - name: Install dependencies (logout-media only)
+        if: matrix.capability == 'logout-media'
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
 
       - name: Run acceptance — ${{ matrix.capability }}
         run: |
