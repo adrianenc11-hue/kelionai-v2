@@ -10,15 +10,35 @@ const rateLimit = require('express-rate-limit');
 const config = require('./config');
 const { csrfSeed } = require('./middleware/csrf');
 const { requireAuth } = require('./middleware/auth');
-const { checkSubscription, getPlans } = require('./middleware/subscription');
+const { checkSubscription, getPlans, SUBSCRIPTION_PLANS } = require('./middleware/subscription');
 const { initDb } = require('./db');
-const { createReferralCode, findReferralCode, useReferralCode } = require('./db');
+const {
+  createReferralCode, findReferralCode, useReferralCode,
+  findById, updateSubscription, updateStripeCustomerId,
+  findByStripeCustomerId, getUsageToday,
+} = require('./db');
 const authRouter       = require('./routes/auth');
 const usersRouter      = require('./routes/users');
 const adminRouter      = require('./routes/admin');
 const chatRouter       = require('./routes/chat');
 const ttsRouter        = require('./routes/tts');
 const realtimeRouter   = require('./routes/realtime');
+
+// Lazy-loaded Stripe client. Returns null when STRIPE_SECRET_KEY is absent
+// so the app still boots in test / dev environments without payment keys.
+let _stripe = null;
+function getStripe() {
+  if (_stripe) return _stripe;
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) return null;
+  const Stripe = require('stripe');
+  _stripe = new Stripe(key);
+  return _stripe;
+}
+
+// Trial length cap for the free-trial realtime session. Enforced on our side
+// regardless of what the upstream provider returns.
+const TRIAL_MAX_MS = 15 * 60 * 1000;
 
 const app = express();
 app.disable('x-powered-by');
@@ -91,6 +111,63 @@ const chatLimiter = (process.env.NODE_ENV === 'test') ? (req, res, next) => next
   message: { error: 'Rate limit exceeded for AI services. Please wait a moment.' },
 });
 
+// Stripe webhook must receive the raw request body for signature verification,
+// so it is mounted BEFORE express.json() and uses express.raw() for itself.
+app.post('/api/payments/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  const stripe = getStripe();
+  const whSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  if (!stripe || !whSecret) {
+    return res.status(503).json({ error: 'Webhook not configured' });
+  }
+
+  let event;
+  try {
+    event = stripe.webhooks.constructEvent(req.body, req.headers['stripe-signature'], whSecret);
+  } catch (err) {
+    console.error('[stripe] webhook signature verification failed:', err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  try {
+    switch (event.type) {
+      case 'checkout.session.completed': {
+        const session = event.data.object;
+        const userId = Number(session.metadata?.userId);
+        const planId = session.metadata?.planId;
+        if (userId && planId && SUBSCRIPTION_PLANS[planId]) {
+          await updateSubscription(userId, {
+            subscription_tier: planId,
+            subscription_status: 'active',
+          });
+          if (session.customer) {
+            await updateStripeCustomerId(userId, session.customer);
+          }
+        }
+        break;
+      }
+      case 'customer.subscription.updated':
+      case 'customer.subscription.deleted': {
+        const sub = event.data.object;
+        const user = await findByStripeCustomerId(sub.customer);
+        if (user) {
+          const active = sub.status === 'active' || sub.status === 'trialing';
+          await updateSubscription(user.id, {
+            subscription_status: active ? 'active' : sub.status,
+            subscription_tier:   active ? user.subscription_tier : 'free',
+          });
+        }
+        break;
+      }
+      default:
+        break;
+    }
+    res.json({ received: true });
+  } catch (err) {
+    console.error('[stripe] webhook handler error:', err.message);
+    res.status(500).json({ error: 'Webhook handler failed', detail: err.message });
+  }
+});
+
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
@@ -104,11 +181,11 @@ app.get('/api/subscription/plans', (req, res) => {
   res.json({ plans: getPlans() });
 });
 
-// Payment routes (auth required)
-app.post('/api/payments/create-checkout-session', requireAuth, (req, res) => {
-  const { planId } = req.body || {};
-  const plans = getPlans();
-  const plan = plans.find(p => p.id === planId);
+// Payment routes (auth required).
+// Uses Stripe Checkout with inline price_data — no pre-created Price IDs required.
+app.post('/api/payments/create-checkout-session', requireAuth, async (req, res) => {
+  const { planId, successUrl, cancelUrl } = req.body || {};
+  const plan = SUBSCRIPTION_PLANS[planId];
 
   if (!plan) {
     return res.status(400).json({ error: 'Invalid plan ID' });
@@ -116,14 +193,97 @@ app.post('/api/payments/create-checkout-session', requireAuth, (req, res) => {
   if (planId === 'free') {
     return res.status(400).json({ error: 'Cannot create checkout for free plan' });
   }
-  if (!process.env.STRIPE_SECRET_KEY) {
+
+  const stripe = getStripe();
+  if (!stripe) {
     return res.status(503).json({ error: 'Payment system not configured' });
   }
-  res.json({ sessionId: 'mock-session-id', url: 'https://checkout.stripe.com/mock' });
+
+  try {
+    const user = await findById(req.user.id);
+    const base = `${req.protocol}://${req.get('host')}`;
+    const success = successUrl || `${base}/subscription/success?session_id={CHECKOUT_SESSION_ID}`;
+    const cancel  = cancelUrl  || `${base}/pricing?canceled=1`;
+
+    const session = await stripe.checkout.sessions.create({
+      mode: 'subscription',
+      payment_method_types: ['card'],
+      customer: user?.stripe_customer_id || undefined,
+      customer_email: user?.stripe_customer_id ? undefined : (user?.email || req.user.email),
+      line_items: [{
+        quantity: 1,
+        price_data: {
+          currency: (process.env.STRIPE_CURRENCY || 'usd').toLowerCase(),
+          product_data: {
+            name: `Kelion ${plan.name}`,
+            description: plan.features.join(' • '),
+          },
+          unit_amount: Math.round(plan.price * 100),
+          recurring: { interval: plan.interval || 'month' },
+        },
+      }],
+      success_url: success,
+      cancel_url: cancel,
+      metadata: {
+        userId: String(req.user.id),
+        planId,
+      },
+      subscription_data: {
+        metadata: {
+          userId: String(req.user.id),
+          planId,
+        },
+      },
+    });
+
+    res.json({ sessionId: session.id, url: session.url });
+  } catch (err) {
+    console.error('[stripe] checkout error:', err.message);
+    res.status(500).json({ error: 'Failed to create checkout session', detail: err.message });
+  }
 });
 
 app.get('/api/payments/history', requireAuth, (req, res) => {
   res.json({ payments: [] });
+});
+
+// Current subscription snapshot for the authenticated user.
+app.get('/api/subscription/status', requireAuth, async (req, res) => {
+  try {
+    const user = await findById(req.user.id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const tier = user.subscription_tier || 'free';
+    const plan = SUBSCRIPTION_PLANS[tier] || SUBSCRIPTION_PLANS.free;
+    const usageToday = await getUsageToday(req.user.id);
+    res.json({
+      tier,
+      status: user.subscription_status || 'active',
+      plan: { id: plan.id, name: plan.name, price: plan.price, interval: plan.interval },
+      usage: { today: usageToday, dailyLimit: plan.dailyLimit },
+      stripeCustomerId: user.stripe_customer_id || null,
+    });
+  } catch (err) {
+    console.error('[subscription/status] error:', err.message);
+    res.status(500).json({ error: 'Failed to load subscription status' });
+  }
+});
+
+// Available avatars. Static list for now; kept as an endpoint so the client
+// can discover voices/models without hard-coding them.
+app.get('/api/avatars', (req, res) => {
+  res.json({
+    avatars: [
+      {
+        id: 'kelion',
+        name: 'Kelion',
+        gender: 'male',
+        description: 'Calm, professional male voice assistant.',
+        model: '/models/kelion.glb',
+        voice: process.env.OPENAI_VOICE_KELION || 'ash',
+        geminiVoice: process.env.GEMINI_LIVE_VOICE_KELION || 'Kore',
+      },
+    ],
+  });
 });
 
 // Referral routes (auth required)
@@ -197,12 +357,22 @@ app.get('/api/realtime/trial-token', async (req, res) => {
         voice,
       }),
     });
-    if (!r.ok) return res.status(500).json({ error: 'Failed to create session' });
+    if (!r.ok) {
+      const body = await r.text();
+      console.error('[trial-token] upstream error:', r.status, body);
+      return res.status(500).json({ error: 'Failed to create session', upstream_status: r.status, detail: body.slice(0, 500) });
+    }
     const data = await r.json();
     trialTokens.set(ip, now);
-    res.json({ token: data.client_secret.value, expiresAt: data.client_secret.expires_at, trial: true, voice });
+    // Cap the returned expiresAt at TRIAL_MAX_MS from now on our side, so the
+    // advertised trial length is honoured regardless of upstream defaults.
+    const upstreamExpiresAt = data.client_secret?.expires_at;
+    const capExpiresAt = Math.floor((now + TRIAL_MAX_MS) / 1000);
+    const expiresAt = upstreamExpiresAt && upstreamExpiresAt < capExpiresAt ? upstreamExpiresAt : capExpiresAt;
+    res.json({ token: data.client_secret.value, expiresAt, trial: true, voice });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to create session' });
+    console.error('[trial-token] Error:', err.message);
+    res.status(500).json({ error: 'Failed to create session', detail: err.message });
   }
 });
 

@@ -3,12 +3,17 @@
 const { Router } = require('express');
 const router = Router();
 
+// Trial cap: all trial/realtime sessions are limited to 15 minutes on our side,
+// regardless of what the upstream provider returns. This matches the
+// advertised trial length in the product UI and acceptance tests.
+const TRIAL_MAX_MS = 15 * 60 * 1000;
+
 // Returns a short-lived ephemeral token so the browser can connect
 // directly to the real-time voice API without exposing the main API key.
 //
 // Two providers are supported:
 //  - OpenAI Realtime (WebRTC, model gpt-4o-realtime-preview)     → GET /token
-//  - Gemini Live     (WebSocket, model gemini-3.1-flash-live-*)  → GET /gemini-token
+//  - Gemini Live     (WebSocket, model gemini-live-2.5-flash)    → GET /gemini-token
 router.get('/token', async (req, res) => {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
@@ -30,22 +35,39 @@ router.get('/token', async (req, res) => {
     });
 
     if (!r.ok) {
-      const err = await r.text();
-      console.error('[realtime] OpenAI session error:', err);
-      return res.status(500).json({ error: 'Failed to create realtime session' });
+      const body = await r.text();
+      console.error('[realtime] OpenAI session error:', r.status, body);
+      return res.status(500).json({ error: 'Failed to create realtime session', upstream_status: r.status, detail: body.slice(0, 500) });
     }
 
     const data = await r.json();
+    const upstreamExpiresAt = data.client_secret?.expires_at;
+    const capExpiresAt = Math.floor((Date.now() + TRIAL_MAX_MS) / 1000);
+    const expiresAt = upstreamExpiresAt && upstreamExpiresAt < capExpiresAt ? upstreamExpiresAt : capExpiresAt;
+
     res.json({
       token:     data.client_secret.value,
-      expiresAt: data.client_secret.expires_at,
+      expiresAt,
       voice,
     });
   } catch (err) {
     console.error('[realtime] Error:', err.message);
-    res.status(500).json({ error: 'Failed to create realtime session' });
+    res.status(500).json({ error: 'Failed to create realtime session', detail: err.message });
   }
 });
+
+// Ordered list of Gemini Live models to try. The API naming changes across
+// previews; the first one that works wins.
+function geminiLiveModelCandidates() {
+  const env = process.env.GEMINI_LIVE_MODEL;
+  const defaults = [
+    'gemini-live-2.5-flash-preview',
+    'gemini-2.5-flash-preview-native-audio-dialog',
+    'gemini-2.0-flash-live-001',
+  ];
+  if (env) return [env, ...defaults.filter(m => m !== env)];
+  return defaults;
+}
 
 // Gemini Live ephemeral token
 // Docs: https://ai.google.dev/gemini-api/docs/ephemeral-tokens
@@ -55,52 +77,56 @@ router.get('/gemini-token', async (req, res) => {
     return res.status(503).json({ error: 'GEMINI_API_KEY not configured' });
   }
 
-  try {
-    const voice = process.env.GEMINI_LIVE_VOICE_KELION || 'Kore';
-    const model = process.env.GEMINI_LIVE_MODEL || 'gemini-3.1-flash-live-preview';
+  const voice = process.env.GEMINI_LIVE_VOICE_KELION || 'Kore';
+  const now = Date.now();
+  const newSessionExpireTime = new Date(now + 60 * 1000).toISOString();
+  const expireTime            = new Date(now + TRIAL_MAX_MS).toISOString();
+  const url = 'https://generativelanguage.googleapis.com/v1beta/auth_tokens?key=' + encodeURIComponent(apiKey);
 
-    // New session starts valid for 1 minute; full session length up to 30 min.
-    const now = Date.now();
-    const newSessionExpireTime = new Date(now + 60 * 1000).toISOString();
-    const expireTime            = new Date(now + 30 * 60 * 1000).toISOString();
-
-    const url = 'https://generativelanguage.googleapis.com/v1beta/auth_tokens?key=' + encodeURIComponent(apiKey);
-    const r = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        uses: 1,
-        expireTime,
-        newSessionExpireTime,
-        liveConnectConstraints: {
-          model,
-          config: {
-            responseModalities: ['AUDIO'],
-            speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } },
+  const attempts = [];
+  for (const model of geminiLiveModelCandidates()) {
+    try {
+      const r = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          uses: 1,
+          expireTime,
+          newSessionExpireTime,
+          liveConnectConstraints: {
+            model,
+            config: {
+              responseModalities: ['AUDIO'],
+              speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } },
+            },
           },
-        },
-      }),
-    });
+        }),
+      });
 
-    if (!r.ok) {
-      const err = await r.text();
-      console.error('[realtime] Gemini ephemeral token error:', err);
-      return res.status(500).json({ error: 'Failed to create Gemini live session' });
+      if (r.ok) {
+        const data = await r.json();
+        return res.json({
+          token:     data.name,
+          expiresAt: expireTime,
+          model,
+          voice,
+          provider:  'gemini',
+        });
+      }
+
+      const body = await r.text();
+      attempts.push({ model, status: r.status, detail: body.slice(0, 300) });
+      console.error('[realtime] Gemini token attempt failed:', model, r.status, body.slice(0, 300));
+    } catch (err) {
+      attempts.push({ model, error: err.message });
+      console.error('[realtime] Gemini token attempt threw:', model, err.message);
     }
-
-    const data = await r.json();
-    // `name` is the ephemeral token; clients pass it as apiKey in @google/genai.
-    res.json({
-      token:     data.name,
-      expiresAt: expireTime,
-      model,
-      voice,
-      provider:  'gemini',
-    });
-  } catch (err) {
-    console.error('[realtime] Gemini error:', err.message);
-    res.status(500).json({ error: 'Failed to create Gemini live session' });
   }
+
+  return res.status(500).json({
+    error: 'Failed to create Gemini live session across all candidate models',
+    attempts,
+  });
 });
 
 module.exports = router;

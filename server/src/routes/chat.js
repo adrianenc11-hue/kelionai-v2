@@ -1,9 +1,69 @@
 'use strict';
 
 const { Router } = require('express');
-const { getAI, getDefaultChatModel } = require('../utils/openai');
+const { getChatProviderChain } = require('../utils/openai');
 
 const router = Router();
+
+// Attempt a streaming completion across the provider chain. The first
+// successful `await create()` wins; errors before any data is sent trigger
+// fallback to the next provider. Errors during streaming are surfaced to the
+// client verbatim so real failures are visible, not hidden behind a generic
+// "AI service error" blob.
+async function streamWithFallback(res, messages) {
+  const chain = getChatProviderChain();
+  if (chain.length === 0) {
+    res.write(`data: ${JSON.stringify({ error: 'AI not configured' })}\n\n`);
+    return;
+  }
+
+  const attempts = [];
+  let stream = null;
+  let chosen = null;
+
+  for (const cand of chain) {
+    try {
+      stream = await cand.client.chat.completions.create({
+        model: cand.model,
+        stream: true,
+        messages,
+      });
+      chosen = cand;
+      break;
+    } catch (err) {
+      const status = err?.status || err?.response?.status || 'n/a';
+      const code = err?.code || err?.error?.code || '';
+      attempts.push(`${cand.provider}:${cand.model} status=${status} code=${code} msg=${err.message}`);
+      console.error('[chat] provider failed:', cand.provider, cand.model, status, err.message);
+    }
+  }
+
+  if (!stream) {
+    res.write(`data: ${JSON.stringify({
+      error: 'All AI providers failed',
+      attempts,
+    })}\n\n`);
+    return;
+  }
+
+  res.write(`data: ${JSON.stringify({ _meta: { provider: chosen.provider, model: chosen.model } })}\n\n`);
+
+  try {
+    for await (const chunk of stream) {
+      const content = chunk.choices?.[0]?.delta?.content;
+      if (content) res.write(`data: ${JSON.stringify({ content })}\n\n`);
+    }
+    res.write('data: [DONE]\n\n');
+  } catch (err) {
+    console.error('[chat] stream error:', chosen.provider, chosen.model, err.message);
+    res.write(`data: ${JSON.stringify({
+      error: 'stream interrupted',
+      provider: chosen.provider,
+      model: chosen.model,
+      detail: err.message,
+    })}\n\n`);
+  }
+}
 
 const BASE_PROMPT = `You are Kelion, a friendly and intelligent male AI assistant.
 Language rules (strict):
@@ -25,12 +85,6 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ error: 'messages must be an array' });
   }
 
-  const ai = getAI();
-  if (!ai) {
-    return res.status(503).json({ error: 'AI service not configured. Set GEMINI_API_KEY or OPENAI_API_KEY.' });
-  }
-
-  // Build real-time context for system prompt
   let realtimeContext = '';
   if (datetime) {
     const d = new Date(datetime);
@@ -46,16 +100,13 @@ router.post('/', async (req, res) => {
   }
 
   const systemPrompt = BASE_PROMPT + realtimeContext;
-  const model = getDefaultChatModel();
 
-  // Sanitize message history
   const sanitized = messages
     .filter(m => m && typeof m === 'object' && ['user', 'assistant'].includes(m.role))
     .slice(-MAX_MESSAGES_COUNT)
     .map(m => ({ role: m.role, content: typeof m.content === 'string' ? m.content.slice(0, MAX_MESSAGE_LENGTH) : '' }))
     .filter(m => m.content.length > 0);
 
-  // If a camera frame is provided, attach it to the last user message as a vision input
   if (frame && sanitized.length > 0) {
     const lastUserIdx = [...sanitized].map(m => m.role).lastIndexOf('user');
     if (lastUserIdx !== -1) {
@@ -75,20 +126,7 @@ router.post('/', async (req, res) => {
   res.flushHeaders();
 
   try {
-    const stream = await ai.chat.completions.create({
-      model,
-      stream: true,
-      messages: [{ role: 'system', content: systemPrompt }, ...sanitized],
-    });
-
-    for await (const chunk of stream) {
-      const content = chunk.choices[0]?.delta?.content;
-      if (content) res.write(`data: ${JSON.stringify({ content })}\n\n`);
-    }
-    res.write('data: [DONE]\n\n');
-  } catch (err) {
-    console.error('[chat] AI error:', err.message);
-    res.write(`data: ${JSON.stringify({ error: 'AI service error. Please try again.' })}\n\n`);
+    await streamWithFallback(res, [{ role: 'system', content: systemPrompt }, ...sanitized]);
   } finally {
     res.end();
   }
@@ -99,16 +137,11 @@ router.post('/demo', async (req, res) => {
   const { messages = [] } = req.body;
   if (!Array.isArray(messages)) return res.status(400).json({ error: 'messages must be an array' });
 
-  const ai = getAI();
-  if (!ai) return res.status(503).json({ error: 'AI service not configured' });
-
   const sanitized = messages
     .filter(m => m && typeof m === 'object' && ['user', 'assistant'].includes(m.role))
     .slice(-10)
     .map(m => ({ role: m.role, content: typeof m.content === 'string' ? m.content.slice(0, 2000) : '' }))
     .filter(m => m.content.length > 0);
-
-  const model = getDefaultChatModel();
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -116,18 +149,7 @@ router.post('/demo', async (req, res) => {
   res.flushHeaders();
 
   try {
-    const stream = await ai.chat.completions.create({
-      model, stream: true,
-      messages: [{ role: 'system', content: BASE_PROMPT }, ...sanitized],
-    });
-    for await (const chunk of stream) {
-      const content = chunk.choices[0]?.delta?.content;
-      if (content) res.write(`data: ${JSON.stringify({ content })}\n\n`);
-    }
-    res.write('data: [DONE]\n\n');
-  } catch (err) {
-    console.error('[chat/demo] error:', err.message);
-    res.write(`data: ${JSON.stringify({ error: 'AI service error.' })}\n\n`);
+    await streamWithFallback(res, [{ role: 'system', content: BASE_PROMPT }, ...sanitized]);
   } finally {
     res.end();
   }

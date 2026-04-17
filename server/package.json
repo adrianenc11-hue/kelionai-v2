@@ -18,13 +18,17 @@
     "node-fetch": "^3.0.0",
     "openai": "^4.0.0",
     "sqlite": "^5.1.1",
-    "sqlite3": "^5.1.6"
+    "sqlite3": "^5.1.6",
+    "stripe": "^22.0.2"
   },
   "devDependencies": {
     "jest": "^29.0.0",
     "supertest": "^6.0.0"
   },
   "jest": {
-    "testPathIgnorePatterns": ["/node_modules/", "__tests__/helpers/"]
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "__tests__/helpers/"
+    ]
   }
 }

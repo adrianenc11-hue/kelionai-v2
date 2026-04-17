@@ -4,14 +4,17 @@ const path = require('path');
 
 // Load environment-specific .env file
 // In production on Railway, CWD is /app (project root)
-// Load server/.env.production if NODE_ENV=production and file exists
-const envFile = process.env.NODE_ENV === 'production'
-  ? path.resolve(__dirname, '../../server/.env.production')
-  : path.resolve(__dirname, '../../server/.env');
+// Load server/.env.production if NODE_ENV=production and file exists.
+// In test mode we deliberately skip .env loading so that unit tests never
+// make real network calls to paid APIs using developer-machine secrets.
+if (process.env.NODE_ENV !== 'test') {
+  const envFile = process.env.NODE_ENV === 'production'
+    ? path.resolve(__dirname, '../../server/.env.production')
+    : path.resolve(__dirname, '../../server/.env');
 
-require('dotenv').config({ path: envFile });
-// Also load root .env as fallback
-require('dotenv').config({ path: path.resolve(__dirname, '../../.env'), override: false });
+  require('dotenv').config({ path: envFile });
+  require('dotenv').config({ path: path.resolve(__dirname, '../../.env'), override: false });
+}
 
 const required = (name) => {
   const value = process.env[name];
