@@ -8,7 +8,7 @@ async function createTestUser(request, prefix = 'e2e') {
   const email = `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}@test.kelionai.app`;
   const res = await request.post(`${BASE}/auth/local/register`, {
     headers: { 'Content-Type': 'application/json' },
-    data: { email, password: 'Test12345!', name: `${prefix} User` },
+    data: { email, password: 'Test12345!', name: `${prefix} User`, acceptTerms: true },
   });
   expect(res.status()).toBe(201);
   const body = await res.json();
@@ -66,24 +66,23 @@ test.describe('Frontend pages', () => {
     await page.goto(BASE);
     await expect(page.locator('text=KelionAI').first()).toBeVisible();
     await expect(page.locator('button:has-text("Start Chat")')).toBeVisible();
-    await expect(page.locator('h1:has-text("Kelion")')).toBeVisible();
-    await expect(page.locator('button:has-text("Kira")')).toHaveCount(0);
+    await expect(page.locator('button:has-text("Kelion")')).toBeVisible();
+    await expect(page.locator('button:has-text("Kira")')).toBeVisible();
     await expect(page.locator('button:has-text("Login")')).toBeVisible();
     await expect(page.locator('button:has-text("Planuri")')).toBeVisible();
   });
 
-  test('Chat page shows Kelion avatar and Start Chat', async ({ page }) => {
-    await page.goto(`${BASE}/chat`);
-    await expect(page.locator('text=Kelion').first()).toBeVisible();
+  test('Chat page for kelion shows avatar name and Start Chat', async ({ page }) => {
+    await page.goto(`${BASE}/chat/kelion`);
+    await expect(page.locator('text=Kelion')).toBeVisible();
     await expect(page.locator('button:has-text("Start Chat")')).toBeVisible();
     await expect(page.locator('text=← Back')).toBeVisible();
   });
 
-  test('Legacy /chat/kira and /chat/kelion redirect to /chat', async ({ page }) => {
+  test('Chat page for kira shows avatar name and Start Chat', async ({ page }) => {
     await page.goto(`${BASE}/chat/kira`);
-    await expect(page).toHaveURL(BASE + '/chat');
-    await page.goto(`${BASE}/chat/kelion`);
-    await expect(page).toHaveURL(BASE + '/chat');
+    await expect(page.locator('text=Kira')).toBeVisible();
+    await expect(page.locator('button:has-text("Start Chat")')).toBeVisible();
   });
 
   test('Admin page without auth redirects to landing', async ({ page }) => {
@@ -112,8 +111,11 @@ test.describe('Subscription plans', () => {
     expect(ids).toEqual(['free', 'basic', 'premium', 'enterprise']);
     for (const plan of plans) {
       expect(plan.name).toBeTruthy();
-      expect(typeof plan.price).toBe('number');
       expect(Array.isArray(plan.features)).toBe(true);
+      // Free plan has no priceEnv; paid plans expose priceEnv +
+      // stripePriceId (price/currency/interval come live from Stripe when
+      // STRIPE_SECRET_KEY is set, so they may be absent in CI).
+      if (plan.id !== 'free') expect(plan.priceEnv).toBeTruthy();
     }
   });
 });
@@ -194,7 +196,7 @@ test.describe('Local auth validation', () => {
   test('register rejects invalid email format', async ({ request }) => {
     const res = await request.post(`${BASE}/auth/local/register`, {
       headers: { 'Content-Type': 'application/json' },
-      data: { email: 'not-an-email', password: 'Test12345!', name: 'Test' },
+      data: { email: 'not-an-email', password: 'Test12345!', name: 'Test', acceptTerms: true },
     });
     expect(res.status()).toBe(400);
     expect((await res.json()).error).toContain('email');
@@ -203,7 +205,7 @@ test.describe('Local auth validation', () => {
   test('register rejects password under 8 chars', async ({ request }) => {
     const res = await request.post(`${BASE}/auth/local/register`, {
       headers: { 'Content-Type': 'application/json' },
-      data: { email: 'a@b.com', password: 'Abc1234', name: 'Test' },
+      data: { email: 'a@b.com', password: 'Abc1234', name: 'Test', acceptTerms: true },
     });
     expect(res.status()).toBe(400);
     expect((await res.json()).error).toContain('8');
@@ -240,7 +242,7 @@ test.describe('Local auth validation', () => {
     const { email } = await createTestUser(request, 'dup');
     const res = await request.post(`${BASE}/auth/local/register`, {
       headers: { 'Content-Type': 'application/json' },
-      data: { email, password: 'Test12345!', name: 'Second' },
+      data: { email, password: 'Test12345!', name: 'Second', acceptTerms: true },
     });
     expect(res.status()).toBe(409);
     expect((await res.json()).error).toContain('already');
@@ -255,7 +257,7 @@ test.describe('Local auth flow', () => {
     const email = `flow_${Date.now()}@test.kelionai.app`;
     const reg = await request.post(`${BASE}/auth/local/register`, {
       headers: { 'Content-Type': 'application/json' },
-      data: { email, password: 'Test12345!', name: 'Flow User' },
+      data: { email, password: 'Test12345!', name: 'Flow User', acceptTerms: true },
     });
     expect(reg.status()).toBe(201);
     const regBody = await reg.json();
@@ -536,6 +538,8 @@ test.describe('UI flows', () => {
     await page.fill('input[placeholder*="Nume"]', 'E2E Tester');
     await page.fill('input[type="email"]', email);
     await page.fill('input[type="password"]', 'Test12345!');
+    // GDPR consent is mandatory on the register form now.
+    await page.check('input[type="checkbox"]');
     await page.click('button[type="submit"]');
     await expect(page.locator('text=E2E Tester')).toBeVisible({ timeout: 10000 });
     // Verify logged-in state: Logout button should appear
@@ -548,7 +552,7 @@ test.describe('UI flows', () => {
     const email = `uilogin_${Date.now()}@test.kelionai.app`;
     // Register via API, then clear cookies so the page loads unauthenticated
     await page.request.post(`${BASE}/auth/local/register`, {
-      data: { email, password: 'Test12345!', name: 'Login Tester' },
+      data: { email, password: 'Test12345!', name: 'Login Tester', acceptTerms: true },
     });
     await context.clearCookies();
     await page.goto(BASE);
@@ -572,7 +576,7 @@ test.describe('Register cookie details', () => {
     const email = `cookie_${Date.now()}@test.kelionai.app`;
     const res = await request.post(`${BASE}/auth/local/register`, {
       headers: { 'Content-Type': 'application/json' },
-      data: { email, password: 'Test12345!', name: 'Cookie User' },
+      data: { email, password: 'Test12345!', name: 'Cookie User', acceptTerms: true },
     });
     expect(res.status()).toBe(201);
     const cookies = res.headers()['set-cookie'] || '';
@@ -605,7 +609,7 @@ test.describe('Login cookie details', () => {
     const email = `logcookie_${Date.now()}@test.kelionai.app`;
     await request.post(`${BASE}/auth/local/register`, {
       headers: { 'Content-Type': 'application/json' },
-      data: { email, password: 'Test12345!', name: 'LC User' },
+      data: { email, password: 'Test12345!', name: 'LC User', acceptTerms: true },
     });
     const res = await request.post(`${BASE}/auth/local/login`, {
       headers: { 'Content-Type': 'application/json' },
@@ -621,7 +625,7 @@ test.describe('Login cookie details', () => {
     const email = `logjwt_${Date.now()}@test.kelionai.app`;
     await request.post(`${BASE}/auth/local/register`, {
       headers: { 'Content-Type': 'application/json' },
-      data: { email, password: 'Test12345!', name: 'LJ User' },
+      data: { email, password: 'Test12345!', name: 'LJ User', acceptTerms: true },
     });
     const res = await request.post(`${BASE}/auth/local/login`, {
       headers: { 'Content-Type': 'application/json' },
@@ -638,18 +642,18 @@ test.describe('Login cookie details', () => {
 // 14. SUBSCRIPTION PLAN DETAILS
 // ═══════════════════════════════════════════════════════════════════════════
 test.describe('Subscription plan details', () => {
-  test('free plan — price 0, dailyLimit 10', async ({ request }) => {
+  test('free plan — no priceEnv, dailyLimit 10', async ({ request }) => {
     const res = await request.get(`${BASE}/api/subscription/plans`);
     const free = (await res.json()).plans.find(p => p.id === 'free');
-    expect(free.price).toBe(0);
+    expect(free.priceEnv).toBeUndefined();
     expect(free.dailyLimit).toBe(10);
   });
 
-  test('basic plan — $9.99/month', async ({ request }) => {
+  test('basic plan — priceEnv points at Stripe price', async ({ request }) => {
     const res = await request.get(`${BASE}/api/subscription/plans`);
     const basic = (await res.json()).plans.find(p => p.id === 'basic');
-    expect(basic.price).toBe(9.99);
-    expect(basic.interval).toBe('month');
+    expect(basic.priceEnv).toBe('STRIPE_PRICE_BASIC');
+    expect(basic).toHaveProperty('stripePriceId');
   });
 
   test('enterprise plan — null dailyLimit', async ({ request }) => {
