@@ -59,7 +59,7 @@ function pass(detail) {
     // Some production deployments still require an explicit Terms acceptance
     // field; newer code ignores it. Include it so the script is robust across
     // both versions.
-    body: JSON.stringify({ email, password, name: 'Logout Media', terms_accepted: true, accept_terms: true }),
+    body: JSON.stringify({ email, password, name: 'Logout Media', acceptTerms: true }),
   });
   if (regRes.status !== 201) {
     const txt = await regRes.text().catch(() => '');

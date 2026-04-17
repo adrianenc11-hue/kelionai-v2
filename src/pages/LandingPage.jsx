@@ -127,7 +127,7 @@ export default function LandingPage() {
 
   function handleFreeTrial() {
     localStorage.setItem('kelion_free_trial', JSON.stringify({ start: Date.now(), limit: 15 * 60 * 1000 }))
-    navigate('/chat')
+    navigate('/chat/kelion')
   }
 
   const inp = {
