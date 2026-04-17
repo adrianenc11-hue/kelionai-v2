@@ -561,3 +561,123 @@ test.describe('UI flows', () => {
     await context.close();
   });
 });
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 12. REGISTER — cookie & token details
+// ═══════════════════════════════════════════════════════════════════════════
+test.describe('Register cookie details', () => {
+  test('register sets HttpOnly cookie', async ({ request }) => {
+    const email = `cookie_${Date.now()}@test.kelionai.app`;
+    const res = await request.post(`${BASE}/auth/local/register`, {
+      headers: { 'Content-Type': 'application/json' },
+      data: { email, password: 'Test12345!', name: 'Cookie User' },
+    });
+    expect(res.status()).toBe(201);
+    const cookies = res.headers()['set-cookie'] || '';
+    expect(cookies).toContain('kelion.token');
+    expect(cookies).toContain('HttpOnly');
+  });
+
+  test('register returns JWT token in body', async ({ request }) => {
+    const { token } = await createTestUser(request, 'jwtbody');
+    expect(typeof token).toBe('string');
+    expect(token.split('.').length).toBe(3);
+  });
+
+  test('register role defaults to user', async ({ request }) => {
+    const { user } = await createTestUser(request, 'role');
+    expect(user.role).toBe('user');
+  });
+
+  test('register subscription defaults to free', async ({ request }) => {
+    const { user } = await createTestUser(request, 'tier');
+    expect(user.subscription_tier).toBe('free');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 13. LOGIN — cookie details
+// ═══════════════════════════════════════════════════════════════════════════
+test.describe('Login cookie details', () => {
+  test('login sets HttpOnly cookie', async ({ request }) => {
+    const email = `logcookie_${Date.now()}@test.kelionai.app`;
+    await request.post(`${BASE}/auth/local/register`, {
+      headers: { 'Content-Type': 'application/json' },
+      data: { email, password: 'Test12345!', name: 'LC User' },
+    });
+    const res = await request.post(`${BASE}/auth/local/login`, {
+      headers: { 'Content-Type': 'application/json' },
+      data: { email, password: 'Test12345!' },
+    });
+    expect(res.status()).toBe(200);
+    const cookies = res.headers()['set-cookie'] || '';
+    expect(cookies).toContain('kelion.token');
+    expect(cookies).toContain('HttpOnly');
+  });
+
+  test('login returns JWT token in body', async ({ request }) => {
+    const email = `logjwt_${Date.now()}@test.kelionai.app`;
+    await request.post(`${BASE}/auth/local/register`, {
+      headers: { 'Content-Type': 'application/json' },
+      data: { email, password: 'Test12345!', name: 'LJ User' },
+    });
+    const res = await request.post(`${BASE}/auth/local/login`, {
+      headers: { 'Content-Type': 'application/json' },
+      data: { email, password: 'Test12345!' },
+    });
+    const body = await res.json();
+    expect(body.token).toBeTruthy();
+    expect(body.token.split('.').length).toBe(3);
+    expect(body.user.email).toBe(email);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 14. SUBSCRIPTION PLAN DETAILS
+// ═══════════════════════════════════════════════════════════════════════════
+test.describe('Subscription plan details', () => {
+  test('free plan — price 0, dailyLimit 10', async ({ request }) => {
+    const res = await request.get(`${BASE}/api/subscription/plans`);
+    const free = (await res.json()).plans.find(p => p.id === 'free');
+    expect(free.price).toBe(0);
+    expect(free.dailyLimit).toBe(10);
+  });
+
+  test('basic plan — $9.99/month', async ({ request }) => {
+    const res = await request.get(`${BASE}/api/subscription/plans`);
+    const basic = (await res.json()).plans.find(p => p.id === 'basic');
+    expect(basic.price).toBe(9.99);
+    expect(basic.interval).toBe('month');
+  });
+
+  test('enterprise plan — null dailyLimit', async ({ request }) => {
+    const res = await request.get(`${BASE}/api/subscription/plans`);
+    const ent = (await res.json()).plans.find(p => p.id === 'enterprise');
+    expect(ent.dailyLimit).toBeNull();
+  });
+
+  test('all plans have features array', async ({ request }) => {
+    const res = await request.get(`${BASE}/api/subscription/plans`);
+    const { plans } = await res.json();
+    for (const p of plans) {
+      expect(Array.isArray(p.features)).toBe(true);
+      expect(p.features.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 15. NEW USER DEFAULTS
+// ═══════════════════════════════════════════════════════════════════════════
+test.describe('New user defaults', () => {
+  test('tier=free, status=active, usage.today=0, usage.daily_limit=10', async ({ request }) => {
+    const { token } = await createTestUser(request, 'defaults');
+    const res = await authGet(request, '/api/users/me', token);
+    const body = await res.json();
+    expect(body.subscription_tier).toBe('free');
+    expect(body.subscription_status).toBe('active');
+    expect(body.usage.today).toBe(0);
+    expect(body.usage.daily_limit).toBe(10);
+  });
+});

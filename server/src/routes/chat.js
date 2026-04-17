@@ -1,7 +1,7 @@
 'use strict';
 
 const { Router } = require('express');
-const { getOpenAI } = require('../utils/openai');
+const { getAI, getDefaultChatModel } = require('../utils/openai');
 
 const router = Router();
 
@@ -21,9 +21,9 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ error: 'messages must be an array' });
   }
 
-  const openai = getOpenAI();
-  if (!openai) {
-    return res.status(503).json({ error: 'AI service not configured. Set OPENAI_API_KEY.' });
+  const ai = getAI();
+  if (!ai) {
+    return res.status(503).json({ error: 'AI service not configured. Set GEMINI_API_KEY or OPENAI_API_KEY.' });
   }
 
   // Build real-time context for system prompt
@@ -42,7 +42,7 @@ router.post('/', async (req, res) => {
   }
 
   const systemPrompt = BASE_PROMPT + realtimeContext;
-  const model = process.env.AI_MODEL || 'gpt-4o-mini';
+  const model = getDefaultChatModel();
 
   // Sanitize message history
   const sanitized = messages
@@ -71,7 +71,7 @@ router.post('/', async (req, res) => {
   res.flushHeaders();
 
   try {
-    const stream = await openai.chat.completions.create({
+    const stream = await ai.chat.completions.create({
       model,
       stream: true,
       messages: [{ role: 'system', content: systemPrompt }, ...sanitized],
@@ -83,7 +83,7 @@ router.post('/', async (req, res) => {
     }
     res.write('data: [DONE]\n\n');
   } catch (err) {
-    console.error('[chat] OpenAI error:', err.message);
+    console.error('[chat] AI error:', err.message);
     res.write(`data: ${JSON.stringify({ error: 'AI service error. Please try again.' })}\n\n`);
   } finally {
     res.end();
@@ -95,8 +95,8 @@ router.post('/demo', async (req, res) => {
   const { messages = [] } = req.body;
   if (!Array.isArray(messages)) return res.status(400).json({ error: 'messages must be an array' });
 
-  const openai = getOpenAI();
-  if (!openai) return res.status(503).json({ error: 'AI service not configured' });
+  const ai = getAI();
+  if (!ai) return res.status(503).json({ error: 'AI service not configured' });
 
   const sanitized = messages
     .filter(m => m && typeof m === 'object' && ['user', 'assistant'].includes(m.role))
@@ -104,7 +104,7 @@ router.post('/demo', async (req, res) => {
     .map(m => ({ role: m.role, content: typeof m.content === 'string' ? m.content.slice(0, 2000) : '' }))
     .filter(m => m.content.length > 0);
 
-  const model = process.env.AI_MODEL || 'gpt-4o-mini';
+  const model = getDefaultChatModel();
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -112,7 +112,7 @@ router.post('/demo', async (req, res) => {
   res.flushHeaders();
 
   try {
-    const stream = await openai.chat.completions.create({
+    const stream = await ai.chat.completions.create({
       model, stream: true,
       messages: [{ role: 'system', content: BASE_PROMPT }, ...sanitized],
     });

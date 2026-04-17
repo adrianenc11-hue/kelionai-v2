@@ -1,9 +1,10 @@
 'use strict';
 
-process.env.NODE_ENV       = 'test';
-process.env.JWT_SECRET     = 'test-jwt-secret-at-least-32-chars!!';
-process.env.SESSION_SECRET = 'test-session-secret-32chars-longx';
-process.env.DB_PATH        = '/tmp/noop.db';
+process.env.NODE_ENV          = 'test';
+process.env.JWT_SECRET        = 'test-jwt-secret-at-least-32-chars!!';
+process.env.SESSION_SECRET    = 'test-session-secret-32chars-longx';
+process.env.DB_PATH           = '/tmp/noop.db';
+process.env.STRIPE_SECRET_KEY = ''; // Ensure Stripe is not configured for this test suite
 
 const { createMockDb } = require('./helpers/mockDb');
 const mockDb = createMockDb();

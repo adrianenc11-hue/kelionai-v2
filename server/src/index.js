@@ -223,7 +223,10 @@ app.get('/health', async (_req, res) => {
     ts: new Date().toISOString(),
     services: {
       database: 'unknown',
+      ai: 'unknown',
+      ai_provider: 'none',
       openai: 'unknown',
+      gemini: 'unknown',
       elevenlabs: 'unknown',
     },
   };
@@ -242,10 +245,15 @@ app.get('/health', async (_req, res) => {
     health.services.database = 'error';
   }
 
-  // Check OpenAI
-  health.services.openai = process.env.OPENAI_API_KEY ? 'configured' : 'not configured';
+  // AI providers — Gemini preferred, OpenAI fallback
+  const hasGemini = !!process.env.GEMINI_API_KEY;
+  const hasOpenAI = !!process.env.OPENAI_API_KEY;
+  health.services.gemini = hasGemini ? 'configured' : 'not configured';
+  health.services.openai = hasOpenAI ? 'configured' : 'not configured';
+  health.services.ai = (hasGemini || hasOpenAI) ? 'configured' : 'not configured';
+  health.services.ai_provider = hasGemini ? 'gemini' : (hasOpenAI ? 'openai' : 'none');
 
-  // Check ElevenLabs
+  // ElevenLabs (legacy TTS fallback)
   health.services.elevenlabs = process.env.ELEVENLABS_API_KEY ? 'configured' : 'not configured';
 
   res.json(health);
