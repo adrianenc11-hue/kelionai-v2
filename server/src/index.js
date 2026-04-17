@@ -19,6 +19,8 @@ const adminRouter      = require('./routes/admin');
 const chatRouter       = require('./routes/chat');
 const ttsRouter        = require('./routes/tts');
 const realtimeRouter   = require('./routes/realtime');
+const webhooksRouter   = require('./routes/webhooks');
+const { findById } = require('./db');
 
 const app = express();
 app.disable('x-powered-by');
@@ -91,6 +93,11 @@ const chatLimiter = (process.env.NODE_ENV === 'test') ? (req, res, next) => next
   message: { error: 'Rate limit exceeded for AI services. Please wait a moment.' },
 });
 
+// Stripe webhooks must receive the raw body for signature verification, so
+// they must be mounted BEFORE express.json(). The webhook router uses
+// express.raw({ type: 'application/json' }) internally.
+app.use('/api/webhooks', webhooksRouter);
+
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
@@ -105,7 +112,13 @@ app.get('/api/subscription/plans', (req, res) => {
 });
 
 // Payment routes (auth required)
-app.post('/api/payments/create-checkout-session', requireAuth, (req, res) => {
+const PRICE_IDS = {
+  basic:      process.env.STRIPE_PRICE_BASIC,
+  premium:    process.env.STRIPE_PRICE_PREMIUM,
+  enterprise: process.env.STRIPE_PRICE_ENTERPRISE,
+};
+
+app.post('/api/payments/create-checkout-session', requireAuth, async (req, res) => {
   const { planId } = req.body || {};
   const plans = getPlans();
   const plan = plans.find(p => p.id === planId);
@@ -119,11 +132,50 @@ app.post('/api/payments/create-checkout-session', requireAuth, (req, res) => {
   if (!process.env.STRIPE_SECRET_KEY) {
     return res.status(503).json({ error: 'Payment system not configured' });
   }
-  res.json({ sessionId: 'mock-session-id', url: 'https://checkout.stripe.com/mock' });
+
+  const priceId = PRICE_IDS[planId];
+  if (!priceId) {
+    return res.status(503).json({ error: `Price ID not configured for plan ${planId}` });
+  }
+
+  try {
+    const Stripe = require('stripe');
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+    const successBase = process.env.APP_BASE_URL || config.appBaseUrl;
+    const session = await stripe.checkout.sessions.create({
+      mode: 'subscription',
+      line_items: [{ price: priceId, quantity: 1 }],
+      client_reference_id: String(req.user.id),
+      customer_email: req.user.email,
+      success_url: `${successBase}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${successBase}/billing/cancel`,
+      metadata: { userId: String(req.user.id), planId },
+    });
+    res.json({ sessionId: session.id, url: session.url });
+  } catch (err) {
+    console.error('[payments] Stripe error:', err.message);
+    res.status(500).json({ error: 'Failed to create checkout session' });
+  }
 });
 
 app.get('/api/payments/history', requireAuth, (req, res) => {
   res.json({ payments: [] });
+});
+
+// Current subscription status for the authenticated user.
+app.get('/api/subscription/status', requireAuth, async (req, res) => {
+  try {
+    const user = await findById(req.user.id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json({
+      status:     user.subscription_status || 'free',
+      tier:       user.subscription_tier   || 'free',
+      customerId: user.stripe_customer_id  || null,
+    });
+  } catch (err) {
+    console.error('[subscription] status error:', err.message);
+    res.status(500).json({ error: 'Failed to get subscription status' });
+  }
 });
 
 // Referral routes (auth required)
@@ -200,7 +252,11 @@ app.get('/api/realtime/trial-token', async (req, res) => {
     if (!r.ok) return res.status(500).json({ error: 'Failed to create session' });
     const data = await r.json();
     trialTokens.set(ip, now);
-    res.json({ token: data.client_secret.value, expiresAt: data.client_secret.expires_at, trial: true, voice });
+    // Trial sessions are capped at 15 minutes of wall-clock time. The
+    // OpenAI client_secret lifetime is unrelated (and shorter), so we return
+    // an expiresAt computed locally.
+    const expiresAt = Math.floor(Date.now() / 1000) + 15 * 60;
+    res.json({ token: data.client_secret.value, expiresAt, trial: true, voice });
   } catch (err) {
     res.status(500).json({ error: 'Failed to create session' });
   }

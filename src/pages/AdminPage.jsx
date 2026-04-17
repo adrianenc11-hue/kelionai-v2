@@ -45,7 +45,7 @@ export default function AdminPage() {
   }
 
   async function handleDelete(id, email) {
-    if (!window.confirm(`Sigur vrei să ștergi userul ${email}?`)) return
+    if (!window.confirm(`Are you sure you want to delete user ${email}?`)) return
     try {
       await api.delete(`/api/admin/users/${id}`)
       loadUsers()
@@ -73,13 +73,13 @@ export default function AdminPage() {
           <span style={s.title}>Admin Panel</span>
           <span style={s.badge}>{total} users</span>
         </div>
-        <button onClick={() => navigate('/')} style={s.backBtn}>← Înapoi</button>
+        <button onClick={() => navigate('/')} style={s.backBtn}>← Back</button>
       </div>
 
       {error && <div style={s.error}>{error}</div>}
 
       {loading ? (
-        <div style={{ color: '#888', textAlign: 'center', marginTop: '60px' }}>Se încarcă...</div>
+        <div style={{ color: '#888', textAlign: 'center', marginTop: '60px' }}>Loading...</div>
       ) : (
         <div style={{ overflowX: 'auto', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)' }}>
           <table style={s.table}>
@@ -87,13 +87,13 @@ export default function AdminPage() {
               <tr>
                 <th style={s.th}>ID</th>
                 <th style={s.th}>Email</th>
-                <th style={s.th}>Nume</th>
-                <th style={s.th}>Rol</th>
+                <th style={s.th}>Name</th>
+                <th style={s.th}>Role</th>
                 <th style={s.th}>Plan</th>
                 <th style={s.th}>Usage</th>
                 <th style={s.th}>Referral</th>
-                <th style={s.th}>Creat</th>
-                <th style={s.th}>Acțiuni</th>
+                <th style={s.th}>Created</th>
+                <th style={s.th}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -120,9 +120,9 @@ export default function AdminPage() {
                   </td>
                   <td style={s.td}>{u.usage_today ?? 0}</td>
                   <td style={{ ...s.td, fontSize: '12px', fontFamily: 'monospace' }}>{u.referral_code || '—'}</td>
-                  <td style={{ ...s.td, fontSize: '12px', color: '#666' }}>{u.created_at ? new Date(u.created_at).toLocaleDateString('ro-RO') : '—'}</td>
+                  <td style={{ ...s.td, fontSize: '12px', color: '#666' }}>{u.created_at ? new Date(u.created_at).toLocaleDateString('en-US') : '—'}</td>
                   <td style={s.td}>
-                    <button onClick={() => handleDelete(u.id, u.email)} style={s.deleteBtn}>Șterge</button>
+                    <button onClick={() => handleDelete(u.id, u.email)} style={s.deleteBtn}>Delete</button>
                   </td>
                 </tr>
               ))}

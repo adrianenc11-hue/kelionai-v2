@@ -69,7 +69,7 @@ test.describe('Frontend pages', () => {
     await expect(page.locator('h1:has-text("Kelion")')).toBeVisible();
     await expect(page.locator('button:has-text("Kira")')).toHaveCount(0);
     await expect(page.locator('button:has-text("Login")')).toBeVisible();
-    await expect(page.locator('button:has-text("Planuri")')).toBeVisible();
+    await expect(page.locator('button:has-text("Plans")')).toBeVisible();
   });
 
   test('Chat page shows Kelion avatar and Start Chat', async ({ page }) => {
@@ -485,6 +485,7 @@ test.describe('Security', () => {
   });
 
   test('CSRF cookie is set with Secure flag', async ({ request }) => {
+    test.skip(BASE.startsWith('http://'), 'Secure flag is only valid over HTTPS (skipped for local http:// runs)');
     const res = await request.get(`${BASE}/health`);
     const cookies = res.headers()['set-cookie'] || '';
     expect(cookies).toContain('kelion.csrf');
@@ -508,15 +509,15 @@ test.describe('UI flows', () => {
 
   test('register modal: shows name, email, password fields', async ({ page }) => {
     await page.goto(BASE);
-    await page.click('button:has-text("Cont nou")');
-    await expect(page.locator('input[placeholder*="Nume"]')).toBeVisible({ timeout: 5000 });
+    await page.click('button:has-text("Sign up")');
+    await expect(page.locator('input[placeholder*="Name"]')).toBeVisible({ timeout: 5000 });
     await expect(page.locator('input[type="email"]')).toBeVisible();
     await expect(page.locator('input[type="password"]')).toBeVisible();
   });
 
   test('plans modal: shows all 4 plan names', async ({ page }) => {
     await page.goto(BASE);
-    await page.click('button:has-text("Planuri")');
+    await page.click('button:has-text("Plans")');
     for (const name of ['Free', 'Basic', 'Premium', 'Enterprise']) {
       await expect(page.locator(`text=${name}`).first()).toBeVisible({ timeout: 5000 });
     }
@@ -524,16 +525,16 @@ test.describe('UI flows', () => {
 
   test('free trial navigates to /chat/kelion by default', async ({ page }) => {
     await page.goto(BASE);
-    await page.click('button:has-text("gratuit")');
+    await page.click('button:has-text("Try 15 minutes free")');
     await expect(page).toHaveURL(/\/chat\/kelion/, { timeout: 10000 });
   });
 
   test('register via modal creates account and shows user in header', async ({ page }) => {
     const email = `uireg_${Date.now()}@test.kelionai.app`;
     await page.goto(BASE);
-    await page.click('button:has-text("Cont nou")');
-    await page.waitForSelector('input[placeholder*="Nume"]', { timeout: 5000 });
-    await page.fill('input[placeholder*="Nume"]', 'E2E Tester');
+    await page.click('button:has-text("Sign up")');
+    await page.waitForSelector('input[placeholder*="Name"]', { timeout: 5000 });
+    await page.fill('input[placeholder*="Name"]', 'E2E Tester');
     await page.fill('input[type="email"]', email);
     await page.fill('input[type="password"]', 'Test12345!');
     await page.click('button[type="submit"]');
