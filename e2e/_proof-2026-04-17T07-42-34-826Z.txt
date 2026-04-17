@@ -1,0 +1,36 @@
+=== KelionAI live verification after Kira removal ===
+Base: https://kelionai.app
+Time: 2026-04-17T07:42:34.978Z
+
+[PASS] Landing title contains "Kelion"  —  title="KelionAI — Your Intelligent Voice AI Assistant"
+[PASS] Landing has NO Kira button  —  count=0
+[PASS] Landing has Kelion heading  —  count=1
+[PASS] Landing has NO "AI Vision" feature  —  count=0
+[PASS] Landing has Romanian Pornește chat button  —  count=1
+[PASS] Landing hero is in Romanian  —  count=1
+[PASS] Landing tagline is in Romanian  —  count=1
+[PASS] Landing has NO English hero left  —  count=0
+[PASS] /chat/kira redirects to /chat  —  final=https://kelionai.app/chat
+[PASS] /chat page has Romanian Pornește chat button  —  count=1
+[PASS] /chat page has Romanian Înapoi button  —  count=1
+[PASS] /chat/kelion redirects to /chat  —  final=https://kelionai.app/chat
+
+/health = {"status":"ok","ts":"2026-04-17T07:42:45.595Z","services":{"database":"connected","ai":"configured","ai_provider":"gemini","openai":"configured","gemini":"configured","elevenlabs":"configured"}}
+[PASS] /health returns ok
+[PASS] /health ai_provider=gemini
+[PASS] /health gemini=configured
+[PASS] /health database=connected
+[PASS] /api/realtime/token requires auth  —  status=401
+[PASS] Kira GLB URL returns SPA HTML fallback (not the old binary)  —  status=200 content-type=text/html; charset=UTF-8 body-starts="<!doctype html>
+<h"
+[PASS] Kelion GLB still served as binary model  —  status=200 content-type=model/gltf-binary
+[PASS] VoiceChat bundle has no Kira references  —  bundle=VoiceChat-BACAnQx8.js, size=14389
+[PASS] VoiceChat bundle requests video+audio (camera with mic)  —  size=14389
+[PASS] VoiceChat bundle enforces per-utterance language detection  —  Language rules=true MOST RECENT=true default-to-RO=false
+[PASS] VoiceChat bundle captures video frames silently (display:none + drawImage)  —  drawImage=true hidden-video=true
+
+=== SUMMARY ===
+PASS: 23
+FAIL: 0
+Log:  C:\Users\adria\kelionai-v2\kelionai-v2\e2e\_proof-2026-04-17T07-42-34-826Z.txt
+Screenshots: _proof-2026-04-17T07-42-34-826Z-*.png

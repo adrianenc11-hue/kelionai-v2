@@ -37,9 +37,11 @@ const BASE = 'https://kelionai.app';
   await page.screenshot({ path: path.join(shotDir, `_proof-${stamp}-01-landing.png`), fullPage: true });
 
   const html = await page.content();
-  check('Landing 200 + title present',
-    /<title>[^<]+<\/title>/.test(html),
-    'title matched');
+  const titleMatch = html.match(/<title>([^<]+)<\/title>/);
+  const titleText  = titleMatch ? titleMatch[1].trim() : '';
+  check('Landing title contains "Kelion"',
+    /Kelion/i.test(titleText),
+    'title="' + titleText + '"');
 
   const kiraButton = await page.locator('button:has-text("Kira")').count();
   check('Landing has NO Kira button', kiraButton === 0, `count=${kiraButton}`);
@@ -93,12 +95,15 @@ const BASE = 'https://kelionai.app';
   const rt = await page.request.get(BASE + '/api/realtime/token');
   check('/api/realtime/token requires auth', rt.status() === 401, 'status=' + rt.status());
 
-  // ---- 7. Kira model GLB is NOT served (SPA fallback returns HTML, not binary) ----
+  // ---- 7. Kira GLB: file is deleted from /public; server only returns SPA HTML fallback ----
+  //          Honest test: status=200 (SPA catch-all) BUT body is HTML, NOT GLB binary.
   const kiraGlb = await page.request.get(BASE + '/kira-rpm_54d82b66.glb');
   const kiraCt  = kiraGlb.headers()['content-type'] || '';
-  check('Kira GLB no longer served (content-type != model/gltf-binary)',
-    !kiraCt.startsWith('model/'),
-    'status=' + kiraGlb.status() + ' content-type=' + kiraCt);
+  const kiraBody = await kiraGlb.text();
+  const isHtmlFallback = kiraCt.includes('text/html') && kiraBody.trimStart().toLowerCase().startsWith('<!doctype html>');
+  check('Kira GLB URL returns SPA HTML fallback (not the old binary)',
+    isHtmlFallback,
+    'status=' + kiraGlb.status() + ' content-type=' + kiraCt + ' body-starts="' + kiraBody.slice(0,18) + '"');
 
   // ---- 8. Kelion GLB still served as binary model ----
   const kelionGlb = await page.request.get(BASE + '/kelion-rpm_e27cb94d.glb');
@@ -125,9 +130,17 @@ const BASE = 'https://kelionai.app';
     check('VoiceChat bundle requests video+audio (camera with mic)',
       /video\s*:\s*\{/.test(bundleText) && /getUserMedia/.test(bundleText),
       'size=' + bundleText.length);
-    check('VoiceChat bundle has strict language rules (no "default to Romanian")',
-      /Language rules/.test(bundleText) && !/default to Romanian/i.test(bundleText),
-      'has Language rules=' + /Language rules/.test(bundleText));
+    const hasLangRules = /Language rules/.test(bundleText);
+    const hasMostRecent = /MOST RECENT/.test(bundleText);
+    const hasDefaultRo  = /default to Romanian/i.test(bundleText);
+    check('VoiceChat bundle enforces per-utterance language detection',
+      hasLangRules && hasMostRecent && !hasDefaultRo,
+      'Language rules=' + hasLangRules + ' MOST RECENT=' + hasMostRecent + ' default-to-RO=' + hasDefaultRo);
+    const hasDrawImage = /drawImage/.test(bundleText);
+    const hasHiddenVideo = /ref:.,playsInline[^}]*display:"none"/.test(bundleText);
+    check('VoiceChat bundle captures video frames silently (display:none + drawImage)',
+      hasDrawImage && hasHiddenVideo,
+      'drawImage=' + hasDrawImage + ' hidden-video=' + hasHiddenVideo);
   } else {
     check('Could not locate VoiceChat chunk in main bundle', false, 'main=' + (indexMatch?.[0]||'?'));
   }
