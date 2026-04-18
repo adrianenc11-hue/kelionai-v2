@@ -23,6 +23,7 @@ const passkeyRouter    = require('./routes/passkey');
 const memoryRouter     = require('./routes/memory');
 const toolsRouter      = require('./routes/tools');
 const pushRouter       = require('./routes/push');
+const creditsRouter    = require('./routes/credits');
 const proactive        = require('./services/proactive');
 
 const app = express();
@@ -96,7 +97,14 @@ const chatLimiter = (process.env.NODE_ENV === 'test') ? (req, res, next) => next
   message: { error: 'Rate limit exceeded for AI services. Please wait a moment.' },
 });
 
-app.use(express.json({ limit: '1mb' }));
+// Skip JSON parsing on the Stripe webhook so signature verification in
+// /api/credits/webhook can read the raw body. Everything else goes
+// through the normal JSON parser. Use req.path (no query string) so a
+// stray ?retry=1 from Stripe wouldn't bypass the guard.
+app.use((req, res, next) => {
+  if (req.path === '/api/credits/webhook') return next();
+  return express.json({ limit: '1mb' })(req, res, next);
+});
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(csrfSeed);
@@ -220,6 +228,11 @@ app.use('/api/tts', requireAuth, chatLimiter, checkSubscription(), ttsRouter);
 // Rate limiting still applies to prevent abuse. Ephemeral-token endpoints only
 // hand back short-lived tokens; persona + config are baked in server-side.
 app.use('/api/realtime', chatLimiter, realtimeRouter);
+
+// Credits (Stage 7 — monetization). The webhook sub-route uses its own
+// raw-body parser; /packages is public, /balance and /checkout require
+// auth (enforced inside credits.js via requireAuth).
+app.use('/api/credits', creditsRouter);
 
 // Stage 3 — M13 passkey (public — register/auth flows need to be reachable
 // without auth) + M14/M16/M17 memory (signed-in users only).

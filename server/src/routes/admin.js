@@ -1,9 +1,9 @@
 'use strict';
 
 const { Router } = require('express');
-const { getUserById, getAllUsers, updateUser, deleteUser } = require('../db');
+const { getUserById, getAllUsers, updateUser, deleteUser, getCreditRevenueSummary } = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
-const { getAllCredits } = require('../services/aiCredits');
+const { getAllCredits, probeStripe } = require('../services/aiCredits');
 const { sendEmailAlert } = require('../services/emailAlerts');
 
 const router = Router();
@@ -24,6 +24,36 @@ router.use(requireAdmin);
  */
 const _alertCooldown = new Map(); // provider id -> last alert sent (ms)
 const ALERT_COOLDOWN_MS = 6 * 60 * 60 * 1000; // 6h
+
+/**
+ * GET /api/admin/business
+ * Live business-health snapshot: credit top-up revenue (from ledger) and
+ * Stripe available balance. Used by the admin "Business" dashboard.
+ */
+router.get('/business', async (req, res) => {
+  try {
+    const days = Math.min(365, Math.max(1, Number(req.query.days) || 30));
+    const [summary, stripeCard] = await Promise.all([
+      getCreditRevenueSummary(days),
+      probeStripe(),
+    ]);
+    res.json({
+      window: { days, since: new Date(Date.now() - days * 86400000).toISOString() },
+      ledger: summary,
+      stripe: {
+        configured: stripeCard.configured,
+        balanceDisplay: stripeCard.balanceDisplay,
+        balance: stripeCard.balance,
+        status: stripeCard.status,
+        message: stripeCard.message,
+      },
+      ts: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error('[admin/business] Error:', err && err.message);
+    res.status(500).json({ error: 'Failed to load business metrics' });
+  }
+});
 
 router.get('/credits', async (req, res) => {
   try {

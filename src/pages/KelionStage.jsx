@@ -212,66 +212,124 @@ function Halo({ status = 'idle', voiceLevel = 0, emotion = null }) {
   )
 }
 
-// ───── Luxury TV studio decor ─────
-function StudioDecor() {
-  // Backdrop — 5 vertical lit panels with gradient
-  const panels = useMemo(() => {
-    const arr = []
-    const count = 7
-    const width = 1.15
-    const gap = 0.08
-    const totalW = count * width + (count - 1) * gap
-    for (let i = 0; i < count; i++) {
-      const x = -totalW / 2 + i * (width + gap) + width / 2
-      const hue = 0.72 + (i - count / 2) * 0.015
-      const color = new THREE.Color().setHSL(hue, 0.7, 0.42)
-      arr.push({ x, color, i })
+// ───── Luxury studio decor — NYC skyline through panoramic windows ─────
+// Adrian asked to swap the old animated color panels for a night-time New
+// York skyline seen through floor-to-ceiling windows. We also killed the
+// breathing-light animation because it was tiring.
+function useNYCSkylineTexture() {
+  return useMemo(() => {
+    const canvas = document.createElement('canvas')
+    canvas.width = 2048
+    canvas.height = 1024
+    const ctx = canvas.getContext('2d')
+    // Deep-night sky gradient
+    const sky = ctx.createLinearGradient(0, 0, 0, 1024)
+    sky.addColorStop(0, '#04060e')
+    sky.addColorStop(0.45, '#0b1029')
+    sky.addColorStop(0.72, '#1a1236')
+    sky.addColorStop(1, '#2a1640')
+    ctx.fillStyle = sky
+    ctx.fillRect(0, 0, 2048, 1024)
+    // Stars
+    for (let i = 0; i < 140; i++) {
+      const s = 0.3 + Math.random() * 0.6
+      ctx.fillStyle = `rgba(255,255,255,${s})`
+      ctx.fillRect(Math.random() * 2048, Math.random() * 350, 1, 1)
     }
-    return arr
+    // Distant back layer of buildings
+    let x = 0
+    while (x < 2048) {
+      const w = 50 + Math.random() * 70
+      const h = 150 + Math.random() * 180
+      const y = 1024 - h
+      ctx.fillStyle = `rgb(${8 + Math.random() * 6}, ${10 + Math.random() * 8}, ${22 + Math.random() * 12})`
+      ctx.fillRect(x, y, w, h)
+      x += w
+    }
+    // Front layer — taller skyscrapers with bright windows
+    x = 0
+    while (x < 2048) {
+      const w = 60 + Math.random() * 140
+      const h = 280 + Math.random() * 460
+      const y = 1024 - h
+      ctx.fillStyle = `rgb(${14 + Math.random() * 8}, ${16 + Math.random() * 10}, ${28 + Math.random() * 14})`
+      ctx.fillRect(x, y, w, h)
+      // Antenna / spire on some taller ones
+      if (h > 550 && Math.random() < 0.4) {
+        ctx.fillStyle = '#1a1e32'
+        ctx.fillRect(x + w / 2 - 1, y - 40 - Math.random() * 60, 2, 50)
+      }
+      // Windows grid
+      const cellW = 10
+      const cellH = 14
+      for (let wx = x + 6; wx < x + w - 6; wx += cellW) {
+        for (let wy = y + 10; wy < 1018; wy += cellH) {
+          if (Math.random() < 0.52) {
+            const warm = Math.random() < 0.65
+            const flicker = 0.55 + Math.random() * 0.45
+            ctx.fillStyle = warm
+              ? `rgba(250, 215, 140, ${flicker})`
+              : `rgba(170, 200, 255, ${flicker})`
+            ctx.fillRect(wx, wy, 4, 6)
+          }
+        }
+      }
+      x += w
+    }
+    const tex = new THREE.CanvasTexture(canvas)
+    tex.colorSpace = THREE.SRGBColorSpace
+    tex.anisotropy = 8
+    return tex
   }, [])
+}
 
-  const panelRefs = useRef([])
-
-  useFrame((state) => {
-    const t = state.clock.elapsedTime
-    panelRefs.current.forEach((ref, i) => {
-      if (!ref) return
-      const breathe = 0.5 + Math.sin(t * 0.4 + i * 0.7) * 0.35
-      ref.material.emissiveIntensity = 0.65 + breathe * 0.45
-    })
-  })
+function StudioDecor() {
+  const skylineTex = useNYCSkylineTexture()
+  // Four windows divided by vertical mullions.
+  const windowCount = 4
+  const wallWidth = 12
+  const wallHeight = 5.4
+  const mullionW = 0.08
+  const windowW = (wallWidth - mullionW * (windowCount + 1)) / windowCount
 
   return (
     <group>
-      {/* Backdrop panels */}
-      {panels.map((p, i) => (
-        <mesh
-          key={i}
-          ref={(el) => (panelRefs.current[i] = el)}
-          position={[p.x, 0.4, -4.5]}
-          castShadow={false}
-          receiveShadow={false}
-        >
-          <planeGeometry args={[1.15, 4.2]} />
-          <meshStandardMaterial
-            color={'#0a0a14'}
-            emissive={p.color}
-            emissiveIntensity={0.9}
-            roughness={0.35}
-            metalness={0.2}
-          />
-        </mesh>
-      ))}
-
-      {/* Horizontal LED bar across top */}
-      <mesh position={[0, 2.8, -4.45]}>
-        <planeGeometry args={[10.5, 0.12]} />
-        <meshBasicMaterial color={'#c084fc'} toneMapped={false} />
+      {/* Full back wall with the NYC skyline showing through */}
+      <mesh position={[0, 0.4, -4.6]}>
+        <planeGeometry args={[wallWidth, wallHeight]} />
+        <meshBasicMaterial map={skylineTex} toneMapped={false} />
       </mesh>
 
-      {/* Horizontal accent light bottom */}
-      <mesh position={[0, -1.8, -4.45]}>
-        <planeGeometry args={[10.5, 0.05]} />
+      {/* Vertical mullions (window frames) over the wall */}
+      {Array.from({ length: windowCount + 1 }).map((_, i) => {
+        const x = -wallWidth / 2 + i * (windowW + mullionW) + mullionW / 2
+        return (
+          <mesh key={`mul-${i}`} position={[x, 0.4, -4.55]}>
+            <planeGeometry args={[mullionW, wallHeight]} />
+            <meshStandardMaterial color={'#0a0b12'} roughness={0.6} metalness={0.35} />
+          </mesh>
+        )
+      })}
+
+      {/* Horizontal top and bottom frames */}
+      <mesh position={[0, 0.4 + wallHeight / 2 - 0.05, -4.55]}>
+        <planeGeometry args={[wallWidth, 0.14]} />
+        <meshStandardMaterial color={'#0a0b12'} roughness={0.6} metalness={0.35} />
+      </mesh>
+      <mesh position={[0, 0.4 - wallHeight / 2 + 0.05, -4.55]}>
+        <planeGeometry args={[wallWidth, 0.14]} />
+        <meshStandardMaterial color={'#0a0b12'} roughness={0.6} metalness={0.35} />
+      </mesh>
+
+      {/* Warm interior ceiling strip — static, no pulsing */}
+      <mesh position={[0, 2.9, -4.5]}>
+        <planeGeometry args={[10.5, 0.08]} />
+        <meshBasicMaterial color={'#ffb27a'} toneMapped={false} />
+      </mesh>
+
+      {/* Cool floor LED strip */}
+      <mesh position={[0, -1.9, -4.5]}>
+        <planeGeometry args={[10.5, 0.04]} />
         <meshBasicMaterial color={'#60a5fa'} toneMapped={false} />
       </mesh>
 
@@ -418,6 +476,120 @@ export default function KelionStage() {
     }
   }, [])
 
+  // Stage 7 — monetization. User-facing top-up modal (Stripe Checkout)
+  // and live balance. `buyOpen` shows the package picker; `buyBusy` is
+  // true while we create the Stripe Checkout session; `balance` is
+  // null until loaded so we can hide the chip until we know it.
+  const [buyOpen, setBuyOpen] = useState(false)
+  const [buyBusy, setBuyBusy] = useState(false)
+  const [buyError, setBuyError] = useState(null)
+  const [packages, setPackages] = useState([])
+  const [balance, setBalance] = useState(null)
+  const refreshBalance = useCallback(async () => {
+    if (!authState.signedIn) { setBalance(null); return }
+    try {
+      const r = await fetch('/api/credits/balance', { credentials: 'include' })
+      if (!r.ok) return
+      const j = await r.json()
+      if (typeof j.balance_minutes === 'number') setBalance(j.balance_minutes)
+    } catch (_) { /* ignore */ }
+  }, [authState.signedIn])
+  useEffect(() => { refreshBalance() }, [refreshBalance])
+  const openBuy = useCallback(async () => {
+    setBuyOpen(true)
+    setBuyError(null)
+    if (packages.length === 0) {
+      try {
+        const r = await fetch('/api/credits/packages')
+        const j = await r.json()
+        setPackages(Array.isArray(j.packages) ? j.packages : [])
+      } catch (err) {
+        setBuyError('Could not load packages')
+      }
+    }
+  }, [packages.length])
+  const handleBuy = useCallback(async (pkgId) => {
+    setBuyBusy(true)
+    setBuyError(null)
+    try {
+      const r = await fetch('/api/credits/checkout', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ packageId: pkgId }),
+      })
+      const j = await r.json().catch(() => ({}))
+      if (!r.ok || !j.url) {
+        throw new Error(j.error || j.hint || `HTTP ${r.status}`)
+      }
+      window.location.href = j.url
+    } catch (err) {
+      setBuyError(err.message || 'Checkout failed')
+      setBuyBusy(false)
+    }
+  }, [])
+
+  // If we returned from Stripe Checkout with ?credits=ok, refresh the
+  // balance once and scrub the query string so reloads don't re-trigger.
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search)
+    if (sp.get('credits') === 'ok') {
+      refreshBalance()
+      sp.delete('credits'); sp.delete('session_id')
+      const q = sp.toString()
+      const clean = window.location.pathname + (q ? `?${q}` : '') + window.location.hash
+      window.history.replaceState(null, '', clean)
+    }
+  }, [refreshBalance])
+
+  // PWA install prompt — Chrome / Edge / Android fire `beforeinstallprompt`
+  // which we stash; iOS Safari has no such event, so we show instructions
+  // inline in the modal instead.
+  const [installPromptEvent, setInstallPromptEvent] = useState(null)
+  const [installed, setInstalled] = useState(() =>
+    typeof window !== 'undefined' && (
+      window.matchMedia?.('(display-mode: standalone)').matches ||
+      window.navigator.standalone === true
+    )
+  )
+  useEffect(() => {
+    const onBip = (e) => { e.preventDefault(); setInstallPromptEvent(e) }
+    const onInstalled = () => { setInstalled(true); setInstallPromptEvent(null) }
+    window.addEventListener('beforeinstallprompt', onBip)
+    window.addEventListener('appinstalled', onInstalled)
+    return () => {
+      window.removeEventListener('beforeinstallprompt', onBip)
+      window.removeEventListener('appinstalled', onInstalled)
+    }
+  }, [])
+  const handleInstall = useCallback(async () => {
+    if (!installPromptEvent) return
+    try {
+      await installPromptEvent.prompt()
+      setInstallPromptEvent(null)
+    } catch (_) { /* user dismissed */ }
+  }, [installPromptEvent])
+
+  // Admin-only — live business metrics (revenue + minutes sold/consumed).
+  const [businessOpen, setBusinessOpen] = useState(false)
+  const [businessData, setBusinessData] = useState(null)
+  const [businessLoading, setBusinessLoading] = useState(false)
+  const [businessError, setBusinessError] = useState(null)
+  const openBusiness = useCallback(async () => {
+    setBusinessOpen(true)
+    setBusinessLoading(true)
+    setBusinessError(null)
+    try {
+      const r = await fetch('/api/admin/business?days=30', { credentials: 'include' })
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      setBusinessData(await r.json())
+    } catch (err) {
+      setBusinessError(err.message || 'Could not load business metrics')
+    } finally {
+      setBusinessLoading(false)
+    }
+  }, [])
+
   // Stage 6 — emotion mirroring + voice style
   const emotion = useEmotion()
   const [voiceStyle, setVoiceStyleState] = useState(() => readVoiceStyleCookie())
@@ -425,6 +597,80 @@ export default function KelionStage() {
     const resolved = await setVoiceStyle(style)
     if (resolved) setVoiceStyleState(resolved)
   }, [])
+
+  // Text chat — user-typed prompts in addition to voice. Talks to
+  // /api/chat which streams assistant deltas via SSE. We keep the last
+  // ~6 turns in memory so the model has short-term context; voice and
+  // text share the same session but don't (yet) share a message log.
+  const [chatInput, setChatInput] = useState('')
+  const [chatMessages, setChatMessages] = useState([]) // [{ role, content }]
+  const [chatBusy, setChatBusy] = useState(false)
+  const [chatError, setChatError] = useState(null)
+  const sendTextMessage = useCallback(async () => {
+    const text = chatInput.trim()
+    if (!text || chatBusy) return
+    setChatError(null)
+    const next = [...chatMessages, { role: 'user', content: text }].slice(-12)
+    setChatMessages(next)
+    setChatInput('')
+    setChatBusy(true)
+    try {
+      const r = await fetch('/api/chat', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: next,
+          datetime: new Date().toISOString(),
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        }),
+      })
+      if (r.status === 401) {
+        throw new Error('Sign in to chat (use the ⋯ menu).')
+      }
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      // Parse SSE stream: lines of form "data: {json}\n\n"
+      const reader = r.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let assistant = ''
+      setChatMessages((m) => [...m, { role: 'assistant', content: '' }])
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const { value, done } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const chunks = buffer.split('\n\n')
+        buffer = chunks.pop() || ''
+        for (const chunk of chunks) {
+          const line = chunk.replace(/^data:\s*/, '').trim()
+          if (!line || line === '[DONE]') continue
+          try {
+            const obj = JSON.parse(line)
+            if (obj.content) {
+              assistant += obj.content
+              setChatMessages((m) => {
+                const copy = m.slice()
+                copy[copy.length - 1] = { role: 'assistant', content: assistant }
+                return copy
+              })
+            } else if (obj.error) {
+              throw new Error(obj.error)
+            }
+          } catch (err) {
+            if (err.message && err.message !== 'Unexpected end of JSON input') throw err
+          }
+        }
+      }
+    } catch (err) {
+      setChatError(err.message || 'Chat failed')
+      // Drop the empty assistant placeholder if we never got content.
+      setChatMessages((m) => m[m.length - 1]?.role === 'assistant' && m[m.length - 1].content === ''
+        ? m.slice(0, -1) : m)
+    } finally {
+      setChatBusy(false)
+    }
+  }, [chatInput, chatBusy, chatMessages])
 
   const mouthOpen = useLipSync(audioRef)
 
@@ -655,6 +901,117 @@ export default function KelionStage() {
 
       <audio ref={audioRef} autoPlay playsInline />
 
+      {/* Last assistant text reply (when chatting by typing) — fades
+          above the input bar. Only the latest assistant message shows
+          so we don't clutter the stage. */}
+      {chatMessages.length > 0 && (() => {
+        const last = chatMessages[chatMessages.length - 1]
+        const userTurn = [...chatMessages].reverse().find((m) => m.role === 'user')
+        return (
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: 'absolute',
+              bottom: 'calc(max(32px, env(safe-area-inset-bottom)) + 110px)',
+              left: '50%', transform: 'translateX(-50%)',
+              width: 'min(680px, 92vw)',
+              maxHeight: '42vh', overflowY: 'auto',
+              display: 'flex', flexDirection: 'column', gap: 8,
+              padding: 14,
+              borderRadius: 16,
+              background: 'rgba(10, 8, 20, 0.72)',
+              backdropFilter: 'blur(14px)',
+              border: '1px solid rgba(167, 139, 250, 0.22)',
+              color: '#ede9fe',
+              fontSize: 14, lineHeight: 1.45,
+              fontFamily: 'system-ui, -apple-system, sans-serif',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+            }}
+          >
+            {userTurn && (
+              <div style={{
+                alignSelf: 'flex-end', maxWidth: '88%',
+                padding: '8px 12px', borderRadius: 12,
+                background: 'rgba(124, 58, 237, 0.25)',
+                border: '1px solid rgba(167, 139, 250, 0.3)',
+                fontSize: 13,
+              }}>{userTurn.content}</div>
+            )}
+            {last.role === 'assistant' && (
+              <div style={{
+                alignSelf: 'flex-start', maxWidth: '92%',
+                padding: '8px 12px', borderRadius: 12,
+                background: 'rgba(167, 139, 250, 0.08)',
+                border: '1px solid rgba(167, 139, 250, 0.18)',
+                whiteSpace: 'pre-wrap',
+              }}>
+                {last.content || (chatBusy ? 'Kelion is thinking…' : '')}
+              </div>
+            )}
+            {chatError && (
+              <div style={{
+                fontSize: 12, color: '#fecaca',
+                background: 'rgba(80, 14, 14, 0.6)',
+                padding: '6px 10px', borderRadius: 10,
+              }}>{chatError}</div>
+            )}
+          </div>
+        )
+      })()}
+
+      {/* Text chat composer — bottom center, above the status pill.
+          Stops click propagation so typing doesn't toggle the voice
+          session. Submit with Enter or the send button. */}
+      <form
+        onClick={(e) => e.stopPropagation()}
+        onSubmit={(e) => { e.preventDefault(); sendTextMessage() }}
+        style={{
+          position: 'absolute',
+          bottom: 'calc(max(32px, env(safe-area-inset-bottom)) + 54px)',
+          left: '50%', transform: 'translateX(-50%)',
+          width: 'min(680px, 92vw)',
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '8px 10px 8px 16px',
+          borderRadius: 999,
+          background: 'rgba(10, 8, 20, 0.72)',
+          backdropFilter: 'blur(14px)',
+          border: '1px solid rgba(167, 139, 250, 0.25)',
+          zIndex: 5,
+        }}
+      >
+        <input
+          type="text"
+          value={chatInput}
+          onChange={(e) => setChatInput(e.target.value)}
+          placeholder="Type to Kelion…"
+          disabled={chatBusy}
+          autoComplete="off"
+          style={{
+            flex: 1,
+            background: 'transparent', border: 'none', outline: 'none',
+            color: '#ede9fe',
+            fontSize: 15, fontFamily: 'system-ui, -apple-system, sans-serif',
+            padding: '8px 2px',
+          }}
+        />
+        <button
+          type="submit"
+          disabled={chatBusy || chatInput.trim().length === 0}
+          style={{
+            width: 40, height: 40, borderRadius: '50%',
+            background: chatInput.trim().length === 0
+              ? 'rgba(167, 139, 250, 0.18)'
+              : 'linear-gradient(135deg, #7c3aed, #a78bfa)',
+            border: 'none', color: '#fff',
+            cursor: chatBusy || chatInput.trim().length === 0 ? 'default' : 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            opacity: chatBusy ? 0.6 : 1,
+            fontSize: 16,
+          }}
+          aria-label="Send message"
+        >↑</button>
+      </form>
+
       {/* Status pill — bottom center */}
       <div style={{
         position: 'absolute', bottom: 'max(32px, env(safe-area-inset-bottom))',
@@ -674,7 +1031,7 @@ export default function KelionStage() {
           width: 8, height: 8, borderRadius: '50%',
           background: STATUS_COLORS[status],
           boxShadow: `0 0 12px ${STATUS_COLORS[status]}`,
-          animation: `pulse ${1 / (STATUS_PULSE_HZ[status] || 0.5)}s infinite ease-in-out`,
+          // No pulsing animation — Adrian found the blinking tiring.
         }} />
         {statusLabel}
       </div>
@@ -780,13 +1137,31 @@ export default function KelionStage() {
                   </MenuItem>
                 )
               )}
+              {/* User-facing top-up — Stripe Checkout for credit
+                  packages. Visible to all signed-in users. */}
+              <MenuItem onClick={() => { openBuy(); setMenuOpen(false) }}>
+                Buy credits{balance != null ? ` (${balance} min left)` : ''}
+              </MenuItem>
+              {/* PWA install — only shows when the browser actually
+                  fired beforeinstallprompt (Chrome/Edge/Android). iOS
+                  users get instructions inside the Buy-credits modal. */}
+              {!installed && installPromptEvent && (
+                <MenuItem onClick={() => { handleInstall(); setMenuOpen(false) }}>
+                  Install Kelion on this device
+                </MenuItem>
+              )}
               {/* Admin-only — AI credits dashboard (one button per AI we
                   spend on + Stripe revenue card + top-up links + email
                   alerts to contact@kelionai.app). */}
               {isAdmin && (
-                <MenuItem onClick={() => { openCredits(); setMenuOpen(false) }}>
-                  AI credits (admin)
-                </MenuItem>
+                <>
+                  <MenuItem onClick={() => { openCredits(); setMenuOpen(false) }}>
+                    AI credits (admin)
+                  </MenuItem>
+                  <MenuItem onClick={() => { openBusiness(); setMenuOpen(false) }}>
+                    Business metrics (admin)
+                  </MenuItem>
+                </>
               )}
               <MenuItem onClick={() => { handleSignOut(); setMenuOpen(false) }}>
                 Sign out
@@ -841,7 +1216,6 @@ export default function KelionStage() {
               display: 'inline-block', width: 6, height: 6,
               borderRadius: '50%', background: '#ef4444',
               marginRight: 6, boxShadow: '0 0 6px #ef4444',
-              animation: 'pulse 1.5s infinite ease-in-out',
             }} />
             LIVE
           </div>
@@ -868,7 +1242,6 @@ export default function KelionStage() {
             width: 8, height: 8, borderRadius: '50%',
             background: '#60a5fa',
             boxShadow: '0 0 8px #60a5fa',
-            animation: 'pulse 1.5s infinite ease-in-out',
           }} />
           Sharing screen
         </div>
@@ -1089,6 +1462,257 @@ export default function KelionStage() {
               }}
             >Forget everything</button>
           )}
+        </div>
+      )}
+
+      {/* User-facing Buy-credits modal — centered overlay with the
+          three standard packages (starter / standard / pro). Clicking
+          a package creates a Stripe Checkout session and redirects to
+          Stripe's hosted page (3DS + VAT + chargebacks handled by
+          Stripe). iOS users get PWA install instructions at the
+          bottom since Safari has no beforeinstallprompt event. */}
+      {buyOpen && (
+        <div
+          onClick={(e) => { e.stopPropagation(); setBuyOpen(false) }}
+          style={{
+            position: 'fixed', inset: 0,
+            background: 'rgba(3, 4, 10, 0.78)',
+            backdropFilter: 'blur(14px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 30, padding: 16,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: 'min(560px, 96vw)',
+              maxHeight: '90vh', overflowY: 'auto',
+              background: 'rgba(14, 11, 26, 0.96)',
+              borderRadius: 20,
+              border: '1px solid rgba(167, 139, 250, 0.25)',
+              padding: '22px 22px 26px 22px',
+              color: '#ede9fe',
+              fontFamily: 'system-ui, -apple-system, sans-serif',
+              boxShadow: '0 30px 80px rgba(0,0,0,0.6)',
+            }}
+          >
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              marginBottom: 14,
+            }}>
+              <div>
+                <div style={{ fontSize: 11, opacity: 0.55, letterSpacing: '0.15em', marginBottom: 4 }}>
+                  KELION CREDITS
+                </div>
+                <div style={{ fontSize: 20, fontWeight: 700 }}>Buy credits</div>
+              </div>
+              <button
+                onClick={() => setBuyOpen(false)}
+                style={{
+                  background: 'transparent', border: 'none', color: '#ede9fe',
+                  fontSize: 22, cursor: 'pointer', opacity: 0.7,
+                }}
+                aria-label="Close"
+              >✕</button>
+            </div>
+
+            {balance != null && (
+              <div style={{
+                fontSize: 13, opacity: 0.75, marginBottom: 14,
+                padding: '8px 12px',
+                background: 'rgba(167, 139, 250, 0.08)',
+                borderRadius: 10,
+              }}>
+                Current balance: <strong>{balance} min</strong>
+              </div>
+            )}
+
+            {buyError && (
+              <div style={{
+                fontSize: 13, color: '#fecaca',
+                background: 'rgba(80, 14, 14, 0.6)',
+                padding: '10px 12px', borderRadius: 10, marginBottom: 12,
+              }}>{buyError}</div>
+            )}
+
+            <div style={{ display: 'grid', gap: 10 }}>
+              {packages.map((pkg) => {
+                const euros = (pkg.priceCents / 100).toFixed(2).replace(/\.00$/, '')
+                const perMin = (pkg.priceCents / 100 / pkg.minutes).toFixed(2)
+                return (
+                  <button
+                    key={pkg.id}
+                    onClick={() => handleBuy(pkg.id)}
+                    disabled={buyBusy}
+                    style={{
+                      display: 'block', textAlign: 'left', width: '100%',
+                      padding: '16px 18px',
+                      borderRadius: 14,
+                      background: pkg.highlight
+                        ? 'linear-gradient(135deg, rgba(167, 139, 250, 0.18), rgba(96, 165, 250, 0.12))'
+                        : 'rgba(167, 139, 250, 0.06)',
+                      border: pkg.highlight
+                        ? '1px solid rgba(167, 139, 250, 0.55)'
+                        : '1px solid rgba(167, 139, 250, 0.2)',
+                      color: '#ede9fe',
+                      cursor: buyBusy ? 'wait' : 'pointer',
+                      opacity: buyBusy ? 0.6 : 1,
+                      transition: 'transform 0.1s, background 0.15s',
+                    }}
+                  >
+                    <div style={{
+                      display: 'flex', alignItems: 'baseline',
+                      justifyContent: 'space-between', marginBottom: 4,
+                    }}>
+                      <div style={{ fontSize: 15, fontWeight: 700 }}>{pkg.name}</div>
+                      <div style={{ fontSize: 18, fontWeight: 700 }}>{euros} €</div>
+                    </div>
+                    <div style={{ fontSize: 12, opacity: 0.65 }}>
+                      {pkg.minutes} min · {perMin} €/min
+                    </div>
+                    {pkg.description && (
+                      <div style={{ fontSize: 12, opacity: 0.55, marginTop: 4 }}>
+                        {pkg.description}
+                      </div>
+                    )}
+                  </button>
+                )
+              })}
+              {packages.length === 0 && !buyError && (
+                <div style={{ opacity: 0.55, fontSize: 13 }}>Loading packages…</div>
+              )}
+            </div>
+
+            <div style={{
+              fontSize: 11, opacity: 0.5, marginTop: 16, lineHeight: 1.5,
+            }}>
+              You'll be redirected to Stripe's secure checkout. EU VAT is
+              handled automatically. Credits never expire.
+            </div>
+
+            {!installed && !installPromptEvent && (
+              <div style={{
+                marginTop: 16, padding: '10px 12px',
+                background: 'rgba(96, 165, 250, 0.08)',
+                border: '1px solid rgba(96, 165, 250, 0.25)',
+                borderRadius: 10, fontSize: 12, opacity: 0.85,
+              }}>
+                <strong>Add Kelion to your home screen:</strong>{' '}
+                on iPhone, tap the Share button → <em>Add to Home Screen</em>.
+                On Android Chrome, tap ⋮ → <em>Install app</em>.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Admin-only — live business metrics drawer. */}
+      {businessOpen && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: 'absolute', top: 0, right: 0, bottom: 0,
+            width: 'min(480px, 96vw)',
+            background: 'rgba(10, 8, 20, 0.92)',
+            backdropFilter: 'blur(22px)',
+            borderLeft: '1px solid rgba(167, 139, 250, 0.2)',
+            padding: '70px 20px 24px 20px',
+            overflowY: 'auto',
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+            zIndex: 26,
+          }}
+        >
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            marginBottom: 18,
+          }}>
+            <div style={{ fontSize: 11, opacity: 0.6, letterSpacing: '0.15em' }}>
+              BUSINESS — LAST 30 DAYS
+            </div>
+            <button
+              onClick={() => setBusinessOpen(false)}
+              style={{
+                background: 'transparent', border: 'none', color: '#ede9fe',
+                fontSize: 20, cursor: 'pointer', opacity: 0.7,
+              }}
+              aria-label="Close"
+            >✕</button>
+          </div>
+
+          {businessLoading && (
+            <div style={{ opacity: 0.55, fontSize: 14 }}>Crunching numbers…</div>
+          )}
+          {businessError && !businessLoading && (
+            <div style={{
+              fontSize: 13, color: '#fecaca',
+              background: 'rgba(80, 14, 14, 0.6)',
+              padding: '10px 12px', borderRadius: 10,
+            }}>{businessError}</div>
+          )}
+
+          {!businessLoading && businessData && (() => {
+            const revenueEur = (businessData.ledger.revenueCents / 100).toFixed(2)
+            // 50/50 split: half goes to AI vendors, half to us. This is a
+            // gross estimate — actual AI spend is visible on the provider
+            // cards. Stripe/tax fees will trim our half ~3%.
+            const platformEstEur = (businessData.ledger.revenueCents / 200).toFixed(2)
+            const minutesSold = businessData.ledger.minutesSold
+            const minutesConsumed = businessData.ledger.minutesConsumed
+            const topups = businessData.ledger.topups
+            const rows = [
+              { label: 'Credit top-ups', value: topups, hint: 'Stripe Checkout sessions completed' },
+              { label: 'Gross revenue', value: `${revenueEur} €`, hint: 'Sum of paid Stripe sessions' },
+              { label: 'Minutes sold', value: `${minutesSold} min`, hint: 'Credits granted to users' },
+              { label: 'Minutes consumed', value: `${minutesConsumed} min`, hint: 'Live conversation time used' },
+              { label: 'Platform share (est.)', value: `${platformEstEur} €`, hint: '50% of gross, before Stripe/VAT' },
+            ]
+            return (
+              <>
+                {rows.map((r) => (
+                  <div
+                    key={r.label}
+                    style={{
+                      padding: '12px 14px', marginBottom: 8,
+                      background: 'rgba(167, 139, 250, 0.06)',
+                      border: '1px solid rgba(167, 139, 250, 0.15)',
+                      borderRadius: 12,
+                    }}
+                  >
+                    <div style={{
+                      display: 'flex', justifyContent: 'space-between',
+                      alignItems: 'baseline',
+                    }}>
+                      <div style={{ fontSize: 13, opacity: 0.75 }}>{r.label}</div>
+                      <div style={{ fontSize: 16, fontWeight: 700 }}>{r.value}</div>
+                    </div>
+                    {r.hint && (
+                      <div style={{ fontSize: 11, opacity: 0.5, marginTop: 2 }}>{r.hint}</div>
+                    )}
+                  </div>
+                ))}
+                {businessData.stripe && (
+                  <div style={{
+                    padding: '12px 14px', marginTop: 10,
+                    background: 'rgba(96, 165, 250, 0.06)',
+                    border: '1px solid rgba(96, 165, 250, 0.25)',
+                    borderRadius: 12,
+                  }}>
+                    <div style={{ fontSize: 11, opacity: 0.6, letterSpacing: '0.1em', marginBottom: 6 }}>
+                      STRIPE BALANCE
+                    </div>
+                    <div style={{ fontSize: 15 }}>
+                      {businessData.stripe.balanceDisplay || '—'}
+                    </div>
+                    {businessData.stripe.message && (
+                      <div style={{ fontSize: 11, opacity: 0.55, marginTop: 4 }}>
+                        {businessData.stripe.message}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )
+          })()}
         </div>
       )}
 

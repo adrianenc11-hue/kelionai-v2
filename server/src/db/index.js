@@ -129,6 +129,33 @@ async function initDb() {
   `);
   await db.exec('CREATE INDEX IF NOT EXISTS idx_proactive_log_user ON proactive_log(user_id, created_at DESC)');
 
+  // Stage 7 — Monetization: per-user Kelion-Live credit balance measured in
+  // whole minutes (1 credit = 1 min of voice + tools). User tops up via
+  // Stripe Checkout; each completed session consumes credits based on its
+  // duration. We store the running balance directly on users (cheap read
+  // in the voice loop) and an immutable ledger for audit / admin dashboard.
+  if (!cols.find(c => c.name === 'credits_balance_minutes')) {
+    await db.exec('ALTER TABLE users ADD COLUMN credits_balance_minutes INTEGER NOT NULL DEFAULT 0');
+  }
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS credit_transactions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      delta_minutes INTEGER NOT NULL,           -- + for top-up, - for consumption
+      amount_cents INTEGER,                     -- EUR cents charged by Stripe (null for consumption)
+      currency TEXT DEFAULT 'eur',
+      kind TEXT NOT NULL,                       -- 'topup' | 'consume' | 'bonus' | 'refund'
+      stripe_session_id TEXT,
+      stripe_payment_intent TEXT,
+      note TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+  await db.exec('CREATE INDEX IF NOT EXISTS idx_credit_tx_user ON credit_transactions(user_id, created_at DESC)');
+  // Guard against double-fulfillment when Stripe retries webhooks.
+  await db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_credit_tx_session ON credit_transactions(stripe_session_id) WHERE stripe_session_id IS NOT NULL');
+
   return db;
 }
 
@@ -474,6 +501,11 @@ module.exports = {
   markPushSent,
   logProactive,
   recentProactiveForUser,
+  // Stage 7 — credits / monetization
+  getCreditsBalance,
+  addCreditsTransaction,
+  listCreditTransactions,
+  getCreditRevenueSummary,
 };
 
 // ─── Stage 5 helpers ────────────────────────────────────────────────
@@ -527,4 +559,119 @@ async function recentProactiveForUser(userId, sinceMs) {
     "SELECT id, kind, title, created_at FROM proactive_log WHERE user_id = ? AND created_at > ? ORDER BY created_at DESC",
     [userId, since]
   );
+}
+
+// ─── Stage 7 — Monetization (credits) ────────────────────────────
+async function getCreditsBalance(userId) {
+  const row = await db.get('SELECT credits_balance_minutes FROM users WHERE id = ?', [userId]);
+  return row ? Number(row.credits_balance_minutes || 0) : 0;
+}
+
+// In-process serializer for credit transactions. sqlite3's driver
+// serializes individual statements but NOT multi-statement transactions,
+// so two concurrent BEGIN IMMEDIATE calls can interleave. Devin Review
+// flagged this at commit 39043d96. We guard the whole transaction body
+// with a tiny promise chain so callers queue behind each other.
+let creditsTxnQueue = Promise.resolve();
+function serializeCreditsTxn(fn) {
+  const next = creditsTxnQueue.then(() => fn());
+  // Keep the chain alive even if fn throws — otherwise a rejection would
+  // break every subsequent call.
+  creditsTxnQueue = next.catch(() => {});
+  return next;
+}
+
+/**
+ * Atomically add `deltaMinutes` to a user's balance and write a ledger
+ * row. Use a positive `deltaMinutes` for top-ups / bonuses and a
+ * negative one for consumption. Returns the new balance.
+ *
+ * Stripe guarantees webhook at-least-once delivery, so top-up callers
+ * should pass a unique `stripe_session_id` — the UNIQUE index on that
+ * column rejects duplicates and we treat the collision as "already
+ * fulfilled" and no-op.
+ */
+function addCreditsTransaction({
+  userId,
+  deltaMinutes,
+  amountCents = null,
+  currency = 'eur',
+  kind,
+  stripeSessionId = null,
+  stripePaymentIntent = null,
+  note = null,
+}) {
+  if (!Number.isFinite(deltaMinutes) || deltaMinutes === 0) {
+    return Promise.reject(new Error('deltaMinutes must be a non-zero number'));
+  }
+  if (!kind || typeof kind !== 'string') {
+    return Promise.reject(new Error('kind is required'));
+  }
+  return serializeCreditsTxn(async () => {
+    try {
+      await db.run('BEGIN IMMEDIATE');
+      const row = await db.get('SELECT credits_balance_minutes FROM users WHERE id = ?', [userId]);
+      if (!row) {
+        await db.run('ROLLBACK');
+        throw new Error('user not found');
+      }
+      const current = Number(row.credits_balance_minutes || 0);
+      const next = current + deltaMinutes;
+      if (next < 0) {
+        // Refuse to go negative; caller should check balance first.
+        await db.run('ROLLBACK');
+        throw new Error('insufficient credits');
+      }
+      await db.run('UPDATE users SET credits_balance_minutes = ? WHERE id = ?', [next, userId]);
+      await db.run(
+        `INSERT INTO credit_transactions
+         (user_id, delta_minutes, amount_cents, currency, kind, stripe_session_id, stripe_payment_intent, note)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [userId, deltaMinutes, amountCents, currency, kind, stripeSessionId, stripePaymentIntent, note],
+      );
+      await db.run('COMMIT');
+      return { balance: next, previous: current, deltaMinutes };
+    } catch (err) {
+      try { await db.run('ROLLBACK'); } catch (_) { /* ignore */ }
+      // UNIQUE stripe_session_id → duplicate webhook delivery. Treat as idempotent.
+      if (/UNIQUE/i.test(err && err.message) && stripeSessionId) {
+        const balance = await getCreditsBalance(userId);
+        return { balance, previous: balance, deltaMinutes: 0, duplicate: true };
+      }
+      throw err;
+    }
+  });
+}
+
+async function listCreditTransactions(userId, limit = 50) {
+  return db.all(
+    `SELECT id, delta_minutes, amount_cents, currency, kind, stripe_session_id, note, created_at
+     FROM credit_transactions WHERE user_id = ? ORDER BY created_at DESC LIMIT ?`,
+    [userId, limit],
+  );
+}
+
+/**
+ * Admin-only — aggregate revenue + minutes sold in the last `sinceDays`.
+ * Used by the business dashboard.
+ */
+async function getCreditRevenueSummary(sinceDays = 30) {
+  const since = new Date(Date.now() - sinceDays * 86400000).toISOString();
+  const row = await db.get(
+    `SELECT
+       COUNT(CASE WHEN kind = 'topup' THEN 1 END) AS topups,
+       COALESCE(SUM(CASE WHEN delta_minutes > 0 THEN delta_minutes ELSE 0 END), 0) AS minutes_sold,
+       COALESCE(SUM(CASE WHEN kind = 'topup' AND amount_cents IS NOT NULL THEN amount_cents ELSE 0 END), 0) AS revenue_cents,
+       COALESCE(SUM(CASE WHEN delta_minutes < 0 THEN -delta_minutes ELSE 0 END), 0) AS minutes_consumed
+     FROM credit_transactions
+     WHERE created_at > ? AND kind IN ('topup', 'consume')`,
+    [since],
+  );
+  return {
+    sinceDays,
+    topups: Number(row?.topups || 0),
+    minutesSold: Number(row?.minutes_sold || 0),
+    minutesConsumed: Number(row?.minutes_consumed || 0),
+    revenueCents: Number(row?.revenue_cents || 0),
+  };
 }
