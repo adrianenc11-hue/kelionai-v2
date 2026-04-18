@@ -99,7 +99,7 @@ function checkSubscription(requiredPlan = 'free') {
       // a week. The JWT-only path above is limited to the "row missing"
       // case it was designed for (stale cookie against a reset DB).
       const dbRoleIsAdmin = user.role === 'admin';
-      const dbEmailIsAdmin = user.email && allAdmins.includes(String(user.email).toLowerCase());
+      const dbEmailIsAdmin = isAdminEmail(user.email);
       if (dbRoleIsAdmin || dbEmailIsAdmin) {
         req.subscription = {
           tier: 'admin',
