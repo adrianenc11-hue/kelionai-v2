@@ -40,12 +40,12 @@ async function bootstrapAdmin() {
   const password = process.env.ADMIN_BOOTSTRAP_PASSWORD;
 
   if (!password) {
-    // No-op without a configured password. This is the default in dev.
+    console.log(`[adminBootstrap] skipped — ADMIN_BOOTSTRAP_PASSWORD not set (target email: ${email})`);
     return { seeded: false, reason: 'ADMIN_BOOTSTRAP_PASSWORD not set' };
   }
 
   if (password.length < 8) {
-    console.warn('[adminBootstrap] refusing to seed: password shorter than 8 chars');
+    console.warn(`[adminBootstrap] REFUSED — password shorter than 8 chars (target email: ${email})`);
     return { seeded: false, reason: 'password too short' };
   }
 
@@ -58,8 +58,8 @@ async function bootstrapAdmin() {
         password_hash,
         role: 'admin',
       });
-      console.log(`[adminBootstrap] refreshed admin password for ${email}`);
-      return { seeded: true, updated: true, email };
+      console.log(`[adminBootstrap] refreshed admin password + role for ${email} (user id ${existing.id})`);
+      return { seeded: true, updated: true, email, userId: existing.id };
     }
 
     // createUser does not take password_hash — fall back to a direct insert

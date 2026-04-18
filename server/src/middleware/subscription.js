@@ -50,22 +50,42 @@ function checkSubscription(requiredPlan = 'free') {
     try {
       const userId = req.user.id;
 
+      // Admin identity check — ran BEFORE the DB lookup so that admins with
+      // stale JWTs (cookie minted against a previous DB snapshot that has
+      // since been reset / migrated) don't hit a 404 "User not found" wall.
+      // Adrian's requirement is "admin are tot nelimitat" — identity-based,
+      // not row-based. We trust the JWT email + allow-list for admin gating.
+      const defaultAdmins = ['adrianenc11@gmail.com'];
+      const extraAdmins = (process.env.ADMIN_EMAILS || '')
+        .split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
+      const allAdmins = [...new Set([...defaultAdmins, ...extraAdmins])];
+      const jwtEmail = (req.user.email || '').toLowerCase();
+      const jwtRoleIsAdmin = req.user.role === 'admin';
+      const jwtEmailIsAdmin = jwtEmail && allAdmins.includes(jwtEmail);
+
       const user = await findById(userId);
+
+      // Admin bypass via JWT identity — works even if the DB row was wiped.
+      if (!user && (jwtRoleIsAdmin || jwtEmailIsAdmin)) {
+        req.subscription = {
+          tier: 'admin',
+          plan: { id: 'admin', name: 'Admin', dailyLimit: null },
+          usageToday: 0,
+          dailyLimit: null,
+          isAdmin: true,
+        };
+        return next();
+      }
 
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
 
-      // Admins bypass all quotas + tier gating. Adrian's requirement:
-      // "admin are tot nelimitat" — regardless of plan, daily limit, or
-      // required tier, admin requests pass through untouched.
-      const defaultAdmins = ['adrianenc11@gmail.com'];
-      const extraAdmins = (process.env.ADMIN_EMAILS || '')
-        .split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
-      const allAdmins = [...new Set([...defaultAdmins, ...extraAdmins])];
-      const isAdmin = user.role === 'admin'
-        || (user.email && allAdmins.includes(String(user.email).toLowerCase()));
-      if (isAdmin) {
+      // Admin bypass via DB row — covers users whose admin role was toggled
+      // after they signed in (new JWT not yet minted).
+      const dbRoleIsAdmin = user.role === 'admin';
+      const dbEmailIsAdmin = user.email && allAdmins.includes(String(user.email).toLowerCase());
+      if (jwtRoleIsAdmin || jwtEmailIsAdmin || dbRoleIsAdmin || dbEmailIsAdmin) {
         req.subscription = {
           tier: 'admin',
           plan: { id: 'admin', name: 'Admin', dailyLimit: null },
