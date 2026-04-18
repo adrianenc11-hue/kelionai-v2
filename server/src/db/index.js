@@ -643,9 +643,9 @@ async function getCreditRevenueSummary(sinceDays = 30) {
   const since = new Date(Date.now() - sinceDays * 86400000).toISOString();
   const row = await db.get(
     `SELECT
-       COUNT(*) AS topups,
+       COUNT(CASE WHEN kind = 'topup' THEN 1 END) AS topups,
        COALESCE(SUM(CASE WHEN delta_minutes > 0 THEN delta_minutes ELSE 0 END), 0) AS minutes_sold,
-       COALESCE(SUM(CASE WHEN amount_cents IS NOT NULL THEN amount_cents ELSE 0 END), 0) AS revenue_cents,
+       COALESCE(SUM(CASE WHEN kind = 'topup' AND amount_cents IS NOT NULL THEN amount_cents ELSE 0 END), 0) AS revenue_cents,
        COALESCE(SUM(CASE WHEN delta_minutes < 0 THEN -delta_minutes ELSE 0 END), 0) AS minutes_consumed
      FROM credit_transactions
      WHERE created_at > ? AND kind IN ('topup', 'consume')`,

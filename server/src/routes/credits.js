@@ -171,13 +171,20 @@ router.post('/checkout', requireAuth, async (req, res) => {
  */
 function verifyStripeSignature(rawBody, header, secret, toleranceSeconds = 300) {
   if (!header || !secret) return false;
-  const parts = header.split(',').reduce((acc, kv) => {
-    const [k, v] = kv.split('=');
-    if (k && v) acc[k.trim()] = v.trim();
-    return acc;
-  }, {});
-  const timestamp = parts.t;
-  const signatures = [parts.v1, parts.v0].filter(Boolean);
+  // Collect ALL v1 signatures — during webhook secret rotation Stripe
+  // may send multiple v1 entries, one per active secret. Reducing into
+  // an object would clobber all but the last. See stripe-node's
+  // parseEventDetails for the canonical approach.
+  let timestamp = null;
+  const signatures = [];
+  for (const kv of header.split(',')) {
+    const idx = kv.indexOf('=');
+    if (idx < 0) continue;
+    const k = kv.slice(0, idx).trim();
+    const v = kv.slice(idx + 1).trim();
+    if (k === 't') timestamp = v;
+    else if (k === 'v1' || k === 'v0') signatures.push(v);
+  }
   if (!timestamp || signatures.length === 0) return false;
   const ts = Number(timestamp);
   if (!Number.isFinite(ts)) return false;
@@ -246,7 +253,16 @@ const webhookHandler = async (req, res) => {
     // Other events (payment_intent.succeeded etc) are harmless to ack.
     res.status(200).send('ok');
   } catch (err) {
-    console.error('[credits/webhook] handler error:', err && err.message);
+    const msg = err && err.message;
+    // If the user row is gone (deleted after payment), Stripe would
+    // retry this webhook ~30 times over several days for a 5xx. Since
+    // retries will never succeed, ACK with 200 + a loud log so the
+    // admin can refund manually via Stripe dashboard.
+    if (msg === 'user not found') {
+      console.error('[credits/webhook] user missing; payment orphaned — manual refund needed:', event?.id);
+      return res.status(200).send('ok (user missing)');
+    }
+    console.error('[credits/webhook] handler error:', msg);
     res.status(500).send('handler failed');
   }
 };
