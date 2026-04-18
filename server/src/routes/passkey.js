@@ -230,9 +230,25 @@ router.get('/me', (req, res) => {
     const token = req.cookies?.['kelion.token'];
     if (!token) return res.json({ signedIn: false });
     const decoded = jwt.verify(token, config.jwt.secret);
+    // Surface role + email so the frontend can gate admin-only UI
+    // (credits dashboard, business panel). Email is also used client-side
+    // against the env-configured ADMIN_EMAILS fallback list.
+    const defaultAdmins = ['adrianenc11@gmail.com'];
+    const adminEmails = (process.env.ADMIN_EMAILS || '')
+      .split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
+    const allAdmins = [...new Set([...defaultAdmins, ...adminEmails])];
+    const email = decoded.email || null;
+    const roleIsAdmin = decoded.role === 'admin';
+    const emailIsAdmin = email ? allAdmins.includes(email.toLowerCase()) : false;
     return res.json({
       signedIn: true,
-      user: { id: decoded.sub, name: decoded.name },
+      user: {
+        id: decoded.sub,
+        name: decoded.name,
+        email,
+        role: decoded.role || 'user',
+        isAdmin: Boolean(roleIsAdmin || emailIsAdmin),
+      },
     });
   } catch {
     return res.json({ signedIn: false });
