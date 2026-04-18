@@ -184,25 +184,36 @@ router.get('/gemini-token', async (req, res) => {
         uses: 1,
         expireTime,
         newSessionExpireTime,
-        liveConnectConstraints: {
+        // The REST provisioning endpoint calls this field
+        // `bidiGenerateContentSetup` (matching the WebSocket setup message
+        // https://ai.google.dev/api/live#BidiGenerateContentSetup). The Python
+        // SDK's `liveConnectConstraints` is an SDK-side alias — the raw HTTP
+        // API rejects it with 400 "Unknown name liveConnectConstraints".
+        // Inside the setup object, generationConfig is its own nested field
+        // (responseModalities / speechConfig / temperature / mediaResolution),
+        // while systemInstruction / realtimeInputConfig / tools /
+        // inputAudioTranscription / outputAudioTranscription live at the
+        // top level of the setup message.
+        bidiGenerateContentSetup: {
           model,
-          config: {
+          generationConfig: {
             responseModalities: ['AUDIO'],
             speechConfig: {
               voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } },
               languageCode: browserLang,
             },
-            systemInstruction: {
-              parts: [{ text: buildKelionPersona({ user, memoryItems, voiceStyle }) }],
-            },
-            realtimeInputConfig: {
-              automaticActivityDetection: { disabled: false },
-              turnCoverage: 'TURN_INCLUDES_ALL_INPUT',
-            },
-            inputAudioTranscription: {},
-            outputAudioTranscription: {},
             temperature: 0.85,
-            // Stage 4 — tools. googleSearch is a built-in grounding tool
+          },
+          systemInstruction: {
+            parts: [{ text: buildKelionPersona({ user, memoryItems, voiceStyle }) }],
+          },
+          realtimeInputConfig: {
+            automaticActivityDetection: { disabled: false },
+            turnCoverage: 'TURN_INCLUDES_ALL_INPUT',
+          },
+          inputAudioTranscription: {},
+          outputAudioTranscription: {},
+          // Stage 4 — tools. googleSearch is a built-in grounding tool
             // (model runs it server-side, returns grounded answer w/ citations).
             // functionDeclarations route tool calls back to OUR backend via the
             // client, which executes them and returns a tool_response. Keep this
@@ -301,7 +312,6 @@ router.get('/gemini-token', async (req, res) => {
                 ],
               },
             ],
-          },
         },
       }),
     });
