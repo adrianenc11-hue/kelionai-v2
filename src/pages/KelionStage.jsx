@@ -138,17 +138,24 @@ function AvatarModel({ mouthOpen = 0, status = 'idle', emotion = null, presentin
     const b = bonesRef.current
     if (!b) return
 
-    // Breathing — subtle chest rise
-    const breath = Math.sin(t * 0.8) * 0.015
-    const spine = b['Spine'] || b['mixamorigSpine'] || b['Spine1']
+    // Breathing — visible chest rise + upper-body sway. Adrian reported
+    // the avatar looked frozen ("nu mai respiră"), so we bump the spine
+    // amplitude and also drive spine1/chest for a compound rise. Period
+    // ~6s (0.8 Hz → cycle ≈1.25 s) is the resting-adult rate.
+    const breath = Math.sin(t * 0.8) * 0.032
+    const spine = b['Spine'] || b['mixamorigSpine']
+    const spine1 = b['Spine1'] || b['mixamorigSpine1']
+    const chest = b['Chest'] || b['mixamorigChest']
     if (spine) spine.rotation.x = -0.05 + breath
+    if (spine1) spine1.rotation.x = breath * 0.6
+    if (chest) chest.rotation.x = breath * 0.4
 
     // Micro head movement — never still
     const head = b['Head'] || b['mixamorigHead']
     if (head) {
-      head.rotation.y = Math.sin(t * 0.45) * 0.025
-      head.rotation.x = Math.sin(t * 0.62) * 0.02 - 0.02
-      head.rotation.z = Math.cos(t * 0.38) * 0.015
+      head.rotation.y = Math.sin(t * 0.45) * 0.035
+      head.rotation.x = Math.sin(t * 0.62) * 0.028 - 0.02
+      head.rotation.z = Math.cos(t * 0.38) * 0.02
     }
 
     // Lipsync — drive jaw + viseme morphs
@@ -191,11 +198,17 @@ function AvatarModel({ mouthOpen = 0, status = 'idle', emotion = null, presentin
       if (smileIdx !== undefined) {
         m.morphTargetInfluences[smileIdx] = Math.min(0.9, baseSmile + emotionSmile)
       }
-      const blinkLIdx = d['eyeBlinkLeft'] ?? d['eyesClosed']
-      const blinkRIdx = d['eyeBlinkRight']
+      // Blink — try every common morph name variant exposed by RPM / ARKit
+      // / mixamo exports. The "eyesClosed" fallback fires if only the
+      // grouped target exists. This is the fix for F6 (avatar not blinking).
+      const blinkLIdx = d['eyeBlinkLeft'] ?? d['eyeBlink_L'] ?? d['EyeBlinkLeft']
+      const blinkRIdx = d['eyeBlinkRight'] ?? d['eyeBlink_R'] ?? d['EyeBlinkRight']
+      const eyesClosedIdx = d['eyesClosed'] ?? d['EyesClosed'] ?? d['eyes_closed']
       const tiredBoost = emoMorphs && emoMorphs.eyeBlinkLeft ? emoMorphs.eyeBlinkLeft * emoScale : 0
-      if (blinkLIdx !== undefined) m.morphTargetInfluences[blinkLIdx] = Math.max(blinkStrength, tiredBoost)
-      if (blinkRIdx !== undefined) m.morphTargetInfluences[blinkRIdx] = Math.max(blinkStrength, tiredBoost)
+      const eyeWeight = Math.max(blinkStrength, tiredBoost)
+      if (blinkLIdx !== undefined) m.morphTargetInfluences[blinkLIdx] = eyeWeight
+      if (blinkRIdx !== undefined) m.morphTargetInfluences[blinkRIdx] = eyeWeight
+      if (eyesClosedIdx !== undefined) m.morphTargetInfluences[eyesClosedIdx] = eyeWeight
 
       // Apply the rest of the emotion morph weights directly by name when
       // the mesh exposes them. Unknown keys silently no-op.
@@ -1211,14 +1224,12 @@ export default function KelionStage() {
       >
         <TopBarIconButton
           onClick={() => { cameraStream ? stopCamera() : startCamera() }}
-          disabled={status === 'idle' || status === 'error'}
           active={!!cameraStream}
           title={cameraStream ? 'Turn camera off' : 'Turn camera on'}
           ariaLabel={cameraStream ? 'Turn camera off' : 'Turn camera on'}
         >📹</TopBarIconButton>
         <TopBarIconButton
           onClick={() => { screenStream ? stopScreen() : startScreen() }}
-          disabled={status === 'idle' || status === 'error'}
           active={!!screenStream}
           title={screenStream ? 'Stop sharing screen' : 'Share screen'}
           ariaLabel={screenStream ? 'Stop sharing screen' : 'Share screen'}
@@ -1229,7 +1240,11 @@ export default function KelionStage() {
           title={transcriptOpen ? 'Hide transcript' : 'Show transcript'}
           ariaLabel={transcriptOpen ? 'Hide transcript' : 'Show transcript'}
         >📝</TopBarIconButton>
-        {authState.signedIn && (
+        {/* Credits pill — hidden for admins (they have unlimited access and
+            no billing; showing "0 min" confused Adrian in testing). For
+            regular signed-in users we still show balance + open the Stripe
+            Checkout flow on click. */}
+        {authState.signedIn && !isAdmin && (
           <button
             onClick={() => openBuy()}
             style={{
@@ -1245,6 +1260,28 @@ export default function KelionStage() {
           >
             <span style={{ fontSize: 14 }}>💳</span>
             <span>Credits{balance != null ? ` · ${balance} min` : ''}</span>
+          </button>
+        )}
+        {/* Unlimited pill — admin-only, replaces Credits pill. Visual cue
+            that the current account is not gated. Click opens the business
+            metrics overlay, same as the overflow menu entry. */}
+        {authState.signedIn && isAdmin && (
+          <button
+            onClick={() => openBusiness()}
+            style={{
+              height: 36, padding: '0 12px', borderRadius: 999,
+              background: 'linear-gradient(135deg, rgba(250, 204, 21, 0.18), rgba(167, 139, 250, 0.18))',
+              backdropFilter: 'blur(12px)',
+              border: '1px solid rgba(250, 204, 21, 0.45)',
+              color: '#fef3c7', fontSize: 12, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 6,
+              fontWeight: 600,
+            }}
+            title="Admin — unlimited access"
+            aria-label="Admin — unlimited access"
+          >
+            <span style={{ fontSize: 14 }}>🛡️</span>
+            <span>Admin · ∞</span>
           </button>
         )}
         <button
