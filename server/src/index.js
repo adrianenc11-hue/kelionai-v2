@@ -19,6 +19,11 @@ const adminRouter      = require('./routes/admin');
 const chatRouter       = require('./routes/chat');
 const ttsRouter        = require('./routes/tts');
 const realtimeRouter   = require('./routes/realtime');
+const passkeyRouter    = require('./routes/passkey');
+const memoryRouter     = require('./routes/memory');
+const toolsRouter      = require('./routes/tools');
+const pushRouter       = require('./routes/push');
+const proactive        = require('./services/proactive');
 
 const app = express();
 app.disable('x-powered-by');
@@ -58,7 +63,7 @@ app.use(
         styleSrc:   ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         fontSrc:    ["'self'", "https://fonts.gstatic.com"],
         imgSrc:     ["'self'", "data:", "blob:", "https:"],
-        connectSrc: ["'self'", "https://api.openai.com", "wss://api.openai.com", "https://raw.githack.com", "https://*.githubusercontent.com", "blob:", "https:", "wss:"],
+        connectSrc: ["'self'", "https://api.openai.com", "wss://api.openai.com", "https://generativelanguage.googleapis.com", "wss://generativelanguage.googleapis.com", "https://raw.githack.com", "https://*.githubusercontent.com", "blob:", "https:", "wss:"],
         mediaSrc:   ["'self'", "blob:"],
         workerSrc:  ["'self'", "blob:"],
       },
@@ -211,7 +216,35 @@ app.use('/api/users', requireAuth, usersRouter);
 app.use('/api/admin', requireAuth, adminRouter);
 app.use('/api/chat', requireAuth, chatLimiter, checkSubscription(), chatRouter);
 app.use('/api/tts', requireAuth, chatLimiter, checkSubscription(), ttsRouter);
-app.use('/api/realtime', requireAuth, chatLimiter, realtimeRouter);
+// Realtime router is PUBLIC in Stage 1 (no login/users/subs per product spec).
+// Rate limiting still applies to prevent abuse. Ephemeral-token endpoints only
+// hand back short-lived tokens; persona + config are baked in server-side.
+app.use('/api/realtime', chatLimiter, realtimeRouter);
+
+// Stage 3 — M13 passkey (public — register/auth flows need to be reachable
+// without auth) + M14/M16/M17 memory (signed-in users only).
+// Rate-limited because POST /register/options creates a new user row on
+// every call; without a limiter an unauthenticated attacker can fill the
+// users table with orphan rows (Devin Review BUG pr-review-182448fc_0001).
+app.use('/api/auth/passkey', chatLimiter, passkeyRouter);
+app.use('/api/memory', requireAuth, memoryRouter);
+
+// Stage 4 — M19 (browser use) + M20 (web search status) + M21 (MCP stubs).
+// Router is PUBLIC by design: Gemini Live tool-call flow has no login gate,
+// and MCP endpoints self-check for a signed-in user inside the handler.
+app.use('/api/tools', chatLimiter, toolsRouter);
+
+// Stage 5 — M23 push + M24/M25 proactive scheduler. Requires passkey auth,
+// except /public-key which the browser needs to fetch BEFORE authenticating.
+app.get('/api/push/public-key', (_req, res) => {
+  res.json({ publicKey: pushRouter.getVapidPublicKey() });
+});
+app.use('/api/push', requireAuth, pushRouter);
+
+if (process.env.NODE_ENV !== 'test' && process.env.PROACTIVE_DISABLED !== '1') {
+  try { proactive.start(require('./routes/push').getWebPush()); }
+  catch (err) { console.warn('[proactive] failed to start:', err.message); }
+}
 
 // Health check with service status
 app.get('/health', async (_req, res) => {

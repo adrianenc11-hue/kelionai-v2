@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "@google-cloud/text-to-speech": "^5.0.0",
+    "@simplewebauthn/server": "^13.3.0",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
     "dotenv": "^16.0.0",
@@ -18,13 +19,17 @@
     "node-fetch": "^3.0.0",
     "openai": "^4.0.0",
     "sqlite": "^5.1.1",
-    "sqlite3": "^5.1.6"
+    "sqlite3": "^5.1.6",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "jest": "^29.0.0",
     "supertest": "^6.0.0"
   },
   "jest": {
-    "testPathIgnorePatterns": ["/node_modules/", "__tests__/helpers/"]
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "__tests__/helpers/"
+    ]
   }
 }
