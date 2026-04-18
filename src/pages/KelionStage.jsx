@@ -1207,6 +1207,67 @@ export default function KelionStage() {
           zIndex: 5,
         }}
       >
+        {/* F2 — hidden native file picker driving the "+" button below.
+            Accepts images, PDFs and text files. The selected file shows
+            as a dismissible pill and its filename + size land in the
+            outgoing message as a bracketed note. */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,application/pdf,text/plain,.txt,.md,.csv,.json"
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            const f = e.target.files && e.target.files[0]
+            if (f) setAttachedFile(f)
+          }}
+        />
+        <button
+          type="button"
+          onClick={() => fileInputRef.current && fileInputRef.current.click()}
+          disabled={chatBusy}
+          style={{
+            width: 30, height: 30, borderRadius: '50%',
+            background: 'rgba(167, 139, 250, 0.18)',
+            border: '1px solid rgba(167, 139, 250, 0.3)',
+            color: '#ede9fe',
+            cursor: chatBusy ? 'default' : 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 18, lineHeight: 1, flexShrink: 0, padding: 0,
+          }}
+          title="Attach file"
+          aria-label="Attach file"
+        >+</button>
+        {attachedFile && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 4,
+            padding: '3px 8px',
+            borderRadius: 999,
+            background: 'rgba(124, 58, 237, 0.22)',
+            border: '1px solid rgba(167, 139, 250, 0.35)',
+            color: '#ede9fe', fontSize: 11,
+            maxWidth: 130, overflow: 'hidden',
+            whiteSpace: 'nowrap', textOverflow: 'ellipsis',
+            flexShrink: 0,
+          }} title={attachedFile.name}>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              📎 {attachedFile.name}
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setAttachedFile(null)
+                if (fileInputRef.current) fileInputRef.current.value = ''
+              }}
+              style={{
+                background: 'transparent', border: 'none',
+                color: '#ede9fe', cursor: 'pointer', padding: '0 2px',
+                fontSize: 13, lineHeight: 1,
+              }}
+              aria-label="Remove attachment"
+              title="Remove attachment"
+            >×</button>
+          </div>
+        )}
         <input
           type="text"
           value={chatInput}
