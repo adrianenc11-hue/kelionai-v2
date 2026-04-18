@@ -144,7 +144,7 @@ function AvatarModel({ mouthOpen = 0, status = 'idle', emotion = null, presentin
     // `Math.sin(t * 0.8)`, the breathing rate is 0.8 rad/s, so the cycle
     // period is 2π / 0.8 ≈ 7.85 s (roughly an 8-second breath cycle).
     const breath = Math.sin(t * 0.8) * 0.032
-    const spine = b['Spine'] || b['mixamorigSpine']
+    const spine = b['Spine'] || b['mixamorigSpine'] || b['Spine1']
     const spine1 = b['Spine1'] || b['mixamorigSpine1']
     const chest = b['Chest'] || b['mixamorigChest']
     if (spine) spine.rotation.x = -0.05 + breath
