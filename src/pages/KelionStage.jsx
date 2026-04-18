@@ -333,30 +333,44 @@ function StudioDecor() {
         <meshBasicMaterial color={'#60a5fa'} toneMapped={false} />
       </mesh>
 
-      {/* Side wall slats — left */}
-      {[-3.2, -3.0, -2.8].map((x, i) => (
-        <mesh key={`sl-${i}`} position={[x, 0, -2 - i * 0.3]} rotation={[0, Math.PI / 6, 0]}>
-          <planeGeometry args={[0.15, 4]} />
-          <meshStandardMaterial
-            color={'#1a1a2e'}
-            emissive={'#7c3aed'}
-            emissiveIntensity={0.35}
-            roughness={0.5}
-          />
+      {/* Side wall slats were removed — Adrian found them distracting. The
+          left half of the stage now holds the presentation monitor; the
+          right half remains clean so the avatar is the focus. */}
+
+      {/* ───── Presentation monitor on the LEFT wall ─────
+          Large matte screen framed like a studio playback display.
+          Content-less by default (just shows a subtle "Kelion Presents"
+          watermark); future PR will pipe chat tool-use events here to
+          render code, weather, maps, generated images, etc. */}
+      <group position={[-2.6, 0.3, -1.2]} rotation={[0, Math.PI / 8, 0]}>
+        {/* Bezel / outer frame */}
+        <mesh position={[0, 0, -0.03]}>
+          <planeGeometry args={[2.6, 1.7]} />
+          <meshStandardMaterial color={'#0a0b14'} metalness={0.75} roughness={0.35} />
         </mesh>
-      ))}
-      {/* Side wall slats — right */}
-      {[3.2, 3.0, 2.8].map((x, i) => (
-        <mesh key={`sr-${i}`} position={[x, 0, -2 - i * 0.3]} rotation={[0, -Math.PI / 6, 0]}>
-          <planeGeometry args={[0.15, 4]} />
-          <meshStandardMaterial
-            color={'#1a1a2e'}
-            emissive={'#2563eb'}
-            emissiveIntensity={0.35}
-            roughness={0.5}
-          />
+        {/* Inner screen */}
+        <mesh position={[0, 0, 0]}>
+          <planeGeometry args={[2.4, 1.5]} />
+          <meshBasicMaterial color={'#0d0b1d'} toneMapped={false} />
         </mesh>
-      ))}
+        {/* Faint grid lines to hint "display" */}
+        {Array.from({ length: 6 }).map((_, i) => (
+          <mesh key={`mh-${i}`} position={[0, -0.6 + i * 0.25, 0.001]}>
+            <planeGeometry args={[2.3, 0.004]} />
+            <meshBasicMaterial color={'#1f1b3a'} toneMapped={false} opacity={0.4} transparent />
+          </mesh>
+        ))}
+        {/* "Kelion Presents" watermark dot */}
+        <mesh position={[0, 0, 0.002]}>
+          <circleGeometry args={[0.06, 32]} />
+          <meshBasicMaterial color={'#7c3aed'} toneMapped={false} opacity={0.55} transparent />
+        </mesh>
+        {/* Stand leg */}
+        <mesh position={[0, -1.1, -0.02]}>
+          <planeGeometry args={[0.1, 0.6]} />
+          <meshStandardMaterial color={'#0a0b14'} metalness={0.8} roughness={0.3} />
+        </mesh>
+      </group>
 
       {/* Reflective floor */}
       <mesh position={[0, -1.65, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
@@ -368,8 +382,8 @@ function StudioDecor() {
         />
       </mesh>
 
-      {/* Subtle ground glow under avatar */}
-      <mesh position={[0, -1.64, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      {/* Subtle ground glow under avatar — follows avatar's new offset. */}
+      <mesh position={[1.6, -1.64, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <circleGeometry args={[1.8, 64]} />
         <meshBasicMaterial color={'#7c3aed'} transparent opacity={0.18} depthWrite={false} blending={THREE.AdditiveBlending} />
       </mesh>
@@ -392,12 +406,12 @@ function StudioDecor() {
         color={'#a78bfa'}
       />
       <spotLight
-        position={[0, 4, -3]}
+        position={[1.6, 4, -3]}
         angle={0.6}
         penumbra={0.8}
         intensity={0.9}
         color={'#60a5fa'}
-        target-position={[0, 0, 0]}
+        target-position={[1.6, 0, 0]}
       />
       {/* Rim light from behind */}
       <pointLight position={[0, 1.5, -3]} intensity={0.6} color={'#c084fc'} />
@@ -422,9 +436,11 @@ function CameraRig() {
     return () => window.removeEventListener('pointermove', onMove)
   }, [])
   useFrame(() => {
-    camera.position.x += (target.current.x - camera.position.x) * 0.03
+    // Camera recentered slightly to the right so both the presentation
+    // monitor (left) and the avatar (right) are in frame.
+    camera.position.x += (0.3 + target.current.x - camera.position.x) * 0.03
     camera.position.y += (0.2 + target.current.y - camera.position.y) * 0.03
-    camera.lookAt(0, 0.4, 0)
+    camera.lookAt(0.3, 0.4, 0)
   })
   return null
 }
@@ -569,6 +585,25 @@ export default function KelionStage() {
       setInstallPromptEvent(null)
     } catch (_) { /* user dismissed */ }
   }, [installPromptEvent])
+
+  // Global ESC handler — closes any open overlay / drawer so the user is
+  // never stuck with a side panel they cannot dismiss. Also closes the ⋯
+  // menu. The Buy-credits modal has its own backdrop so it also closes
+  // on click-outside; this just adds keyboard parity.
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return
+      setMenuOpen(false)
+      setTranscriptOpen(false)
+      setMemoryOpen(false)
+      setCreditsOpen(false)
+      setBusinessOpen(false)
+      setBuyOpen(false)
+      setRememberPromptOpen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   // Admin-only — live business metrics (revenue + minutes sold/consumed).
   const [businessOpen, setBusinessOpen] = useState(false)
@@ -893,9 +928,13 @@ export default function KelionStage() {
         <Suspense fallback={null}>
           <Environment preset="city" environmentIntensity={0.35} />
           <StudioDecor />
-          <Halo status={status} voiceLevel={voiceLevel} emotion={emotion} />
-          <AvatarModel mouthOpen={mouthOpen} status={status} emotion={emotion} />
-          <ContactShadows position={[0, -1.65, 0]} opacity={0.55} scale={6} blur={2.6} far={2.5} />
+          {/* Halo removed — Adrian asked to stop the pulsating circle behind
+              the avatar; it was too busy. Status color is still conveyed
+              through the spotlights + status-dot in the HUD. */}
+          <group position={[1.6, 0, 0]}>
+            <AvatarModel mouthOpen={mouthOpen} status={status} emotion={emotion} />
+          </group>
+          <ContactShadows position={[1.6, -1.65, 0]} opacity={0.55} scale={5} blur={2.6} far={2.5} />
         </Suspense>
       </Canvas>
 
@@ -1265,22 +1304,48 @@ export default function KelionStage() {
         </div>
       )}
 
-      {/* Transcript drawer */}
+      {/* Transcript drawer — opt-in, has X + backdrop + ESC to close.
+          Previously the only way to close it was to re-open the ⋯ menu
+          and pick "Hide transcript", which was not discoverable. */}
+      {transcriptOpen && (
+        <div
+          onClick={() => setTranscriptOpen(false)}
+          style={{
+            position: 'absolute', inset: 0,
+            background: 'rgba(3, 4, 10, 0.35)',
+            zIndex: 23,
+          }}
+        />
+      )}
       {transcriptOpen && (
         <div
           onClick={(e) => e.stopPropagation()}
           style={{
             position: 'absolute', top: 0, right: 0, bottom: 0,
             width: 'min(420px, 92vw)',
-            background: 'rgba(10, 8, 20, 0.78)',
+            background: 'rgba(10, 8, 20, 0.82)',
             backdropFilter: 'blur(22px)',
             borderLeft: '1px solid rgba(167, 139, 250, 0.2)',
             padding: '70px 20px 20px 20px',
             overflowY: 'auto',
             fontFamily: 'system-ui, -apple-system, sans-serif',
+            zIndex: 24,
           }}
         >
-          <div style={{ fontSize: 11, opacity: 0.6, letterSpacing: '0.15em', marginBottom: 12 }}>TRANSCRIPT</div>
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            marginBottom: 12,
+          }}>
+            <div style={{ fontSize: 11, opacity: 0.6, letterSpacing: '0.15em' }}>TRANSCRIPT</div>
+            <button
+              onClick={() => setTranscriptOpen(false)}
+              style={{
+                background: 'transparent', border: 'none', color: '#ede9fe',
+                fontSize: 20, cursor: 'pointer', opacity: 0.7,
+              }}
+              aria-label="Close transcript"
+            >✕</button>
+          </div>
           {turns.length === 0 && (
             <div style={{ opacity: 0.5, fontSize: 14 }}>Conversation will appear here.</div>
           )}
@@ -1391,6 +1456,16 @@ export default function KelionStage() {
       )}
 
       {/* Stage 3 — memory drawer */}
+      {memoryOpen && (
+        <div
+          onClick={() => setMemoryOpen(false)}
+          style={{
+            position: 'absolute', inset: 0,
+            background: 'rgba(3, 4, 10, 0.35)',
+            zIndex: 23,
+          }}
+        />
+      )}
       {memoryOpen && (
         <div
           onClick={(e) => e.stopPropagation()}
@@ -1609,6 +1684,16 @@ export default function KelionStage() {
       {/* Admin-only — live business metrics drawer. */}
       {businessOpen && (
         <div
+          onClick={() => setBusinessOpen(false)}
+          style={{
+            position: 'absolute', inset: 0,
+            background: 'rgba(3, 4, 10, 0.35)',
+            zIndex: 25,
+          }}
+        />
+      )}
+      {businessOpen && (
+        <div
           onClick={(e) => e.stopPropagation()}
           style={{
             position: 'absolute', top: 0, right: 0, bottom: 0,
@@ -1721,6 +1806,16 @@ export default function KelionStage() {
           "configured" signal + a top-up link that deep-links into the
           provider's billing console. Clicking a card opens the top-up
           page in a new tab. */}
+      {creditsOpen && (
+        <div
+          onClick={() => setCreditsOpen(false)}
+          style={{
+            position: 'absolute', inset: 0,
+            background: 'rgba(3, 4, 10, 0.35)',
+            zIndex: 25,
+          }}
+        />
+      )}
       {creditsOpen && (
         <div
           onClick={(e) => e.stopPropagation()}
