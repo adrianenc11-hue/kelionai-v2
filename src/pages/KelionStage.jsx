@@ -1387,8 +1387,53 @@ export default function KelionStage() {
           <MenuItem onClick={() => { stop(); setMenuOpen(false) }} disabled={status === 'idle'}>
             End chat
           </MenuItem>
+          <div
+            style={{
+              height: 1,
+              background: 'rgba(167, 139, 250, 0.15)',
+              margin: '6px 8px',
+            }}
+          />
+          {/* Contact — routes to the standard /contact page (form with
+              department select). Kept in the overflow menu so the top
+              bar stays focused on session controls. */}
+          <MenuItem
+            onClick={() => {
+              window.location.assign('/contact')
+              setMenuOpen(false)
+            }}
+          >
+            Contact us
+          </MenuItem>
         </div>
       )}
+
+      {/* Small footer-style contact strip, bottom-center. Always visible,
+          non-intrusive — lets users reach the team with one click without
+          needing to open the overflow menu. */}
+      <a
+        href="/contact"
+        style={{
+          position: 'absolute',
+          bottom: 12,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          fontSize: 11,
+          letterSpacing: 0.4,
+          color: 'rgba(237, 233, 254, 0.55)',
+          textDecoration: 'none',
+          padding: '4px 10px',
+          borderRadius: 999,
+          background: 'rgba(10, 8, 20, 0.35)',
+          backdropFilter: 'blur(8px)',
+          border: '1px solid rgba(167, 139, 250, 0.15)',
+          zIndex: 5,
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.color = '#ede9fe' }}
+        onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(237, 233, 254, 0.55)' }}
+      >
+        Contact
+      </a>
 
       {/* Camera preview — visible confirmation Kelion sees you (M9) */}
       {cameraStream && (

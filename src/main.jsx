@@ -5,6 +5,7 @@ import ErrorBoundary from './components/ErrorBoundary'
 import './index.css'
 
 const KelionStage = lazy(() => import('./pages/KelionStage'))
+const ContactPage = lazy(() => import('./pages/ContactPage'))
 
 function Loader() {
   return (
