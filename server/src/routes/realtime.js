@@ -146,7 +146,15 @@ router.get('/gemini-token', async (req, res) => {
 
   try {
     const voice = process.env.GEMINI_LIVE_VOICE_KELION || 'Kore';
-    const model = process.env.GEMINI_LIVE_MODEL || 'gemini-3.1-flash-live-preview';
+    // Gemini Live models currently published by Google (as of April 2026):
+    // - gemini-live-2.5-flash-preview  (cascade, widely available)
+    // - gemini-2.5-flash-preview-native-audio-dialog  (native audio)
+    // - gemini-2.0-flash-live-001  (stable v2)
+    // "gemini-3.1-flash-live-preview" is NOT a real model name — Google returns
+    // 400 and our handler bubbles it up as 500 "Failed to create Gemini live
+    // session". Default to the cascade preview model; override via Railway env
+    // GEMINI_LIVE_MODEL when a newer one is announced.
+    const model = process.env.GEMINI_LIVE_MODEL || 'gemini-live-2.5-flash-preview';
     const browserLang = (req.query.lang || 'en-US').toString().slice(0, 16);
     // Stage 6 — M26: voice style preset chosen by the user via the menu.
     // Cookie first (survives refresh), then ?style= query, then default warm.
