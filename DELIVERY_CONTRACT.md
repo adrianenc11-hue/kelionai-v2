@@ -40,12 +40,7 @@ CODEOWNERS approval (see `CODEOWNERS`).
 
 | Feature | Script | Delivered? |
 |---|---|---|
-| Real payments (card → active subscription) | `e2e/acceptance/payments.cjs` | **NO** |
-| Language mirror (reply in user's language) | `e2e/acceptance/language-mirror.cjs` | **NOT VERIFIED** |
-| Language switch mid-conversation | `e2e/acceptance/language-switch.cjs` | **NOT VERIFIED** |
-| 15-minute trial timer enforcement | `e2e/acceptance/trial-timer.cjs` | **NOT VERIFIED** |
-| Logout releases mic+camera tracks | `e2e/acceptance/logout-media.cjs` | **NO (script not implemented)** |
-| Live voice round-trip | `e2e/acceptance/voice-roundtrip.cjs` | **NO (script not implemented)** |
+| Live voice round-trip (Gemini Live ephemeral-token precondition) | `e2e/acceptance/voice-roundtrip.cjs` | driven by CI status on `master` |
 
 The default state for every capability is "not delivered". Moving a row
 from "not delivered" to "delivered" requires:
@@ -57,6 +52,25 @@ from "not delivered" to "delivered" requires:
 
 Moving a row backwards (from delivered to not delivered) happens
 automatically if the script ever fails in CI or a manual run.
+
+## Out of scope (removed from the product)
+
+The following capabilities were part of the pre-Kelion product and were
+intentionally removed from the UI in Stage 1 (no UI exposure to end users
+and no marketing of the capability). Their acceptance scripts were
+removed alongside the feature, not to hide broken behavior but because
+the contract table no longer claims these as delivered work:
+
+- Real card payments and subscription tiers (`payments`).
+- Language mirroring — explicitly setting a reply language (`language-mirror`).
+- Language switch mid-conversation (`language-switch`).
+- 15-minute trial timer (`trial-timer`) — Kelion is public, no trial gate.
+- Logout-releases-media (`logout-media`) — Kelion has no logout UI; auth
+  is passkey-only and optional for memory persistence (see Stage 3).
+
+If any of these capabilities returns to the product, a fresh acceptance
+script must be written and added back to both this table and the
+`acceptance` workflow matrix in `.github/workflows/acceptance.yml`.
 
 ## Weakening the contract is forbidden
 

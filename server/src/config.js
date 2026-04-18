@@ -84,7 +84,10 @@ module.exports = {
   gemini: {
     apiKey:       optional('GEMINI_API_KEY'),
     chatModel:    optional('GEMINI_CHAT_MODEL', 'gemini-3-flash-preview'),
-    liveModel:    optional('GEMINI_LIVE_MODEL', 'gemini-3.1-flash-live-preview'),
+    // Keep this default in sync with server/src/routes/realtime.js — both
+    // read GEMINI_LIVE_MODEL directly, so the fallbacks must match. See
+    // that file for the current list of valid Google Live model names.
+    liveModel:    optional('GEMINI_LIVE_MODEL', 'gemini-live-2.5-flash-preview'),
     ttsModel:     optional('GEMINI_TTS_MODEL', 'gemini-3.1-flash-tts-preview'),
     ttsVoiceKelion: optional('GEMINI_TTS_VOICE_KELION', 'Kore'),
   },
