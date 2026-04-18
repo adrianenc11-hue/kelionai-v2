@@ -40,12 +40,33 @@ CODEOWNERS approval (see `CODEOWNERS`).
 
 | Feature | Script | Delivered? |
 |---|---|---|
-| Real payments (card → active subscription) | `e2e/acceptance/payments.cjs` | **NO** |
-| Language mirror (reply in user's language) | `e2e/acceptance/language-mirror.cjs` | **NOT VERIFIED** |
-| Language switch mid-conversation | `e2e/acceptance/language-switch.cjs` | **NOT VERIFIED** |
-| 15-minute trial timer enforcement | `e2e/acceptance/trial-timer.cjs` | **NOT VERIFIED** |
-| Logout releases mic+camera tracks | `e2e/acceptance/logout-media.cjs` | **NO (script not implemented)** |
-| Live voice round-trip | `e2e/acceptance/voice-roundtrip.cjs` | **NO (script not implemented)** |
+| Live voice round-trip (Stage 1: Gemini Live token mintable on production) | `e2e/acceptance/voice-roundtrip.cjs` | **VERIFIED ONLY UP TO PRECONDITIONS** (token endpoint green; mic→AI→STT full closure not yet implemented) |
+
+### Capabilities deliberately out of scope for the new Kelion product
+
+The old kelionai.app had separate UIs for payments, 15-minute trial, logout
+media tracks, language picker and language switch. The new Kelion product
+(Stages 1–6) removes those flows from the UI per owner decision:
+
+- Payments / subscriptions — not part of this product iteration.
+- 15-minute trial timer — not part of this product iteration.
+- Explicit logout button releasing mic+camera — the new UI has no auth
+  logout flow (passkey sign-in is optional, not required to talk). Media
+  tracks are owned by the `useGeminiLive` hook and torn down when the
+  user taps to end the call or closes the tab.
+- Language picker — Gemini Live auto-detects and mirrors the user's
+  language natively (Stage 1 persona rules §1–§3). No UI toggle.
+- Language switch mid-conversation — same as above, handled natively
+  by the model.
+
+The corresponding acceptance scripts have been removed because the
+features they asserted no longer exist as user-visible capabilities of
+the product. Per §1 above, "delivered" requires a real user action; if
+the action no longer exists in the product, the row is removed.
+
+If the owner later re-introduces any of these capabilities, the
+acceptance script for that capability must be restored first, and the
+row re-added to the table, before the feature can be marked delivered.
 
 The default state for every capability is "not delivered". Moving a row
 from "not delivered" to "delivered" requires:

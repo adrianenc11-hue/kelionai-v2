@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "server:install": "cd server && npm install",
     "server:dev": "cd server && npm run dev",
-    "server:start": "npm run build && cd server && npm start"
+    "server:start": "npm run build && cd server && npm start",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",
