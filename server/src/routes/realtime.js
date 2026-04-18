@@ -24,8 +24,22 @@ async function peekSignedInUser(req) {
 
 // Kelion persona — injected server-side into every Gemini Live session
 // so users cannot jailbreak by replacing the system prompt.
+// Stage 6 — M26: voice style presets. Each preset nudges Gemini Live's
+// prosody / register / pace via system prompt (we keep the native low-latency
+// voice; layering Inworld/Sesame TTS would double our TTFA, not worth it yet).
+const VOICE_STYLES = {
+  warm:    { label: 'warm',    directive: 'Speak warmly — unhurried pace, gentle inflection, the voice of a close friend catching up over coffee. Soft s\'s, relaxed breath.' },
+  playful: { label: 'playful', directive: 'Speak playfully — lighter energy, brighter pitch, a touch of smile in the voice, a quick wit. Not hyperactive, just sparkly.' },
+  calm:    { label: 'calm',    directive: 'Speak calmly — steady, grounded pace, lower register, longer pauses, almost meditative. The voice of someone who has time for you.' },
+  focused: { label: 'focused', directive: 'Speak with crisp focus — clear articulation, direct, a professional cadence. No extra words, no fluff. Still warm, just efficient.' },
+};
+function resolveVoiceStyle(raw) {
+  const k = (raw || '').toString().toLowerCase();
+  return VOICE_STYLES[k] || VOICE_STYLES.warm;
+}
+
 function buildKelionPersona(opts = {}) {
-  const { user = null, memoryItems = [] } = opts;
+  const { user = null, memoryItems = [], voiceStyle = VOICE_STYLES.warm } = opts;
   const now = new Date();
   const iso = now.toISOString();
   const weekday = now.toLocaleDateString('en-US', { weekday: 'long' });
@@ -38,10 +52,11 @@ Character:
 - You never say "As an AI…" or "I'm just a language model". You are Kelion.
 - You never moralize. You never refuse reasonable questions. You help.
 
-Voice style:
+Voice style (current mode: ${voiceStyle.label}):
 - You are speaking OUT LOUD. Keep replies short: 1–3 sentences for most turns, longer only when explicitly asked for depth.
 - Sound natural: pauses, inflection, breath. No long lists, no markdown, no "First,…, Second,…".
 - Do not announce what you are about to do — just do it.
+- ${voiceStyle.directive}
 
 Language (strict):
 1. Detect the language of the MOST RECENT user utterance and reply ONLY in that language.
@@ -52,8 +67,9 @@ Tools you can use (Stage 4):
 - google_search — live web search grounded in Google results. Call this the moment you need anything time-sensitive (news, prices, weather, schedules, recent events, facts that change). Cite the source naturally in speech ("according to the BBC…") when it helps trust.
 - browse_web(task) — send an autonomous web agent to perform a task in a real browser (open a page, fill a form, extract info). Use it when search alone is not enough.
 - read_calendar(range), read_email(query), search_files(query) — look into the user's connected accounts when they ask about their own stuff.
+- observe_user_emotion(state, intensity, cue) — SILENT tool. Call it whenever you read a clear emotional shift on the user's face (when the camera is on) or in their voice. Never narrate this call, never tell the user you are doing it. The client uses it to subtly adapt the avatar's expression and the halo color. Fire it at most once every 4-5 seconds and only when you are genuinely confident.
 
-When you decide to call a tool, narrate briefly and naturally FIRST — one short sentence in the user's language ("one moment, let me check" / "hai să verific repede") — then run the call. When the result arrives, answer the user directly; do not read the raw tool output back.
+When you decide to call a tool, narrate briefly and naturally FIRST — one short sentence in the user's language ("one moment, let me check" / "hai să verific repede") — then run the call. When the result arrives, answer the user directly; do not read the raw tool output back. EXCEPTION: observe_user_emotion is silent — no narration, no announcement.
 
 Other capabilities:
 - Camera vision and screen share work when the user enables them.
@@ -131,6 +147,11 @@ router.get('/gemini-token', async (req, res) => {
     const voice = process.env.GEMINI_LIVE_VOICE_KELION || 'Kore';
     const model = process.env.GEMINI_LIVE_MODEL || 'gemini-3.1-flash-live-preview';
     const browserLang = (req.query.lang || 'en-US').toString().slice(0, 16);
+    // Stage 6 — M26: voice style preset chosen by the user via the menu.
+    // Cookie first (survives refresh), then ?style= query, then default warm.
+    const styleFromCookie = req.cookies?.['kelion.voice_style'];
+    const styleFromQuery  = (req.query.style || '').toString();
+    const voiceStyle = resolveVoiceStyle(styleFromCookie || styleFromQuery);
 
     // Stage 3 — pull memory for signed-in users so Gemini Live starts
     // with the user's durable facts already in the system prompt.
@@ -162,7 +183,7 @@ router.get('/gemini-token', async (req, res) => {
               languageCode: browserLang,
             },
             systemInstruction: {
-              parts: [{ text: buildKelionPersona({ user, memoryItems }) }],
+              parts: [{ text: buildKelionPersona({ user, memoryItems, voiceStyle }) }],
             },
             realtimeInputConfig: {
               automaticActivityDetection: { disabled: false },
@@ -239,6 +260,34 @@ router.get('/gemini-token', async (req, res) => {
                       required: ['query'],
                     },
                   },
+                  // Stage 6 — M27: emotion mirroring. Fire-and-forget tool
+                  // — Kelion calls this whenever he reads a visible emotional
+                  // cue from the user's camera (smile, furrowed brow, etc.).
+                  // The client applies subtle avatar morphs + halo tint.
+                  // Kelion should NOT narrate that he's doing this.
+                  {
+                    name: 'observe_user_emotion',
+                    description: "Record your read of the user's current emotional state based on their face (camera) and voice. Call this silently whenever you notice a clear shift (they smile, frown, look tired, sound stressed, etc.) — do NOT announce it to the user. Keep calls rare (at most every 4-5 seconds) and only when you are genuinely confident.",
+                    parameters: {
+                      type: 'OBJECT',
+                      properties: {
+                        state: {
+                          type: 'STRING',
+                          enum: ['neutral','happy','sad','surprised','angry','tired','focused','confused','anxious'],
+                          description: 'Your best single-word read of the user\'s current state.',
+                        },
+                        intensity: {
+                          type: 'NUMBER',
+                          description: 'How strong the signal is, 0.0 (faint) to 1.0 (unmistakable).',
+                        },
+                        cue: {
+                          type: 'STRING',
+                          description: 'Short phrase naming the cue ("slight smile", "voice trembling", "furrowed brow"). 1-6 words.',
+                        },
+                      },
+                      required: ['state', 'intensity'],
+                    },
+                  },
                 ],
               },
             ],
@@ -263,6 +312,7 @@ router.get('/gemini-token', async (req, res) => {
       signedIn:  !!user,
       userName:  user?.name || null,
       memoryCount: memoryItems.length,
+      voiceStyle: voiceStyle.label,
     });
   } catch (err) {
     console.error('[realtime] Gemini error:', err.message);
@@ -270,4 +320,20 @@ router.get('/gemini-token', async (req, res) => {
   }
 });
 
+// Stage 6 — M26: lightweight cookie-backed voice style setter.
+// Persisted 90 days as httpOnly=false (so the client can read/clear too).
+router.post('/voice-style', (req, res) => {
+  const raw = (req.body?.style || '').toString();
+  const resolved = resolveVoiceStyle(raw);
+  res.cookie('kelion.voice_style', resolved.label, {
+    httpOnly: false,
+    sameSite: 'Lax',
+    maxAge: 90 * 24 * 60 * 60 * 1000,
+  });
+  res.json({ ok: true, style: resolved.label });
+});
+
 module.exports = router;
+module.exports.VOICE_STYLES = VOICE_STYLES;
+module.exports.resolveVoiceStyle = resolveVoiceStyle;
+module.exports.buildKelionPersona = buildKelionPersona;

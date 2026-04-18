@@ -2,6 +2,11 @@
 // When Gemini Live emits a toolCall, geminiLive.js calls runTool(name, args)
 // which proxies to our backend. The backend owns credentials (BROWSER_USE_API_KEY,
 // MCP tokens, etc.); the client just shuttles.
+//
+// Stage 6 — observe_user_emotion is handled LOCALLY (no backend hop). It
+// mutates the emotion store, which the avatar subscribes to.
+
+import { setEmotion } from './emotionStore'
 
 async function postJSON(url, body) {
   const r = await fetch(url, {
@@ -44,6 +49,16 @@ export async function runTool(name, args) {
         query: args?.query || '',
         limit: args?.limit || 5,
       }))
+    case 'observe_user_emotion': {
+      // Local-only: mutate the emotion store so the avatar reacts.
+      // Return a tiny ack so Gemini knows we heard it.
+      const applied = setEmotion({
+        state: args?.state || 'neutral',
+        intensity: args?.intensity ?? 0.5,
+        cue: args?.cue || null,
+      })
+      return `ack:${applied.state}:${applied.intensity.toFixed(2)}`
+    }
     default:
       return `Tool "${name}" is not implemented on this build.`
   }

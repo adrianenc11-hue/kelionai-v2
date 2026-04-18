@@ -24,9 +24,35 @@ import {
   disablePush,
   sendTestPing,
 } from '../lib/pushClient'
+import { useEmotion } from '../lib/emotionStore'
 
-// ───── Avatar with idle animation + lipsync ─────
-function AvatarModel({ mouthOpen = 0, status = 'idle' }) {
+// Stage 6 — M26 voice-style menu presets (labels match server VOICE_STYLES).
+const VOICE_STYLE_OPTIONS = [
+  { key: 'warm',    label: 'Warm' },
+  { key: 'playful', label: 'Playful' },
+  { key: 'calm',    label: 'Calm' },
+  { key: 'focused', label: 'Focused' },
+]
+async function setVoiceStyle(style) {
+  try {
+    const r = await fetch('/api/realtime/voice-style', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ style }),
+    })
+    const j = await r.json().catch(() => ({}))
+    return j?.ok ? j.style : null
+  } catch { return null }
+}
+function readVoiceStyleCookie() {
+  if (typeof document === 'undefined') return 'warm'
+  const m = document.cookie.match(/(?:^|;\s*)kelion\.voice_style=([^;]+)/)
+  return m ? decodeURIComponent(m[1]) : 'warm'
+}
+
+// ───── Avatar with idle animation + lipsync + Stage 6 emotion morphs ─────
+function AvatarModel({ mouthOpen = 0, status = 'idle', emotion = null }) {
   const { scene } = useGLTF('/kelion-rpm_e27cb94d.glb')
   const root = useRef()
   const bonesRef = useRef({})
@@ -104,6 +130,11 @@ function AvatarModel({ mouthOpen = 0, status = 'idle' }) {
       }
     }
 
+    // Stage 6 — emotion morph weights (0..1 per ARKit/RPM morph name).
+    // We multiply by the detected intensity so faint cues = subtle reaction.
+    const emoMorphs = (emotion && emotion.state !== 'neutral' && emotion.profile?.morphs) || null
+    const emoScale  = emotion ? emotion.intensity : 0
+
     for (const m of morphsRef.current) {
       const d = m.morphTargetDictionary
       if (!d) continue
@@ -111,14 +142,27 @@ function AvatarModel({ mouthOpen = 0, status = 'idle' }) {
       if (mouthIdx !== undefined) {
         m.morphTargetInfluences[mouthIdx] = mouthOpen * 0.45
       }
+      const baseSmile = status === 'listening' ? 0.08 : 0.04
+      const emotionSmile = emoMorphs ? (emoMorphs.mouthSmile || emoMorphs.mouthSmileLeft || 0) * emoScale : 0
       const smileIdx = d['mouthSmile'] ?? d['mouthSmileLeft']
       if (smileIdx !== undefined) {
-        m.morphTargetInfluences[smileIdx] = status === 'listening' ? 0.08 : 0.04
+        m.morphTargetInfluences[smileIdx] = Math.min(0.9, baseSmile + emotionSmile)
       }
       const blinkLIdx = d['eyeBlinkLeft'] ?? d['eyesClosed']
       const blinkRIdx = d['eyeBlinkRight']
-      if (blinkLIdx !== undefined) m.morphTargetInfluences[blinkLIdx] = blinkStrength
-      if (blinkRIdx !== undefined) m.morphTargetInfluences[blinkRIdx] = blinkStrength
+      const tiredBoost = emoMorphs && emoMorphs.eyeBlinkLeft ? emoMorphs.eyeBlinkLeft * emoScale : 0
+      if (blinkLIdx !== undefined) m.morphTargetInfluences[blinkLIdx] = Math.max(blinkStrength, tiredBoost)
+      if (blinkRIdx !== undefined) m.morphTargetInfluences[blinkRIdx] = Math.max(blinkStrength, tiredBoost)
+
+      // Apply the rest of the emotion morph weights directly by name when
+      // the mesh exposes them. Unknown keys silently no-op.
+      if (emoMorphs) {
+        for (const [key, weight] of Object.entries(emoMorphs)) {
+          if (key === 'mouthSmile' || key === 'mouthSmileLeft' || key === 'eyeBlinkLeft' || key === 'eyeBlinkRight') continue
+          const idx = d[key]
+          if (idx !== undefined) m.morphTargetInfluences[idx] = weight * emoScale
+        }
+      }
     }
   })
 
@@ -126,12 +170,21 @@ function AvatarModel({ mouthOpen = 0, status = 'idle' }) {
 }
 
 // ───── Status halo — pulsating light behind avatar ─────
-function Halo({ status = 'idle', voiceLevel = 0 }) {
+function Halo({ status = 'idle', voiceLevel = 0, emotion = null }) {
   const mesh = useRef()
-  const color = useMemo(() => new THREE.Color(STATUS_COLORS[status] || STATUS_COLORS.idle), [status])
+  // Stage 6 — blend status color toward emotion tint by intensity.
+  const computeTarget = () => {
+    const base = new THREE.Color(STATUS_COLORS[status] || STATUS_COLORS.idle)
+    if (emotion && emotion.state !== 'neutral' && emotion.profile?.halo) {
+      const emo = new THREE.Color(emotion.profile.halo)
+      base.lerp(emo, Math.min(0.7, emotion.intensity * 0.8))
+    }
+    return base
+  }
+  const color = useMemo(computeTarget, [status, emotion?.state, emotion?.intensity])
   const colorTarget = useRef(color.clone())
 
-  useEffect(() => { colorTarget.current = new THREE.Color(STATUS_COLORS[status] || STATUS_COLORS.idle) }, [status])
+  useEffect(() => { colorTarget.current = computeTarget() }, [status, emotion?.state, emotion?.intensity])
 
   useFrame((state) => {
     if (!mesh.current) return
@@ -339,6 +392,14 @@ export default function KelionStage() {
   const [pushState, setPushState] = useState({ supported: false, enabled: false, permission: 'default' })
   const [pushBusy, setPushBusy] = useState(false)
   const [pushError, setPushError] = useState(null)
+
+  // Stage 6 — emotion mirroring + voice style
+  const emotion = useEmotion()
+  const [voiceStyle, setVoiceStyleState] = useState(() => readVoiceStyleCookie())
+  const handleVoiceStyleChange = useCallback(async (style) => {
+    const resolved = await setVoiceStyle(style)
+    if (resolved) setVoiceStyleState(resolved)
+  }, [])
 
   const mouthOpen = useLipSync(audioRef)
 
@@ -561,8 +622,8 @@ export default function KelionStage() {
         <Suspense fallback={null}>
           <Environment preset="city" environmentIntensity={0.35} />
           <StudioDecor />
-          <Halo status={status} voiceLevel={voiceLevel} />
-          <AvatarModel mouthOpen={mouthOpen} status={status} />
+          <Halo status={status} voiceLevel={voiceLevel} emotion={emotion} />
+          <AvatarModel mouthOpen={mouthOpen} status={status} emotion={emotion} />
           <ContactShadows position={[0, -1.65, 0]} opacity={0.55} scale={6} blur={2.6} far={2.5} />
         </Suspense>
       </Canvas>
@@ -637,6 +698,31 @@ export default function KelionStage() {
           <MenuItem onClick={() => { setTranscriptOpen((v) => !v); setMenuOpen(false) }}>
             {transcriptOpen ? 'Hide transcript' : 'Show transcript'}
           </MenuItem>
+          {/* Stage 6 — voice style submenu */}
+          <div
+            style={{
+              padding: '6px 10px 4px',
+              fontSize: 11,
+              letterSpacing: 0.6,
+              textTransform: 'uppercase',
+              color: 'rgba(237,233,254,0.45)',
+              marginTop: 4,
+            }}
+          >
+            Voice style
+          </div>
+          {VOICE_STYLE_OPTIONS.map((opt) => (
+            <MenuItem
+              key={opt.key}
+              onClick={() => { handleVoiceStyleChange(opt.key); setMenuOpen(false) }}
+            >
+              <span style={{ opacity: voiceStyle === opt.key ? 1 : 0.75 }}>
+                {voiceStyle === opt.key ? '● ' : '○ '}
+                {opt.label}
+              </span>
+            </MenuItem>
+          ))}
+          <div style={{ height: 6 }} />
           {/* Stage 3 — memory + passkey */}
           {authState.signedIn ? (
             <>
