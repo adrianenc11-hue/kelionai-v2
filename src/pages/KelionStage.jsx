@@ -52,12 +52,54 @@ function readVoiceStyleCookie() {
 }
 
 // ───── Avatar with idle animation + lipsync + Stage 6 emotion morphs ─────
-function AvatarModel({ mouthOpen = 0, status = 'idle', emotion = null }) {
+// Baseline arm pose — this is the pose Adrian dialled in and wants hands to
+// ALWAYS return to when no gesture is active. All hand motion is expressed as
+// an *additive* delta on top of this baseline, multiplied by an envelope
+// weight that goes 0 → 1 → 0 over each gesture's lifetime, so every gesture
+// ends with hands exactly at the baseline again.
+const ARM_BASELINE = {
+  LeftArm:      { x: 1.30, y:  0.00, z:  0.18 },
+  RightArm:     { x: 1.30, y:  0.00, z: -0.18 },
+  LeftForeArm:  { x: 0.35, y:  0.00, z:  0.00 },
+  RightForeArm: { x: 0.35, y:  0.00, z:  0.00 },
+}
+
+// Curated gesture palette — each entry is a small additive delta (radians)
+// layered on top of ARM_BASELINE while Kelion is speaking/presenting. Kept
+// intentionally subtle so the hands never drift into weird poses, and the
+// return-to-baseline invariant is preserved as long as envelope weight → 0.
+const GESTURE_PALETTE = [
+  // "open palm" — slight outward rotation of the left forearm
+  { LeftArm: { x: -0.08, y: 0, z: 0.10 }, LeftForeArm: { x: -0.12, y: 0, z: 0.05 } },
+  // "point toward monitor" (monitor is on camera-left / avatar's right-front)
+  { RightArm: { x: -0.18, y: -0.22, z: -0.08 }, RightForeArm: { x: -0.20, y: 0, z: 0 } },
+  // "both-hand emphasis" — small symmetric raise
+  { LeftArm: { x: -0.10, y: 0, z: 0.06 }, RightArm: { x: -0.10, y: 0, z: -0.06 } },
+  // "lean in / thoughtful" — forearms only
+  { LeftForeArm: { x: -0.14, y: 0, z: 0 }, RightForeArm: { x: -0.14, y: 0, z: 0 } },
+  // "counting off" — right hand raises with a tilt
+  { RightArm: { x: -0.12, y: 0, z: -0.14 }, RightForeArm: { x: -0.22, y: 0.05, z: 0 } },
+]
+
+function AvatarModel({ mouthOpen = 0, status = 'idle', emotion = null, presenting = false }) {
   const { scene } = useGLTF('/kelion-rpm_e27cb94d.glb')
   const root = useRef()
   const bonesRef = useRef({})
   const morphsRef = useRef([])
   const blinkRef = useRef({ t: 0, nextBlinkAt: 2 + Math.random() * 4, duration: 0.18, phase: 0 })
+  // Gesture scheduler — one gesture at a time, fade-in → hold → fade-out,
+  // with a quiet window between gestures so speaking looks measured, not twitchy.
+  const gestureRef = useRef({
+    active: false,
+    delta: null,
+    startedAt: 0,
+    duration: 0,
+    nextAt: 2.5,     // first gesture can fire ~2.5s after mount (only if speaking)
+    weight: 0,
+  })
+  // Current body yaw, lerped every frame toward the target (0 normally, -0.14
+  // ≈ -8° when `presenting` so the avatar turns toward the monitor on the left).
+  const bodyYawRef = useRef(0)
 
   useEffect(() => {
     const bones = {}
@@ -78,16 +120,16 @@ function AvatarModel({ mouthOpen = 0, status = 'idle', emotion = null }) {
     bonesRef.current = bones
     morphsRef.current = morphs
 
-    // Natural arm rest pose
+    // Natural arm rest pose (baseline — gestures are applied on top of this)
     const setRot = (names, x, y, z) => {
       for (const n of names) {
         if (bones[n]) { bones[n].rotation.set(x, y, z); return }
       }
     }
-    setRot(['LeftArm', 'LeftUpperArm', 'mixamorigLeftArm'], 1.3, 0, 0.18)
-    setRot(['RightArm', 'RightUpperArm', 'mixamorigRightArm'], 1.3, 0, -0.18)
-    setRot(['LeftForeArm', 'mixamorigLeftForeArm'], 0.35, 0, 0)
-    setRot(['RightForeArm', 'mixamorigRightForeArm'], 0.35, 0, 0)
+    setRot(['LeftArm', 'LeftUpperArm', 'mixamorigLeftArm'], ARM_BASELINE.LeftArm.x, ARM_BASELINE.LeftArm.y, ARM_BASELINE.LeftArm.z)
+    setRot(['RightArm', 'RightUpperArm', 'mixamorigRightArm'], ARM_BASELINE.RightArm.x, ARM_BASELINE.RightArm.y, ARM_BASELINE.RightArm.z)
+    setRot(['LeftForeArm', 'mixamorigLeftForeArm'], ARM_BASELINE.LeftForeArm.x, ARM_BASELINE.LeftForeArm.y, ARM_BASELINE.LeftForeArm.z)
+    setRot(['RightForeArm', 'mixamorigRightForeArm'], ARM_BASELINE.RightForeArm.x, ARM_BASELINE.RightForeArm.y, ARM_BASELINE.RightForeArm.z)
   }, [scene])
 
   useFrame((state, delta) => {
@@ -164,6 +206,72 @@ function AvatarModel({ mouthOpen = 0, status = 'idle', emotion = null }) {
         }
       }
     }
+
+    // ───── Presenting body yaw ─────
+    // When Kelion is presenting (or speaking and content is on the monitor),
+    // rotate the whole body by ~8° toward the monitor on the left. Smooth
+    // lerp so transitions in/out of the presenting state are never snappy.
+    const yawTarget = presenting ? -0.14 : 0 // -8° ≈ -0.1396 rad, turned toward camera-left
+    const yawK = 1 - Math.exp(-delta * 2.5)  // frame-independent easing (~2.5 Hz)
+    bodyYawRef.current += (yawTarget - bodyYawRef.current) * yawK
+    if (root.current) root.current.rotation.y = bodyYawRef.current
+
+    // ───── Additive hand gestures ─────
+    // Invariant: when no gesture is active, final arm rotation === ARM_BASELINE
+    // exactly. Gestures add a delta scaled by an envelope that always ends at 0.
+    const g = gestureRef.current
+    const speaking = status === 'speaking' || presenting
+
+    if (speaking && !g.active && t >= g.nextAt) {
+      g.active = true
+      g.startedAt = t
+      g.duration = 1.4 + Math.random() * 1.0 // 1.4..2.4s total gesture life
+      g.delta = GESTURE_PALETTE[Math.floor(Math.random() * GESTURE_PALETTE.length)]
+    }
+
+    // Compute envelope weight (0..1). Shape: quick fade-in, hold, gentle fade-out.
+    let gestureWeight = 0
+    if (g.active && g.delta) {
+      const u = (t - g.startedAt) / g.duration
+      if (u >= 1) {
+        // Gesture finished — return to baseline and schedule the next one.
+        g.active = false
+        g.delta = null
+        g.weight = 0
+        g.nextAt = t + 1.6 + Math.random() * 2.4 // 1.6..4.0s quiet window
+      } else if (u < 0.18) {
+        gestureWeight = u / 0.18          // fade-in 0..1 over first 18%
+      } else if (u > 0.62) {
+        gestureWeight = (1 - u) / 0.38    // fade-out 1..0 over last 38%
+      } else {
+        gestureWeight = 1
+      }
+    }
+    // Hard invariant: if we are NOT in a speaking/presenting state, drag
+    // the envelope to 0 immediately so hands snap back to baseline even
+    // mid-gesture (fast enough to be invisible; still frame-independent).
+    if (!speaking) {
+      g.active = false
+      g.delta = null
+      gestureWeight = 0
+    }
+    g.weight = gestureWeight
+
+    const delta4 = g.delta // may be null if no gesture right now
+    const applyArm = (names, base, d) => {
+      for (const n of names) {
+        const bone = b[n]
+        if (!bone) continue
+        bone.rotation.x = base.x + (d?.x || 0) * gestureWeight
+        bone.rotation.y = base.y + (d?.y || 0) * gestureWeight
+        bone.rotation.z = base.z + (d?.z || 0) * gestureWeight
+        return
+      }
+    }
+    applyArm(['LeftArm', 'LeftUpperArm', 'mixamorigLeftArm'],   ARM_BASELINE.LeftArm,      delta4?.LeftArm)
+    applyArm(['RightArm', 'RightUpperArm', 'mixamorigRightArm'], ARM_BASELINE.RightArm,    delta4?.RightArm)
+    applyArm(['LeftForeArm', 'mixamorigLeftForeArm'],            ARM_BASELINE.LeftForeArm,  delta4?.LeftForeArm)
+    applyArm(['RightForeArm', 'mixamorigRightForeArm'],          ARM_BASELINE.RightForeArm, delta4?.RightForeArm)
   })
 
   return <primitive ref={root} object={scene} scale={1.65} position={[0, -1.65, 0]} />
@@ -321,11 +429,8 @@ function StudioDecor() {
         <meshStandardMaterial color={'#0a0b12'} roughness={0.6} metalness={0.35} />
       </mesh>
 
-      {/* Warm interior ceiling strip — static, no pulsing */}
-      <mesh position={[0, 2.9, -4.5]}>
-        <planeGeometry args={[10.5, 0.08]} />
-        <meshBasicMaterial color={'#ffb27a'} toneMapped={false} />
-      </mesh>
+      {/* Ceiling strip removed — Adrian flagged the warm #ffb27a line as
+          a distracting "brown bar" at the top of the stage. */}
 
       {/* Cool floor LED strip */}
       <mesh position={[0, -1.9, -4.5]}>
@@ -339,35 +444,36 @@ function StudioDecor() {
 
       {/* ───── Presentation monitor on the LEFT wall ─────
           Large matte screen framed like a studio playback display.
-          Content-less by default (just shows a subtle "Kelion Presents"
-          watermark); future PR will pipe chat tool-use events here to
-          render code, weather, maps, generated images, etc. */}
-      <group position={[-2.6, 0.3, -1.2]} rotation={[0, Math.PI / 8, 0]}>
+          Adrian flagged that the old position (-2.6, 0.3, -1.2) let the
+          left edge clip off the viewport on wider screens and the panel
+          felt too small. We moved it closer to center and enlarged it so
+          it stays fully visible and reads as a proper studio monitor. */}
+      <group position={[-1.7, 0.35, -0.8]} rotation={[0, Math.PI / 9, 0]}>
         {/* Bezel / outer frame */}
         <mesh position={[0, 0, -0.03]}>
-          <planeGeometry args={[2.6, 1.7]} />
+          <planeGeometry args={[3.2, 2.1]} />
           <meshStandardMaterial color={'#0a0b14'} metalness={0.75} roughness={0.35} />
         </mesh>
         {/* Inner screen */}
         <mesh position={[0, 0, 0]}>
-          <planeGeometry args={[2.4, 1.5]} />
+          <planeGeometry args={[3.0, 1.9]} />
           <meshBasicMaterial color={'#0d0b1d'} toneMapped={false} />
         </mesh>
         {/* Faint grid lines to hint "display" */}
         {Array.from({ length: 6 }).map((_, i) => (
-          <mesh key={`mh-${i}`} position={[0, -0.6 + i * 0.25, 0.001]}>
-            <planeGeometry args={[2.3, 0.004]} />
+          <mesh key={`mh-${i}`} position={[0, -0.75 + i * 0.3, 0.001]}>
+            <planeGeometry args={[2.9, 0.004]} />
             <meshBasicMaterial color={'#1f1b3a'} toneMapped={false} opacity={0.4} transparent />
           </mesh>
         ))}
         {/* "Kelion Presents" watermark dot */}
         <mesh position={[0, 0, 0.002]}>
-          <circleGeometry args={[0.06, 32]} />
+          <circleGeometry args={[0.07, 32]} />
           <meshBasicMaterial color={'#7c3aed'} toneMapped={false} opacity={0.55} transparent />
         </mesh>
         {/* Stand leg */}
-        <mesh position={[0, -1.1, -0.02]}>
-          <planeGeometry args={[0.1, 0.6]} />
+        <mesh position={[0, -1.3, -0.02]}>
+          <planeGeometry args={[0.12, 0.7]} />
           <meshStandardMaterial color={'#0a0b14'} metalness={0.8} roughness={0.3} />
         </mesh>
       </group>
@@ -932,7 +1038,17 @@ export default function KelionStage() {
               the avatar; it was too busy. Status color is still conveyed
               through the spotlights + status-dot in the HUD. */}
           <group position={[1.6, 0, 0]}>
-            <AvatarModel mouthOpen={mouthOpen} status={status} emotion={emotion} />
+            {/* `presenting` flips true whenever Kelion is speaking an answer
+                — that's when we have (or will have) content on the monitor
+                and want the body to rotate ~8° toward it. When we wire the
+                tool-use pipeline, this will be driven by an explicit
+                "content on monitor" signal instead. */}
+            <AvatarModel
+              mouthOpen={mouthOpen}
+              status={status}
+              emotion={emotion}
+              presenting={status === 'speaking'}
+            />
           </group>
           <ContactShadows position={[1.6, -1.65, 0]} opacity={0.55} scale={5} blur={2.6} far={2.5} />
         </Suspense>
@@ -1075,20 +1191,95 @@ export default function KelionStage() {
         {statusLabel}
       </div>
 
-      {/* Menu trigger ⋯ top-right */}
-      <button
-        onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v) }}
+      {/* Top-right action bar — Adrian asked for the frequently-used
+          controls to live directly on the bar instead of hiding inside
+          the ⋯ menu. The bar carries (left→right): camera, screen share,
+          transcript, buy-credits (with balance), sign in / sign out, and
+          finally a ⋯ button that still opens the overflow menu for
+          voice style, memory, pings, admin tools, PWA install, etc. */}
+      <div
+        onClick={(e) => e.stopPropagation()}
         style={{
-          position: 'absolute', top: 18, right: 18,
-          width: 42, height: 42, borderRadius: 999,
-          background: 'rgba(10, 8, 20, 0.5)',
-          backdropFilter: 'blur(12px)',
-          border: '1px solid rgba(167, 139, 250, 0.25)',
-          color: '#ede9fe', fontSize: 20, cursor: 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          position: 'absolute', top: 18, right: 18, zIndex: 20,
+          display: 'flex', alignItems: 'center', gap: 8,
         }}
-        aria-label="Menu"
-      >⋯</button>
+      >
+        <TopBarIconButton
+          onClick={() => { cameraStream ? stopCamera() : startCamera() }}
+          disabled={status === 'idle' || status === 'error'}
+          active={!!cameraStream}
+          title={cameraStream ? 'Turn camera off' : 'Turn camera on'}
+          ariaLabel={cameraStream ? 'Turn camera off' : 'Turn camera on'}
+        >📹</TopBarIconButton>
+        <TopBarIconButton
+          onClick={() => { screenStream ? stopScreen() : startScreen() }}
+          disabled={status === 'idle' || status === 'error'}
+          active={!!screenStream}
+          title={screenStream ? 'Stop sharing screen' : 'Share screen'}
+          ariaLabel={screenStream ? 'Stop sharing screen' : 'Share screen'}
+        >🖥️</TopBarIconButton>
+        <TopBarIconButton
+          onClick={() => setTranscriptOpen((v) => !v)}
+          active={transcriptOpen}
+          title={transcriptOpen ? 'Hide transcript' : 'Show transcript'}
+          ariaLabel={transcriptOpen ? 'Hide transcript' : 'Show transcript'}
+        >📝</TopBarIconButton>
+        {authState.signedIn && (
+          <button
+            onClick={() => openBuy()}
+            style={{
+              height: 36, padding: '0 12px', borderRadius: 999,
+              background: 'rgba(10, 8, 20, 0.5)',
+              backdropFilter: 'blur(12px)',
+              border: '1px solid rgba(167, 139, 250, 0.25)',
+              color: '#ede9fe', fontSize: 12, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}
+            title="Buy credits"
+            aria-label="Buy credits"
+          >
+            <span style={{ fontSize: 14 }}>💳</span>
+            <span>Credits{balance != null ? ` · ${balance} min` : ''}</span>
+          </button>
+        )}
+        <button
+          onClick={() => {
+            if (authState.signedIn) {
+              handleSignOut()
+            } else {
+              // No dedicated sign-in UI yet — route through the "remember me"
+              // passkey prompt which handles both "create passkey" and
+              // "sign in with existing passkey" cases.
+              setRememberPromptOpen(true)
+            }
+          }}
+          style={{
+            height: 36, padding: '0 14px', borderRadius: 999,
+            background: authState.signedIn
+              ? 'rgba(239, 68, 68, 0.18)'
+              : 'linear-gradient(135deg, #a78bfa, #60a5fa)',
+            border: authState.signedIn
+              ? '1px solid rgba(239, 68, 68, 0.45)'
+              : '1px solid rgba(167, 139, 250, 0.5)',
+            color: authState.signedIn ? '#fecaca' : '#0b0716',
+            fontSize: 12, fontWeight: 600, letterSpacing: '0.03em',
+            cursor: 'pointer',
+            display: 'flex', alignItems: 'center', gap: 6,
+          }}
+          title={authState.signedIn ? 'Sign out' : 'Sign in'}
+          aria-label={authState.signedIn ? 'Sign out' : 'Sign in'}
+        >
+          {authState.signedIn
+            ? `Sign out${authState.user?.name ? ` · ${authState.user.name}` : ''}`
+            : 'Sign in'}
+        </button>
+        <TopBarIconButton
+          onClick={() => setMenuOpen((v) => !v)}
+          active={menuOpen}
+          title="More"
+          ariaLabel="More options"
+        >⋯</TopBarIconButton>
+      </div>
 
       {menuOpen && (
         <div
@@ -1104,21 +1295,8 @@ export default function KelionStage() {
             boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
           }}
         >
-          <MenuItem
-            onClick={() => { cameraStream ? stopCamera() : startCamera(); setMenuOpen(false) }}
-            disabled={status === 'idle' || status === 'error'}
-          >
-            {cameraStream ? 'Turn camera off' : 'Turn camera on'}
-          </MenuItem>
-          <MenuItem
-            onClick={() => { screenStream ? stopScreen() : startScreen(); setMenuOpen(false) }}
-            disabled={status === 'idle' || status === 'error'}
-          >
-            {screenStream ? 'Stop sharing screen' : 'Share screen'}
-          </MenuItem>
-          <MenuItem onClick={() => { setTranscriptOpen((v) => !v); setMenuOpen(false) }}>
-            {transcriptOpen ? 'Hide transcript' : 'Show transcript'}
-          </MenuItem>
+          {/* Camera / Screen share / Transcript moved to the top-right
+              action bar — no longer duplicated here. */}
           {/* Stage 6 — voice style submenu */}
           <div
             style={{
@@ -1127,7 +1305,6 @@ export default function KelionStage() {
               letterSpacing: 0.6,
               textTransform: 'uppercase',
               color: 'rgba(237,233,254,0.45)',
-              marginTop: 4,
             }}
           >
             Voice style
@@ -1176,11 +1353,7 @@ export default function KelionStage() {
                   </MenuItem>
                 )
               )}
-              {/* User-facing top-up — Stripe Checkout for credit
-                  packages. Visible to all signed-in users. */}
-              <MenuItem onClick={() => { openBuy(); setMenuOpen(false) }}>
-                Buy credits{balance != null ? ` (${balance} min left)` : ''}
-              </MenuItem>
+              {/* Buy credits moved to the top-right action bar. */}
               {/* PWA install — only shows when the browser actually
                   fired beforeinstallprompt (Chrome/Edge/Android). iOS
                   users get instructions inside the Buy-credits modal. */}
@@ -1202,9 +1375,7 @@ export default function KelionStage() {
                   </MenuItem>
                 </>
               )}
-              <MenuItem onClick={() => { handleSignOut(); setMenuOpen(false) }}>
-                Sign out
-              </MenuItem>
+              {/* Sign out moved to the top-right action bar. */}
             </>
           ) : (
             supportsPasskey() && (
@@ -1933,6 +2104,37 @@ export default function KelionStage() {
         * { box-sizing: border-box; }
       `}</style>
     </div>
+  )
+}
+
+// Compact pill button used on the top-right action bar. Keeps a consistent
+// look with the ⋯ overflow button — an accent ring appears when `active`
+// so camera/screen/transcript toggles read as "on".
+function TopBarIconButton({ children, onClick, disabled, active, title, ariaLabel }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      aria-label={ariaLabel || title}
+      style={{
+        width: 36, height: 36, borderRadius: 999,
+        background: active
+          ? 'rgba(167, 139, 250, 0.25)'
+          : 'rgba(10, 8, 20, 0.5)',
+        backdropFilter: 'blur(12px)',
+        border: active
+          ? '1px solid rgba(167, 139, 250, 0.75)'
+          : '1px solid rgba(167, 139, 250, 0.25)',
+        color: disabled ? '#6b7280' : '#ede9fe',
+        fontSize: 16,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 0,
+        opacity: disabled ? 0.5 : 1,
+        transition: 'background 0.15s, border-color 0.15s',
+      }}
+    >{children}</button>
   )
 }
 
