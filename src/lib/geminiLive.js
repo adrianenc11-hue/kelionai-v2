@@ -6,6 +6,7 @@
 //   M11 (vision reasoning via multimodal frames), M12 (emotion mirror via persona).
 
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { runTool } from './kelionTools'
 
 const SAMPLE_RATE_IN = 16000   // Gemini Live expects 16kHz PCM16 mic
 const SAMPLE_RATE_OUT = 24000  // Gemini Live returns 24kHz PCM16 audio
@@ -206,6 +207,46 @@ export function useGeminiLive({ audioRef }) {
         if (!playbackPlayingRef.current) setStatus('listening')
       } else if (sc.generationComplete) {
         setStatus('speaking')
+      }
+    }
+
+    // Stage 4 — Gemini Live asks us to run a function tool.
+    // Each functionCall carries { id, name, args }. We route to the right
+    // /api/tools/* backend endpoint, then send back a toolResponse with the
+    // matching id so Gemini can continue the turn with the result.
+    if (msg.toolCall?.functionCalls?.length) {
+      const ws = wsRef.current
+      const fcs = msg.toolCall.functionCalls
+      // Narrate to the transcript so the user SEES what Kelion is doing
+      // (audio narration is handled by the model itself per the persona).
+      for (const fc of fcs) {
+        appendTurn('assistant', `[tool: ${fc.name}]`, true)
+      }
+      try {
+        const responses = await Promise.all(fcs.map(async (fc) => {
+          const result = await runTool(fc.name, fc.args || {})
+          return {
+            id: fc.id,
+            name: fc.name,
+            response: { result },
+          }
+        }))
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ toolResponse: { functionResponses: responses } }))
+        }
+      } catch (err) {
+        console.error('[geminiLive] tool execution failed', err)
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({
+            toolResponse: {
+              functionResponses: fcs.map((fc) => ({
+                id: fc.id,
+                name: fc.name,
+                response: { result: `Tool error: ${err.message || 'unknown'}. Tell the user honestly and move on.` },
+              })),
+            },
+          }))
+        }
       }
     }
 

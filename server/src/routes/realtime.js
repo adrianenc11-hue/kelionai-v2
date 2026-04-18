@@ -48,10 +48,16 @@ Language (strict):
 2. If the user switches mid-conversation, switch with them on the very next reply.
 3. When the user speaks Romanian, reply with natural Romanian, not Romanian-via-English.
 
-Scope (current stage — be honest about limits):
+Tools you can use (Stage 4):
+- google_search — live web search grounded in Google results. Call this the moment you need anything time-sensitive (news, prices, weather, schedules, recent events, facts that change). Cite the source naturally in speech ("according to the BBC…") when it helps trust.
+- browse_web(task) — send an autonomous web agent to perform a task in a real browser (open a page, fill a form, extract info). Use it when search alone is not enough.
+- read_calendar(range), read_email(query), search_files(query) — look into the user's connected accounts when they ask about their own stuff.
+
+When you decide to call a tool, narrate briefly and naturally FIRST — one short sentence in the user's language ("one moment, let me check" / "hai să verific repede") — then run the call. When the result arrives, answer the user directly; do not read the raw tool output back.
+
+Other capabilities:
 - Camera vision and screen share work when the user enables them.
 - Long-term memory works when the user is signed in with a passkey (see below).
-- Web search and browser actions are coming in the next stage. If asked, say so plainly.
 
 Long-term memory:
 - If a "Known facts about the user" section is included below, those are durable facts you remember about THIS user from past conversations. Use them naturally — do not recite them, do not say "according to my memory". Weave them in only when relevant.
@@ -165,6 +171,77 @@ router.get('/gemini-token', async (req, res) => {
             inputAudioTranscription: {},
             outputAudioTranscription: {},
             temperature: 0.85,
+            // Stage 4 — tools. googleSearch is a built-in grounding tool
+            // (model runs it server-side, returns grounded answer w/ citations).
+            // functionDeclarations route tool calls back to OUR backend via the
+            // client, which executes them and returns a tool_response. Keep this
+            // list stable server-side so users cannot swap tools client-side.
+            tools: [
+              { googleSearch: {} },
+              {
+                functionDeclarations: [
+                  {
+                    name: 'browse_web',
+                    description: 'Run an autonomous web-browsing agent in a real browser. Use when the user asks Kelion to open a site, fill a form, extract info from a page behind JS, compare products, book/reserve, etc. Returns a short summary + optional URL.',
+                    parameters: {
+                      type: 'OBJECT',
+                      properties: {
+                        task: {
+                          type: 'STRING',
+                          description: 'Natural-language instruction for the web agent, e.g. "Find the cheapest round-trip Bucharest-Rome flight next weekend on skyscanner.com and tell me the airline and price."',
+                        },
+                        start_url: {
+                          type: 'STRING',
+                          description: 'Optional URL to start on. Leave empty to let the agent pick.',
+                        },
+                      },
+                      required: ['task'],
+                    },
+                  },
+                  {
+                    name: 'read_calendar',
+                    description: "Look into the signed-in user's calendar. Use when the user asks about their schedule, upcoming events, availability.",
+                    parameters: {
+                      type: 'OBJECT',
+                      properties: {
+                        range: {
+                          type: 'STRING',
+                          description: 'Natural-language range, e.g. "today", "this week", "next Monday 9am-noon".',
+                        },
+                      },
+                      required: ['range'],
+                    },
+                  },
+                  {
+                    name: 'read_email',
+                    description: "Search the signed-in user's email. Use when they ask about a specific message, sender, or thread.",
+                    parameters: {
+                      type: 'OBJECT',
+                      properties: {
+                        query: {
+                          type: 'STRING',
+                          description: 'Free-text search (sender, subject, keyword).',
+                        },
+                        limit: { type: 'INTEGER', description: 'Max results (default 5).' },
+                      },
+                      required: ['query'],
+                    },
+                  },
+                  {
+                    name: 'search_files',
+                    description: "Search the signed-in user's connected file storage (Drive, Dropbox, etc).",
+                    parameters: {
+                      type: 'OBJECT',
+                      properties: {
+                        query: { type: 'STRING', description: 'Free-text search.' },
+                        limit: { type: 'INTEGER', description: 'Max results (default 5).' },
+                      },
+                      required: ['query'],
+                    },
+                  },
+                ],
+              },
+            ],
           },
         },
       }),

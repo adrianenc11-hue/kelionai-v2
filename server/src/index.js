@@ -21,6 +21,7 @@ const ttsRouter        = require('./routes/tts');
 const realtimeRouter   = require('./routes/realtime');
 const passkeyRouter    = require('./routes/passkey');
 const memoryRouter     = require('./routes/memory');
+const toolsRouter      = require('./routes/tools');
 
 const app = express();
 app.disable('x-powered-by');
@@ -222,6 +223,11 @@ app.use('/api/realtime', chatLimiter, realtimeRouter);
 // without auth) + M14/M16/M17 memory (signed-in users only).
 app.use('/api/auth/passkey', passkeyRouter);
 app.use('/api/memory', requireAuth, memoryRouter);
+
+// Stage 4 — M19 (browser use) + M20 (web search status) + M21 (MCP stubs).
+// Router is PUBLIC by design: Gemini Live tool-call flow has no login gate,
+// and MCP endpoints self-check for a signed-in user inside the handler.
+app.use('/api/tools', chatLimiter, toolsRouter);
 
 // Health check with service status
 app.get('/health', async (_req, res) => {
