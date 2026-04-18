@@ -317,6 +317,22 @@ router.get('/gemini-token', async (req, res) => {
         'lang=' + browserLang,
         'body=' + err.slice(0, 2000),
       );
+      // Short-lived diagnostic: with ?diag=1 we surface the exact Google error
+      // body to the caller so an operator can debug 400/403/429 without needing
+      // Railway log access. Google's error responses never echo the API key.
+      // Remove this branch once Gemini Live is stable in production.
+      if (req.query.diag === '1') {
+        return res.status(500).json({
+          error: 'Failed to create Gemini live session',
+          diag: {
+            status: r.status,
+            model,
+            voice,
+            lang: browserLang,
+            google: err.slice(0, 4000),
+          },
+        });
+      }
       return res.status(500).json({ error: 'Failed to create Gemini live session' });
     }
 
