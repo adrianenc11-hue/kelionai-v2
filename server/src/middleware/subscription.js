@@ -56,6 +56,26 @@ function checkSubscription(requiredPlan = 'free') {
         return res.status(404).json({ error: 'User not found' });
       }
 
+      // Admins bypass all quotas + tier gating. Adrian's requirement:
+      // "admin are tot nelimitat" — regardless of plan, daily limit, or
+      // required tier, admin requests pass through untouched.
+      const defaultAdmins = ['adrianenc11@gmail.com'];
+      const extraAdmins = (process.env.ADMIN_EMAILS || '')
+        .split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
+      const allAdmins = [...new Set([...defaultAdmins, ...extraAdmins])];
+      const isAdmin = user.role === 'admin'
+        || (user.email && allAdmins.includes(String(user.email).toLowerCase()));
+      if (isAdmin) {
+        req.subscription = {
+          tier: 'admin',
+          plan: { id: 'admin', name: 'Admin', dailyLimit: null },
+          usageToday: 0,
+          dailyLimit: null,
+          isAdmin: true,
+        };
+        return next();
+      }
+
       const tier = user.subscription_tier || 'free';
       const plan = SUBSCRIPTION_PLANS[tier];
       const required = SUBSCRIPTION_PLANS[requiredPlan];
