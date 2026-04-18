@@ -418,6 +418,120 @@ export default function KelionStage() {
     }
   }, [])
 
+  // Stage 7 — monetization. User-facing top-up modal (Stripe Checkout)
+  // and live balance. `buyOpen` shows the package picker; `buyBusy` is
+  // true while we create the Stripe Checkout session; `balance` is
+  // null until loaded so we can hide the chip until we know it.
+  const [buyOpen, setBuyOpen] = useState(false)
+  const [buyBusy, setBuyBusy] = useState(false)
+  const [buyError, setBuyError] = useState(null)
+  const [packages, setPackages] = useState([])
+  const [balance, setBalance] = useState(null)
+  const refreshBalance = useCallback(async () => {
+    if (!authState.signedIn) { setBalance(null); return }
+    try {
+      const r = await fetch('/api/credits/balance', { credentials: 'include' })
+      if (!r.ok) return
+      const j = await r.json()
+      if (typeof j.balance_minutes === 'number') setBalance(j.balance_minutes)
+    } catch (_) { /* ignore */ }
+  }, [authState.signedIn])
+  useEffect(() => { refreshBalance() }, [refreshBalance])
+  const openBuy = useCallback(async () => {
+    setBuyOpen(true)
+    setBuyError(null)
+    if (packages.length === 0) {
+      try {
+        const r = await fetch('/api/credits/packages')
+        const j = await r.json()
+        setPackages(Array.isArray(j.packages) ? j.packages : [])
+      } catch (err) {
+        setBuyError('Could not load packages')
+      }
+    }
+  }, [packages.length])
+  const handleBuy = useCallback(async (pkgId) => {
+    setBuyBusy(true)
+    setBuyError(null)
+    try {
+      const r = await fetch('/api/credits/checkout', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ packageId: pkgId }),
+      })
+      const j = await r.json().catch(() => ({}))
+      if (!r.ok || !j.url) {
+        throw new Error(j.error || j.hint || `HTTP ${r.status}`)
+      }
+      window.location.href = j.url
+    } catch (err) {
+      setBuyError(err.message || 'Checkout failed')
+      setBuyBusy(false)
+    }
+  }, [])
+
+  // If we returned from Stripe Checkout with ?credits=ok, refresh the
+  // balance once and scrub the query string so reloads don't re-trigger.
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search)
+    if (sp.get('credits') === 'ok') {
+      refreshBalance()
+      sp.delete('credits'); sp.delete('session_id')
+      const q = sp.toString()
+      const clean = window.location.pathname + (q ? `?${q}` : '') + window.location.hash
+      window.history.replaceState(null, '', clean)
+    }
+  }, [refreshBalance])
+
+  // PWA install prompt — Chrome / Edge / Android fire `beforeinstallprompt`
+  // which we stash; iOS Safari has no such event, so we show instructions
+  // inline in the modal instead.
+  const [installPromptEvent, setInstallPromptEvent] = useState(null)
+  const [installed, setInstalled] = useState(() =>
+    typeof window !== 'undefined' && (
+      window.matchMedia?.('(display-mode: standalone)').matches ||
+      window.navigator.standalone === true
+    )
+  )
+  useEffect(() => {
+    const onBip = (e) => { e.preventDefault(); setInstallPromptEvent(e) }
+    const onInstalled = () => { setInstalled(true); setInstallPromptEvent(null) }
+    window.addEventListener('beforeinstallprompt', onBip)
+    window.addEventListener('appinstalled', onInstalled)
+    return () => {
+      window.removeEventListener('beforeinstallprompt', onBip)
+      window.removeEventListener('appinstalled', onInstalled)
+    }
+  }, [])
+  const handleInstall = useCallback(async () => {
+    if (!installPromptEvent) return
+    try {
+      await installPromptEvent.prompt()
+      setInstallPromptEvent(null)
+    } catch (_) { /* user dismissed */ }
+  }, [installPromptEvent])
+
+  // Admin-only — live business metrics (revenue + minutes sold/consumed).
+  const [businessOpen, setBusinessOpen] = useState(false)
+  const [businessData, setBusinessData] = useState(null)
+  const [businessLoading, setBusinessLoading] = useState(false)
+  const [businessError, setBusinessError] = useState(null)
+  const openBusiness = useCallback(async () => {
+    setBusinessOpen(true)
+    setBusinessLoading(true)
+    setBusinessError(null)
+    try {
+      const r = await fetch('/api/admin/business?days=30', { credentials: 'include' })
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      setBusinessData(await r.json())
+    } catch (err) {
+      setBusinessError(err.message || 'Could not load business metrics')
+    } finally {
+      setBusinessLoading(false)
+    }
+  }, [])
+
   // Stage 6 — emotion mirroring + voice style
   const emotion = useEmotion()
   const [voiceStyle, setVoiceStyleState] = useState(() => readVoiceStyleCookie())
@@ -780,13 +894,31 @@ export default function KelionStage() {
                   </MenuItem>
                 )
               )}
+              {/* User-facing top-up — Stripe Checkout for credit
+                  packages. Visible to all signed-in users. */}
+              <MenuItem onClick={() => { openBuy(); setMenuOpen(false) }}>
+                Buy credits{balance != null ? ` (${balance} min left)` : ''}
+              </MenuItem>
+              {/* PWA install — only shows when the browser actually
+                  fired beforeinstallprompt (Chrome/Edge/Android). iOS
+                  users get instructions inside the Buy-credits modal. */}
+              {!installed && installPromptEvent && (
+                <MenuItem onClick={() => { handleInstall(); setMenuOpen(false) }}>
+                  Install Kelion on this device
+                </MenuItem>
+              )}
               {/* Admin-only — AI credits dashboard (one button per AI we
                   spend on + Stripe revenue card + top-up links + email
                   alerts to contact@kelionai.app). */}
               {isAdmin && (
-                <MenuItem onClick={() => { openCredits(); setMenuOpen(false) }}>
-                  AI credits (admin)
-                </MenuItem>
+                <>
+                  <MenuItem onClick={() => { openCredits(); setMenuOpen(false) }}>
+                    AI credits (admin)
+                  </MenuItem>
+                  <MenuItem onClick={() => { openBusiness(); setMenuOpen(false) }}>
+                    Business metrics (admin)
+                  </MenuItem>
+                </>
               )}
               <MenuItem onClick={() => { handleSignOut(); setMenuOpen(false) }}>
                 Sign out
@@ -1089,6 +1221,257 @@ export default function KelionStage() {
               }}
             >Forget everything</button>
           )}
+        </div>
+      )}
+
+      {/* User-facing Buy-credits modal — centered overlay with the
+          three standard packages (starter / standard / pro). Clicking
+          a package creates a Stripe Checkout session and redirects to
+          Stripe's hosted page (3DS + VAT + chargebacks handled by
+          Stripe). iOS users get PWA install instructions at the
+          bottom since Safari has no beforeinstallprompt event. */}
+      {buyOpen && (
+        <div
+          onClick={(e) => { e.stopPropagation(); setBuyOpen(false) }}
+          style={{
+            position: 'fixed', inset: 0,
+            background: 'rgba(3, 4, 10, 0.78)',
+            backdropFilter: 'blur(14px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 30, padding: 16,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: 'min(560px, 96vw)',
+              maxHeight: '90vh', overflowY: 'auto',
+              background: 'rgba(14, 11, 26, 0.96)',
+              borderRadius: 20,
+              border: '1px solid rgba(167, 139, 250, 0.25)',
+              padding: '22px 22px 26px 22px',
+              color: '#ede9fe',
+              fontFamily: 'system-ui, -apple-system, sans-serif',
+              boxShadow: '0 30px 80px rgba(0,0,0,0.6)',
+            }}
+          >
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              marginBottom: 14,
+            }}>
+              <div>
+                <div style={{ fontSize: 11, opacity: 0.55, letterSpacing: '0.15em', marginBottom: 4 }}>
+                  KELION CREDITS
+                </div>
+                <div style={{ fontSize: 20, fontWeight: 700 }}>Buy credits</div>
+              </div>
+              <button
+                onClick={() => setBuyOpen(false)}
+                style={{
+                  background: 'transparent', border: 'none', color: '#ede9fe',
+                  fontSize: 22, cursor: 'pointer', opacity: 0.7,
+                }}
+                aria-label="Close"
+              >✕</button>
+            </div>
+
+            {balance != null && (
+              <div style={{
+                fontSize: 13, opacity: 0.75, marginBottom: 14,
+                padding: '8px 12px',
+                background: 'rgba(167, 139, 250, 0.08)',
+                borderRadius: 10,
+              }}>
+                Current balance: <strong>{balance} min</strong>
+              </div>
+            )}
+
+            {buyError && (
+              <div style={{
+                fontSize: 13, color: '#fecaca',
+                background: 'rgba(80, 14, 14, 0.6)',
+                padding: '10px 12px', borderRadius: 10, marginBottom: 12,
+              }}>{buyError}</div>
+            )}
+
+            <div style={{ display: 'grid', gap: 10 }}>
+              {packages.map((pkg) => {
+                const euros = (pkg.priceCents / 100).toFixed(2).replace(/\.00$/, '')
+                const perMin = (pkg.priceCents / 100 / pkg.minutes).toFixed(2)
+                return (
+                  <button
+                    key={pkg.id}
+                    onClick={() => handleBuy(pkg.id)}
+                    disabled={buyBusy}
+                    style={{
+                      display: 'block', textAlign: 'left', width: '100%',
+                      padding: '16px 18px',
+                      borderRadius: 14,
+                      background: pkg.highlight
+                        ? 'linear-gradient(135deg, rgba(167, 139, 250, 0.18), rgba(96, 165, 250, 0.12))'
+                        : 'rgba(167, 139, 250, 0.06)',
+                      border: pkg.highlight
+                        ? '1px solid rgba(167, 139, 250, 0.55)'
+                        : '1px solid rgba(167, 139, 250, 0.2)',
+                      color: '#ede9fe',
+                      cursor: buyBusy ? 'wait' : 'pointer',
+                      opacity: buyBusy ? 0.6 : 1,
+                      transition: 'transform 0.1s, background 0.15s',
+                    }}
+                  >
+                    <div style={{
+                      display: 'flex', alignItems: 'baseline',
+                      justifyContent: 'space-between', marginBottom: 4,
+                    }}>
+                      <div style={{ fontSize: 15, fontWeight: 700 }}>{pkg.name}</div>
+                      <div style={{ fontSize: 18, fontWeight: 700 }}>{euros} €</div>
+                    </div>
+                    <div style={{ fontSize: 12, opacity: 0.65 }}>
+                      {pkg.minutes} min · {perMin} €/min
+                    </div>
+                    {pkg.description && (
+                      <div style={{ fontSize: 12, opacity: 0.55, marginTop: 4 }}>
+                        {pkg.description}
+                      </div>
+                    )}
+                  </button>
+                )
+              })}
+              {packages.length === 0 && !buyError && (
+                <div style={{ opacity: 0.55, fontSize: 13 }}>Loading packages…</div>
+              )}
+            </div>
+
+            <div style={{
+              fontSize: 11, opacity: 0.5, marginTop: 16, lineHeight: 1.5,
+            }}>
+              You'll be redirected to Stripe's secure checkout. EU VAT is
+              handled automatically. Credits never expire.
+            </div>
+
+            {!installed && !installPromptEvent && (
+              <div style={{
+                marginTop: 16, padding: '10px 12px',
+                background: 'rgba(96, 165, 250, 0.08)',
+                border: '1px solid rgba(96, 165, 250, 0.25)',
+                borderRadius: 10, fontSize: 12, opacity: 0.85,
+              }}>
+                <strong>Add Kelion to your home screen:</strong>{' '}
+                on iPhone, tap the Share button → <em>Add to Home Screen</em>.
+                On Android Chrome, tap ⋮ → <em>Install app</em>.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Admin-only — live business metrics drawer. */}
+      {businessOpen && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: 'absolute', top: 0, right: 0, bottom: 0,
+            width: 'min(480px, 96vw)',
+            background: 'rgba(10, 8, 20, 0.92)',
+            backdropFilter: 'blur(22px)',
+            borderLeft: '1px solid rgba(167, 139, 250, 0.2)',
+            padding: '70px 20px 24px 20px',
+            overflowY: 'auto',
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+            zIndex: 26,
+          }}
+        >
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            marginBottom: 18,
+          }}>
+            <div style={{ fontSize: 11, opacity: 0.6, letterSpacing: '0.15em' }}>
+              BUSINESS — LAST 30 DAYS
+            </div>
+            <button
+              onClick={() => setBusinessOpen(false)}
+              style={{
+                background: 'transparent', border: 'none', color: '#ede9fe',
+                fontSize: 20, cursor: 'pointer', opacity: 0.7,
+              }}
+              aria-label="Close"
+            >✕</button>
+          </div>
+
+          {businessLoading && (
+            <div style={{ opacity: 0.55, fontSize: 14 }}>Crunching numbers…</div>
+          )}
+          {businessError && !businessLoading && (
+            <div style={{
+              fontSize: 13, color: '#fecaca',
+              background: 'rgba(80, 14, 14, 0.6)',
+              padding: '10px 12px', borderRadius: 10,
+            }}>{businessError}</div>
+          )}
+
+          {!businessLoading && businessData && (() => {
+            const revenueEur = (businessData.ledger.revenueCents / 100).toFixed(2)
+            // 50/50 split: half goes to AI vendors, half to us. This is a
+            // gross estimate — actual AI spend is visible on the provider
+            // cards. Stripe/tax fees will trim our half ~3%.
+            const platformEstEur = (businessData.ledger.revenueCents / 200).toFixed(2)
+            const minutesSold = businessData.ledger.minutesSold
+            const minutesConsumed = businessData.ledger.minutesConsumed
+            const topups = businessData.ledger.topups
+            const rows = [
+              { label: 'Credit top-ups', value: topups, hint: 'Stripe Checkout sessions completed' },
+              { label: 'Gross revenue', value: `${revenueEur} €`, hint: 'Sum of paid Stripe sessions' },
+              { label: 'Minutes sold', value: `${minutesSold} min`, hint: 'Credits granted to users' },
+              { label: 'Minutes consumed', value: `${minutesConsumed} min`, hint: 'Live conversation time used' },
+              { label: 'Platform share (est.)', value: `${platformEstEur} €`, hint: '50% of gross, before Stripe/VAT' },
+            ]
+            return (
+              <>
+                {rows.map((r) => (
+                  <div
+                    key={r.label}
+                    style={{
+                      padding: '12px 14px', marginBottom: 8,
+                      background: 'rgba(167, 139, 250, 0.06)',
+                      border: '1px solid rgba(167, 139, 250, 0.15)',
+                      borderRadius: 12,
+                    }}
+                  >
+                    <div style={{
+                      display: 'flex', justifyContent: 'space-between',
+                      alignItems: 'baseline',
+                    }}>
+                      <div style={{ fontSize: 13, opacity: 0.75 }}>{r.label}</div>
+                      <div style={{ fontSize: 16, fontWeight: 700 }}>{r.value}</div>
+                    </div>
+                    {r.hint && (
+                      <div style={{ fontSize: 11, opacity: 0.5, marginTop: 2 }}>{r.hint}</div>
+                    )}
+                  </div>
+                ))}
+                {businessData.stripe && (
+                  <div style={{
+                    padding: '12px 14px', marginTop: 10,
+                    background: 'rgba(96, 165, 250, 0.06)',
+                    border: '1px solid rgba(96, 165, 250, 0.25)',
+                    borderRadius: 12,
+                  }}>
+                    <div style={{ fontSize: 11, opacity: 0.6, letterSpacing: '0.1em', marginBottom: 6 }}>
+                      STRIPE BALANCE
+                    </div>
+                    <div style={{ fontSize: 15 }}>
+                      {businessData.stripe.balanceDisplay || '—'}
+                    </div>
+                    {businessData.stripe.message && (
+                      <div style={{ fontSize: 11, opacity: 0.55, marginTop: 4 }}>
+                        {businessData.stripe.message}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )
+          })()}
         </div>
       )}
 

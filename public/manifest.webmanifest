@@ -1,0 +1,21 @@
+{
+  "name": "KelionAI — Voice Assistant",
+  "short_name": "Kelion",
+  "description": "Real-time AI voice companion with 3D avatar and persistent memory.",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#05060a",
+  "theme_color": "#0a0a0f",
+  "lang": "en",
+  "categories": ["productivity", "lifestyle", "utilities"],
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
