@@ -31,22 +31,12 @@ jobs:
       fail-fast: false
       matrix:
         capability:
-          # voice-roundtrip is the only real acceptance test still tied to a
-          # live Kelion feature (Gemini Live ephemeral-token mint).
-          - voice-roundtrip
-          # The next five capabilities were deleted from the product in the
-          # Kelion rebuild (see DELIVERY_CONTRACT.md § Out of scope). Their
-          # scripts exist ONLY as out-of-scope stubs that exit 0 so the
-          # GitHub branch protection rules, which still list these as
-          # required, continue to receive a status report. RULES.md §2
-          # compliance is handled inside the stubs: they print an explicit
-          # "OUT OF SCOPE" banner on stdout and do NOT claim the feature
-          # works.
           - payments
           - language-mirror
           - language-switch
           - trial-timer
           - logout-media
+          - voice-roundtrip
     steps:
       - name: Checkout
         uses: actions/checkout@v4

@@ -2,23 +2,34 @@
 'use strict';
 
 /**
- * ACCEPTANCE: logout-media — OUT OF SCOPE in Kelion (Stages 1–6).
+ * ACCEPTANCE: logout-media
  *
- * The old flow tested that hitting "Log out" terminated any active
- * mic/camera streams. The Kelion rebuild has no visible logout button
- * for anonymous guests (there is no login for them), and signed-in
- * users do have a "Sign out" item in the ⋯ menu but the audio/video
- * teardown happens in the existing `endSession()` path of
- * src/lib/geminiLive.js — which is automatic when the page state
- * changes, not conditioned on an explicit logout UI.
+ * After logout, the user's microphone and camera must be released. The
+ * only way to verify this truthfully is in a real browser, because media
+ * tracks are held by the browser, not by the server.
  *
- * There is no longer a separate "logout terminates media" contract
- * to assert against; it is folded into session-end teardown, which
- * is covered by the component tests on VoiceChat.jsx. Stub kept to
- * satisfy required branch-protection status; DELIVERY_CONTRACT.md
- * lists this as out of scope for static acceptance.
+ * This script uses Playwright to:
+ *   1. Register + log in.
+ *   2. Navigate to /chat and click "Porneste chat" which calls getUserMedia.
+ *   3. Observe that a MediaStream with audio+video tracks is active.
+ *   4. Trigger logout (via app nav).
+ *   5. Observe that all tracks from that stream are in readyState='ended'.
+ *
+ * If the browser reports any track still 'live' after logout, this script
+ * fails. No workaround, no mock, no cosmetic.
+ *
+ * This script is NOT IMPLEMENTED YET because it requires:
+ *   - automated click path to the logout button (depends on UI stability);
+ *   - instrumentation of the MediaStream from inside the page;
+ *   - a browser granted permanent camera+mic permissions for the test origin.
+ *
+ * Until it is written, the capability is NOT DELIVERED. That is the honest
+ * default.
  */
 
-console.log('[acceptance:logout-media] OUT OF SCOPE — no dedicated logout UI in Kelion; media teardown folded into endSession().');
-console.log('[acceptance:logout-media] See DELIVERY_CONTRACT.md § Capabilities deliberately out of scope.');
-process.exit(0);
+process.stderr.write('ACCEPTANCE FAIL: logout-media\n');
+process.stderr.write('  reason: script not implemented yet; logout-kills-media capability is not verified\n');
+process.stderr.write('  next step: implement Playwright flow that grants media permissions,\n');
+process.stderr.write('             captures the MediaStream references, triggers logout, and\n');
+process.stderr.write('             asserts every track is readyState="ended".\n');
+process.exit(1);
