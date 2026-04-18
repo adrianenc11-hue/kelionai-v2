@@ -140,8 +140,9 @@ function AvatarModel({ mouthOpen = 0, status = 'idle', emotion = null, presentin
 
     // Breathing — visible chest rise + upper-body sway. Adrian reported
     // the avatar looked frozen ("nu mai respiră"), so we bump the spine
-    // amplitude and also drive spine1/chest for a compound rise. Period
-    // ~6s (0.8 Hz → cycle ≈1.25 s) is the resting-adult rate.
+    // amplitude and also drive spine1/chest for a compound rise. With
+    // `Math.sin(t * 0.8)`, the breathing rate is 0.8 rad/s, so the cycle
+    // period is 2π / 0.8 ≈ 7.85 s (roughly an 8-second breath cycle).
     const breath = Math.sin(t * 0.8) * 0.032
     const spine = b['Spine'] || b['mixamorigSpine']
     const spine1 = b['Spine1'] || b['mixamorigSpine1']
