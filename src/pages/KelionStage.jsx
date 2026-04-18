@@ -5,6 +5,18 @@ import * as THREE from 'three'
 import { useLipSync } from '../lib/lipSync'
 import { STATUS_COLORS, STATUS_PULSE_HZ } from '../lib/kelionStatus'
 import { useGeminiLive } from '../lib/geminiLive'
+import {
+  supportsPasskey,
+  registerPasskey,
+  authenticateWithPasskey,
+  fetchMe,
+  signOut,
+} from '../lib/passkeyClient'
+import {
+  fetchMemory,
+  extractAndStore,
+  forgetAllMemory,
+} from '../lib/memoryClient'
 
 // ───── Avatar with idle animation + lipsync ─────
 function AvatarModel({ mouthOpen = 0, status = 'idle' }) {
@@ -306,6 +318,16 @@ export default function KelionStage() {
   const [transcriptOpen, setTranscriptOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
 
+  // Stage 3 — auth + memory state
+  const [authState, setAuthState] = useState({ signedIn: false, user: null })
+  const [memoryOpen, setMemoryOpen] = useState(false)
+  const [memoryItems, setMemoryItems] = useState([])
+  const [memoryLoading, setMemoryLoading] = useState(false)
+  const [rememberPromptOpen, setRememberPromptOpen] = useState(false)
+  const [rememberBusy, setRememberBusy] = useState(false)
+  const [rememberError, setRememberError] = useState(null)
+  const dismissedPromptRef = useRef(false)
+
   const mouthOpen = useLipSync(audioRef)
 
   const {
@@ -334,6 +356,114 @@ export default function KelionStage() {
   }, [cameraStream])
 
   useEffect(() => { setVoiceLevel(userLevel || 0) }, [userLevel])
+
+  // Stage 3 — probe whether the user is already signed in (passkey cookie).
+  useEffect(() => {
+    let cancelled = false
+    fetchMe().then((r) => {
+      if (cancelled) return
+      setAuthState({ signedIn: !!r.signedIn, user: r.user || null })
+    }).catch(() => { /* fail silently */ })
+    return () => { cancelled = true }
+  }, [])
+
+  // Stage 3 — after enough user turns, if not signed in, gently open the
+  // "Remember me?" prompt ONCE. Dismissed permanently per-session on close.
+  const userTurnCount = useMemo(
+    () => turns.filter((t) => t && t.role === 'user' && t.text && t.text.trim()).length,
+    [turns]
+  )
+  useEffect(() => {
+    if (authState.signedIn) return
+    if (dismissedPromptRef.current) return
+    if (rememberPromptOpen) return
+    if (userTurnCount >= 4 && supportsPasskey()) {
+      setRememberPromptOpen(true)
+    }
+  }, [userTurnCount, authState.signedIn, rememberPromptOpen])
+
+  // Stage 3 — when the user ends a session, extract facts (if signed in).
+  const turnsRef = useRef(turns)
+  useEffect(() => { turnsRef.current = turns }, [turns])
+  const prevStatusRef = useRef(status)
+  useEffect(() => {
+    const prev = prevStatusRef.current
+    prevStatusRef.current = status
+    const justEnded = (prev && prev !== 'idle' && prev !== 'error') && (status === 'idle' || status === 'error')
+    if (!justEnded) return
+    if (!authState.signedIn) return
+    const snapshot = turnsRef.current.filter((t) => t && t.role && t.text && t.text.trim())
+    if (snapshot.length < 2) return
+    extractAndStore(snapshot).catch((err) => {
+      console.warn('[memory extract]', err.message)
+    })
+  }, [status, authState.signedIn])
+
+  const openMemory = useCallback(async () => {
+    setMemoryOpen(true)
+    setMemoryLoading(true)
+    try {
+      const r = await fetchMemory()
+      setMemoryItems(Array.isArray(r.items) ? r.items : [])
+    } catch (err) {
+      console.warn('[memory]', err.message)
+    } finally {
+      setMemoryLoading(false)
+    }
+  }, [])
+
+  const handleRemember = useCallback(async () => {
+    setRememberBusy(true)
+    setRememberError(null)
+    try {
+      const nameGuess = '' // Kelion will discover the user's name over time
+      const res = await registerPasskey(nameGuess)
+      setAuthState({ signedIn: true, user: res.user })
+      setRememberPromptOpen(false)
+      // Immediately extract facts from what was said so far, so the next
+      // session opens with real memory.
+      const snapshot = turnsRef.current.filter((t) => t && t.role && t.text && t.text.trim())
+      if (snapshot.length >= 2) {
+        extractAndStore(snapshot).catch(() => {})
+      }
+    } catch (err) {
+      setRememberError(err.message || 'Could not save the passkey')
+    } finally {
+      setRememberBusy(false)
+    }
+  }, [])
+
+  const handleSignInExisting = useCallback(async () => {
+    setRememberBusy(true)
+    setRememberError(null)
+    try {
+      const res = await authenticateWithPasskey()
+      setAuthState({ signedIn: true, user: res.user })
+      setRememberPromptOpen(false)
+    } catch (err) {
+      setRememberError(err.message || 'Could not sign in')
+    } finally {
+      setRememberBusy(false)
+    }
+  }, [])
+
+  const handleSignOut = useCallback(async () => {
+    await signOut().catch(() => {})
+    setAuthState({ signedIn: false, user: null })
+    setMemoryItems([])
+    setMemoryOpen(false)
+  }, [])
+
+  const handleForgetAll = useCallback(async () => {
+    if (!authState.signedIn) return
+    if (!window.confirm('Forget everything Kelion knows about you? This cannot be undone.')) return
+    try {
+      await forgetAllMemory()
+      setMemoryItems([])
+    } catch (err) {
+      console.warn('[memory]', err.message)
+    }
+  }, [authState.signedIn])
 
   const statusLabel = {
     idle:       'Tap to talk',
@@ -450,6 +580,23 @@ export default function KelionStage() {
           <MenuItem onClick={() => { setTranscriptOpen((v) => !v); setMenuOpen(false) }}>
             {transcriptOpen ? 'Hide transcript' : 'Show transcript'}
           </MenuItem>
+          {/* Stage 3 — memory + passkey */}
+          {authState.signedIn ? (
+            <>
+              <MenuItem onClick={() => { openMemory(); setMenuOpen(false) }}>
+                What do you know about me?
+              </MenuItem>
+              <MenuItem onClick={() => { handleSignOut(); setMenuOpen(false) }}>
+                Sign out
+              </MenuItem>
+            </>
+          ) : (
+            supportsPasskey() && (
+              <MenuItem onClick={() => { setRememberPromptOpen(true); setMenuOpen(false) }}>
+                Remember me
+              </MenuItem>
+            )
+          )}
           <MenuItem onClick={() => { stop(); setMenuOpen(false) }} disabled={status === 'idle'}>
             End chat
           </MenuItem>
@@ -576,6 +723,170 @@ export default function KelionStage() {
               {t.text || <i style={{ opacity: 0.4 }}>…</i>}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Stage 3 — "Remember me" soft prompt */}
+      {rememberPromptOpen && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: 'absolute',
+            left: '50%',
+            bottom: 'calc(env(safe-area-inset-bottom, 0px) + 88px)',
+            transform: 'translateX(-50%)',
+            width: 'min(420px, 92vw)',
+            padding: '18px 20px 16px',
+            borderRadius: 18,
+            background: 'rgba(14, 10, 28, 0.92)',
+            backdropFilter: 'blur(22px)',
+            border: '1px solid rgba(167, 139, 250, 0.32)',
+            boxShadow: '0 24px 60px rgba(0,0,0,0.55)',
+            color: '#ede9fe',
+            zIndex: 25,
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+          }}
+        >
+          <div style={{ fontSize: 14, lineHeight: 1.45, marginBottom: 14 }}>
+            I'd like to remember you next time.<br />
+            <span style={{ opacity: 0.65, fontSize: 13 }}>
+              Save a passkey on this device — no password, no email.
+            </span>
+          </div>
+          {rememberError && (
+            <div style={{
+              fontSize: 12, color: '#fecaca',
+              background: 'rgba(80, 14, 14, 0.6)',
+              padding: '8px 10px', borderRadius: 8, marginBottom: 10,
+            }}>{rememberError}</div>
+          )}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button
+              onClick={handleRemember}
+              disabled={rememberBusy}
+              style={{
+                flex: '1 1 auto',
+                padding: '10px 14px',
+                borderRadius: 10,
+                background: 'linear-gradient(135deg, #a78bfa, #60a5fa)',
+                color: '#0a0818',
+                border: 'none',
+                cursor: rememberBusy ? 'wait' : 'pointer',
+                fontSize: 14, fontWeight: 600,
+              }}
+            >
+              {rememberBusy ? 'Saving…' : 'Remember me'}
+            </button>
+            <button
+              onClick={handleSignInExisting}
+              disabled={rememberBusy}
+              style={{
+                padding: '10px 14px',
+                borderRadius: 10,
+                background: 'rgba(167, 139, 250, 0.12)',
+                color: '#ede9fe',
+                border: '1px solid rgba(167, 139, 250, 0.3)',
+                cursor: rememberBusy ? 'wait' : 'pointer',
+                fontSize: 14,
+              }}
+            >
+              I have a passkey
+            </button>
+            <button
+              onClick={() => {
+                dismissedPromptRef.current = true
+                setRememberPromptOpen(false)
+                setRememberError(null)
+              }}
+              disabled={rememberBusy}
+              style={{
+                padding: '10px 14px',
+                borderRadius: 10,
+                background: 'transparent',
+                color: '#ede9fe',
+                border: '1px solid rgba(167, 139, 250, 0.18)',
+                cursor: 'pointer',
+                fontSize: 14, opacity: 0.75,
+              }}
+            >
+              Not now
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Stage 3 — memory drawer */}
+      {memoryOpen && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: 'absolute', top: 0, right: 0, bottom: 0,
+            width: 'min(440px, 92vw)',
+            background: 'rgba(10, 8, 20, 0.82)',
+            backdropFilter: 'blur(22px)',
+            borderLeft: '1px solid rgba(167, 139, 250, 0.2)',
+            padding: '70px 20px 20px 20px',
+            overflowY: 'auto',
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+            zIndex: 24,
+          }}
+        >
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            marginBottom: 14,
+          }}>
+            <div style={{ fontSize: 11, opacity: 0.6, letterSpacing: '0.15em' }}>
+              WHAT I KNOW ABOUT YOU
+            </div>
+            <button
+              onClick={() => setMemoryOpen(false)}
+              style={{
+                background: 'transparent', border: 'none', color: '#ede9fe',
+                fontSize: 20, cursor: 'pointer', opacity: 0.7,
+              }}
+              aria-label="Close"
+            >✕</button>
+          </div>
+
+          {memoryLoading && (
+            <div style={{ opacity: 0.5, fontSize: 14 }}>Loading…</div>
+          )}
+          {!memoryLoading && memoryItems.length === 0 && (
+            <div style={{ opacity: 0.55, fontSize: 14, lineHeight: 1.5 }}>
+              Nothing yet. Keep talking — I'll pick up on things worth remembering
+              and save them here. You can review and delete anything.
+            </div>
+          )}
+          {memoryItems.map((m) => (
+            <div key={m.id} style={{
+              marginBottom: 10, padding: '10px 12px',
+              borderRadius: 10,
+              background: 'rgba(167, 139, 250, 0.08)',
+              borderLeft: '2px solid #a78bfa',
+              fontSize: 14, lineHeight: 1.45,
+              display: 'flex', flexDirection: 'column', gap: 4,
+            }}>
+              <div style={{
+                fontSize: 10, opacity: 0.55, letterSpacing: '0.12em',
+              }}>{(m.kind || 'fact').toUpperCase()}</div>
+              <div>{m.fact}</div>
+            </div>
+          ))}
+
+          {memoryItems.length > 0 && (
+            <button
+              onClick={handleForgetAll}
+              style={{
+                marginTop: 18,
+                padding: '10px 14px',
+                borderRadius: 10,
+                background: 'transparent',
+                color: '#fecaca',
+                border: '1px solid rgba(239, 68, 68, 0.4)',
+                cursor: 'pointer', fontSize: 13,
+              }}
+            >Forget everything</button>
+          )}
         </div>
       )}
 

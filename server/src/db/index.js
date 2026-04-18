@@ -47,6 +47,15 @@ async function initDb() {
   if (!cols.find(c => c.name === 'password_hash')) {
     await db.exec('ALTER TABLE users ADD COLUMN password_hash TEXT');
   }
+  // Stage 3 — M13: Passkey credentials stored as JSON array
+  if (!cols.find(c => c.name === 'passkey_credentials')) {
+    await db.exec("ALTER TABLE users ADD COLUMN passkey_credentials TEXT DEFAULT '[]'");
+  }
+  // Stage 3 — passkey registration challenges (short-lived, in-memory would also work
+  // but we want them to survive a single dev-server reload)
+  if (!cols.find(c => c.name === 'current_webauthn_challenge')) {
+    await db.exec("ALTER TABLE users ADD COLUMN current_webauthn_challenge TEXT");
+  }
 
   // Create index for faster lookups
   await db.exec('CREATE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id)');
@@ -70,7 +79,133 @@ async function initDb() {
   await db.exec('CREATE INDEX IF NOT EXISTS idx_referrals_code ON referrals(code)');
   await db.exec('CREATE INDEX IF NOT EXISTS idx_referrals_owner ON referrals(owner_id)');
 
+  // Stage 3 — M14/M15: Long-term memory store. One row per extracted fact
+  // about the user. We keep it simple (no embeddings yet — retrieval dumps
+  // the most-recent-N facts into the system prompt, which fits within
+  // Gemini Live's budget for typical user memory sizes).
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS memory_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      kind TEXT NOT NULL DEFAULT 'fact',
+      fact TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+  await db.exec('CREATE INDEX IF NOT EXISTS idx_memory_items_user ON memory_items(user_id, created_at DESC)');
+
   return db;
+}
+
+// Stage 3 — memory helpers
+async function addMemoryItems(userId, items) {
+  if (!Array.isArray(items) || items.length === 0) return [];
+  const inserted = [];
+  for (const it of items) {
+    if (!it || !it.fact || typeof it.fact !== 'string') continue;
+    const fact = it.fact.trim().slice(0, 500);
+    if (!fact) continue;
+    const kind = (it.kind && typeof it.kind === 'string') ? it.kind.slice(0, 40) : 'fact';
+    // De-dupe: skip if identical fact already exists for this user
+    const dup = await db.get(
+      'SELECT id FROM memory_items WHERE user_id = ? AND fact = ? LIMIT 1',
+      [userId, fact]
+    );
+    if (dup) continue;
+    const r = await db.run(
+      'INSERT INTO memory_items (user_id, kind, fact) VALUES (?, ?, ?)',
+      [userId, kind, fact]
+    );
+    inserted.push({ id: r.lastID, user_id: userId, kind, fact });
+  }
+  return inserted;
+}
+
+async function listMemoryItems(userId, limit = 100) {
+  return db.all(
+    'SELECT id, kind, fact, created_at FROM memory_items WHERE user_id = ? ORDER BY created_at DESC LIMIT ?',
+    [userId, limit]
+  );
+}
+
+async function deleteMemoryItem(userId, id) {
+  const r = await db.run('DELETE FROM memory_items WHERE id = ? AND user_id = ?', [id, userId]);
+  return r.changes > 0;
+}
+
+async function clearMemoryForUser(userId) {
+  const r = await db.run('DELETE FROM memory_items WHERE user_id = ?', [userId]);
+  return r.changes;
+}
+
+// Stage 3 — passkey helpers
+async function getUserPasskeys(userId) {
+  const row = await db.get('SELECT passkey_credentials FROM users WHERE id = ?', [userId]);
+  if (!row || !row.passkey_credentials) return [];
+  try {
+    const arr = JSON.parse(row.passkey_credentials);
+    return Array.isArray(arr) ? arr : [];
+  } catch { return []; }
+}
+
+async function addPasskey(userId, credential) {
+  const existing = await getUserPasskeys(userId);
+  // De-dupe by credentialID
+  const filtered = existing.filter(c => c.credentialID !== credential.credentialID);
+  filtered.push(credential);
+  await db.run(
+    'UPDATE users SET passkey_credentials = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+    [JSON.stringify(filtered), userId]
+  );
+  return filtered;
+}
+
+async function updatePasskeyCounter(userId, credentialID, counter) {
+  const existing = await getUserPasskeys(userId);
+  const updated = existing.map(c =>
+    c.credentialID === credentialID ? { ...c, counter } : c
+  );
+  await db.run(
+    'UPDATE users SET passkey_credentials = ? WHERE id = ?',
+    [JSON.stringify(updated), userId]
+  );
+}
+
+async function findUserByCredentialId(credentialID) {
+  // SQLite has no JSON search out of the box; scan users.
+  // Fine for current scale. Switch to a dedicated credentials table if it grows.
+  const rows = await db.all('SELECT id, passkey_credentials FROM users WHERE passkey_credentials IS NOT NULL');
+  for (const r of rows) {
+    try {
+      const arr = JSON.parse(r.passkey_credentials || '[]');
+      if (arr.find(c => c.credentialID === credentialID)) {
+        return getUserById(r.id);
+      }
+    } catch { /* ignore */ }
+  }
+  return null;
+}
+
+async function setWebauthnChallenge(userId, challenge) {
+  await db.run(
+    'UPDATE users SET current_webauthn_challenge = ? WHERE id = ?',
+    [challenge, userId]
+  );
+}
+
+async function consumeWebauthnChallenge(userId) {
+  const row = await db.get(
+    'SELECT current_webauthn_challenge FROM users WHERE id = ?',
+    [userId]
+  );
+  if (row) {
+    await db.run(
+      'UPDATE users SET current_webauthn_challenge = NULL WHERE id = ?',
+      [userId]
+    );
+  }
+  return row?.current_webauthn_challenge || null;
 }
 
 function getDb() { return db; }
@@ -278,4 +413,16 @@ module.exports = {
   findReferralCode,
   useReferralCode,
   sanitizeUser,
+  // Stage 3 — memory
+  addMemoryItems,
+  listMemoryItems,
+  deleteMemoryItem,
+  clearMemoryForUser,
+  // Stage 3 — passkey
+  getUserPasskeys,
+  addPasskey,
+  updatePasskeyCounter,
+  findUserByCredentialId,
+  setWebauthnChallenge,
+  consumeWebauthnChallenge,
 };

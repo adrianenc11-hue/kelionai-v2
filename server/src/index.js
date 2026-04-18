@@ -19,6 +19,8 @@ const adminRouter      = require('./routes/admin');
 const chatRouter       = require('./routes/chat');
 const ttsRouter        = require('./routes/tts');
 const realtimeRouter   = require('./routes/realtime');
+const passkeyRouter    = require('./routes/passkey');
+const memoryRouter     = require('./routes/memory');
 
 const app = express();
 app.disable('x-powered-by');
@@ -215,6 +217,11 @@ app.use('/api/tts', requireAuth, chatLimiter, checkSubscription(), ttsRouter);
 // Rate limiting still applies to prevent abuse. Ephemeral-token endpoints only
 // hand back short-lived tokens; persona + config are baked in server-side.
 app.use('/api/realtime', chatLimiter, realtimeRouter);
+
+// Stage 3 — M13 passkey (public — register/auth flows need to be reachable
+// without auth) + M14/M16/M17 memory (signed-in users only).
+app.use('/api/auth/passkey', passkeyRouter);
+app.use('/api/memory', requireAuth, memoryRouter);
 
 // Health check with service status
 app.get('/health', async (_req, res) => {
