@@ -405,6 +405,12 @@ function sanitizeUser(user) {
   if (!user) return user;
   const clean = { ...user };
   delete clean.password_hash;
+  // Strip WebAuthn / passkey secrets — current_webauthn_challenge is an active
+  // registration/authentication challenge whose leak enables replay attacks,
+  // and passkey_credentials contains credential IDs + public keys that are
+  // considered sensitive metadata. Neither is needed on the client.
+  delete clean.passkey_credentials;
+  delete clean.current_webauthn_challenge;
   return clean;
 }
 

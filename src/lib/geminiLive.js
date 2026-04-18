@@ -46,7 +46,8 @@ export function useGeminiLive({ audioRef }) {
   const [visionError, setVisionError] = useState(null)
 
   const wsRef = useRef(null)
-  const audioCtxRef = useRef(null)
+  const audioCtxRef = useRef(null)       // 16kHz capture context for Gemini — MUST match SAMPLE_RATE_IN
+  const meterCtxRef = useRef(null)       // Separate default-rate context for the level meter analyser
   const workletNodeRef = useRef(null)
   const micStreamRef = useRef(null)
   const outputGainRef = useRef(null)
@@ -83,11 +84,15 @@ export function useGeminiLive({ audioRef }) {
   }, [])
 
   // ───── Mic level meter (drives halo voice-reactive glow) ─────
+  // IMPORTANT: uses a SEPARATE AudioContext from the 16kHz capture context.
+  // Sharing `audioCtxRef` here lazily created a 48kHz default-rate context
+  // before the capture pipeline could create its 16kHz one, which caused the
+  // mic to be captured at 48kHz but tagged as 16kHz on the wire to Gemini.
   const startMicLevel = useCallback((stream) => {
-    if (!audioCtxRef.current) {
-      audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)()
+    if (!meterCtxRef.current) {
+      meterCtxRef.current = new (window.AudioContext || window.webkitAudioContext)()
     }
-    const ctx = audioCtxRef.current
+    const ctx = meterCtxRef.current
     const src = ctx.createMediaStreamSource(stream)
     const analyser = ctx.createAnalyser()
     analyser.fftSize = 256
@@ -512,6 +517,10 @@ export function useGeminiLive({ audioRef }) {
     }
     if (micLevelRafRef.current) cancelAnimationFrame(micLevelRafRef.current)
     analyserRef.current = null
+    if (meterCtxRef.current) {
+      try { meterCtxRef.current.close() } catch {}
+      meterCtxRef.current = null
+    }
     setUserLevel(0)
     setStatus('idle')
     setError(null)

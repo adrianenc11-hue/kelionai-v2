@@ -36,8 +36,11 @@ const origin = config.appBaseUrl;
 
 // Helper — flip the session cookie that Stage 1 auth middleware already honours.
 function issueSessionCookie(res, user) {
+  // signAppToken reads user.id to populate the JWT `sub` claim, so we must
+  // pass the object with `.id`, not `.sub`. Passing `{sub: ...}` produced
+  // JWTs with sub=undefined, breaking memory/push lookups for passkey users.
   const token = signAppToken({
-    sub: user.id,
+    id: user.id,
     email: user.email,
     name: user.name,
     role: user.role || 'user',
