@@ -95,6 +95,40 @@ async function initDb() {
   `);
   await db.exec('CREATE INDEX IF NOT EXISTS idx_memory_items_user ON memory_items(user_id, created_at DESC)');
 
+  // Stage 5 — M23: Web Push subscriptions. One row per device/browser; a
+  // single user may have several (phone + laptop). endpoint is unique.
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS push_subscriptions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      endpoint TEXT NOT NULL UNIQUE,
+      p256dh TEXT NOT NULL,
+      auth_secret TEXT NOT NULL,
+      user_agent TEXT,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      last_sent_at DATETIME,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+  await db.exec('CREATE INDEX IF NOT EXISTS idx_push_subs_user ON push_subscriptions(user_id, enabled)');
+
+  // Stage 5 — M25: log of proactive pings sent so we don't spam & can debug.
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS proactive_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      kind TEXT NOT NULL,
+      title TEXT,
+      body TEXT,
+      reason TEXT,
+      delivered INTEGER NOT NULL DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+  await db.exec('CREATE INDEX IF NOT EXISTS idx_proactive_log_user ON proactive_log(user_id, created_at DESC)');
+
   return db;
 }
 
@@ -425,4 +459,66 @@ module.exports = {
   findUserByCredentialId,
   setWebauthnChallenge,
   consumeWebauthnChallenge,
+  // Stage 5 — push + proactive
+  upsertPushSubscription,
+  listPushSubscriptionsForUser,
+  listActivePushSubscriptions,
+  deletePushSubscription,
+  disablePushSubscriptionByEndpoint,
+  markPushSent,
+  logProactive,
+  recentProactiveForUser,
 };
+
+// ─── Stage 5 helpers ────────────────────────────────────────────────
+async function upsertPushSubscription({ userId, endpoint, p256dh, auth, userAgent }) {
+  const existing = await db.get('SELECT id FROM push_subscriptions WHERE endpoint = ?', [endpoint]);
+  if (existing) {
+    await db.run(
+      'UPDATE push_subscriptions SET user_id = ?, p256dh = ?, auth_secret = ?, user_agent = ?, enabled = 1 WHERE endpoint = ?',
+      [userId, p256dh, auth, userAgent || null, endpoint]
+    );
+    return existing.id;
+  }
+  const r = await db.run(
+    'INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth_secret, user_agent) VALUES (?, ?, ?, ?, ?)',
+    [userId, endpoint, p256dh, auth, userAgent || null]
+  );
+  return r.lastID;
+}
+
+async function listPushSubscriptionsForUser(userId) {
+  return db.all('SELECT id, endpoint, p256dh, auth_secret, enabled, created_at, last_sent_at FROM push_subscriptions WHERE user_id = ? ORDER BY created_at DESC', [userId]);
+}
+
+async function listActivePushSubscriptions() {
+  return db.all('SELECT id, user_id, endpoint, p256dh, auth_secret FROM push_subscriptions WHERE enabled = 1');
+}
+
+async function deletePushSubscription(userId, endpoint) {
+  const r = await db.run('DELETE FROM push_subscriptions WHERE user_id = ? AND endpoint = ?', [userId, endpoint]);
+  return r.changes > 0;
+}
+
+async function disablePushSubscriptionByEndpoint(endpoint) {
+  await db.run('UPDATE push_subscriptions SET enabled = 0 WHERE endpoint = ?', [endpoint]);
+}
+
+async function markPushSent(id) {
+  await db.run('UPDATE push_subscriptions SET last_sent_at = CURRENT_TIMESTAMP WHERE id = ?', [id]);
+}
+
+async function logProactive({ userId, kind, title, body, reason, delivered }) {
+  await db.run(
+    'INSERT INTO proactive_log (user_id, kind, title, body, reason, delivered) VALUES (?, ?, ?, ?, ?, ?)',
+    [userId, kind, title || null, body || null, reason || null, delivered ? 1 : 0]
+  );
+}
+
+async function recentProactiveForUser(userId, sinceMs) {
+  const since = new Date(Date.now() - sinceMs).toISOString();
+  return db.all(
+    "SELECT id, kind, title, created_at FROM proactive_log WHERE user_id = ? AND created_at > ? ORDER BY created_at DESC",
+    [userId, since]
+  );
+}

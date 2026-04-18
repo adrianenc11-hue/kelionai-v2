@@ -17,6 +17,13 @@ import {
   extractAndStore,
   forgetAllMemory,
 } from '../lib/memoryClient'
+import {
+  pushSupported,
+  getPushStatus,
+  enablePush,
+  disablePush,
+  sendTestPing,
+} from '../lib/pushClient'
 
 // ───── Avatar with idle animation + lipsync ─────
 function AvatarModel({ mouthOpen = 0, status = 'idle' }) {
@@ -328,6 +335,11 @@ export default function KelionStage() {
   const [rememberError, setRememberError] = useState(null)
   const dismissedPromptRef = useRef(false)
 
+  // Stage 5 — proactive pings state
+  const [pushState, setPushState] = useState({ supported: false, enabled: false, permission: 'default' })
+  const [pushBusy, setPushBusy] = useState(false)
+  const [pushError, setPushError] = useState(null)
+
   const mouthOpen = useLipSync(audioRef)
 
   const {
@@ -465,6 +477,51 @@ export default function KelionStage() {
     }
   }, [authState.signedIn])
 
+  // Stage 5 — probe current push subscription state on mount + when auth changes
+  useEffect(() => {
+    let cancelled = false
+    if (!pushSupported()) {
+      setPushState({ supported: false, enabled: false, permission: 'unsupported' })
+      return
+    }
+    getPushStatus().then((s) => { if (!cancelled) setPushState(s) }).catch(() => {})
+    return () => { cancelled = true }
+  }, [authState.signedIn])
+
+  const handleEnablePush = useCallback(async () => {
+    setPushError(null)
+    setPushBusy(true)
+    try {
+      await enablePush()
+      const s = await getPushStatus()
+      setPushState(s)
+    } catch (err) {
+      setPushError(err.message || 'Could not enable pings.')
+    } finally {
+      setPushBusy(false)
+    }
+  }, [])
+
+  const handleDisablePush = useCallback(async () => {
+    setPushError(null)
+    setPushBusy(true)
+    try {
+      await disablePush()
+      const s = await getPushStatus()
+      setPushState(s)
+    } catch (err) {
+      setPushError(err.message || 'Could not disable pings.')
+    } finally {
+      setPushBusy(false)
+    }
+  }, [])
+
+  const handleTestPing = useCallback(async () => {
+    setPushError(null)
+    try { await sendTestPing('This is Kelion testing the ping channel.') }
+    catch (err) { setPushError(err.message || 'Test ping failed.') }
+  }, [])
+
   const statusLabel = {
     idle:       'Tap to talk',
     requesting: 'Requesting mic…',
@@ -586,6 +643,32 @@ export default function KelionStage() {
               <MenuItem onClick={() => { openMemory(); setMenuOpen(false) }}>
                 What do you know about me?
               </MenuItem>
+              {/* Stage 5 — proactive pings */}
+              {pushState.supported && (
+                pushState.enabled ? (
+                  <>
+                    <MenuItem
+                      onClick={() => { handleTestPing(); setMenuOpen(false) }}
+                      disabled={pushBusy}
+                    >
+                      Send a test ping
+                    </MenuItem>
+                    <MenuItem
+                      onClick={() => { handleDisablePush(); setMenuOpen(false) }}
+                      disabled={pushBusy}
+                    >
+                      {pushBusy ? 'Disabling pings…' : 'Disable pings'}
+                    </MenuItem>
+                  </>
+                ) : (
+                  <MenuItem
+                    onClick={() => { handleEnablePush(); setMenuOpen(false) }}
+                    disabled={pushBusy}
+                  >
+                    {pushBusy ? 'Enabling pings…' : 'Enable pings'}
+                  </MenuItem>
+                )
+              )}
               <MenuItem onClick={() => { handleSignOut(); setMenuOpen(false) }}>
                 Sign out
               </MenuItem>

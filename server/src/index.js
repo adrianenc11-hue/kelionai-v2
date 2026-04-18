@@ -22,6 +22,8 @@ const realtimeRouter   = require('./routes/realtime');
 const passkeyRouter    = require('./routes/passkey');
 const memoryRouter     = require('./routes/memory');
 const toolsRouter      = require('./routes/tools');
+const pushRouter       = require('./routes/push');
+const proactive        = require('./services/proactive');
 
 const app = express();
 app.disable('x-powered-by');
@@ -228,6 +230,18 @@ app.use('/api/memory', requireAuth, memoryRouter);
 // Router is PUBLIC by design: Gemini Live tool-call flow has no login gate,
 // and MCP endpoints self-check for a signed-in user inside the handler.
 app.use('/api/tools', chatLimiter, toolsRouter);
+
+// Stage 5 — M23 push + M24/M25 proactive scheduler. Requires passkey auth,
+// except /public-key which the browser needs to fetch BEFORE authenticating.
+app.get('/api/push/public-key', (_req, res) => {
+  res.json({ publicKey: pushRouter.getVapidPublicKey() });
+});
+app.use('/api/push', requireAuth, pushRouter);
+
+if (process.env.NODE_ENV !== 'test' && process.env.PROACTIVE_DISABLED !== '1') {
+  try { proactive.start(require('./routes/push').getWebPush()); }
+  catch (err) { console.warn('[proactive] failed to start:', err.message); }
+}
 
 // Health check with service status
 app.get('/health', async (_req, res) => {
