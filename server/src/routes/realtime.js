@@ -307,7 +307,16 @@ router.get('/gemini-token', async (req, res) => {
 
     if (!r.ok) {
       const err = await r.text();
-      console.error('[realtime] Gemini ephemeral token error:', err);
+      // Log enough to diagnose without leaking the API key back to the client.
+      // Operators can grep Railway logs for "[realtime] Gemini ephemeral token error".
+      console.error(
+        '[realtime] Gemini ephemeral token error:',
+        'status=' + r.status,
+        'model=' + model,
+        'voice=' + voice,
+        'lang=' + browserLang,
+        'body=' + err.slice(0, 2000),
+      );
       return res.status(500).json({ error: 'Failed to create Gemini live session' });
     }
 

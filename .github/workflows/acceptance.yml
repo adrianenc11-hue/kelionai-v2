@@ -31,11 +31,11 @@ jobs:
       fail-fast: false
       matrix:
         capability:
-          - payments
-          - language-mirror
-          - language-switch
-          - trial-timer
-          - logout-media
+          # Kelion scope: a voice-first avatar. Legacy capabilities
+          # (payments, language-mirror, language-switch, trial-timer,
+          # logout-media) were removed from the product surface in
+          # Stage 1 and their acceptance scripts were dropped with
+          # them — see DELIVERY_CONTRACT.md § "Out of scope".
           - voice-roundtrip
     steps:
       - name: Checkout
