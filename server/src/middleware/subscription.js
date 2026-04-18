@@ -81,11 +81,15 @@ function checkSubscription(requiredPlan = 'free') {
         return res.status(404).json({ error: 'User not found' });
       }
 
-      // Admin bypass via DB row — covers users whose admin role was toggled
-      // after they signed in (new JWT not yet minted).
+      // Admin bypass via DB row — when the user row exists, the DB is
+      // authoritative. We intentionally do NOT OR-in the JWT role/email
+      // claims here: JWTs are valid for 7 days (see config.js), so reusing
+      // stale JWT claims would make admin revocation ineffective for up to
+      // a week. The JWT-only path above is limited to the "row missing"
+      // case it was designed for (stale cookie against a reset DB).
       const dbRoleIsAdmin = user.role === 'admin';
       const dbEmailIsAdmin = user.email && allAdmins.includes(String(user.email).toLowerCase());
-      if (jwtRoleIsAdmin || jwtEmailIsAdmin || dbRoleIsAdmin || dbEmailIsAdmin) {
+      if (dbRoleIsAdmin || dbEmailIsAdmin) {
         req.subscription = {
           tier: 'admin',
           plan: { id: 'admin', name: 'Admin', dailyLimit: null },
