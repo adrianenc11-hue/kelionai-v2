@@ -99,9 +99,10 @@ const chatLimiter = (process.env.NODE_ENV === 'test') ? (req, res, next) => next
 
 // Skip JSON parsing on the Stripe webhook so signature verification in
 // /api/credits/webhook can read the raw body. Everything else goes
-// through the normal JSON parser.
+// through the normal JSON parser. Use req.path (no query string) so a
+// stray ?retry=1 from Stripe wouldn't bypass the guard.
 app.use((req, res, next) => {
-  if (req.originalUrl === '/api/credits/webhook') return next();
+  if (req.path === '/api/credits/webhook') return next();
   return express.json({ limit: '1mb' })(req, res, next);
 });
 app.use(express.urlencoded({ extended: false }));

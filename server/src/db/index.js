@@ -567,6 +567,20 @@ async function getCreditsBalance(userId) {
   return row ? Number(row.credits_balance_minutes || 0) : 0;
 }
 
+// In-process serializer for credit transactions. sqlite3's driver
+// serializes individual statements but NOT multi-statement transactions,
+// so two concurrent BEGIN IMMEDIATE calls can interleave. Devin Review
+// flagged this at commit 39043d96. We guard the whole transaction body
+// with a tiny promise chain so callers queue behind each other.
+let creditsTxnQueue = Promise.resolve();
+function serializeCreditsTxn(fn) {
+  const next = creditsTxnQueue.then(() => fn());
+  // Keep the chain alive even if fn throws — otherwise a rejection would
+  // break every subsequent call.
+  creditsTxnQueue = next.catch(() => {});
+  return next;
+}
+
 /**
  * Atomically add `deltaMinutes` to a user's balance and write a ledger
  * row. Use a positive `deltaMinutes` for top-ups / bonuses and a
@@ -577,7 +591,7 @@ async function getCreditsBalance(userId) {
  * column rejects duplicates and we treat the collision as "already
  * fulfilled" and no-op.
  */
-async function addCreditsTransaction({
+function addCreditsTransaction({
   userId,
   deltaMinutes,
   amountCents = null,
@@ -588,43 +602,45 @@ async function addCreditsTransaction({
   note = null,
 }) {
   if (!Number.isFinite(deltaMinutes) || deltaMinutes === 0) {
-    throw new Error('deltaMinutes must be a non-zero number');
+    return Promise.reject(new Error('deltaMinutes must be a non-zero number'));
   }
   if (!kind || typeof kind !== 'string') {
-    throw new Error('kind is required');
+    return Promise.reject(new Error('kind is required'));
   }
-  try {
-    await db.run('BEGIN IMMEDIATE');
-    const row = await db.get('SELECT credits_balance_minutes FROM users WHERE id = ?', [userId]);
-    if (!row) {
-      await db.run('ROLLBACK');
-      throw new Error('user not found');
+  return serializeCreditsTxn(async () => {
+    try {
+      await db.run('BEGIN IMMEDIATE');
+      const row = await db.get('SELECT credits_balance_minutes FROM users WHERE id = ?', [userId]);
+      if (!row) {
+        await db.run('ROLLBACK');
+        throw new Error('user not found');
+      }
+      const current = Number(row.credits_balance_minutes || 0);
+      const next = current + deltaMinutes;
+      if (next < 0) {
+        // Refuse to go negative; caller should check balance first.
+        await db.run('ROLLBACK');
+        throw new Error('insufficient credits');
+      }
+      await db.run('UPDATE users SET credits_balance_minutes = ? WHERE id = ?', [next, userId]);
+      await db.run(
+        `INSERT INTO credit_transactions
+         (user_id, delta_minutes, amount_cents, currency, kind, stripe_session_id, stripe_payment_intent, note)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [userId, deltaMinutes, amountCents, currency, kind, stripeSessionId, stripePaymentIntent, note],
+      );
+      await db.run('COMMIT');
+      return { balance: next, previous: current, deltaMinutes };
+    } catch (err) {
+      try { await db.run('ROLLBACK'); } catch (_) { /* ignore */ }
+      // UNIQUE stripe_session_id → duplicate webhook delivery. Treat as idempotent.
+      if (/UNIQUE/i.test(err && err.message) && stripeSessionId) {
+        const balance = await getCreditsBalance(userId);
+        return { balance, previous: balance, deltaMinutes: 0, duplicate: true };
+      }
+      throw err;
     }
-    const current = Number(row.credits_balance_minutes || 0);
-    const next = current + deltaMinutes;
-    if (next < 0) {
-      // Refuse to go negative; caller should check balance first.
-      await db.run('ROLLBACK');
-      throw new Error('insufficient credits');
-    }
-    await db.run('UPDATE users SET credits_balance_minutes = ? WHERE id = ?', [next, userId]);
-    await db.run(
-      `INSERT INTO credit_transactions
-       (user_id, delta_minutes, amount_cents, currency, kind, stripe_session_id, stripe_payment_intent, note)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [userId, deltaMinutes, amountCents, currency, kind, stripeSessionId, stripePaymentIntent, note],
-    );
-    await db.run('COMMIT');
-    return { balance: next, previous: current, deltaMinutes };
-  } catch (err) {
-    try { await db.run('ROLLBACK'); } catch (_) { /* ignore */ }
-    // UNIQUE stripe_session_id → duplicate webhook delivery. Treat as idempotent.
-    if (/UNIQUE/i.test(err && err.message) && stripeSessionId) {
-      const balance = await getCreditsBalance(userId);
-      return { balance, previous: balance, deltaMinutes: 0, duplicate: true };
-    }
-    throw err;
-  }
+  });
 }
 
 async function listCreditTransactions(userId, limit = 50) {
