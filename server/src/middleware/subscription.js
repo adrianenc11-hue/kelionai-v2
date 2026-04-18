@@ -41,6 +41,22 @@ const SUBSCRIPTION_PLANS = {
   },
 };
 
+function getAdminEmails() {
+  const defaultAdmins = ['adrianenc11@gmail.com'];
+  const extraAdmins = (process.env.ADMIN_EMAILS || '')
+    .split(',')
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+
+  return [...new Set([...defaultAdmins, ...extraAdmins])];
+}
+
+function isAdminEmail(email) {
+  const normalizedEmail = (email || '').trim().toLowerCase();
+
+  return Boolean(normalizedEmail) && getAdminEmails().includes(normalizedEmail);
+}
+
 /**
  * Middleware pentru verificarea subscription-ului.
  * Verifică dacă utilizatorul are quota disponibilă.
@@ -55,13 +71,8 @@ function checkSubscription(requiredPlan = 'free') {
       // since been reset / migrated) don't hit a 404 "User not found" wall.
       // Adrian's requirement is "admin are tot nelimitat" — identity-based,
       // not row-based. We trust the JWT email + allow-list for admin gating.
-      const defaultAdmins = ['adrianenc11@gmail.com'];
-      const extraAdmins = (process.env.ADMIN_EMAILS || '')
-        .split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
-      const allAdmins = [...new Set([...defaultAdmins, ...extraAdmins])];
-      const jwtEmail = (req.user.email || '').toLowerCase();
       const jwtRoleIsAdmin = req.user.role === 'admin';
-      const jwtEmailIsAdmin = jwtEmail && allAdmins.includes(jwtEmail);
+      const jwtEmailIsAdmin = isAdminEmail(req.user.email);
 
       const user = await findById(userId);
 
