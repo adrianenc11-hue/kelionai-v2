@@ -222,7 +222,7 @@ router.post('/authenticate/verify', async (req, res) => {
 });
 
 // GET /api/auth/passkey/me — quick "am I signed in?" probe for the frontend
-router.get('/me', (req, res) => {
+router.get('/me', async (req, res) => {
   // The stage-1 requireAuth middleware already populates req.user when the
   // cookie is valid. But we want this endpoint public (no 401 for guests).
   try {
@@ -237,17 +237,40 @@ router.get('/me', (req, res) => {
     const adminEmails = (process.env.ADMIN_EMAILS || '')
       .split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
     const allAdmins = [...new Set([...defaultAdmins, ...adminEmails])];
-    const email = decoded.email || null;
+    const jwtEmail = decoded.email || null;
     const roleIsAdmin = decoded.role === 'admin';
-    const emailIsAdmin = email ? allAdmins.includes(email.toLowerCase()) : false;
+    const jwtEmailIsAdmin = jwtEmail ? allAdmins.includes(jwtEmail.toLowerCase()) : false;
+
+    // Also consult the DB — JWT payload may be stale if the user was
+    // promoted to admin AFTER the token was signed, or if the JWT is old
+    // and missing the email claim. DB row is authoritative for freshness.
+    let dbName = null;
+    let dbEmail = null;
+    let dbIsAdmin = false;
+    try {
+      const { findById } = require('../db');
+      if (findById && decoded.sub) {
+        const dbUser = await findById(decoded.sub);
+        if (dbUser) {
+          dbName = dbUser.name || null;
+          dbEmail = dbUser.email || null;
+          const dbRoleIsAdmin = dbUser.role === 'admin';
+          const dbEmailIsAdmin = dbUser.email && allAdmins.includes(String(dbUser.email).toLowerCase());
+          dbIsAdmin = Boolean(dbRoleIsAdmin || dbEmailIsAdmin);
+        }
+      }
+    } catch (_) { /* ignore — fall back to JWT-only */ }
+
+    const effectiveEmail = dbEmail || jwtEmail;
+    const effectiveName = dbName || decoded.name || null;
     return res.json({
       signedIn: true,
       user: {
         id: decoded.sub,
-        name: decoded.name,
-        email,
-        role: decoded.role || 'user',
-        isAdmin: Boolean(roleIsAdmin || emailIsAdmin),
+        name: effectiveName,
+        email: effectiveEmail,
+        role: (dbIsAdmin || roleIsAdmin) ? 'admin' : (decoded.role || 'user'),
+        isAdmin: Boolean(roleIsAdmin || jwtEmailIsAdmin || dbIsAdmin),
       },
     });
   } catch {

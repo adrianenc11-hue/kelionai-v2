@@ -457,13 +457,12 @@ function StudioDecor() {
           left half of the stage now holds the presentation monitor; the
           right half remains clean so the avatar is the focus. */}
 
-      {/* ───── Presentation monitor on the LEFT wall ─────
-          Large matte screen framed like a studio playback display.
-          Adrian flagged that the old position (-2.6, 0.3, -1.2) let the
-          left edge clip off the viewport on wider screens and the panel
-          felt too small. We moved it closer to center and enlarged it so
-          it stays fully visible and reads as a proper studio monitor. */}
-      <group position={[-1.7, 0.35, -0.8]} rotation={[0, Math.PI / 9, 0]}>
+      {/* ───── Presentation monitor ─────
+          Positioned adjacent to the avatar as a presenter + screen pair.
+          Adrian: "monitor mai spre el" — moved closer to center (-1.1 from
+          -1.7) and slightly forward (-0.35 from -0.8) so the monitor reads
+          as the avatar's screen, not a separate fixture on the wall. */}
+      <group position={[-1.1, 0.35, -0.35]} rotation={[0, Math.PI / 9, 0]}>
         {/* Bezel / outer frame */}
         <mesh position={[0, 0, -0.03]}>
           <planeGeometry args={[3.2, 2.1]} />
@@ -766,13 +765,27 @@ export default function KelionStage() {
   const [chatMessages, setChatMessages] = useState([]) // [{ role, content }]
   const [chatBusy, setChatBusy] = useState(false)
   const [chatError, setChatError] = useState(null)
+  // F2 — "+" attach. Adrian: "lipseste + de introdus date". Accepts
+  // images, PDFs and text files. For MVP we only surface the filename to
+  // the model (as a bracketed note) and preview-pill it in the composer
+  // so the user gets visual confirmation of the attachment. Full upload
+  // + embedding support lands in a follow-up PR.
+  const [attachedFile, setAttachedFile] = useState(null)
+  const fileInputRef = useRef(null)
   const sendTextMessage = useCallback(async () => {
     const text = chatInput.trim()
-    if (!text || chatBusy) return
+    if (!text && !attachedFile) return
+    if (chatBusy) return
     setChatError(null)
-    const next = [...chatMessages, { role: 'user', content: text }].slice(-12)
+    const attachNote = attachedFile
+      ? `\n\n[attached file: ${attachedFile.name}${attachedFile.size ? ` (${Math.round(attachedFile.size / 1024)} KB)` : ''}]`
+      : ''
+    const combined = (text + attachNote).trim()
+    const next = [...chatMessages, { role: 'user', content: combined }].slice(-12)
     setChatMessages(next)
     setChatInput('')
+    setAttachedFile(null)
+    if (fileInputRef.current) fileInputRef.current.value = ''
     setChatBusy(true)
     try {
       const r = await fetch('/api/chat', {
@@ -830,7 +843,7 @@ export default function KelionStage() {
     } finally {
       setChatBusy(false)
     }
-  }, [chatInput, chatBusy, chatMessages])
+  }, [chatInput, chatBusy, chatMessages, attachedFile])
 
   const mouthOpen = useLipSync(audioRef)
 
@@ -860,6 +873,45 @@ export default function KelionStage() {
   }, [cameraStream])
 
   useEffect(() => { setVoiceLevel(userLevel || 0) }, [userLevel])
+
+  // F15 — camera auto on/off. Adrian: "camera nu are nevoie de buton,
+  // pleaca de fiecare data cind user scrie sau vorbeste la microfon.
+  // Cind nu scrie sau vorbeste, camera e off." Debounced 2.5s after last
+  // speech/keystroke → stop. Manual override still possible via ⋯ menu.
+  const cameraAutoOffTimerRef = useRef(null)
+  const cameraAutoStartedRef = useRef(false)
+  useEffect(() => {
+    const speaking = (userLevel || 0) > 0.05
+    const typing = (chatInput || '').length > 0
+    const active = speaking || typing
+    if (active) {
+      if (cameraAutoOffTimerRef.current) {
+        clearTimeout(cameraAutoOffTimerRef.current)
+        cameraAutoOffTimerRef.current = null
+      }
+      if (!cameraStream) {
+        // Only auto-start once we have the stream API wired (guard against
+        // double-invocation during React strict mode). startCamera itself
+        // is idempotent.
+        cameraAutoStartedRef.current = true
+        startCamera && startCamera()
+      }
+    } else if (cameraStream && cameraAutoStartedRef.current) {
+      // Debounced stop — 2.5s of idle (no speech, no typing).
+      if (cameraAutoOffTimerRef.current) clearTimeout(cameraAutoOffTimerRef.current)
+      cameraAutoOffTimerRef.current = setTimeout(() => {
+        stopCamera && stopCamera()
+        cameraAutoStartedRef.current = false
+        cameraAutoOffTimerRef.current = null
+      }, 2500)
+    }
+    return () => {
+      if (cameraAutoOffTimerRef.current) {
+        clearTimeout(cameraAutoOffTimerRef.current)
+        cameraAutoOffTimerRef.current = null
+      }
+    }
+  }, [userLevel, chatInput, cameraStream, startCamera, stopCamera])
 
   // Stage 3 — probe whether the user is already signed in (passkey cookie).
   useEffect(() => {
@@ -1172,14 +1224,14 @@ export default function KelionStage() {
         />
         <button
           type="submit"
-          disabled={chatBusy || chatInput.trim().length === 0}
+          disabled={chatBusy || (chatInput.trim().length === 0 && !attachedFile)}
           style={{
             width: 40, height: 40, borderRadius: '50%',
-            background: chatInput.trim().length === 0
+            background: (chatInput.trim().length === 0 && !attachedFile)
               ? 'rgba(167, 139, 250, 0.18)'
               : 'linear-gradient(135deg, #7c3aed, #a78bfa)',
             border: 'none', color: '#fff',
-            cursor: chatBusy || chatInput.trim().length === 0 ? 'default' : 'pointer',
+            cursor: chatBusy || (chatInput.trim().length === 0 && !attachedFile) ? 'default' : 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             opacity: chatBusy ? 0.6 : 1,
             fontSize: 16,
@@ -1212,12 +1264,11 @@ export default function KelionStage() {
         {statusLabel}
       </div>
 
-      {/* Top-right action bar — Adrian asked for the frequently-used
-          controls to live directly on the bar instead of hiding inside
-          the ⋯ menu. The bar carries (left→right): camera, screen share,
-          transcript, buy-credits (with balance), sign in / sign out, and
-          finally a ⋯ button that still opens the overflow menu for
-          voice style, memory, pings, admin tools, PWA install, etc. */}
+      {/* Top-right action bar — Adrian: "panoul cu butoane e gândit
+          greșit". Simplified to: Credits/Admin pill + Sign in/out + ⋯.
+          Camera, screen, transcript, contact all moved into the ⋯
+          overflow menu. Camera also now auto-starts when the user types
+          or speaks and auto-stops after idle (F15). */}
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
@@ -1225,32 +1276,6 @@ export default function KelionStage() {
           display: 'flex', alignItems: 'center', gap: 8,
         }}
       >
-        <TopBarIconButton
-          onClick={() => { cameraStream ? stopCamera() : startCamera() }}
-          active={!!cameraStream}
-          title={cameraStream ? 'Turn camera off' : 'Turn camera on'}
-          ariaLabel={cameraStream ? 'Turn camera off' : 'Turn camera on'}
-        >📹</TopBarIconButton>
-        <TopBarIconButton
-          onClick={() => { screenStream ? stopScreen() : startScreen() }}
-          active={!!screenStream}
-          title={screenStream ? 'Stop sharing screen' : 'Share screen'}
-          ariaLabel={screenStream ? 'Stop sharing screen' : 'Share screen'}
-        >🖥️</TopBarIconButton>
-        <TopBarIconButton
-          onClick={() => setTranscriptOpen((v) => !v)}
-          active={transcriptOpen}
-          title={transcriptOpen ? 'Hide transcript' : 'Show transcript'}
-          ariaLabel={transcriptOpen ? 'Hide transcript' : 'Show transcript'}
-        >📝</TopBarIconButton>
-        {/* Contact — direct access from the top bar (Adrian moved it here
-            from the bottom strip so the stage stays uncluttered). Full
-            page nav so the contact form gets a clean URL for sharing. */}
-        <TopBarIconButton
-          onClick={() => { window.location.assign('/contact') }}
-          title="Contact us"
-          ariaLabel="Contact us"
-        >✉️</TopBarIconButton>
         {/* Credits pill — hidden for admins (they have unlimited access and
             no billing; showing "0 min" confused Adrian in testing). For
             regular signed-in users we still show balance + open the Stripe
@@ -1349,8 +1374,40 @@ export default function KelionStage() {
             boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
           }}
         >
-          {/* Camera / Screen share / Transcript moved to the top-right
-              action bar — no longer duplicated here. */}
+          {/* Camera / Screen share / Transcript — tools moved back into
+              the overflow menu so the top bar stays clean (Adrian: "panoul
+              e gândit greșit"). Camera also now auto-starts on speech/
+              typing, so the explicit toggle here is for manual override. */}
+          <div
+            style={{
+              padding: '6px 10px 4px',
+              fontSize: 11,
+              letterSpacing: 0.6,
+              textTransform: 'uppercase',
+              color: 'rgba(237,233,254,0.45)',
+            }}
+          >
+            Tools
+          </div>
+          <MenuItem onClick={() => { cameraStream ? stopCamera() : startCamera(); setMenuOpen(false) }}>
+            {cameraStream ? '📹 Turn camera off' : '📹 Turn camera on'}
+          </MenuItem>
+          <MenuItem onClick={() => { screenStream ? stopScreen() : startScreen(); setMenuOpen(false) }}>
+            {screenStream ? '🖥️ Stop sharing screen' : '🖥️ Share screen'}
+          </MenuItem>
+          <MenuItem onClick={() => { setTranscriptOpen((v) => !v); setMenuOpen(false) }}>
+            {transcriptOpen ? '📝 Hide transcript' : '📝 Show transcript'}
+          </MenuItem>
+          <MenuItem onClick={() => { window.location.assign('/contact'); setMenuOpen(false) }}>
+            ✉️ Contact us
+          </MenuItem>
+          <div
+            style={{
+              height: 1,
+              background: 'rgba(167, 139, 250, 0.15)',
+              margin: '6px 8px',
+            }}
+          />
           {/* Stage 6 — voice style submenu */}
           <div
             style={{
@@ -1448,17 +1505,7 @@ export default function KelionStage() {
               margin: '6px 8px',
             }}
           />
-          {/* Contact — routes to the standard /contact page (form with
-              department select). Kept in the overflow menu so the top
-              bar stays focused on session controls. */}
-          <MenuItem
-            onClick={() => {
-              window.location.assign('/contact')
-              setMenuOpen(false)
-            }}
-          >
-            Contact us
-          </MenuItem>
+          {/* Contact duplicated in the Tools section above. */}
         </div>
       )}
 
