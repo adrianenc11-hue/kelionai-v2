@@ -1,7 +1,9 @@
 // Gemini 3.1 Flash Live client hook.
 // Manages: mic capture → WebSocket → audio playback → lipsync driver → transcript.
-// Modules covered: M3 (mic+VAD), M4 (Gemini Live loop), M5 (auto-language),
-// M6 (turn-taking via server VAD + interrupt), M8 (Kelion persona).
+// Stage 1 modules: M3 (mic+VAD), M4 (Gemini Live loop), M5 (auto-language),
+//   M6 (turn-taking via server VAD + interrupt), M8 (Kelion persona).
+// Stage 2 modules: M9 (camera live stream w/ visible preview), M10 (screen share),
+//   M11 (vision reasoning via multimodal frames), M12 (emotion mirror via persona).
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 
@@ -38,6 +40,9 @@ export function useGeminiLive({ audioRef }) {
   const [error, setError] = useState(null)
   const [turns, setTurns] = useState([]) // [{ role: 'user'|'assistant', text }]
   const [userLevel, setUserLevel] = useState(0) // mic level 0..1 for halo reactivity
+  const [cameraStream, setCameraStream] = useState(null) // MediaStream for preview
+  const [screenStream, setScreenStream] = useState(null) // MediaStream for screen share (no preview)
+  const [visionError, setVisionError] = useState(null)
 
   const wsRef = useRef(null)
   const audioCtxRef = useRef(null)
@@ -52,6 +57,13 @@ export function useGeminiLive({ audioRef }) {
   const turnActiveRef = useRef({ user: null, assistant: null })
   const analyserRef = useRef(null)
   const micLevelRafRef = useRef(null)
+  const cameraStreamRef = useRef(null)
+  const screenStreamRef = useRef(null)
+  const cameraFrameTimerRef = useRef(null)
+  const screenFrameTimerRef = useRef(null)
+  const hiddenVideoCameraRef = useRef(null)
+  const hiddenVideoScreenRef = useRef(null)
+  const frameCanvasRef = useRef(null)
 
   const appendTurn = useCallback((role, delta, finalize = false) => {
     setTurns((prev) => {
@@ -300,6 +312,137 @@ export function useGeminiLive({ audioRef }) {
   const statusRef = useRef(status)
   useEffect(() => { statusRef.current = status }, [status])
 
+  // ───── Video frame sender (M9 camera + M10 screen share) ─────
+  // Grabs a snapshot from a MediaStream at ~1 fps, encodes to JPEG, sends as realtimeInput.
+  const startFrameSender = useCallback((stream, kind /* 'camera' | 'screen' */) => {
+    if (!frameCanvasRef.current) {
+      frameCanvasRef.current = document.createElement('canvas')
+    }
+    const canvas = frameCanvasRef.current
+    const hiddenRef = kind === 'camera' ? hiddenVideoCameraRef : hiddenVideoScreenRef
+    if (!hiddenRef.current) {
+      const v = document.createElement('video')
+      v.autoplay = true
+      v.muted = true
+      v.playsInline = true
+      hiddenRef.current = v
+    }
+    const video = hiddenRef.current
+    video.srcObject = stream
+    video.play().catch(() => {})
+
+    const send = async () => {
+      const ws = wsRef.current
+      if (!ws || ws.readyState !== WebSocket.OPEN) return
+      if (!video.videoWidth || !video.videoHeight) return
+      const maxW = 640
+      const scale = Math.min(1, maxW / video.videoWidth)
+      canvas.width = Math.floor(video.videoWidth * scale)
+      canvas.height = Math.floor(video.videoHeight * scale)
+      const ctx = canvas.getContext('2d')
+      try {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+      } catch {
+        return
+      }
+      try {
+        const blob = await new Promise((res) => canvas.toBlob(res, 'image/jpeg', 0.7))
+        if (!blob) return
+        const buf = await blob.arrayBuffer()
+        const bytes = new Uint8Array(buf)
+        const b64 = base64FromBytes(bytes)
+        ws.send(JSON.stringify({
+          realtimeInput: {
+            mediaChunks: [{ mimeType: 'image/jpeg', data: b64 }],
+          },
+        }))
+      } catch (e) {
+        console.warn('[geminiLive] frame send failed', e)
+      }
+    }
+
+    const timerId = setInterval(send, 1000) // 1 fps — keeps token budget sane
+    if (kind === 'camera') cameraFrameTimerRef.current = timerId
+    else screenFrameTimerRef.current = timerId
+  }, [])
+
+  const stopFrameSender = useCallback((kind) => {
+    const ref = kind === 'camera' ? cameraFrameTimerRef : screenFrameTimerRef
+    if (ref.current) {
+      clearInterval(ref.current)
+      ref.current = null
+    }
+    const hiddenRef = kind === 'camera' ? hiddenVideoCameraRef : hiddenVideoScreenRef
+    if (hiddenRef.current) {
+      try { hiddenRef.current.pause() } catch {}
+      hiddenRef.current.srcObject = null
+    }
+  }, [])
+
+  const startCamera = useCallback(async () => {
+    setVisionError(null)
+    if (cameraStreamRef.current) return
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
+        audio: false,
+      })
+      cameraStreamRef.current = stream
+      setCameraStream(stream)
+      startFrameSender(stream, 'camera')
+    } catch (e) {
+      console.error('[geminiLive] camera start failed', e)
+      setVisionError(e.message || 'Camera access denied')
+    }
+  }, [startFrameSender])
+
+  const stopCamera = useCallback(() => {
+    stopFrameSender('camera')
+    if (cameraStreamRef.current) {
+      cameraStreamRef.current.getTracks().forEach((t) => t.stop())
+      cameraStreamRef.current = null
+      setCameraStream(null)
+    }
+  }, [stopFrameSender])
+
+  const startScreen = useCallback(async () => {
+    setVisionError(null)
+    if (screenStreamRef.current) return
+    try {
+      if (!navigator.mediaDevices?.getDisplayMedia) {
+        throw new Error('Screen share is not supported in this browser')
+      }
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: { frameRate: { ideal: 2 } },
+        audio: false,
+      })
+      screenStreamRef.current = stream
+      setScreenStream(stream)
+      // If user stops share via browser UI, clean up.
+      stream.getVideoTracks()[0].addEventListener('ended', () => {
+        stopFrameSender('screen')
+        screenStreamRef.current = null
+        setScreenStream(null)
+      })
+      startFrameSender(stream, 'screen')
+    } catch (e) {
+      // User canceling the picker throws AbortError — not a real error.
+      if (e.name !== 'AbortError' && e.name !== 'NotAllowedError') {
+        console.error('[geminiLive] screen share failed', e)
+        setVisionError(e.message || 'Screen share failed')
+      }
+    }
+  }, [startFrameSender, stopFrameSender])
+
+  const stopScreen = useCallback(() => {
+    stopFrameSender('screen')
+    if (screenStreamRef.current) {
+      screenStreamRef.current.getTracks().forEach((t) => t.stop())
+      screenStreamRef.current = null
+      setScreenStream(null)
+    }
+  }, [stopFrameSender])
+
   const stop = useCallback(() => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       try { wsRef.current.close(1000, 'user_stopped') } catch {}
@@ -313,14 +456,33 @@ export function useGeminiLive({ audioRef }) {
       micStreamRef.current.getTracks().forEach((t) => t.stop())
       micStreamRef.current = null
     }
+    // Stage 2: also stop camera + screen
+    stopFrameSender('camera')
+    stopFrameSender('screen')
+    if (cameraStreamRef.current) {
+      cameraStreamRef.current.getTracks().forEach((t) => t.stop())
+      cameraStreamRef.current = null
+      setCameraStream(null)
+    }
+    if (screenStreamRef.current) {
+      screenStreamRef.current.getTracks().forEach((t) => t.stop())
+      screenStreamRef.current = null
+      setScreenStream(null)
+    }
     if (micLevelRafRef.current) cancelAnimationFrame(micLevelRafRef.current)
     analyserRef.current = null
     setUserLevel(0)
     setStatus('idle')
     setError(null)
-  }, [])
+    setVisionError(null)
+  }, [stopFrameSender])
 
   useEffect(() => () => { stop() }, [stop])
 
-  return { status, error, start, stop, turns, userLevel }
+  return {
+    status, error, start, stop, turns, userLevel,
+    // Stage 2
+    cameraStream, screenStream, visionError,
+    startCamera, stopCamera, startScreen, stopScreen,
+  }
 }

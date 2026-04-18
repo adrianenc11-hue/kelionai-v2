@@ -315,7 +315,23 @@ export default function KelionStage() {
     stop,
     turns,
     userLevel,
+    // Stage 2 — Kelion Sees
+    cameraStream,
+    screenStream,
+    visionError,
+    startCamera,
+    stopCamera,
+    startScreen,
+    stopScreen,
   } = useGeminiLive({ audioRef })
+
+  const cameraVideoRef = useRef(null)
+  useEffect(() => {
+    if (cameraVideoRef.current && cameraStream) {
+      cameraVideoRef.current.srcObject = cameraStream
+      cameraVideoRef.current.play().catch(() => {})
+    }
+  }, [cameraStream])
 
   useEffect(() => { setVoiceLevel(userLevel || 0) }, [userLevel])
 
@@ -409,8 +425,8 @@ export default function KelionStage() {
         <div
           onClick={(e) => e.stopPropagation()}
           style={{
-            position: 'absolute', top: 70, right: 18,
-            minWidth: 200,
+            position: 'absolute', top: 70, right: 18, zIndex: 20,
+            minWidth: 220,
             background: 'rgba(14, 10, 28, 0.92)',
             backdropFilter: 'blur(20px)',
             border: '1px solid rgba(167, 139, 250, 0.2)',
@@ -419,12 +435,111 @@ export default function KelionStage() {
             boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
           }}
         >
+          <MenuItem
+            onClick={() => { cameraStream ? stopCamera() : startCamera(); setMenuOpen(false) }}
+            disabled={status === 'idle' || status === 'error'}
+          >
+            {cameraStream ? 'Turn camera off' : 'Turn camera on'}
+          </MenuItem>
+          <MenuItem
+            onClick={() => { screenStream ? stopScreen() : startScreen(); setMenuOpen(false) }}
+            disabled={status === 'idle' || status === 'error'}
+          >
+            {screenStream ? 'Stop sharing screen' : 'Share screen'}
+          </MenuItem>
           <MenuItem onClick={() => { setTranscriptOpen((v) => !v); setMenuOpen(false) }}>
             {transcriptOpen ? 'Hide transcript' : 'Show transcript'}
           </MenuItem>
           <MenuItem onClick={() => { stop(); setMenuOpen(false) }} disabled={status === 'idle'}>
             End chat
           </MenuItem>
+        </div>
+      )}
+
+      {/* Camera preview — visible confirmation Kelion sees you (M9) */}
+      {cameraStream && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: 'absolute', top: 18, left: 18,
+            width: 180, height: 135,
+            borderRadius: 14,
+            overflow: 'hidden',
+            border: '1px solid rgba(167, 139, 250, 0.35)',
+            boxShadow: '0 16px 40px rgba(0,0,0,0.5)',
+            background: '#000',
+            zIndex: 15,
+          }}
+        >
+          <video
+            ref={cameraVideoRef}
+            autoPlay
+            muted
+            playsInline
+            style={{
+              width: '100%', height: '100%',
+              objectFit: 'cover',
+              transform: 'scaleX(-1)', // mirrored like a selfie cam
+            }}
+          />
+          <div style={{
+            position: 'absolute', bottom: 6, left: 8,
+            fontSize: 10, letterSpacing: '0.15em',
+            color: '#ede9fe', opacity: 0.8,
+            textShadow: '0 1px 2px rgba(0,0,0,0.8)',
+          }}>
+            <span style={{
+              display: 'inline-block', width: 6, height: 6,
+              borderRadius: '50%', background: '#ef4444',
+              marginRight: 6, boxShadow: '0 0 6px #ef4444',
+              animation: 'pulse 1.5s infinite ease-in-out',
+            }} />
+            LIVE
+          </div>
+        </div>
+      )}
+
+      {/* Screen share indicator — Kelion is watching your screen (M10) */}
+      {screenStream && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: 'absolute', top: 18, left: cameraStream ? 210 : 18,
+            padding: '8px 14px',
+            borderRadius: 999,
+            background: 'rgba(10, 8, 20, 0.65)',
+            backdropFilter: 'blur(12px)',
+            border: '1px solid rgba(96, 165, 250, 0.4)',
+            color: '#bfdbfe', fontSize: 12, letterSpacing: '0.05em',
+            display: 'flex', alignItems: 'center', gap: 8,
+            zIndex: 15,
+          }}
+        >
+          <span style={{
+            width: 8, height: 8, borderRadius: '50%',
+            background: '#60a5fa',
+            boxShadow: '0 0 8px #60a5fa',
+            animation: 'pulse 1.5s infinite ease-in-out',
+          }} />
+          Sharing screen
+        </div>
+      )}
+
+      {visionError && !cameraStream && !screenStream && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: 'absolute', top: 18, left: 18,
+            padding: '8px 14px',
+            borderRadius: 999,
+            background: 'rgba(80, 14, 14, 0.7)',
+            backdropFilter: 'blur(12px)',
+            border: '1px solid rgba(239, 68, 68, 0.45)',
+            color: '#fecaca', fontSize: 12,
+            zIndex: 15,
+          }}
+        >
+          {visionError}
         </div>
       )}
 
