@@ -46,6 +46,42 @@ jobs:
         with:
           node-version: '20'
 
+      # Sync gate — wait until Railway has finished rolling out the
+      # commit that triggered this workflow. Without this, CI on master
+      # races the Railway webhook and routinely turns red against the
+      # previous production image even though the new one is about to
+      # land. The /health endpoint exposes `deploy_sha` (populated from
+      # RAILWAY_GIT_COMMIT_SHA); we poll for up to 8 minutes for it to
+      # match ${{ github.sha }} before running the acceptance script.
+      # On PRs (where github.sha is a merge-commit SHA that never
+      # reaches Railway) the gate is skipped.
+      - name: Wait for Railway deploy of this commit
+        if: github.event_name == 'push'
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          echo "Waiting for $ACCEPTANCE_BASE/health to report deploy_sha=$EXPECTED_SHA"
+          DEADLINE=$(( $(date +%s) + 480 ))  # 8 minutes
+          while :; do
+            RESP=$(curl -fsS --max-time 15 "$ACCEPTANCE_BASE/health" || echo '{}')
+            LIVE_SHA=$(printf '%s' "$RESP" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{try{console.log(JSON.parse(d).deploy_sha||'')}catch{console.log('')}})")
+            if [ -n "$LIVE_SHA" ] && [ "$LIVE_SHA" = "$EXPECTED_SHA" ]; then
+              echo "deploy_sha matches ($LIVE_SHA) — proceeding"
+              break
+            fi
+            if [ "$LIVE_SHA" = "unknown" ]; then
+              echo "Production does not expose deploy_sha yet (pre-sync-gate build). Proceeding without matching."
+              break
+            fi
+            NOW=$(date +%s)
+            if [ "$NOW" -ge "$DEADLINE" ]; then
+              echo "Timeout waiting for Railway redeploy of $EXPECTED_SHA (last seen live_sha=$LIVE_SHA)"
+              exit 1
+            fi
+            echo "  live_sha=${LIVE_SHA:-<empty>} — sleeping 15s"
+            sleep 15
+          done
+
       - name: Run acceptance — ${{ matrix.capability }}
         run: |
           echo "Running e2e/acceptance/${{ matrix.capability }}.cjs against $ACCEPTANCE_BASE"

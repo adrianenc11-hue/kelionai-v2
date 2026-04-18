@@ -248,9 +248,21 @@ if (process.env.NODE_ENV !== 'test' && process.env.PROACTIVE_DISABLED !== '1') {
 
 // Health check with service status
 app.get('/health', async (_req, res) => {
+  // Deploy SHA exposed so CI (acceptance.yml) can wait until the
+  // current production build matches the commit that triggered the
+  // workflow — prevents false reds from CI running against the
+  // previous image while Railway is still rolling out the new one.
+  // Railway injects RAILWAY_GIT_COMMIT_SHA automatically at build time
+  // (https://docs.railway.com/reference/variables#git-variables);
+  // fall back to GIT_COMMIT_SHA (Docker builds, local) and finally
+  // 'unknown' if nothing is set.
+  const deploySha = process.env.RAILWAY_GIT_COMMIT_SHA
+    || process.env.GIT_COMMIT_SHA
+    || 'unknown';
   const health = {
     status: 'ok',
     ts: new Date().toISOString(),
+    deploy_sha: deploySha,
     services: {
       database: 'unknown',
       ai: 'unknown',
