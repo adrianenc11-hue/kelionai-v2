@@ -333,6 +333,39 @@ router.get('/gemini-token', async (req, res) => {
       // Railway log access. Google's error responses never echo the API key.
       // Remove this branch once Gemini Live is stable in production.
       if (req.query.diag === '1') {
+        // Additional probes to pin down the root cause:
+        //   A) key-fingerprint (prefix + length) so we can tell if Railway's
+        //      GEMINI_API_KEY is the same one that works elsewhere.
+        //   B) models.list on v1alpha — if this succeeds, the key is valid
+        //      and v1alpha reachable; if it 403s or 400s, the key doesn't
+        //      have v1alpha access (a different Google Cloud project or
+        //      a basic-tier key without Live API).
+        //   C) minimal auth_tokens body — reproduces the 400 from the
+        //      simplest possible request so we can rule out persona/tools.
+        const keyPrefix = (apiKey || '').slice(0, 6);
+        const keyLen = (apiKey || '').length;
+        let modelsProbe = null;
+        try {
+          const pr = await fetch('https://generativelanguage.googleapis.com/v1alpha/models?key=' + encodeURIComponent(apiKey));
+          const pt = await pr.text();
+          modelsProbe = { status: pr.status, body: pt.slice(0, 500) };
+        } catch (e) { modelsProbe = { error: e.message }; }
+        let minimalProbe = null;
+        try {
+          const mbody = {
+            uses: 1,
+            expireTime: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+            newSessionExpireTime: new Date(Date.now() + 60 * 1000).toISOString(),
+            bidiGenerateContentSetup: { model },
+          };
+          const mr = await fetch('https://generativelanguage.googleapis.com/v1alpha/auth_tokens?key=' + encodeURIComponent(apiKey), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(mbody),
+          });
+          const mt = await mr.text();
+          minimalProbe = { status: mr.status, body: mt.slice(0, 500) };
+        } catch (e) { minimalProbe = { error: e.message }; }
         return res.status(500).json({
           error: 'Failed to create Gemini live session',
           diag: {
@@ -341,6 +374,10 @@ router.get('/gemini-token', async (req, res) => {
             voice,
             lang: browserLang,
             google: err.slice(0, 4000),
+            keyPrefix,
+            keyLen,
+            modelsProbe,
+            minimalProbe,
           },
         });
       }
