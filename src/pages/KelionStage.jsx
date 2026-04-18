@@ -1133,8 +1133,10 @@ export default function KelionStage() {
       })()}
 
       {/* Text chat composer — bottom center, above the status pill.
-          Stops click propagation so typing doesn't toggle the voice
-          session. Submit with Enter or the send button. */}
+          Narrower (420px) than the old 680px because the wider pill was
+          overlapping the stage monitor on the left. Stops click
+          propagation so typing doesn't toggle the voice session.
+          Submit with Enter or the send button. */}
       <form
         onClick={(e) => e.stopPropagation()}
         onSubmit={(e) => { e.preventDefault(); sendTextMessage() }}
@@ -1142,9 +1144,9 @@ export default function KelionStage() {
           position: 'absolute',
           bottom: 'calc(max(32px, env(safe-area-inset-bottom)) + 54px)',
           left: '50%', transform: 'translateX(-50%)',
-          width: 'min(680px, 92vw)',
+          width: 'min(420px, 92vw)',
           display: 'flex', alignItems: 'center', gap: 8,
-          padding: '8px 10px 8px 16px',
+          padding: '6px 8px 6px 14px',
           borderRadius: 999,
           background: 'rgba(10, 8, 20, 0.72)',
           backdropFilter: 'blur(14px)',
@@ -1240,6 +1242,14 @@ export default function KelionStage() {
           title={transcriptOpen ? 'Hide transcript' : 'Show transcript'}
           ariaLabel={transcriptOpen ? 'Hide transcript' : 'Show transcript'}
         >📝</TopBarIconButton>
+        {/* Contact — direct access from the top bar (Adrian moved it here
+            from the bottom strip so the stage stays uncluttered). Full
+            page nav so the contact form gets a clean URL for sharing. */}
+        <TopBarIconButton
+          onClick={() => { window.location.assign('/contact') }}
+          title="Contact us"
+          ariaLabel="Contact us"
+        >✉️</TopBarIconButton>
         {/* Credits pill — hidden for admins (they have unlimited access and
             no billing; showing "0 min" confused Adrian in testing). For
             regular signed-in users we still show balance + open the Stripe
@@ -1451,32 +1461,9 @@ export default function KelionStage() {
         </div>
       )}
 
-      {/* Small footer-style contact strip, bottom-center. Always visible,
-          non-intrusive — lets users reach the team with one click without
-          needing to open the overflow menu. */}
-      <a
-        href="/contact"
-        style={{
-          position: 'absolute',
-          bottom: 12,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          fontSize: 11,
-          letterSpacing: 0.4,
-          color: 'rgba(237, 233, 254, 0.55)',
-          textDecoration: 'none',
-          padding: '4px 10px',
-          borderRadius: 999,
-          background: 'rgba(10, 8, 20, 0.35)',
-          backdropFilter: 'blur(8px)',
-          border: '1px solid rgba(167, 139, 250, 0.15)',
-          zIndex: 5,
-        }}
-        onMouseEnter={(e) => { e.currentTarget.style.color = '#ede9fe' }}
-        onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(237, 233, 254, 0.55)' }}
-      >
-        Contact
-      </a>
+      {/* Contact moved to the top-bar as an icon (✉️) per Adrian's
+          request — the old bottom-strip was cluttering the stage. The
+          top-bar entry calls window.location.assign('/contact') directly. */}
 
       {/* Camera preview — visible confirmation Kelion sees you (M9) */}
       {cameraStream && (
