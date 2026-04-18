@@ -146,15 +146,13 @@ router.get('/gemini-token', async (req, res) => {
 
   try {
     const voice = process.env.GEMINI_LIVE_VOICE_KELION || 'Kore';
-    // Gemini Live models currently published by Google (as of April 2026):
-    // - gemini-live-2.5-flash-preview  (cascade, widely available)
-    // - gemini-2.5-flash-preview-native-audio-dialog  (native audio)
-    // - gemini-2.0-flash-live-001  (stable v2)
-    // "gemini-3.1-flash-live-preview" is NOT a real model name — Google returns
-    // 400 and our handler bubbles it up as 500 "Failed to create Gemini live
-    // session". Default to the cascade preview model; override via Railway env
-    // GEMINI_LIVE_MODEL when a newer one is announced.
-    const model = process.env.GEMINI_LIVE_MODEL || 'gemini-live-2.5-flash-preview';
+    // Default to the newest Gemini Live model documented by Google
+    // (https://ai.google.dev/gemini-api/docs/live-api/ephemeral-tokens —
+    // the official example uses this exact name). Override via Railway env
+    // GEMINI_LIVE_MODEL when a newer one is announced. Previous fallbacks
+    // tried include `gemini-live-2.5-flash-preview` which returns 404 from
+    // the v1alpha auth_tokens provisioning endpoint.
+    const model = process.env.GEMINI_LIVE_MODEL || 'gemini-3.1-flash-live-preview';
     const browserLang = (req.query.lang || 'en-US').toString().slice(0, 16);
     // Stage 6 — M26: voice style preset chosen by the user via the menu.
     // Cookie first (survives refresh), then ?style= query, then default warm.
@@ -175,7 +173,10 @@ router.get('/gemini-token', async (req, res) => {
     const newSessionExpireTime = new Date(now + 60 * 1000).toISOString();
     const expireTime            = new Date(now + 30 * 60 * 1000).toISOString();
 
-    const url = 'https://generativelanguage.googleapis.com/v1beta/auth_tokens?key=' + encodeURIComponent(apiKey);
+    // Ephemeral tokens live under v1alpha only — v1beta/auth_tokens returns 404.
+    // See https://ai.google.dev/gemini-api/docs/live-api/ephemeral-tokens
+    // (Python SDK sets http_options={'api_version': 'v1alpha'}).
+    const url = 'https://generativelanguage.googleapis.com/v1alpha/auth_tokens?key=' + encodeURIComponent(apiKey);
     const r = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
