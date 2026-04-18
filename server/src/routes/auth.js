@@ -215,7 +215,14 @@ router.post('/local/register', async (req, res) => {
     });
 
     const safeUser = sanitizeUser ? sanitizeUser(user) : user;
-    return res.status(201).json({ token, user: safeUser });
+    const defaultAdmins = ['adrianenc11@gmail.com'];
+    const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+    const allAdmins = [...new Set([...defaultAdmins, ...adminEmails])];
+    const isAdmin = Boolean(
+      (user.role === 'admin') ||
+      (user.email && allAdmins.includes(String(user.email).toLowerCase()))
+    );
+    return res.status(201).json({ token, user: { ...safeUser, isAdmin } });
   } catch (err) {
     console.error('[auth] Register error:', err.message);
     return res.status(500).json({ error: 'Registration failed' });
@@ -256,7 +263,14 @@ router.post('/local/login', async (req, res) => {
     });
 
     const safeUser = sanitizeUser ? sanitizeUser(user) : user;
-    return res.status(200).json({ token, user: safeUser });
+    const defaultAdmins = ['adrianenc11@gmail.com'];
+    const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+    const allAdmins = [...new Set([...defaultAdmins, ...adminEmails])];
+    const isAdmin = Boolean(
+      (user.role === 'admin') ||
+      (user.email && allAdmins.includes(String(user.email).toLowerCase()))
+    );
+    return res.status(200).json({ token, user: { ...safeUser, isAdmin } });
   } catch (err) {
     console.error('[auth] Login error:', err.message);
     return res.status(500).json({ error: 'Login failed' });
