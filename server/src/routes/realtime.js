@@ -4,6 +4,7 @@ const { Router } = require('express');
 const jwt = require('jsonwebtoken');
 const config = require('../config');
 const { listMemoryItems } = require('../db');
+const { requireAuth } = require('../middleware/auth');
 const router = Router();
 
 // Stage 3 — read user from JWT cookie without gating the route.
