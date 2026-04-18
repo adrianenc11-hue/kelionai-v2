@@ -393,6 +393,31 @@ export default function KelionStage() {
   const [pushBusy, setPushBusy] = useState(false)
   const [pushError, setPushError] = useState(null)
 
+  // Admin-only — AI credits dashboard state (Stage 7 / monetization gate).
+  // `creditsOpen` controls the overlay; `creditsCards` is the normalized
+  // array returned by GET /api/admin/credits; `creditsLoading` shows a
+  // skeleton while the server probes providers.
+  const [creditsOpen, setCreditsOpen] = useState(false)
+  const [creditsCards, setCreditsCards] = useState([])
+  const [creditsLoading, setCreditsLoading] = useState(false)
+  const [creditsError, setCreditsError] = useState(null)
+  const isAdmin = Boolean(authState.user && authState.user.isAdmin)
+  const openCredits = useCallback(async () => {
+    setCreditsOpen(true)
+    setCreditsLoading(true)
+    setCreditsError(null)
+    try {
+      const r = await fetch('/api/admin/credits', { credentials: 'include' })
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      const j = await r.json()
+      setCreditsCards(Array.isArray(j.cards) ? j.cards : [])
+    } catch (err) {
+      setCreditsError(err.message || 'Could not load AI credits')
+    } finally {
+      setCreditsLoading(false)
+    }
+  }, [])
+
   // Stage 6 — emotion mirroring + voice style
   const emotion = useEmotion()
   const [voiceStyle, setVoiceStyleState] = useState(() => readVoiceStyleCookie())
@@ -755,6 +780,14 @@ export default function KelionStage() {
                   </MenuItem>
                 )
               )}
+              {/* Admin-only — AI credits dashboard (one button per AI we
+                  spend on + Stripe revenue card + top-up links + email
+                  alerts to contact@kelionai.app). */}
+              {isAdmin && (
+                <MenuItem onClick={() => { openCredits(); setMenuOpen(false) }}>
+                  AI credits (admin)
+                </MenuItem>
+              )}
               <MenuItem onClick={() => { handleSignOut(); setMenuOpen(false) }}>
                 Sign out
               </MenuItem>
@@ -1055,6 +1088,119 @@ export default function KelionStage() {
                 cursor: 'pointer', fontSize: 13,
               }}
             >Forget everything</button>
+          )}
+        </div>
+      )}
+
+      {/* Admin-only — AI credits dashboard drawer. One card per provider
+          showing real balance (where the provider exposes it) or a
+          "configured" signal + a top-up link that deep-links into the
+          provider's billing console. Clicking a card opens the top-up
+          page in a new tab. */}
+      {creditsOpen && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: 'absolute', top: 0, right: 0, bottom: 0,
+            width: 'min(480px, 96vw)',
+            background: 'rgba(10, 8, 20, 0.92)',
+            backdropFilter: 'blur(22px)',
+            borderLeft: '1px solid rgba(167, 139, 250, 0.2)',
+            padding: '70px 20px 24px 20px',
+            overflowY: 'auto',
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+            zIndex: 26,
+          }}
+        >
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            marginBottom: 18,
+          }}>
+            <div style={{ fontSize: 11, opacity: 0.6, letterSpacing: '0.15em' }}>
+              AI CREDITS — ADMIN
+            </div>
+            <button
+              onClick={() => setCreditsOpen(false)}
+              style={{
+                background: 'transparent', border: 'none', color: '#ede9fe',
+                fontSize: 20, cursor: 'pointer', opacity: 0.7,
+              }}
+              aria-label="Close"
+            >✕</button>
+          </div>
+
+          {creditsLoading && (
+            <div style={{ opacity: 0.55, fontSize: 14 }}>Fetching provider balances…</div>
+          )}
+          {creditsError && !creditsLoading && (
+            <div style={{
+              fontSize: 13, color: '#fecaca',
+              background: 'rgba(80, 14, 14, 0.6)',
+              padding: '10px 12px', borderRadius: 10, marginBottom: 12,
+            }}>{creditsError}</div>
+          )}
+
+          {!creditsLoading && creditsCards.map((c) => {
+            const badge = {
+              ok: { bg: 'rgba(34, 197, 94, 0.12)', border: 'rgba(34, 197, 94, 0.55)', text: '#bbf7d0', label: 'OK' },
+              low: { bg: 'rgba(245, 158, 11, 0.12)', border: 'rgba(245, 158, 11, 0.55)', text: '#fde68a', label: 'LOW' },
+              error: { bg: 'rgba(239, 68, 68, 0.12)', border: 'rgba(239, 68, 68, 0.55)', text: '#fecaca', label: 'ERROR' },
+              unknown: { bg: 'rgba(148, 163, 184, 0.1)', border: 'rgba(148, 163, 184, 0.4)', text: '#cbd5e1', label: '—' },
+            }[c.status || 'unknown']
+            return (
+              <a
+                key={c.id}
+                href={c.topUpUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: 'block',
+                  marginBottom: 12,
+                  padding: '14px 16px',
+                  borderRadius: 14,
+                  background: 'rgba(167, 139, 250, 0.06)',
+                  border: `1px solid ${badge.border}`,
+                  textDecoration: 'none',
+                  color: 'inherit',
+                  transition: 'background 0.15s, transform 0.1s',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(167, 139, 250, 0.12)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(167, 139, 250, 0.06)' }}
+              >
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  marginBottom: 6,
+                }}>
+                  <div style={{ fontSize: 15, fontWeight: 600 }}>{c.name}</div>
+                  <span style={{
+                    fontSize: 10, letterSpacing: '0.1em', fontWeight: 600,
+                    padding: '3px 8px', borderRadius: 999,
+                    background: badge.bg, color: badge.text, border: `1px solid ${badge.border}`,
+                  }}>{badge.label}</span>
+                </div>
+                {c.subtitle && (
+                  <div style={{ fontSize: 12, opacity: 0.55, marginBottom: 8 }}>{c.subtitle}</div>
+                )}
+                <div style={{ fontSize: 14, marginBottom: 4 }}>
+                  {c.balanceDisplay || '—'}
+                </div>
+                {c.message && (
+                  <div style={{ fontSize: 11, opacity: 0.6, marginTop: 4 }}>
+                    {c.message}
+                  </div>
+                )}
+                <div style={{
+                  fontSize: 11, opacity: 0.55, marginTop: 8,
+                  letterSpacing: '0.02em',
+                }}>
+                  Tap to open {c.kind === 'revenue' ? 'dashboard' : 'top-up'} →
+                </div>
+              </a>
+            )
+          })}
+
+          {!creditsLoading && creditsCards.length === 0 && !creditsError && (
+            <div style={{ opacity: 0.55, fontSize: 14 }}>No providers configured.</div>
           )}
         </div>
       )}

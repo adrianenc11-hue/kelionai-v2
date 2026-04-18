@@ -3,12 +3,60 @@
 const { Router } = require('express');
 const { getUserById, getAllUsers, updateUser, deleteUser } = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { getAllCredits } = require('../services/aiCredits');
+const { sendEmailAlert } = require('../services/emailAlerts');
 
 const router = Router();
 
 // All admin routes require authentication AND admin role
 router.use(requireAuth);
 router.use(requireAdmin);
+
+/**
+ * GET /api/admin/credits
+ * Returns per-provider AI credit / balance status for the admin dashboard.
+ *
+ * Adrian's spec: one card per AI we use, showing the real remaining balance,
+ * a top-up link to the provider's billing page, and an email alert sent
+ * to contact@kelionai.app when a balance goes low. We also expose a
+ * "kind" flag so the UI can visually separate AI spend (cost centers)
+ * from Stripe revenue (income).
+ */
+const _alertCooldown = new Map(); // provider id -> last alert sent (ms)
+const ALERT_COOLDOWN_MS = 6 * 60 * 60 * 1000; // 6h
+
+router.get('/credits', async (req, res) => {
+  try {
+    const cards = await getAllCredits();
+
+    // Fire-and-forget email alerts for low/error providers we care about.
+    // Cooldown per provider so we don't spam the inbox on every refresh.
+    const now = Date.now();
+    for (const c of cards) {
+      if (c.kind === 'revenue') continue; // revenue providers don't trigger low alerts
+      if (c.status !== 'low' && c.status !== 'error') continue;
+      const last = _alertCooldown.get(c.id) || 0;
+      if (now - last < ALERT_COOLDOWN_MS) continue;
+      _alertCooldown.set(c.id, now);
+      sendEmailAlert({
+        subject: `[Kelion] ${c.name} credit ${c.status === 'low' ? 'LOW' : 'ERROR'}`,
+        text: [
+          `${c.name} — ${c.status.toUpperCase()}`,
+          `Balance: ${c.balanceDisplay}`,
+          c.message ? `Detail: ${c.message}` : '',
+          `Top up: ${c.topUpUrl}`,
+        ].filter(Boolean).join('\n'),
+      }).catch((err) => {
+        console.warn('[admin/credits] alert dispatch failed:', err && err.message);
+      });
+    }
+
+    res.json({ cards, ts: new Date().toISOString() });
+  } catch (err) {
+    console.error('[admin/credits] Error:', err && err.message);
+    res.status(500).json({ error: 'Failed to fetch AI credits' });
+  }
+});
 
 /**
  * GET /api/admin/users
