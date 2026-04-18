@@ -223,7 +223,10 @@ app.use('/api/realtime', chatLimiter, realtimeRouter);
 
 // Stage 3 — M13 passkey (public — register/auth flows need to be reachable
 // without auth) + M14/M16/M17 memory (signed-in users only).
-app.use('/api/auth/passkey', passkeyRouter);
+// Rate-limited because POST /register/options creates a new user row on
+// every call; without a limiter an unauthenticated attacker can fill the
+// users table with orphan rows (Devin Review BUG pr-review-182448fc_0001).
+app.use('/api/auth/passkey', chatLimiter, passkeyRouter);
 app.use('/api/memory', requireAuth, memoryRouter);
 
 // Stage 4 — M19 (browser use) + M20 (web search status) + M21 (MCP stubs).

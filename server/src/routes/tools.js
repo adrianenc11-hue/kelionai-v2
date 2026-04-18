@@ -25,6 +25,11 @@ async function peekUser(req) {
 }
 
 // Tiny per-IP rate cap so a runaway session cannot burn budget.
+// Max bucket size guards against unbounded growth from one-shot IPs that
+// never return (Devin Review ANALYSIS pr-review-182448fc_0002); combined
+// with the periodic sweep below that drops buckets with no live entries.
+const BUCKET_MAX_ENTRIES = 10_000;
+const BUCKET_SWEEP_MS    = 15 * 60 * 1000;
 const bucket = new Map(); // key -> [t1, t2, ...]
 function rateOk(key, max, windowMs) {
   const now = Date.now();
@@ -32,7 +37,28 @@ function rateOk(key, max, windowMs) {
   if (arr.length >= max) return false;
   arr.push(now);
   bucket.set(key, arr);
+  // Hard cap: if we somehow passed the size guard, evict the oldest half.
+  if (bucket.size > BUCKET_MAX_ENTRIES) {
+    const victims = Math.floor(BUCKET_MAX_ENTRIES / 2);
+    let i = 0;
+    for (const k of bucket.keys()) {
+      if (i++ >= victims) break;
+      bucket.delete(k);
+    }
+  }
   return true;
+}
+// Periodically sweep entries whose newest timestamp is older than the
+// widest window any caller uses (1h). Disabled under NODE_ENV=test so
+// Jest does not hang on an open timer.
+if (process.env.NODE_ENV !== 'test') {
+  const sweep = setInterval(() => {
+    const cutoff = Date.now() - 60 * 60 * 1000;
+    for (const [k, arr] of bucket) {
+      if (!arr.length || arr[arr.length - 1] < cutoff) bucket.delete(k);
+    }
+  }, BUCKET_SWEEP_MS);
+  if (sweep.unref) sweep.unref();
 }
 
 // ─── browse_web (M19) ─────────────────────────────────────────────
