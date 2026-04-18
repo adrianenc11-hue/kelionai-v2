@@ -122,6 +122,10 @@ async function getJson(path) {
   process.stdout.write('  voiceStyle: ' + body.voiceStyle + '\n');
   process.stdout.write('  expiresAt:  ' + body.expiresAt + '\n');
   process.stdout.write('  tokenType:  ' + body.token.split('/')[0] + '/…\n');
+  // Node fetch keeps an HTTP keep-alive pool which prevents the event loop
+  // from draining on success; exit explicitly so CI step finishes instead of
+  // waiting for the connection to time out.
+  process.exit(0);
 })().catch(err => {
   process.stderr.write('ACCEPTANCE FAIL: voice-roundtrip (script error)\n');
   process.stderr.write('  ' + (err && err.stack ? err.stack : String(err)) + '\n');
