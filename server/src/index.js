@@ -25,13 +25,24 @@ const toolsRouter      = require('./routes/tools');
 const pushRouter       = require('./routes/push');
 const creditsRouter    = require('./routes/credits');
 const proactive        = require('./services/proactive');
+const { bootstrapAdmin } = require('./services/adminBootstrap');
 
 const app = express();
 app.disable('x-powered-by');
 
-// Initialize database
-initDb().then(() => {
+// Initialize database, then seed admin if ADMIN_BOOTSTRAP_PASSWORD is set.
+// Seeding is idempotent — running every boot lets Adrian rotate the admin
+// password by just changing the Railway env var and redeploying.
+initDb().then(async () => {
   console.log('[kelion-startup] Database initialized');
+  try {
+    const result = await bootstrapAdmin();
+    if (result && result.seeded) {
+      console.log(`[kelion-startup] admin bootstrap: ${result.created ? 'created' : 'refreshed'} ${result.email}`);
+    }
+  } catch (err) {
+    console.warn('[kelion-startup] admin bootstrap failed:', err && err.message);
+  }
 }).catch(err => {
   console.error('[kelion-startup] Database initialization failed:', err.message);
 });

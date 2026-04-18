@@ -5,6 +5,7 @@ import * as THREE from 'three'
 import { useLipSync } from '../lib/lipSync'
 import { STATUS_COLORS, STATUS_PULSE_HZ } from '../lib/kelionStatus'
 import { useGeminiLive } from '../lib/geminiLive'
+import SignInModal from '../components/SignInModal'
 import {
   supportsPasskey,
   registerPasskey,
@@ -566,6 +567,10 @@ export default function KelionStage() {
   const [rememberPromptOpen, setRememberPromptOpen] = useState(false)
   const [rememberBusy, setRememberBusy] = useState(false)
   const [rememberError, setRememberError] = useState(null)
+  // Full sign-in modal (email+password primary, Google, passkey) — opened
+  // from the top-bar "Sign in" button. Separate from the soft passkey prompt
+  // above which auto-opens mid-conversation after several turns.
+  const [signInModalOpen, setSignInModalOpen] = useState(false)
   const dismissedPromptRef = useRef(false)
 
   // Stage 5 — proactive pings state
@@ -1247,10 +1252,11 @@ export default function KelionStage() {
             if (authState.signedIn) {
               handleSignOut()
             } else {
-              // No dedicated sign-in UI yet — route through the "remember me"
-              // passkey prompt which handles both "create passkey" and
-              // "sign in with existing passkey" cases.
-              setRememberPromptOpen(true)
+              // Full sign-in modal: email+password first, Google SSO, passkey
+              // as a 1-tap alternative. Admins who need to log in with
+              // credentials land here directly instead of bouncing off the
+              // passkey-only prompt.
+              setSignInModalOpen(true)
             }
           }}
           style={{
@@ -1581,6 +1587,43 @@ export default function KelionStage() {
           ))}
         </div>
       )}
+
+      {/* Full sign-in modal — triggered by the top-bar Sign in button.
+          Email+password primary, Google SSO, passkey as 1-tap. */}
+      <SignInModal
+        open={signInModalOpen}
+        onClose={() => setSignInModalOpen(false)}
+        passkeySupported={supportsPasskey()}
+        onAuthenticated={async (user) => {
+          // Login succeeded. Re-fetch /api/auth/passkey/me so we get the
+          // canonical { isAdmin } flag computed server-side (covers the
+          // admin email allow-list). Fall back to the raw response if the
+          // probe fails — at worst the admin-only UI pieces won't render
+          // until next reload.
+          setSignInModalOpen(false)
+          try {
+            const me = await fetchMe()
+            if (me && me.signedIn) {
+              setAuthState({ signedIn: true, user: me.user || user || null })
+              return
+            }
+          } catch (_) { /* ignore */ }
+          setAuthState({ signedIn: true, user: user || null })
+        }}
+        onUsePasskey={async () => {
+          // Reuse the existing WebAuthn flow. Close the modal first so the
+          // OS-level passkey sheet appears in front.
+          setSignInModalOpen(false)
+          try {
+            const res = await authenticateWithPasskey()
+            setAuthState({ signedIn: true, user: res.user })
+          } catch (err) {
+            // Re-open with the error surfaced — but the modal has its own
+            // state now, so just log; user can retry.
+            console.warn('[passkey auth]', err && err.message)
+          }
+        }}
+      />
 
       {/* Stage 3 — "Remember me" soft prompt */}
       {rememberPromptOpen && (
