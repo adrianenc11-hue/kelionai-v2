@@ -267,7 +267,14 @@ function AvatarModel({ mouthOpen = 0, status = 'idle', emotion = null, presentin
     // When Kelion is presenting (or speaking and content is on the monitor),
     // rotate the whole body by ~8° toward the monitor on the left. Smooth
     // lerp so transitions in/out of the presenting state are never snappy.
-    const yawTarget = presenting ? -0.14 : 0 // -8° ≈ -0.1396 rad, turned toward camera-left
+    //
+    // Adrian: "rotește avatarul cu fața la mine 3 grade la stânga" — the
+    // rig's default forward vector aims a few degrees camera-right of the
+    // user's centerline, so we shift the resting orientation by an extra
+    // -3° (≈ -0.0524 rad) on Y. The presenting yaw carries the same offset
+    // so the relative swing toward the monitor is unchanged.
+    const BASE_FACING_OFFSET = -0.0524 // -3° toward camera-left
+    const yawTarget = (presenting ? -0.14 : 0) + BASE_FACING_OFFSET
     const yawK = 1 - Math.exp(-delta * 2.5)  // frame-independent easing (~2.5 Hz)
     bodyYawRef.current += (yawTarget - bodyYawRef.current) * yawK
     if (root.current) root.current.rotation.y = bodyYawRef.current
