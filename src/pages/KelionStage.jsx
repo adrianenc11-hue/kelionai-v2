@@ -1581,46 +1581,22 @@ export default function KelionStage() {
           request — the old bottom-strip was cluttering the stage. The
           top-bar entry calls window.location.assign('/contact') directly. */}
 
-      {/* Camera preview — visible confirmation Kelion sees you (M9) */}
+      {/* F17 — camera self-view removed from the page per Adrian's request:
+          "am cerut sa nu fie vizibila informatia pe pagina". The camera
+          stream still runs (frames feed the vision pipeline for Kelion),
+          but there is no visible preview thumbnail. We still mount a
+          hidden <video> element so the MediaStream attachment lifecycle
+          (srcObject assignment + play() trigger) works the same way it
+          did with a visible preview — some browsers stall the track if
+          no element ever consumes the stream. Hidden via display:none. */}
       {cameraStream && (
-        <div
-          onClick={(e) => e.stopPropagation()}
-          style={{
-            position: 'absolute', top: 18, left: 18,
-            width: 180, height: 135,
-            borderRadius: 14,
-            overflow: 'hidden',
-            border: '1px solid rgba(167, 139, 250, 0.35)',
-            boxShadow: '0 16px 40px rgba(0,0,0,0.5)',
-            background: '#000',
-            zIndex: 15,
-          }}
-        >
-          <video
-            ref={cameraVideoRef}
-            autoPlay
-            muted
-            playsInline
-            style={{
-              width: '100%', height: '100%',
-              objectFit: 'cover',
-              transform: 'scaleX(-1)', // mirrored like a selfie cam
-            }}
-          />
-          <div style={{
-            position: 'absolute', bottom: 6, left: 8,
-            fontSize: 10, letterSpacing: '0.15em',
-            color: '#ede9fe', opacity: 0.8,
-            textShadow: '0 1px 2px rgba(0,0,0,0.8)',
-          }}>
-            <span style={{
-              display: 'inline-block', width: 6, height: 6,
-              borderRadius: '50%', background: '#ef4444',
-              marginRight: 6, boxShadow: '0 0 6px #ef4444',
-            }} />
-            LIVE
-          </div>
-        </div>
+        <video
+          ref={cameraVideoRef}
+          autoPlay
+          muted
+          playsInline
+          style={{ display: 'none' }}
+        />
       )}
 
       {/* Screen share indicator — Kelion is watching your screen (M10) */}
@@ -1628,7 +1604,7 @@ export default function KelionStage() {
         <div
           onClick={(e) => e.stopPropagation()}
           style={{
-            position: 'absolute', top: 18, left: cameraStream ? 210 : 18,
+            position: 'absolute', top: 18, left: 18,
             padding: '8px 14px',
             borderRadius: 999,
             background: 'rgba(10, 8, 20, 0.65)',
