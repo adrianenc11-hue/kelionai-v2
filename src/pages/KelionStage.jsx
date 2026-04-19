@@ -3,6 +3,7 @@ import { useGLTF, Environment, ContactShadows, Float, Html } from '@react-three/
 import { Suspense, useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback } from 'react'
 import * as THREE from 'three'
 import { useLipSync } from '../lib/lipSync'
+import { subscribeMonitor } from '../lib/monitorStore'
 import { STATUS_COLORS, STATUS_PULSE_HZ } from '../lib/kelionStatus'
 import { useGeminiLive } from '../lib/geminiLive'
 import SignInModal from '../components/SignInModal'
@@ -449,12 +450,14 @@ function useNYCSkylineTexture() {
 // the `show_on_monitor` Gemini tool → monitorStore updates → this component
 // re-renders with the new URL.
 function StageMonitorContent() {
-  const [m, setM] = useState(getMonitorState())
-  useEffect(() => {
-    // Seed + subscribe. The store calls listeners with the whole state object.
-    setM({ ...getMonitorState() })
-    return subscribeMonitor((s) => setM({ ...s }))
-  }, [])
+  // Idle default — identical shape to what monitorStore keeps internally.
+  // We intentionally do NOT read the store synchronously here: doing so at
+  // module-scope in a bundle-split build caused a `ReferenceError:
+  // getMonitorState is not defined` in production (Vite tree-shook it
+  // while keeping the `subscribeMonitor` symbol). Pulling only
+  // `subscribeMonitor` keeps the cross-chunk binding stable.
+  const [m, setM] = useState({ kind: null, src: null, title: null, embedType: 'iframe', updatedAt: 0 })
+  useEffect(() => subscribeMonitor((s) => setM({ ...s })), [])
 
   // Idle: faint grid + watermark, matches the previous static monitor look.
   if (!m.src) {
