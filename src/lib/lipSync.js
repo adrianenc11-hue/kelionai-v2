@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { TUNING } from './tuning'
 
 // Lip-sync driver. Listens to the audio element's MediaStream (the Gemini
 // Live hook routes decoded PCM through a MediaStreamDestination and sets
@@ -27,15 +28,12 @@ const SPEECH_HI_HZ = 3500
 const FORMANT_LO_HZ = 200
 const FORMANT_HI_HZ = 2000
 
-// Envelope shape. 60 fps => 16.7 ms per frame. ATTACK=0.45 ≈ 22 ms to
-// reach 90% of target; RELEASE=0.08 ≈ 120 ms to decay to 10%. Feels like
+// Envelope shape. 60 fps => 16.7 ms per frame. ATTACK≈0.45 → 22 ms to
+// reach 90% of target; RELEASE≈0.08 → 120 ms to decay to 10%. Feels like
 // real speech: lips snap open on the vowel onset, close gradually.
-const ATTACK = 0.45
-const RELEASE = 0.08
+// The actual attack/release/formant-weight/peak-decay values live in
+// `TUNING` so the Leva debug panel can tweak them live without rebuild.
 
-// Auto-gain: rolling peak decays slowly so a single loud chunk doesn't
-// permanently suppress subsequent quieter speech.
-const PEAK_DECAY = 0.9995
 // Floor keeps the divisor strictly positive even when the stream is
 // silent (e.g. between turns) — prevents NaN/∞ spikes on the first sample.
 const PEAK_FLOOR = 8
@@ -85,13 +83,17 @@ export function useLipSync(audioRef) {
       if (!analyzerRef.current) return
       analyzerRef.current.getByteFrequencyData(data)
 
-      // Weighted voice-band average. Formant region gets 1.5× weight, the
-      // rest of the speech band (bass fundamental + upper formants) gets 1.
+      // Weighted voice-band average. Formant region gets a multiplier
+      // (TUNING.lipFormantWeight, default 1.5×) so vowel formants
+      // dominate over sibilant / fricative energy. The rest of the
+      // speech band stays at 1× so bass fundamentals and upper formants
+      // still contribute.
+      const formantW = TUNING.lipFormantWeight
       let sum = 0
       let weight = 0
       for (let i = loBin; i <= hiBin; i++) {
         const hz = i * binHz
-        const w = hz >= FORMANT_LO_HZ && hz <= FORMANT_HI_HZ ? 1.5 : 1
+        const w = hz >= FORMANT_LO_HZ && hz <= FORMANT_HI_HZ ? formantW : 1
         sum += data[i] * w
         weight += w
       }
@@ -99,13 +101,13 @@ export function useLipSync(audioRef) {
 
       // Auto-gain: rolling peak, slow decay. Divide current sample by it to
       // get 0..1 range that adapts to the speaker's actual level.
-      peakRef.current = Math.max(peakRef.current * PEAK_DECAY, avg, PEAK_FLOOR)
+      peakRef.current = Math.max(peakRef.current * TUNING.lipPeakDecay, avg, PEAK_FLOOR)
       const raw = Math.min(1, avg / peakRef.current)
 
       // Asymmetric envelope: fast attack (mouth snaps open on vowel onset),
       // slow release (closes gradually, like a real jaw).
       const prev = envelopeRef.current
-      const k = raw > prev ? ATTACK : RELEASE
+      const k = raw > prev ? TUNING.lipAttack : TUNING.lipRelease
       const env = prev + (raw - prev) * k
       envelopeRef.current = env
 
