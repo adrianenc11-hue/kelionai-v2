@@ -1050,13 +1050,18 @@ export default function KelionStage() {
     }
   }, [stopCamera])
 
-  // Stage 3 — probe whether the user is already signed in (passkey cookie).
+  // Adrian's spec ("cind intru pe aplicatie sa fie default delogat"):
+  // every fresh page load must start in the signed-out trial state, even
+  // if the user has a valid kelion.token cookie from a previous visit.
+  // We intentionally do NOT hydrate auth from /api/auth/passkey/me here;
+  // instead we best-effort clear the server cookie on mount so the user
+  // must explicitly click "Sign in" and re-enter credentials. Auth still
+  // works normally after they click through the modal — handleSignIn in
+  // the modal onSuccess path does its own fetchMe + setAuthState below.
   useEffect(() => {
     let cancelled = false
-    fetchMe().then((r) => {
-      if (cancelled) return
-      setAuthState({ signedIn: !!r.signedIn, user: r.user || null })
-    }).catch(() => { /* fail silently */ })
+    signOut().catch(() => { /* best-effort; modal will still work */ })
+    if (!cancelled) setAuthState({ signedIn: false, user: null })
     return () => { cancelled = true }
   }, [])
 
