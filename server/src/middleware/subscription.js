@@ -89,7 +89,15 @@ function checkSubscription(requiredPlan = 'free') {
       }
 
       if (!user) {
-        return res.status(404).json({ error: 'User not found' });
+        // Stale JWT — the cookie references a user row that no longer exists
+        // (DB reset, user deleted, orphan from an older schema). For non-admin
+        // identities we previously returned 404, which the frontend rendered
+        // as a bare "HTTP 404" bubble and left the user with no way to
+        // recover short of manually clearing cookies. Instead: clear the
+        // cookie server-side and return a clean 401 so the client falls back
+        // to the trial / sign-in flow on its own.
+        try { res.clearCookie('kelion.token', { path: '/' }); } catch (_) { /* best-effort */ }
+        return res.status(401).json({ error: 'Session expired, please sign in again' });
       }
 
       // Admin bypass via DB row — when the user row exists, the DB is
