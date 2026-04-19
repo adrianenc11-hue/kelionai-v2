@@ -883,6 +883,12 @@ export default function KelionStage() {
   // who explicitly turn it off.
   const cameraAutoStartedRef = useRef(false)
   useEffect(() => {
+    // Codex P1 on PR #43: the auto-start effect must be gated on
+    // authState.signedIn. Without this gate, after sign-out the stop
+    // effect sets cameraStream=null and clears the guard, which then
+    // re-triggers this effect and restarts the camera — defeating the
+    // privacy intent of sign-out stop.
+    if (!authState.signedIn) return
     if (cameraAutoStartedRef.current) return
     if (cameraStream) return // already running (manual toggle or prior mount)
     if (typeof startCamera !== 'function') return
@@ -890,7 +896,7 @@ export default function KelionStage() {
     // Some browsers gate getUserMedia to a user-gesture; attempt anyway
     // — startCamera's own error handling surfaces a visionError banner.
     try { startCamera() } catch (_) { /* swallowed; banner handles it */ }
-  }, [cameraStream, startCamera])
+  }, [authState.signedIn, cameraStream, startCamera])
 
   // Stop the camera reactively when the user signs out. handleSignOut
   // only resets authState; it does NOT unmount KelionStage, so without
@@ -902,7 +908,9 @@ export default function KelionStage() {
         try { stopCamera() } catch (_) {}
       }
       // Reset the guard so a subsequent sign-in re-starts the camera
-      // (re-entering the interface per F16 spec).
+      // (re-entering the interface per F16 spec). Safe because the
+      // auto-start effect above is gated on authState.signedIn and
+      // will not fire again until the user signs back in.
       cameraAutoStartedRef.current = false
     }
     return () => {
