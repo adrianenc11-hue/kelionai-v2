@@ -881,14 +881,21 @@ export default function KelionStage() {
   // or VAD — the camera is a persistent ambient sensor for as long as
   // the stage is mounted. Manual toggle via ⋯ menu still works for users
   // who explicitly turn it off.
+  // F16 — camera auto-start once per mount. Runs for trial (not signed
+  // in) AND signed-in users per spec ("camera este on din momentul
+  // intrarii pe interfata"). The guard is set true on first run and
+  // deliberately NEVER cleared for the lifetime of this mount — that
+  // way, once the user has signed out (see stop effect below), the
+  // camera will not auto-restart in the same tab without a page
+  // reload. Re-engagement on re-sign-in is a reload, not an in-tab
+  // flip, which matches Adrian's F16 wording "pina la inchidere".
   const cameraAutoStartedRef = useRef(false)
+  // Tracks whether we've ever seen authState.signedIn === true during
+  // this mount. Used to distinguish "user just signed out" from "user
+  // never signed in (trial)". We only react to the sign-out transition,
+  // not to the initial false-on-mount state.
+  const hasBeenSignedInRef = useRef(false)
   useEffect(() => {
-    // Codex P1 on PR #43: the auto-start effect must be gated on
-    // authState.signedIn. Without this gate, after sign-out the stop
-    // effect sets cameraStream=null and clears the guard, which then
-    // re-triggers this effect and restarts the camera — defeating the
-    // privacy intent of sign-out stop.
-    if (!authState.signedIn) return
     if (cameraAutoStartedRef.current) return
     if (cameraStream) return // already running (manual toggle or prior mount)
     if (typeof startCamera !== 'function') return
@@ -896,29 +903,36 @@ export default function KelionStage() {
     // Some browsers gate getUserMedia to a user-gesture; attempt anyway
     // — startCamera's own error handling surfaces a visionError banner.
     try { startCamera() } catch (_) { /* swallowed; banner handles it */ }
-  }, [authState.signedIn, cameraStream, startCamera])
+  }, [cameraStream, startCamera])
 
   // Stop the camera reactively when the user signs out. handleSignOut
   // only resets authState; it does NOT unmount KelionStage, so without
   // this effect the camera would keep streaming after sign-out (Codex
-  // P1 on PR #42). Also covers unmount (navigation away, tab close).
+  // P1 on PR #42). We intentionally do NOT reset cameraAutoStartedRef
+  // here (Codex P1 on PR #43): leaving the guard set prevents the
+  // auto-start effect above from immediately re-firing when
+  // cameraStream transitions to null.
   useEffect(() => {
-    if (!authState.signedIn && cameraAutoStartedRef.current) {
-      if (typeof stopCamera === 'function') {
-        try { stopCamera() } catch (_) {}
-      }
-      // Reset the guard so a subsequent sign-in re-starts the camera
-      // (re-entering the interface per F16 spec). Safe because the
-      // auto-start effect above is gated on authState.signedIn and
-      // will not fire again until the user signs back in.
-      cameraAutoStartedRef.current = false
+    if (authState.signedIn) {
+      hasBeenSignedInRef.current = true
+      return
     }
+    // Only stop on the signed-in → signed-out transition, not on the
+    // initial { signedIn: false } mount state (trial users).
+    if (!hasBeenSignedInRef.current) return
+    if (typeof stopCamera === 'function') {
+      try { stopCamera() } catch (_) {}
+    }
+  }, [authState.signedIn, stopCamera])
+
+  // Belt-and-braces unmount cleanup (navigation away, tab close).
+  useEffect(() => {
     return () => {
       if (typeof stopCamera === 'function') {
         try { stopCamera() } catch (_) {}
       }
     }
-  }, [authState.signedIn, stopCamera])
+  }, [stopCamera])
 
   // Stage 3 — probe whether the user is already signed in (passkey cookie).
   useEffect(() => {
@@ -1581,46 +1595,22 @@ export default function KelionStage() {
           request — the old bottom-strip was cluttering the stage. The
           top-bar entry calls window.location.assign('/contact') directly. */}
 
-      {/* Camera preview — visible confirmation Kelion sees you (M9) */}
+      {/* F17 — camera self-view removed from the page per Adrian's request:
+          "am cerut sa nu fie vizibila informatia pe pagina". The camera
+          stream still runs (frames feed the vision pipeline for Kelion),
+          but there is no visible preview thumbnail. We still mount a
+          hidden <video> element so the MediaStream attachment lifecycle
+          (srcObject assignment + play() trigger) works the same way it
+          did with a visible preview — some browsers stall the track if
+          no element ever consumes the stream. Hidden via display:none. */}
       {cameraStream && (
-        <div
-          onClick={(e) => e.stopPropagation()}
-          style={{
-            position: 'absolute', top: 18, left: 18,
-            width: 180, height: 135,
-            borderRadius: 14,
-            overflow: 'hidden',
-            border: '1px solid rgba(167, 139, 250, 0.35)',
-            boxShadow: '0 16px 40px rgba(0,0,0,0.5)',
-            background: '#000',
-            zIndex: 15,
-          }}
-        >
-          <video
-            ref={cameraVideoRef}
-            autoPlay
-            muted
-            playsInline
-            style={{
-              width: '100%', height: '100%',
-              objectFit: 'cover',
-              transform: 'scaleX(-1)', // mirrored like a selfie cam
-            }}
-          />
-          <div style={{
-            position: 'absolute', bottom: 6, left: 8,
-            fontSize: 10, letterSpacing: '0.15em',
-            color: '#ede9fe', opacity: 0.8,
-            textShadow: '0 1px 2px rgba(0,0,0,0.8)',
-          }}>
-            <span style={{
-              display: 'inline-block', width: 6, height: 6,
-              borderRadius: '50%', background: '#ef4444',
-              marginRight: 6, boxShadow: '0 0 6px #ef4444',
-            }} />
-            LIVE
-          </div>
-        </div>
+        <video
+          ref={cameraVideoRef}
+          autoPlay
+          muted
+          playsInline
+          style={{ display: 'none' }}
+        />
       )}
 
       {/* Screen share indicator — Kelion is watching your screen (M10) */}
@@ -1628,7 +1618,7 @@ export default function KelionStage() {
         <div
           onClick={(e) => e.stopPropagation()}
           style={{
-            position: 'absolute', top: 18, left: cameraStream ? 210 : 18,
+            position: 'absolute', top: 18, left: 18,
             padding: '8px 14px',
             borderRadius: 999,
             background: 'rgba(10, 8, 20, 0.65)',
