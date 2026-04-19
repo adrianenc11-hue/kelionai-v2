@@ -53,16 +53,20 @@ function readVoiceStyleCookie() {
 }
 
 // ───── Avatar with idle animation + lipsync + Stage 6 emotion morphs ─────
-// Baseline arm pose — this is the pose Adrian dialled in and wants hands to
-// ALWAYS return to when no gesture is active. All hand motion is expressed as
-// an *additive* delta on top of this baseline, multiplied by an envelope
-// weight that goes 0 → 1 → 0 over each gesture's lifetime, so every gesture
-// ends with hands exactly at the baseline again.
+// Baseline arm pose — Adrian's requirement is arms-by-the-sides rest pose at
+// load with no "hands forward / T-pose" flash. The previous numeric values
+// (x=1.30) were dialled in for an older GLB export and ended up rotating the
+// arms FORWARD on the current `kelion-rpm_e27cb94d.glb` avatar, leaving the
+// avatar permanently stuck with its right arm extended toward the camera
+// (exactly the "mâini în față" that Adrian flagged). The current RPM GLB
+// already ships in a rest-pose with arms lowered, so the correct baseline is
+// simply zero — trust the GLB's authored rest pose. Gestures still layer on
+// top as additive deltas and fade back to zero.
 const ARM_BASELINE = {
-  LeftArm:      { x: 1.30, y:  0.00, z:  0.18 },
-  RightArm:     { x: 1.30, y:  0.00, z: -0.18 },
-  LeftForeArm:  { x: 0.35, y:  0.00, z:  0.00 },
-  RightForeArm: { x: 0.35, y:  0.00, z:  0.00 },
+  LeftArm:      { x: 0, y: 0, z: 0 },
+  RightArm:     { x: 0, y: 0, z: 0 },
+  LeftForeArm:  { x: 0, y: 0, z: 0 },
+  RightForeArm: { x: 0, y: 0, z: 0 },
 }
 
 // Curated gesture palette — each entry is a small additive delta (radians)
@@ -816,7 +820,11 @@ export default function KelionStage() {
         }),
       })
       if (r.status === 401) {
-        throw new Error('Sign in to chat (use the ⋯ menu).')
+        // Stale JWT or expired session — server already cleared the cookie.
+        // Drop local auth state so the UI reverts to the Sign-in button and
+        // trial flow instead of looking "signed in" with a dead session.
+        setAuthState({ signedIn: false, user: null })
+        throw new Error('Session expired — please sign in again (⋯ menu).')
       }
       if (!r.ok) throw new Error(`HTTP ${r.status}`)
       // Parse SSE stream: lines of form "data: {json}\n\n"
