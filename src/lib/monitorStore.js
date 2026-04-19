@@ -28,6 +28,11 @@ export function getMonitorState() {
 
 export function subscribeMonitor(fn) {
   listeners.add(fn);
+  // Invoke immediately with current state so late subscribers (e.g. a React
+  // component re-mounted after a Suspense fallback) don't miss whatever is
+  // already being displayed. Wrapped in try/catch so a bad listener can't
+  // break the subscribe path.
+  try { fn(state); } catch { /* ignore */ }
   return () => listeners.delete(fn);
 }
 
