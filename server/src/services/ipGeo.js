@@ -38,8 +38,12 @@ function isPrivate(ip) {
 
 async function lookup(ip) {
   if (!ip || isPrivate(ip)) return null;
+  const now = Date.now();
+  // Lazy TTL + cap enforcement on every read keeps memory bounded without a
+  // background timer (which wouldn't survive Railway cold starts anyway).
+  evictExpired(now);
   const cached = CACHE.get(ip);
-  if (cached && cached.expires > Date.now()) return cached.data;
+  if (cached && cached.expires > now) return cached.data;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), LOOKUP_TIMEOUT_MS);
