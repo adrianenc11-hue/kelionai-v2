@@ -1,5 +1,5 @@
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { useGLTF, Environment, ContactShadows, Float } from '@react-three/drei'
+import { useGLTF, Environment, ContactShadows, Float, Html } from '@react-three/drei'
 import { Suspense, useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback } from 'react'
 import * as THREE from 'three'
 import { useLipSync } from '../lib/lipSync'
@@ -442,6 +442,80 @@ function useNYCSkylineTexture() {
   }, [])
 }
 
+// StageMonitorContent — renders whatever `monitorStore` currently holds onto
+// the inner-screen plane of the presentation monitor. drei's <Html transform>
+// projects a real DOM subtree onto the 3D plane with correct perspective, so
+// users see an actual live iframe / image from the AI's vantage. Kelion calls
+// the `show_on_monitor` Gemini tool → monitorStore updates → this component
+// re-renders with the new URL.
+function StageMonitorContent() {
+  const [m, setM] = useState(getMonitorState())
+  useEffect(() => {
+    // Seed + subscribe. The store calls listeners with the whole state object.
+    setM({ ...getMonitorState() })
+    return subscribeMonitor((s) => setM({ ...s }))
+  }, [])
+
+  // Idle: faint grid + watermark, matches the previous static monitor look.
+  if (!m.src) {
+    return (
+      <>
+        {Array.from({ length: 6 }).map((_, i) => (
+          <mesh key={`mh-${i}`} position={[0, -0.75 + i * 0.3, 0.001]}>
+            <planeGeometry args={[2.9, 0.004]} />
+            <meshBasicMaterial color={'#1f1b3a'} toneMapped={false} opacity={0.4} transparent />
+          </mesh>
+        ))}
+        <mesh position={[0, 0, 0.002]}>
+          <circleGeometry args={[0.07, 32]} />
+          <meshBasicMaterial color={'#7c3aed'} toneMapped={false} opacity={0.55} transparent />
+        </mesh>
+      </>
+    )
+  }
+
+  // Active: project a DOM iframe / image onto the screen plane. We downscale
+  // the DOM with `distanceFactor` so 3.0 x 1.9 world units ≈ 960 x 600 px.
+  const isImage = m.embedType === 'image'
+  return (
+    <Html
+      transform
+      occlude={false}
+      position={[0, 0, 0.01]}
+      distanceFactor={1.2}
+      zIndexRange={[10, 0]}
+      pointerEvents="none"
+      style={{
+        width: 960,
+        height: 600,
+        border: 'none',
+        overflow: 'hidden',
+        background: '#0d0b1d',
+        borderRadius: 4,
+        boxShadow: '0 0 40px rgba(124, 58, 237, 0.35) inset',
+      }}
+    >
+      {isImage ? (
+        <img
+          src={m.src}
+          alt={m.title || 'Monitor content'}
+          referrerPolicy="no-referrer"
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+        />
+      ) : (
+        <iframe
+          src={m.src}
+          title={m.title || 'Kelion monitor'}
+          referrerPolicy="no-referrer"
+          sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation"
+          allow="fullscreen; geolocation; autoplay; encrypted-media"
+          style={{ width: '100%', height: '100%', border: 'none', background: '#0d0b1d' }}
+        />
+      )}
+    </Html>
+  )
+}
+
 function StudioDecor() {
   const skylineTex = useNYCSkylineTexture()
   // Four windows divided by vertical mullions.
@@ -497,30 +571,21 @@ function StudioDecor() {
           Positioned adjacent to the avatar as a presenter + screen pair.
           Adrian: "monitor mai spre el" — moved closer to center (-1.1 from
           -1.7) and slightly forward (-0.35 from -0.8) so the monitor reads
-          as the avatar's screen, not a separate fixture on the wall. */}
+          as the avatar's screen, not a separate fixture on the wall.
+          When Gemini Live calls the `show_on_monitor` tool, <StageMonitor/>
+          renders an iframe / image on the inner plane via drei <Html transform>. */}
       <group position={[-1.1, 0.35, -0.35]} rotation={[0, Math.PI / 9, 0]}>
         {/* Bezel / outer frame */}
         <mesh position={[0, 0, -0.03]}>
           <planeGeometry args={[3.2, 2.1]} />
           <meshStandardMaterial color={'#0a0b14'} metalness={0.75} roughness={0.35} />
         </mesh>
-        {/* Inner screen */}
+        {/* Inner screen (idle state: dark purple with faint grid). */}
         <mesh position={[0, 0, 0]}>
           <planeGeometry args={[3.0, 1.9]} />
           <meshBasicMaterial color={'#0d0b1d'} toneMapped={false} />
         </mesh>
-        {/* Faint grid lines to hint "display" */}
-        {Array.from({ length: 6 }).map((_, i) => (
-          <mesh key={`mh-${i}`} position={[0, -0.75 + i * 0.3, 0.001]}>
-            <planeGeometry args={[2.9, 0.004]} />
-            <meshBasicMaterial color={'#1f1b3a'} toneMapped={false} opacity={0.4} transparent />
-          </mesh>
-        ))}
-        {/* "Kelion Presents" watermark dot */}
-        <mesh position={[0, 0, 0.002]}>
-          <circleGeometry args={[0.07, 32]} />
-          <meshBasicMaterial color={'#7c3aed'} toneMapped={false} opacity={0.55} transparent />
-        </mesh>
+        <StageMonitorContent />
         {/* Stand leg */}
         <mesh position={[0, -1.3, -0.02]}>
           <planeGeometry args={[0.12, 0.7]} />
