@@ -82,7 +82,23 @@ jobs:
             sleep 15
           done
 
+      # Skip the actual acceptance run on pull_request events. Per the
+      # workflow header: "This workflow is informational on PRs (so broken
+      # features do not block unrelated changes) but tracked on master so
+      # the real status is always visible." Running it on PRs against the
+      # currently-deployed production (which has NOT yet received the PR
+      # changes) creates a merge-blocking race — a PR that fixes a prod
+      # bug can never go green until it is merged. On master the push
+      # event above will wait for Railway deploy_sha match and then run
+      # the real acceptance.
       - name: Run acceptance — ${{ matrix.capability }}
+        if: github.event_name != 'pull_request'
         run: |
           echo "Running e2e/acceptance/${{ matrix.capability }}.cjs against $ACCEPTANCE_BASE"
           node e2e/acceptance/${{ matrix.capability }}.cjs
+
+      - name: Skip acceptance on PR (informational only)
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "Skipping e2e/acceptance/${{ matrix.capability }}.cjs on PR."
+          echo "Acceptance is evaluated against production after merge to master."
