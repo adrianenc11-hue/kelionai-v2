@@ -892,14 +892,25 @@ export default function KelionStage() {
     try { startCamera() } catch (_) { /* swallowed; banner handles it */ }
   }, [cameraStream, startCamera])
 
-  // Stop the camera on unmount (covers sign-out and navigation away).
+  // Stop the camera reactively when the user signs out. handleSignOut
+  // only resets authState; it does NOT unmount KelionStage, so without
+  // this effect the camera would keep streaming after sign-out (Codex
+  // P1 on PR #42). Also covers unmount (navigation away, tab close).
   useEffect(() => {
+    if (!authState.signedIn && cameraAutoStartedRef.current) {
+      if (typeof stopCamera === 'function') {
+        try { stopCamera() } catch (_) {}
+      }
+      // Reset the guard so a subsequent sign-in re-starts the camera
+      // (re-entering the interface per F16 spec).
+      cameraAutoStartedRef.current = false
+    }
     return () => {
       if (typeof stopCamera === 'function') {
         try { stopCamera() } catch (_) {}
       }
     }
-  }, [stopCamera])
+  }, [authState.signedIn, stopCamera])
 
   // Stage 3 — probe whether the user is already signed in (passkey cookie).
   useEffect(() => {
