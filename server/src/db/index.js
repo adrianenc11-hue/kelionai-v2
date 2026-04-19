@@ -5,6 +5,16 @@ const fs = require('fs');
 const sqlite3 = require('sqlite3');
 const { open } = require('sqlite');
 
+const { createPgAdapter } = require('./pg-adapter');
+const POSTGRES_DDL = require('./postgres-schema');
+
+// When DATABASE_URL is set we route every query through a Postgres
+// (Supabase) connection pool instead of the local SQLite file. The
+// adapter exposes the same `.run / .get / .all / .exec` surface so the
+// rest of this module (and every caller) keeps working untouched.
+const DATABASE_URL = process.env.DATABASE_URL || '';
+const USE_POSTGRES = !!DATABASE_URL;
+
 const dbPath = process.env.DB_PATH || './data/kelion.db';
 let db;
 
@@ -39,6 +49,14 @@ function logAndMigrateDbLocation() {
 }
 
 async function initDb() {
+  if (USE_POSTGRES) {
+    console.log('[db] using Postgres via DATABASE_URL (Supabase)');
+    db = createPgAdapter(DATABASE_URL);
+    // Apply idempotent schema. Safe to call on every boot.
+    await db.exec(POSTGRES_DDL);
+    return db;
+  }
+
   logAndMigrateDbLocation();
 
   db = await open({
@@ -634,6 +652,40 @@ function addCreditsTransaction({
     return Promise.reject(new Error('kind is required'));
   }
   return serializeCreditsTxn(async () => {
+    // Postgres path: must use a single pooled client for the transaction,
+    // otherwise each query lands on a different connection and BEGIN /
+    // COMMIT don't apply.
+    if (db && db._isPg) {
+      const c = await db.connect();
+      try {
+        await c.exec('BEGIN');
+        const row = await c.get('SELECT credits_balance_minutes FROM users WHERE id = ?', [userId]);
+        if (!row) { await c.exec('ROLLBACK'); throw new Error('user not found'); }
+        const current = Number(row.credits_balance_minutes || 0);
+        const next = current + deltaMinutes;
+        if (next < 0) { await c.exec('ROLLBACK'); throw new Error('insufficient credits'); }
+        await c.run('UPDATE users SET credits_balance_minutes = ? WHERE id = ?', [next, userId]);
+        await c.run(
+          `INSERT INTO credit_transactions
+           (user_id, delta_minutes, amount_cents, currency, kind, stripe_session_id, stripe_payment_intent, note)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [userId, deltaMinutes, amountCents, currency, kind, stripeSessionId, stripePaymentIntent, note],
+        );
+        await c.exec('COMMIT');
+        return { balance: next, previous: current, deltaMinutes };
+      } catch (err) {
+        try { await c.exec('ROLLBACK'); } catch (_) { /* ignore */ }
+        if (/UNIQUE/i.test(err && err.message) && stripeSessionId) {
+          const balance = await getCreditsBalance(userId);
+          return { balance, previous: balance, deltaMinutes: 0, duplicate: true };
+        }
+        throw err;
+      } finally {
+        try { c.release(); } catch (_) { /* ignore */ }
+      }
+    }
+
+    // SQLite path (original behaviour).
     try {
       await db.run('BEGIN IMMEDIATE');
       const row = await db.get('SELECT credits_balance_minutes FROM users WHERE id = ?', [userId]);
