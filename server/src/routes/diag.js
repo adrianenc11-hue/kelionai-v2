@@ -10,10 +10,60 @@
  */
 
 const express = require('express');
+const fs = require('fs');
+const path = require('path');
 const { getUserByEmail, getDb } = require('../db');
 const { getLastBootstrapResult, bootstrapAdmin } = require('../services/adminBootstrap');
 
 const router = express.Router();
+
+/**
+ * GET /api/diag/db-path — returns where SQLite is persisted and whether
+ * the parent directory looks like a Railway persistent volume (i.e. does
+ * it survive redeploys). Zero secrets exposed; metadata only.
+ *
+ * We consider the volume "persistent" when the directory is outside the
+ * app bundle (everything under /app/server/data/, /data/, /mnt/, etc.
+ * matches — Railway mounts volumes at configured paths with those
+ * prefixes). If the path resolves inside /app/server/data without a
+ * volume attached, writes succeed but are wiped on every container
+ * rebuild, which is the exact bug that was silently wiping credits +
+ * memory_items across deploys before this change.
+ */
+router.get('/db-path', async (req, res) => {
+  try {
+    const configured = process.env.DB_PATH || './data/kelion.db';
+    const resolved = path.resolve(configured);
+    const dir = path.dirname(resolved);
+    let dirExists = false, fileExists = false, fileSize = null, fileMtime = null;
+    try { dirExists = fs.existsSync(dir); } catch (_) {}
+    try {
+      if (fs.existsSync(resolved)) {
+        const st = fs.statSync(resolved);
+        fileExists = true;
+        fileSize = st.size;
+        fileMtime = st.mtime.toISOString();
+      }
+    } catch (_) {}
+    const looksPersistent = /^\/(data|mnt|app\/server\/data)\b/.test(resolved);
+    res.json({
+      now: new Date().toISOString(),
+      configured,
+      resolved,
+      dir,
+      dirExists,
+      fileExists,
+      fileSize,
+      fileMtime,
+      looksPersistent,
+      note: looksPersistent
+        ? 'Path is under a directory that is expected to be a Railway volume. If credits still wipe on redeploy, the Railway service is missing the volume attachment.'
+        : 'Path is not under a typical Railway volume mount (/app/server/data, /data, /mnt). SQLite will land on ephemeral disk and wipe on redeploy.',
+    });
+  } catch (err) {
+    res.status(500).json({ error: err && err.message });
+  }
+});
 
 const DEFAULT_ADMIN_EMAIL = 'adrianenc11@gmail.com';
 

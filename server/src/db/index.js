@@ -8,12 +8,38 @@ const { open } = require('sqlite');
 const dbPath = process.env.DB_PATH || './data/kelion.db';
 let db;
 
-async function initDb() {
-  // Ensure the directory exists
-  const dir = path.dirname(dbPath);
-  if (dir && dir !== '.' && !fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+// One-shot boot log so we can tell at a glance whether the SQLite file is
+// being created on an ephemeral layer (bad — everything wipes on redeploy)
+// or on a persistent volume (good — credits + memories survive restarts).
+// We also one-time migrate from the legacy /data/kelion.db location used
+// by older Dockerfile builds so nothing is lost on the first deploy after
+// this change.
+function logAndMigrateDbLocation() {
+  try {
+    const absPath = path.resolve(dbPath);
+    const dir = path.dirname(absPath);
+    if (dir && !fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    const legacyPath = '/data/kelion.db';
+    const targetExists = fs.existsSync(absPath);
+    const legacyExists = fs.existsSync(legacyPath);
+    if (!targetExists && legacyExists && legacyPath !== absPath) {
+      try {
+        fs.copyFileSync(legacyPath, absPath);
+        console.log(`[db] migrated legacy SQLite ${legacyPath} -> ${absPath}`);
+      } catch (err) {
+        console.warn(`[db] legacy migration failed (continuing fresh):`, err && err.message);
+      }
+    }
+    console.log(`[db] using SQLite at ${absPath} (exists=${fs.existsSync(absPath)})`);
+  } catch (err) {
+    console.warn('[db] startup location check failed:', err && err.message);
   }
+}
+
+async function initDb() {
+  logAndMigrateDbLocation();
 
   db = await open({
     filename: dbPath,

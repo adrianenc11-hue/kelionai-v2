@@ -839,6 +839,40 @@ export default function KelionStage() {
       if (authTokenRef.current) {
         chatHeaders['Authorization'] = `Bearer ${authTokenRef.current}`
       }
+      // ───── Vision: capture a frame from the user's webcam ─────
+      // Adrian: "viziunea nu merge, gpt 5.4 trebuie sa capteze si sa-i dea
+      // avatarului detaliile cind este intrebat". The backend `/api/chat`
+      // route already accepts an optional `frame` (base64 data URL) and
+      // attaches it to the last user message as an image_url part; we just
+      // weren't ever sending one from the text composer. Grab the latest
+      // frame from the hidden <video> that mirrors `cameraStream` whenever
+      // the camera is live — if the user is on trial / camera off / grant
+      // denied, we skip the frame and fall back to text-only chat.
+      let frame = null
+      try {
+        const v = cameraVideoRef.current
+        if (
+          v && !v.paused && v.readyState >= 2 &&
+          v.videoWidth > 0 && v.videoHeight > 0
+        ) {
+          // Downscale to 512px on the long edge: vision models only need a
+          // rough view, and keeping the payload small avoids slow uploads
+          // from the user's home uplink.
+          const maxDim = 512
+          const scale = Math.min(1, maxDim / Math.max(v.videoWidth, v.videoHeight))
+          const w = Math.max(1, Math.round(v.videoWidth * scale))
+          const h = Math.max(1, Math.round(v.videoHeight * scale))
+          const c = document.createElement('canvas')
+          c.width = w; c.height = h
+          const ctx = c.getContext('2d')
+          if (ctx) {
+            ctx.drawImage(v, 0, 0, w, h)
+            // JPEG at q=0.7 keeps a 512-px frame at ~25-40 KB — small
+            // enough to send inline without blocking the request.
+            frame = c.toDataURL('image/jpeg', 0.7)
+          }
+        }
+      } catch (_) { frame = null }
       const r = await fetch('/api/chat', {
         method: 'POST',
         credentials: 'include',
@@ -847,6 +881,7 @@ export default function KelionStage() {
           messages: next,
           datetime: new Date().toISOString(),
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          ...(frame ? { frame } : {}),
         }),
       })
       if (r.status === 401) {
@@ -1334,7 +1369,13 @@ export default function KelionStage() {
               mouthOpen={mouthOpen}
               status={status}
               emotion={emotion}
-              presenting={status === 'speaking'}
+              // Adrian: "avatarul nu priveste catre user" — previously the
+              // body yawed ~8° toward the on-stage monitor whenever Kelion
+              // spoke, which left the avatar glancing away from the webcam.
+              // We always face the user now; hand gestures still fire while
+              // speaking (see AvatarModel below where we key them off
+              // status === 'speaking').
+              presenting={false}
             />
           </group>
           <ContactShadows position={[1.6, -1.65, 0]} opacity={0.55} scale={5} blur={2.6} far={2.5} />

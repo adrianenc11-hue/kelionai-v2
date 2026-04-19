@@ -1,10 +1,11 @@
 'use strict';
 
 const { Router } = require('express');
-const { getUserById, getAllUsers, updateUser, deleteUser, getCreditRevenueSummary } = require('../db');
+const { getUserById, getAllUsers, updateUser, deleteUser, getCreditRevenueSummary, getDb } = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { getAllCredits, probeStripe } = require('../services/aiCredits');
 const { sendEmailAlert } = require('../services/emailAlerts');
+const { bootstrapAdmin } = require('../services/adminBootstrap');
 
 const router = Router();
 
@@ -245,6 +246,54 @@ router.delete('/users/:id', async (req, res) => {
   } catch (err) {
     console.error('[admin/delete] Error:', err.message);
     res.status(500).json({ error: 'Failed to delete user' });
+  }
+});
+
+/**
+ * POST /api/admin/purge-users
+ *
+ * Adrian: "golesti toti userii". Wipes every user row (and dependent
+ * tables: credits, memory, push, referrals, proactive log) then re-seeds
+ * the admin from ADMIN_BOOTSTRAP_PASSWORD so the caller can still sign
+ * back in. Mirrors /api/diag/purge-users but is gated by admin JWT
+ * instead of the shared X-Purge-Secret — so Adrian can trigger it from
+ * his signed-in admin session without needing the env var.
+ */
+router.post('/purge-users', async (req, res) => {
+  try {
+    const db = getDb();
+    if (!db) return res.status(503).json({ error: 'db not initialized' });
+
+    const tables = [
+      'credit_transactions',
+      'credit_ledger',
+      'credit_balances',
+      'memory_items',
+      'push_subscriptions',
+      'proactive_log',
+      'referrals',
+      'users',
+    ];
+    const deleted = {};
+    for (const t of tables) {
+      try {
+        const exists = await db.get(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name = ?",
+          [t],
+        );
+        if (!exists) { deleted[t] = 'table not present'; continue; }
+        const result = await db.run(`DELETE FROM ${t}`);
+        deleted[t] = result && result.changes != null ? result.changes : 'ok';
+      } catch (err) {
+        deleted[t] = `error: ${err && err.message}`;
+      }
+    }
+
+    const reseed = await bootstrapAdmin();
+    return res.json({ now: new Date().toISOString(), deleted, reseed });
+  } catch (err) {
+    console.error('[admin/purge-users] failed:', err && err.message);
+    return res.status(500).json({ error: err && err.message });
   }
 });
 

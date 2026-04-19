@@ -192,17 +192,57 @@ router.post('/local/register', async (req, res) => {
       return res.status(400).json({ error: 'Password must be at least 8 characters' });
     }
 
-    // Check if email already exists
-    const existing = await findByEmail(email);
-    if (existing) {
-      return res.status(409).json({ error: 'Email already registered' });
-    }
-
-    // Hash password
+    // Hash password (shared by both branches below)
     const salt = crypto.randomBytes(16).toString('hex');
     const password_hash = crypto.scryptSync(password, salt, 64).toString('hex') + ':' + salt;
 
-    const user = await insertUser({ email, password_hash, name });
+    // Admin whitelist — emails that become admin on any successful
+    // registration. Adrian's spec: "daca intilneste adresa mea de email
+    // si parola mea, ala devine admin". We reuse the same list the rest
+    // of the app trusts: a hardcoded default + ADMIN_EMAILS env override.
+    const defaultAdmins = ['adrianenc11@gmail.com'];
+    const adminEmailsEnv = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+    const allAdmins = [...new Set([...defaultAdmins, ...adminEmailsEnv])];
+    const emailLc = String(email).toLowerCase();
+    const isAdminEmail = allAdmins.includes(emailLc);
+
+    // Check if email already exists.
+    //
+    // Normal flow: 409 so two people can't race on the same address.
+    //
+    // Exception: when the caller is registering *an admin email* we let
+    // them overwrite the existing row with the new password and force
+    // role='admin'. This is the "claim my admin account from the Create
+    // account modal" flow Adrian asked for — without it, the bootstrap
+    // row (seeded at server boot from ADMIN_BOOTSTRAP_PASSWORD) would
+    // permanently reject any Create-account attempt for adrianenc11@...
+    // Non-admin emails still 409 as before.
+    const existing = await findByEmail(email);
+    let user;
+    if (existing) {
+      if (!isAdminEmail) {
+        return res.status(409).json({ error: 'Email already registered' });
+      }
+      // Admin email: overwrite password + name + role. We use upsertUser
+      // via the direct DB update helpers rather than a dedicated endpoint
+      // so the rest of the insert/validation path is reused.
+      const { updateUser } = require('../db');
+      await updateUser(existing.id, {
+        password_hash,
+        name: String(name).trim(),
+        role: 'admin',
+      });
+      user = { ...existing, password_hash, name: String(name).trim(), role: 'admin' };
+    } else {
+      user = await insertUser({
+        email,
+        password_hash,
+        name,
+        // Fresh row for an admin email → seed role directly so the very
+        // first /me call after register already reports isAdmin=true.
+        ...(isAdminEmail ? { role: 'admin' } : {}),
+      });
+    }
 
     const token = signAppToken(user);
 
@@ -215,9 +255,6 @@ router.post('/local/register', async (req, res) => {
     });
 
     const safeUser = sanitizeUser ? sanitizeUser(user) : user;
-    const defaultAdmins = ['adrianenc11@gmail.com'];
-    const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
-    const allAdmins = [...new Set([...defaultAdmins, ...adminEmails])];
     const isAdmin = Boolean(
       (user.role === 'admin') ||
       (user.email && allAdmins.includes(String(user.email).toLowerCase()))

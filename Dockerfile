@@ -21,9 +21,14 @@ RUN npm run build
 
 ENV NODE_ENV=production
 ENV PORT=8080
-ENV DB_PATH=/data/kelion.db
+# DB lives on the Railway persistent volume. We standardise on
+# /app/server/data/kelion.db because that is the path RAILWAY_SETUP.md
+# instructs operators to mount the volume at; keeping Dockerfile and
+# docs aligned stops the SQLite file from landing on ephemeral disk
+# (which silently wipes credits + memories on every redeploy).
+ENV DB_PATH=/app/server/data/kelion.db
 
-RUN mkdir -p /data
+RUN mkdir -p /app/server/data
 
 EXPOSE 8080
 
