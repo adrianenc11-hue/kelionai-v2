@@ -48,9 +48,24 @@ function buildKelionPersona(opts = {}) {
   const weekday = now.toLocaleDateString('en-US', { weekday: 'long', timeZone: tz });
   const localTime = now.toLocaleString('en-US', { timeZone: tz, dateStyle: 'full', timeStyle: 'short' });
   const locationLine = ipGeo.formatForPrompt(geo);
-  const coordLine = (geo && geo.latitude != null && geo.longitude != null)
-    ? `Approximate GPS coordinates: ${geo.latitude.toFixed(4)}, ${geo.longitude.toFixed(4)}.`
-    : '';
+  // When the browser resolved real GPS (source === 'client-gps') we have
+  // 5-6 decimal precision + a measured accuracy radius. Label the line
+  // differently so Kelion knows the coords are authoritative (user
+  // standing right here) and not just an ISP centroid.
+  const coordLine = (() => {
+    if (!geo || geo.latitude == null || geo.longitude == null) return '';
+    const precise = geo.source === 'client-gps';
+    const digits = precise ? 6 : 4;
+    const lat = geo.latitude.toFixed(digits);
+    const lon = geo.longitude.toFixed(digits);
+    if (precise) {
+      const acc = Number.isFinite(geo.accuracy)
+        ? ` (±${Math.max(1, Math.round(geo.accuracy))} m)`
+        : '';
+      return `Real-time GPS coordinates${acc}: ${lat}, ${lon}.`;
+    }
+    return `Approximate GPS coordinates: ${lat}, ${lon}.`;
+  })();
 
   return `You are Kelion — the brilliant intelligence of the future, embodied as a visible presence.
 
@@ -187,10 +202,30 @@ router.get('/gemini-token', async (req, res) => {
       try { memoryItems = await listMemoryItems(user.id, 60); }
       catch (err) { console.warn('[realtime] memory load failed', err.message); }
     }
-    // IP-based geolocation (no browser permission) — Cloudflare / Railway
-    // forward headers → ipapi.co (cached 1h, 1.5s timeout). Injected into
-    // persona below so Kelion answers "where am I?" without a GPS prompt.
-    const geo = await ipGeo.lookup(ipGeo.clientIp(req));
+    // Two-tier geolocation:
+    //   1. `lat`/`lon` query params from the client's navigator.geolocation
+    //      (real GPS on mobile, WiFi-fused OS location on desktop — typical
+    //      accuracy ~20 m). The client sends these when it has them.
+    //   2. IP-geo via Cloudflare / Railway forward headers → ipapi.co
+    //      (typical accuracy ~25-50 km; used as fallback AND to enrich
+    //      city / timezone / country when we only have raw coords).
+    // We merge the two: when real coords are present they OVERRIDE the
+    // IP-level latitude/longitude but we keep the IP-derived city /
+    // region / country / timezone so the persona prompt still reads
+    // "Cluj-Napoca, Romania" instead of just "46.77, 23.59".
+    const ipGeoData = await ipGeo.lookup(ipGeo.clientIp(req));
+    const clientLat = Number.parseFloat(req.query.lat);
+    const clientLon = Number.parseFloat(req.query.lon);
+    const clientAcc = Number.parseFloat(req.query.acc);
+    const geo = (Number.isFinite(clientLat) && Number.isFinite(clientLon))
+      ? {
+          ...(ipGeoData || {}),
+          latitude:  clientLat,
+          longitude: clientLon,
+          accuracy:  Number.isFinite(clientAcc) ? clientAcc : null,
+          source:    'client-gps',
+        }
+      : ipGeoData;
 
     const now = Date.now();
     const newSessionExpireTime = new Date(now + 60 * 1000).toISOString();
