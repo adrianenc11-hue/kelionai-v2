@@ -294,7 +294,12 @@ export function useGeminiLive({ audioRef }) {
       if (!token) throw new Error('No ephemeral token returned')
 
       // 3. Connect WebSocket — constraints come from the token.
-      const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?access_token=${encodeURIComponent(token)}`
+      // Ephemeral tokens are v1alpha-only (the SDK itself warns: "The SDK's
+      // ephemeral token support is in v1alpha only"). Using the v1beta path
+      // here silently closes the socket with HTTP 404 before onopen fires,
+      // which is exactly the "voice chat doesn't work" symptom Adrian saw
+      // after PR #55. See https://github.com/googleapis/js-genai/issues/1257
+      const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?access_token=${encodeURIComponent(token)}`
       const ws = new WebSocket(wsUrl)
       wsRef.current = ws
 
@@ -359,7 +364,14 @@ export function useGeminiLive({ audioRef }) {
   useEffect(() => { statusRef.current = status }, [status])
 
   // ───── Video frame sender (M9 camera + M10 screen share) ─────
-  // Grabs a snapshot from a MediaStream at ~1 fps, encodes to JPEG, sends as realtimeInput.
+  // Streams a MediaStream to Gemini Live as a continuous sequence of JPEG
+  // frames tagged with `realtimeInput.video` (the field Gemini Live treats
+  // as a live video track, not isolated images). Adrian flagged 2026-04-19
+  // that the previous 1-fps "snapshot" behavior made the avatar feel blind
+  // between captures — now we stream at ~15 fps with a 480px short edge and
+  // JPEG q≈0.55 so the wire cost stays reasonable while the model sees real
+  // motion. If the socket back-pressures (bufferedAmount > 2 MB) we skip
+  // the current frame instead of piling work.
   const startFrameSender = useCallback((stream, kind /* 'camera' | 'screen' */) => {
     if (!frameCanvasRef.current) {
       frameCanvasRef.current = document.createElement('canvas')
@@ -377,37 +389,56 @@ export function useGeminiLive({ audioRef }) {
     video.srcObject = stream
     video.play().catch(() => {})
 
+    // ~15 fps target. We honor the spec in wall time rather than animation
+    // frames so tab-visibility throttling does not pause the stream to the
+    // AI (the user might be looking at a different window but we still want
+    // Kelion to "see" the camera).
+    const TARGET_FPS = kind === 'screen' ? 8 : 15
+    const MIN_INTERVAL_MS = Math.floor(1000 / TARGET_FPS)
+    const MAX_W = kind === 'screen' ? 960 : 480
+    const JPEG_Q = kind === 'screen' ? 0.6 : 0.55
+    const BACKPRESSURE_BYTES = 2_000_000
+
+    let busy = false
     const send = async () => {
       const ws = wsRef.current
       if (!ws || ws.readyState !== WebSocket.OPEN) return
+      if (busy) return
+      if (ws.bufferedAmount > BACKPRESSURE_BYTES) return
       if (!video.videoWidth || !video.videoHeight) return
-      const maxW = 640
-      const scale = Math.min(1, maxW / video.videoWidth)
-      canvas.width = Math.floor(video.videoWidth * scale)
-      canvas.height = Math.floor(video.videoHeight * scale)
-      const ctx = canvas.getContext('2d')
+      busy = true
       try {
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-      } catch {
-        return
-      }
-      try {
-        const blob = await new Promise((res) => canvas.toBlob(res, 'image/jpeg', 0.7))
+        const scale = Math.min(1, MAX_W / video.videoWidth)
+        canvas.width = Math.floor(video.videoWidth * scale)
+        canvas.height = Math.floor(video.videoHeight * scale)
+        const ctx = canvas.getContext('2d')
+        try {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+        } catch {
+          return
+        }
+        const blob = await new Promise((res) => canvas.toBlob(res, 'image/jpeg', JPEG_Q))
         if (!blob) return
         const buf = await blob.arrayBuffer()
         const bytes = new Uint8Array(buf)
         const b64 = base64FromBytes(bytes)
         ws.send(JSON.stringify({
           realtimeInput: {
-            mediaChunks: [{ mimeType: 'image/jpeg', data: b64 }],
+            // `video` is the live-video channel (continuous). Previously we
+            // used `mediaChunks` which Gemini Live treats as discrete image
+            // attachments (snapshots), which is exactly what broke the
+            // "live" feel Adrian reported.
+            video: { data: b64, mimeType: 'image/jpeg' },
           },
         }))
       } catch (e) {
         console.warn('[geminiLive] frame send failed', e)
+      } finally {
+        busy = false
       }
     }
 
-    const timerId = setInterval(send, 1000) // 1 fps — keeps token budget sane
+    const timerId = setInterval(send, MIN_INTERVAL_MS)
     if (kind === 'camera') cameraFrameTimerRef.current = timerId
     else screenFrameTimerRef.current = timerId
   }, [])

@@ -7,6 +7,7 @@
 // mutates the emotion store, which the avatar subscribes to.
 
 import { setEmotion } from './emotionStore'
+import { handleShowOnMonitor } from './monitorStore'
 
 async function postJSON(url, body) {
   const r = await fetch(url, {
@@ -58,6 +59,12 @@ export async function runTool(name, args) {
         cue: args?.cue || null,
       })
       return `ack:${applied.state}:${applied.intensity.toFixed(2)}`
+    }
+    case 'show_on_monitor': {
+      // Local-only: project content onto the avatar's on-stage monitor.
+      // monitorStore resolves (kind, query) → iframe/image URL and notifies
+      // the React tree via subscribeMonitor. No backend round-trip needed.
+      return handleShowOnMonitor({ kind: args?.kind, query: args?.query })
     }
     default:
       return `Tool "${name}" is not implemented on this build.`

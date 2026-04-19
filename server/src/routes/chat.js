@@ -2,6 +2,7 @@
 
 const { Router } = require('express');
 const { getAI, getDefaultChatModel } = require('../utils/openai');
+const ipGeo = require('../services/ipGeo');
 
 const router = Router();
 
@@ -40,6 +41,11 @@ router.post('/', async (req, res) => {
     return res.status(503).json({ error: 'AI service not configured. Set GEMINI_API_KEY or OPENAI_API_KEY.' });
   }
 
+  // IP-based geolocation — no browser permission prompt. Uses Cloudflare /
+  // Railway forward headers and ipapi.co (cached 1h). If it fails, we just
+  // fall back to whatever the client volunteered in `coords`.
+  const geo = await ipGeo.lookup(ipGeo.clientIp(req));
+
   // Build real-time context for system prompt
   let realtimeContext = '';
   if (datetime) {
@@ -47,12 +53,18 @@ router.post('/', async (req, res) => {
     const formatted = d.toLocaleString('en-US', {
       weekday: 'long', year: 'numeric', month: 'long',
       day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit',
-      timeZone: timezone || 'UTC',
+      timeZone: timezone || geo?.timezone || 'UTC',
     });
-    realtimeContext += `\n\nReal-time context:\n- Current date & time: ${formatted} (${timezone || 'UTC'})`;
+    realtimeContext += `\n\nReal-time context:\n- Current date & time: ${formatted} (${timezone || geo?.timezone || 'UTC'})`;
   }
   if (coords?.lat != null && coords?.lon != null) {
     realtimeContext += `\n- User GPS coordinates: ${Number(coords.lat).toFixed(5)}, ${Number(coords.lon).toFixed(5)}`;
+  } else if (geo && (geo.latitude != null || geo.city)) {
+    const place = ipGeo.formatForPrompt(geo);
+    if (place) realtimeContext += `\n- Approximate user location (IP-based): ${place}`;
+    if (geo.latitude != null && geo.longitude != null) {
+      realtimeContext += `\n- Approximate GPS coordinates: ${geo.latitude.toFixed(4)}, ${geo.longitude.toFixed(4)}`;
+    }
   }
 
   const systemPrompt = BASE_PROMPT + realtimeContext;
