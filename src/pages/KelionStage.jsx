@@ -53,24 +53,22 @@ function readVoiceStyleCookie() {
 }
 
 // ───── Avatar with idle animation + lipsync + Stage 6 emotion morphs ─────
-// Baseline arm pose — Adrian's requirement is arms-by-the-sides rest pose at
-// load with no "hands forward / T-pose" flash. The previous numeric values
-// (x=1.30) were dialled in for an older GLB export and ended up rotating the
-// arms FORWARD on the current `kelion-rpm_e27cb94d.glb` avatar, leaving the
-// avatar permanently stuck with its right arm extended toward the camera
-// (exactly the "mâini în față" that Adrian flagged). The current RPM GLB
-// already ships in a rest-pose with arms lowered, so the correct baseline is
-// simply zero — trust the GLB's authored rest pose. Gestures still layer on
-// top as additive deltas and fade back to zero.
-const ARM_BASELINE = {
-  LeftArm:      { x: 0, y: 0, z: 0 },
-  RightArm:     { x: 0, y: 0, z: 0 },
-  LeftForeArm:  { x: 0, y: 0, z: 0 },
-  RightForeArm: { x: 0, y: 0, z: 0 },
+// Arm baseline is CAPTURED at mount from the GLB's authored bind pose —
+// whatever rotation the glTF exporter wrote for each arm bone becomes the
+// "rest" pose, and gestures are applied as additive deltas on top. This is
+// rig-agnostic: hand-picked numeric values (x=1.30, or zero) were wrong for
+// THIS particular `kelion-rpm_e27cb94d.glb` export and caused the avatar to
+// show either arms-forward or arms-overhead at load. The bind pose of the
+// GLB is the artist's intended rest, so trust it.
+const ARM_BONE_NAMES = {
+  LeftArm:      ['LeftArm', 'LeftUpperArm', 'mixamorigLeftArm'],
+  RightArm:     ['RightArm', 'RightUpperArm', 'mixamorigRightArm'],
+  LeftForeArm:  ['LeftForeArm', 'mixamorigLeftForeArm'],
+  RightForeArm: ['RightForeArm', 'mixamorigRightForeArm'],
 }
 
 // Curated gesture palette — each entry is a small additive delta (radians)
-// layered on top of ARM_BASELINE while Kelion is speaking/presenting. Kept
+// layered on top of the captured bind-pose baseline while Kelion is speaking/presenting. Kept
 // intentionally subtle so the hands never drift into weird poses, and the
 // return-to-baseline invariant is preserved as long as envelope weight → 0.
 const GESTURE_PALETTE = [
@@ -92,6 +90,14 @@ function AvatarModel({ mouthOpen = 0, status = 'idle', emotion = null, presentin
   const bonesRef = useRef({})
   const morphsRef = useRef([])
   const blinkRef = useRef({ t: 0, nextBlinkAt: 2 + Math.random() * 4, duration: 0.18, phase: 0 })
+  // Captured at mount from the GLB bind pose — one { x, y, z } per arm bone
+  // key in ARM_BONE_NAMES. Gestures are additive deltas on top of this.
+  const armBaselineRef = useRef({
+    LeftArm:      { x: 0, y: 0, z: 0 },
+    RightArm:     { x: 0, y: 0, z: 0 },
+    LeftForeArm:  { x: 0, y: 0, z: 0 },
+    RightForeArm: { x: 0, y: 0, z: 0 },
+  })
   // Gesture scheduler — one gesture at a time, fade-in → hold → fade-out,
   // with a quiet window between gestures so speaking looks measured, not twitchy.
   const gestureRef = useRef({
@@ -130,28 +136,23 @@ function AvatarModel({ mouthOpen = 0, status = 'idle', emotion = null, presentin
     bonesRef.current = bones
     morphsRef.current = morphs
 
-    // Natural arm rest pose (baseline — gestures are applied on top of this)
-    const setRot = (names, x, y, z) => {
+    // Capture the GLB's authored bind-pose rotation for each arm bone, so
+    // we can layer gesture deltas on top without fighting the artist. This
+    // is rig-agnostic and works for any future GLB swap — no hardcoded
+    // radians. If a bone isn't found we store zero (no-op baseline).
+    const capture = (names) => {
       for (const n of names) {
-        if (bones[n]) { bones[n].rotation.set(x, y, z); return }
+        const bone = bones[n]
+        if (bone) return { x: bone.rotation.x, y: bone.rotation.y, z: bone.rotation.z }
       }
+      return { x: 0, y: 0, z: 0 }
     }
-    setRot(['LeftArm', 'LeftUpperArm', 'mixamorigLeftArm'], ARM_BASELINE.LeftArm.x, ARM_BASELINE.LeftArm.y, ARM_BASELINE.LeftArm.z)
-    setRot(['RightArm', 'RightUpperArm', 'mixamorigRightArm'], ARM_BASELINE.RightArm.x, ARM_BASELINE.RightArm.y, ARM_BASELINE.RightArm.z)
-    setRot(['LeftForeArm', 'mixamorigLeftForeArm'], ARM_BASELINE.LeftForeArm.x, ARM_BASELINE.LeftForeArm.y, ARM_BASELINE.LeftForeArm.z)
-    setRot(['RightForeArm', 'mixamorigRightForeArm'], ARM_BASELINE.RightForeArm.x, ARM_BASELINE.RightForeArm.y, ARM_BASELINE.RightForeArm.z)
-    // Also zero out common shoulder/hand bones that GLB exports sometimes
-    // ship with non-zero rotations (Mixamo FBX → GLTF conversions often
-    // leave shoulders at y≈0.3 which reads as "T-pose-ish" hands-out).
-    const zero = (names) => {
-      for (const n of names) {
-        if (bones[n]) { bones[n].rotation.set(0, 0, 0); return }
-      }
+    armBaselineRef.current = {
+      LeftArm:      capture(ARM_BONE_NAMES.LeftArm),
+      RightArm:     capture(ARM_BONE_NAMES.RightArm),
+      LeftForeArm:  capture(ARM_BONE_NAMES.LeftForeArm),
+      RightForeArm: capture(ARM_BONE_NAMES.RightForeArm),
     }
-    zero(['LeftShoulder', 'mixamorigLeftShoulder'])
-    zero(['RightShoulder', 'mixamorigRightShoulder'])
-    zero(['LeftHand', 'mixamorigLeftHand'])
-    zero(['RightHand', 'mixamorigRightHand'])
   }, [scene])
 
   useFrame((state, delta) => {
@@ -253,8 +254,9 @@ function AvatarModel({ mouthOpen = 0, status = 'idle', emotion = null, presentin
     if (root.current) root.current.rotation.y = bodyYawRef.current
 
     // ───── Additive hand gestures ─────
-    // Invariant: when no gesture is active, final arm rotation === ARM_BASELINE
-    // exactly. Gestures add a delta scaled by an envelope that always ends at 0.
+    // Invariant: when no gesture is active, final arm rotation === the captured
+    // GLB bind-pose baseline exactly. Gestures add a delta scaled by an envelope
+    // that always ends at 0, so arms always return to rest pose.
     const g = gestureRef.current
     const speaking = status === 'speaking' || presenting
 
@@ -304,10 +306,11 @@ function AvatarModel({ mouthOpen = 0, status = 'idle', emotion = null, presentin
         return
       }
     }
-    applyArm(['LeftArm', 'LeftUpperArm', 'mixamorigLeftArm'],   ARM_BASELINE.LeftArm,      delta4?.LeftArm)
-    applyArm(['RightArm', 'RightUpperArm', 'mixamorigRightArm'], ARM_BASELINE.RightArm,    delta4?.RightArm)
-    applyArm(['LeftForeArm', 'mixamorigLeftForeArm'],            ARM_BASELINE.LeftForeArm,  delta4?.LeftForeArm)
-    applyArm(['RightForeArm', 'mixamorigRightForeArm'],          ARM_BASELINE.RightForeArm, delta4?.RightForeArm)
+    const baseline = armBaselineRef.current
+    applyArm(ARM_BONE_NAMES.LeftArm,      baseline.LeftArm,      delta4?.LeftArm)
+    applyArm(ARM_BONE_NAMES.RightArm,     baseline.RightArm,     delta4?.RightArm)
+    applyArm(ARM_BONE_NAMES.LeftForeArm,  baseline.LeftForeArm,  delta4?.LeftForeArm)
+    applyArm(ARM_BONE_NAMES.RightForeArm, baseline.RightForeArm, delta4?.RightForeArm)
   })
 
   return <primitive ref={root} object={scene} scale={1.65} position={[0, -1.65, 0]} />
