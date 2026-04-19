@@ -63,6 +63,19 @@ STRIPE_WEBHOOK_SECRET=<your-webhook-secret>
 
 ---
 
+## 💾 STEP 2b: Attach Persistent Volume (REQUIRED)
+
+Without a volume, the SQLite DB is recreated on every deploy.
+
+1. Railway Dashboard → Service → **Volumes** → **New Volume**
+2. **Mount Path:** `/app/server/data`
+3. **Size:** 1 GB is plenty for tens of thousands of users
+4. Redeploy once and confirm `GET /api/diag/db-path` returns
+   `looksPersistent: true` and that `fileMtime` stays constant across
+   redeploys (not reset to deploy time).
+
+---
+
 ## 🔐 STEP 3: Google OAuth Setup
 
 Google Cloud Console → Credentials:
