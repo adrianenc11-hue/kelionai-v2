@@ -1,6 +1,6 @@
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { useGLTF, Environment, ContactShadows, Float } from '@react-three/drei'
-import { Suspense, useState, useRef, useEffect, useMemo, useCallback } from 'react'
+import { Suspense, useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback } from 'react'
 import * as THREE from 'three'
 import { useLipSync } from '../lib/lipSync'
 import { STATUS_COLORS, STATUS_PULSE_HZ } from '../lib/kelionStatus'
@@ -102,7 +102,12 @@ function AvatarModel({ mouthOpen = 0, status = 'idle', emotion = null, presentin
   // ≈ -8° when `presenting` so the avatar turns toward the monitor on the left).
   const bodyYawRef = useRef(0)
 
-  useEffect(() => {
+  // Bug A fix: use useLayoutEffect so arms are at baseline BEFORE the first
+  // paint. Previously useEffect ran after the first frame was rendered, so
+  // Adrian saw the model briefly in its GLB import pose (hands forward /
+  // T-pose) before snapping down — "la pornire pleacă cu mâinile în față și
+  // după le duce jos". With useLayoutEffect there is no intermediate frame.
+  useLayoutEffect(() => {
     const bones = {}
     const morphs = []
     scene.traverse((o) => {
@@ -131,6 +136,18 @@ function AvatarModel({ mouthOpen = 0, status = 'idle', emotion = null, presentin
     setRot(['RightArm', 'RightUpperArm', 'mixamorigRightArm'], ARM_BASELINE.RightArm.x, ARM_BASELINE.RightArm.y, ARM_BASELINE.RightArm.z)
     setRot(['LeftForeArm', 'mixamorigLeftForeArm'], ARM_BASELINE.LeftForeArm.x, ARM_BASELINE.LeftForeArm.y, ARM_BASELINE.LeftForeArm.z)
     setRot(['RightForeArm', 'mixamorigRightForeArm'], ARM_BASELINE.RightForeArm.x, ARM_BASELINE.RightForeArm.y, ARM_BASELINE.RightForeArm.z)
+    // Also zero out common shoulder/hand bones that GLB exports sometimes
+    // ship with non-zero rotations (Mixamo FBX → GLTF conversions often
+    // leave shoulders at y≈0.3 which reads as "T-pose-ish" hands-out).
+    const zero = (names) => {
+      for (const n of names) {
+        if (bones[n]) { bones[n].rotation.set(0, 0, 0); return }
+      }
+    }
+    zero(['LeftShoulder', 'mixamorigLeftShoulder'])
+    zero(['RightShoulder', 'mixamorigRightShoulder'])
+    zero(['LeftHand', 'mixamorigLeftHand'])
+    zero(['RightHand', 'mixamorigRightHand'])
   }, [scene])
 
   useFrame((state, delta) => {
@@ -845,7 +862,83 @@ export default function KelionStage() {
     }
   }, [chatInput, chatBusy, chatMessages, attachedFile])
 
-  const mouthOpen = useLipSync(audioRef)
+  const micMouthOpen = useLipSync(audioRef)
+
+  // ───── Text-chat TTS + simulated mouth-sync ─────
+  // Adrian: "nu vad sa miste gura, pleapele si nu aud nimic din chat live".
+  // The text-chat pipeline (/api/chat → SSE) returns TEXT ONLY — no audio.
+  // Voice chat uses Gemini Live which does stream audio and drives lipSync
+  // off that MediaStream, but when the user TYPES, nothing was ever played.
+  // Fix: speak each finalized assistant message via the browser's
+  // SpeechSynthesis API, and while it's speaking, drive a cosine-shaped
+  // mouthOpen envelope so the avatar's jaw/viseme morphs animate. This
+  // keeps lip movement coarsely correlated with speech without needing a
+  // real-time audio analyser on the synth voice.
+  const [ttsMouthOpen, setTtsMouthOpen] = useState(0)
+  const lastSpokenRef = useRef('')
+  const ttsRafRef = useRef(null)
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return
+    // Only speak once per unique final assistant reply, and only after the
+    // SSE stream has stopped growing (chatBusy === false) so we don't
+    // stutter on every delta.
+    if (chatBusy) return
+    const last = chatMessages[chatMessages.length - 1]
+    if (!last || last.role !== 'assistant' || !last.content) return
+    if (last.content === lastSpokenRef.current) return
+    lastSpokenRef.current = last.content
+    try { window.speechSynthesis.cancel() } catch (_) {}
+    const utt = new SpeechSynthesisUtterance(last.content)
+    utt.rate = 1.0
+    utt.pitch = 1.0
+    utt.volume = 1.0
+    // Pick a natural-sounding English voice if available.
+    try {
+      const voices = window.speechSynthesis.getVoices()
+      const en = voices.find((v) => /en[-_]/i.test(v.lang) && /natural|google|samantha|daniel|karen|aria/i.test(v.name))
+        || voices.find((v) => /en[-_]/i.test(v.lang))
+      if (en) utt.voice = en
+    } catch (_) { /* best-effort */ }
+    const drive = () => {
+      // 4 Hz cosine envelope, 0..0.9, approximates jaw motion during speech.
+      const t = performance.now() / 1000
+      const v = 0.45 + 0.45 * Math.abs(Math.sin(t * 4 * Math.PI))
+      setTtsMouthOpen(v)
+      ttsRafRef.current = requestAnimationFrame(drive)
+    }
+    utt.onstart = () => {
+      if (ttsRafRef.current) cancelAnimationFrame(ttsRafRef.current)
+      drive()
+    }
+    const stopDrive = () => {
+      if (ttsRafRef.current) { cancelAnimationFrame(ttsRafRef.current); ttsRafRef.current = null }
+      setTtsMouthOpen(0)
+    }
+    utt.onend = stopDrive
+    utt.onerror = stopDrive
+    try { window.speechSynthesis.speak(utt) } catch (_) { stopDrive() }
+    return stopDrive
+  }, [chatMessages, chatBusy])
+
+  // Max of voice-chat lipsync and text-chat TTS envelope feeds the avatar.
+  const mouthOpen = Math.max(micMouthOpen || 0, ttsMouthOpen || 0)
+
+  // Chat bubble auto-hide — Adrian: "chatul trebuie sa dispara dupa ce s-a
+  // spus ramine doar in istoric, se afiseaza doar curent ce scrie user sau
+  // avatar". We keep chatMessages as the persistent history (for context +
+  // transcript panel), but fade the on-stage bubble out after 8s of quiet
+  // so the avatar isn't cluttered. The timer resets on every new message
+  // or when streaming resumes (chatBusy).
+  const [bubbleVisible, setBubbleVisible] = useState(true)
+  const bubbleHideTimerRef = useRef(null)
+  useEffect(() => {
+    if (chatMessages.length === 0) { setBubbleVisible(false); return }
+    setBubbleVisible(true)
+    if (bubbleHideTimerRef.current) clearTimeout(bubbleHideTimerRef.current)
+    if (chatBusy) return
+    bubbleHideTimerRef.current = setTimeout(() => setBubbleVisible(false), 8000)
+    return () => { if (bubbleHideTimerRef.current) clearTimeout(bubbleHideTimerRef.current) }
+  }, [chatMessages, chatBusy])
 
   const {
     status,
@@ -1150,8 +1243,9 @@ export default function KelionStage() {
 
       {/* Last assistant text reply (when chatting by typing) — fades
           above the input bar. Only the latest assistant message shows
-          so we don't clutter the stage. */}
-      {chatMessages.length > 0 && (() => {
+          so we don't clutter the stage. The bubble auto-hides 8s after
+          the reply finishes (kept in history/transcript). */}
+      {chatMessages.length > 0 && bubbleVisible && (() => {
         const last = chatMessages[chatMessages.length - 1]
         const userTurn = [...chatMessages].reverse().find((m) => m.role === 'user')
         return (
@@ -1377,7 +1471,12 @@ export default function KelionStage() {
             aria-label="Buy credits"
           >
             <span style={{ fontSize: 14 }}>💳</span>
-            <span>Credits{balance != null ? ` · ${balance} min` : ''}</span>
+            {/* Adrian: "creditul nu trebuie sa arate minute, trebuie sa fie
+                o unitate x credite". 1 credit = 1 min of Kelion Live kept
+                internally (backend still tracks balance_minutes), but the
+                UI shows the neutral unit label so users think in "credits"
+                not "minutes". */}
+            <span>Credits{balance != null ? ` · ${balance}` : ''}</span>
           </button>
         )}
         {/* Unlimited pill — admin-only, replaces Credits pill. Visual cue
@@ -1987,7 +2086,7 @@ export default function KelionStage() {
                 background: 'rgba(167, 139, 250, 0.08)',
                 borderRadius: 10,
               }}>
-                Current balance: <strong>{balance} min</strong>
+                Current balance: <strong>{balance} credits</strong>
               </div>
             )}
 
@@ -2002,7 +2101,7 @@ export default function KelionStage() {
             <div style={{ display: 'grid', gap: 10 }}>
               {packages.map((pkg) => {
                 const euros = (pkg.priceCents / 100).toFixed(2).replace(/\.00$/, '')
-                const perMin = (pkg.priceCents / 100 / pkg.minutes).toFixed(2)
+                const perCredit = (pkg.priceCents / 100 / pkg.minutes).toFixed(2)
                 return (
                   <button
                     key={pkg.id}
@@ -2032,7 +2131,7 @@ export default function KelionStage() {
                       <div style={{ fontSize: 18, fontWeight: 700 }}>{euros} €</div>
                     </div>
                     <div style={{ fontSize: 12, opacity: 0.65 }}>
-                      {pkg.minutes} min · {perMin} €/min
+                      {pkg.minutes} credits · {perCredit} €/credit
                     </div>
                     {pkg.description && (
                       <div style={{ fontSize: 12, opacity: 0.55, marginTop: 4 }}>
