@@ -874,44 +874,32 @@ export default function KelionStage() {
 
   useEffect(() => { setVoiceLevel(userLevel || 0) }, [userLevel])
 
-  // F15 — camera auto on/off. Adrian: "camera nu are nevoie de buton,
-  // pleaca de fiecare data cind user scrie sau vorbeste la microfon.
-  // Cind nu scrie sau vorbeste, camera e off." Debounced 2.5s after last
-  // speech/keystroke → stop. Manual override still possible via ⋯ menu.
-  const cameraAutoOffTimerRef = useRef(null)
+  // F16 — camera ON from the moment the user enters the interface,
+  // OFF only at sign-out / unmount. Adrian: "camera este on din momentul
+  // intrarii pe interfata pina la inchidere la logoff sau iesire
+  // accidentala din aplicatie". No debounce-off, no gating on keystroke
+  // or VAD — the camera is a persistent ambient sensor for as long as
+  // the stage is mounted. Manual toggle via ⋯ menu still works for users
+  // who explicitly turn it off.
   const cameraAutoStartedRef = useRef(false)
   useEffect(() => {
-    const speaking = (userLevel || 0) > 0.05
-    const typing = (chatInput || '').length > 0
-    const active = speaking || typing
-    if (active) {
-      if (cameraAutoOffTimerRef.current) {
-        clearTimeout(cameraAutoOffTimerRef.current)
-        cameraAutoOffTimerRef.current = null
-      }
-      if (!cameraStream) {
-        // Only auto-start once we have the stream API wired (guard against
-        // double-invocation during React strict mode). startCamera itself
-        // is idempotent.
-        cameraAutoStartedRef.current = true
-        startCamera && startCamera()
-      }
-    } else if (cameraStream && cameraAutoStartedRef.current) {
-      // Debounced stop — 2.5s of idle (no speech, no typing).
-      if (cameraAutoOffTimerRef.current) clearTimeout(cameraAutoOffTimerRef.current)
-      cameraAutoOffTimerRef.current = setTimeout(() => {
-        stopCamera && stopCamera()
-        cameraAutoStartedRef.current = false
-        cameraAutoOffTimerRef.current = null
-      }, 2500)
-    }
+    if (cameraAutoStartedRef.current) return
+    if (cameraStream) return // already running (manual toggle or prior mount)
+    if (typeof startCamera !== 'function') return
+    cameraAutoStartedRef.current = true
+    // Some browsers gate getUserMedia to a user-gesture; attempt anyway
+    // — startCamera's own error handling surfaces a visionError banner.
+    try { startCamera() } catch (_) { /* swallowed; banner handles it */ }
+  }, [cameraStream, startCamera])
+
+  // Stop the camera on unmount (covers sign-out and navigation away).
+  useEffect(() => {
     return () => {
-      if (cameraAutoOffTimerRef.current) {
-        clearTimeout(cameraAutoOffTimerRef.current)
-        cameraAutoOffTimerRef.current = null
+      if (typeof stopCamera === 'function') {
+        try { stopCamera() } catch (_) {}
       }
     }
-  }, [userLevel, chatInput, cameraStream, startCamera, stopCamera])
+  }, [stopCamera])
 
   // Stage 3 — probe whether the user is already signed in (passkey cookie).
   useEffect(() => {

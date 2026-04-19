@@ -24,6 +24,7 @@ const memoryRouter     = require('./routes/memory');
 const toolsRouter      = require('./routes/tools');
 const pushRouter       = require('./routes/push');
 const creditsRouter    = require('./routes/credits');
+const diagRouter       = require('./routes/diag');
 const proactive        = require('./services/proactive');
 const { bootstrapAdmin } = require('./services/adminBootstrap');
 
@@ -244,6 +245,7 @@ app.use('/api/realtime', chatLimiter, realtimeRouter);
 // raw-body parser; /packages is public, /balance and /checkout require
 // auth (enforced inside credits.js via requireAuth).
 app.use('/api/credits', creditsRouter);
+app.use('/api/diag', diagRouter);
 
 // Stage 3 — M13 passkey (public — register/auth flows need to be reachable
 // without auth) + M14/M16/M17 memory (signed-in users only).

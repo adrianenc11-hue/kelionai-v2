@@ -29,6 +29,11 @@ const {
 
 const DEFAULT_ADMIN_EMAIL = 'adrianenc11@gmail.com';
 
+// Last bootstrap result kept in-process so the diag endpoint can report
+// whether this deploy's admin seed actually ran. Never contains hashes
+// or the password itself — only metadata Adrian can read on the live site.
+let lastResult = { ranAt: null, result: null };
+
 function hashPassword(password) {
   const salt = crypto.randomBytes(16).toString('hex');
   const hash = crypto.scryptSync(password, salt, 64).toString('hex');
@@ -37,16 +42,27 @@ function hashPassword(password) {
 
 async function bootstrapAdmin() {
   const email = (process.env.ADMIN_BOOTSTRAP_EMAIL || DEFAULT_ADMIN_EMAIL).trim().toLowerCase();
-  const password = process.env.ADMIN_BOOTSTRAP_PASSWORD;
+  const rawPassword = process.env.ADMIN_BOOTSTRAP_PASSWORD;
+  const password = rawPassword != null ? String(rawPassword) : undefined;
 
   if (!password) {
     console.log(`[adminBootstrap] skipped — ADMIN_BOOTSTRAP_PASSWORD not set (target email: ${email})`);
-    return { seeded: false, reason: 'ADMIN_BOOTSTRAP_PASSWORD not set' };
+    const r = { seeded: false, reason: 'ADMIN_BOOTSTRAP_PASSWORD not set', email, passwordLen: 0 };
+    lastResult = { ranAt: new Date().toISOString(), result: r };
+    return r;
   }
+
+  // Log env-var shape (length only; never the value) so Adrian can spot
+  // accidental quoting or trailing whitespace from Railway Variables UI.
+  const trimmedLen = password.trim().length;
+  const hasLeadingOrTrailingWs = password.length !== trimmedLen;
+  console.log(`[adminBootstrap] ADMIN_BOOTSTRAP_PASSWORD length=${password.length}${hasLeadingOrTrailingWs ? ' (WARNING: leading/trailing whitespace detected)' : ''}`);
 
   if (password.length < 8) {
     console.warn(`[adminBootstrap] REFUSED — password shorter than 8 chars (target email: ${email})`);
-    return { seeded: false, reason: 'password too short' };
+    const r = { seeded: false, reason: 'password too short', email, passwordLen: password.length };
+    lastResult = { ranAt: new Date().toISOString(), result: r };
+    return r;
   }
 
   try {
@@ -59,7 +75,9 @@ async function bootstrapAdmin() {
         role: 'admin',
       });
       console.log(`[adminBootstrap] refreshed admin password + role for ${email} (user id ${existing.id})`);
-      return { seeded: true, updated: true, email, userId: existing.id };
+      const r = { seeded: true, updated: true, email, userId: existing.id, passwordLen: password.length };
+      lastResult = { ranAt: new Date().toISOString(), result: r };
+      return r;
     }
 
     // createUser does not take password_hash — fall back to a direct insert
@@ -75,11 +93,19 @@ async function bootstrapAdmin() {
       role: 'admin',
     });
     console.log(`[adminBootstrap] created admin account for ${email}`);
-    return { seeded: true, created: true, email };
+    const r = { seeded: true, created: true, email, userId: created.id, passwordLen: password.length };
+    lastResult = { ranAt: new Date().toISOString(), result: r };
+    return r;
   } catch (err) {
     console.error('[adminBootstrap] failed:', err && err.message);
-    return { seeded: false, error: err && err.message };
+    const r = { seeded: false, error: err && err.message, email };
+    lastResult = { ranAt: new Date().toISOString(), result: r };
+    return r;
   }
 }
 
-module.exports = { bootstrapAdmin };
+function getLastBootstrapResult() {
+  return lastResult;
+}
+
+module.exports = { bootstrapAdmin, getLastBootstrapResult };
