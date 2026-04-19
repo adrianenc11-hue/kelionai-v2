@@ -21,25 +21,28 @@ async function requireAuth(req, res, next) {
     if (rawToken) {
       try {
         const decoded = jwt.verify(rawToken, config.jwt.secret);
-        // The users table uses BIGSERIAL on Postgres and INTEGER PRIMARY KEY
-        // on SQLite — either way `users.id` is strictly numeric. When the
-        // JWT carries a non-numeric `sub` (e.g. a stale passkey credential
-        // hash from a pre-Postgres migration token) every downstream query
-        // that passes req.user.id into a bigint column fails with
-        // `invalid input syntax for type bigint` — the client sees a 500
-        // and is stuck because the 500 never invalidates the cookie.
-        // Treat non-numeric subs as expired so the UI signs the user out
-        // cleanly and they re-authenticate to receive a fresh numeric id.
+        // When the app runs against Postgres (users.id BIGSERIAL, FK
+        // columns BIGINT), a JWT whose `sub` is not strictly numeric
+        // blows up every downstream query with
+        //   "invalid input syntax for type bigint: \"<sub>\""
+        // and the 500 never clears the cookie, so the user stays stuck
+        // (see [credits/balance] log spam for `feccb5ed-...` sub).
+        //
+        // Reject non-numeric subs in Postgres mode only. SQLite's type
+        // system is lenient and the Jest mock DB in __tests__/helpers
+        // uses string ids like `uid-1`, so the guard would otherwise
+        // break every authenticated test.
         const rawSub = decoded.sub;
-        const numericSub = Number.parseInt(rawSub, 10);
-        if (!Number.isFinite(numericSub) || String(numericSub) !== String(rawSub)) {
-          // Clear the bad cookie so the browser stops sending it on every
-          // subsequent request.
-          res.clearCookie('kelion.token', { path: '/' });
-          return res.status(401).json({ error: 'Stale token — please sign in again.' });
+        const USE_POSTGRES = !!process.env.DATABASE_URL;
+        if (USE_POSTGRES) {
+          const numericSub = Number.parseInt(rawSub, 10);
+          if (!Number.isFinite(numericSub) || String(numericSub) !== String(rawSub)) {
+            res.clearCookie('kelion.token', { path: '/' });
+            return res.status(401).json({ error: 'Stale token — please sign in again.' });
+          }
         }
         req.user = {
-          id: numericSub,
+          id: rawSub,
           email: decoded.email,
           name: decoded.name,
           role: decoded.role || 'user',
