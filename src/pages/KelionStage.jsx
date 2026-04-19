@@ -937,41 +937,36 @@ export default function KelionStage() {
 
   const micMouthOpen = useLipSync(audioRef)
 
-  // ───── Text-chat TTS + simulated mouth-sync ─────
-  // Adrian: "nu vad sa miste gura, pleapele si nu aud nimic din chat live".
-  // The text-chat pipeline (/api/chat → SSE) returns TEXT ONLY — no audio.
-  // Voice chat uses Gemini Live which does stream audio and drives lipSync
-  // off that MediaStream, but when the user TYPES, nothing was ever played.
-  // Fix: speak each finalized assistant message via the browser's
-  // SpeechSynthesis API, and while it's speaking, drive a cosine-shaped
-  // mouthOpen envelope so the avatar's jaw/viseme morphs animate. This
-  // keeps lip movement coarsely correlated with speech without needing a
-  // real-time audio analyser on the synth voice.
+  // ───── Text-chat TTS (server-side ElevenLabs, male native voice) ─────
+  // Adrian: "vocea nu este elevenlab, nativa, barbateasca, voce de femeie acum".
+  // Previously this path used `window.speechSynthesis` which defaults to the
+  // OS voice (on Windows/Chrome that's typically a female English voice).
+  // We now POST the assistant's reply to /api/tts — the server synthesizes
+  // with ElevenLabs (Adam — male, multilingual) or Gemini "Charon" (male)
+  // and returns an audio/mpeg or audio/wav blob. We play it via an offscreen
+  // <audio> element; a cosine envelope drives the mouth while it plays so
+  // the avatar lip-flaps along (no real-time analyser on CORS-restricted
+  // HTMLMediaElement is needed for coarse correlation).
   const [ttsMouthOpen, setTtsMouthOpen] = useState(0)
   const lastSpokenRef = useRef('')
   const ttsRafRef = useRef(null)
+  const ttsAudioRef = useRef(null)
+  const ttsAbortRef = useRef(null)
   useEffect(() => {
-    if (typeof window === 'undefined' || !window.speechSynthesis) return
-    // Only speak once per unique final assistant reply, and only after the
-    // SSE stream has stopped growing (chatBusy === false) so we don't
-    // stutter on every delta.
     if (chatBusy) return
     const last = chatMessages[chatMessages.length - 1]
     if (!last || last.role !== 'assistant' || !last.content) return
     if (last.content === lastSpokenRef.current) return
     lastSpokenRef.current = last.content
-    try { window.speechSynthesis.cancel() } catch (_) {}
-    const utt = new SpeechSynthesisUtterance(last.content)
-    utt.rate = 1.0
-    utt.pitch = 1.0
-    utt.volume = 1.0
-    // Pick a natural-sounding English voice if available.
-    try {
-      const voices = window.speechSynthesis.getVoices()
-      const en = voices.find((v) => /en[-_]/i.test(v.lang) && /natural|google|samantha|daniel|karen|aria/i.test(v.name))
-        || voices.find((v) => /en[-_]/i.test(v.lang))
-      if (en) utt.voice = en
-    } catch (_) { /* best-effort */ }
+
+    // Cancel any in-flight TTS from the previous message.
+    if (ttsAbortRef.current) { try { ttsAbortRef.current.abort() } catch (_) {} }
+    if (ttsAudioRef.current) { try { ttsAudioRef.current.pause() } catch (_) {} ttsAudioRef.current = null }
+    try { if (typeof window !== 'undefined' && window.speechSynthesis) window.speechSynthesis.cancel() } catch (_) {}
+
+    const controller = new AbortController()
+    ttsAbortRef.current = controller
+
     const drive = () => {
       // 4 Hz cosine envelope, 0..0.9, approximates jaw motion during speech.
       const t = performance.now() / 1000
@@ -979,18 +974,81 @@ export default function KelionStage() {
       setTtsMouthOpen(v)
       ttsRafRef.current = requestAnimationFrame(drive)
     }
-    utt.onstart = () => {
-      if (ttsRafRef.current) cancelAnimationFrame(ttsRafRef.current)
-      drive()
-    }
     const stopDrive = () => {
       if (ttsRafRef.current) { cancelAnimationFrame(ttsRafRef.current); ttsRafRef.current = null }
       setTtsMouthOpen(0)
     }
-    utt.onend = stopDrive
-    utt.onerror = stopDrive
-    try { window.speechSynthesis.speak(utt) } catch (_) { stopDrive() }
-    return stopDrive
+
+    const ttsHeaders = { 'Content-Type': 'application/json' }
+    if (authTokenRef.current) ttsHeaders['Authorization'] = `Bearer ${authTokenRef.current}`
+
+    // Browser locale is a highly reliable signal for which language the user
+    // types in — we forward it as a hint so short replies still route to a
+    // native voice (server falls back to text-based detection otherwise).
+    const hint = (typeof navigator !== 'undefined' && navigator.language)
+      ? String(navigator.language).toLowerCase().slice(0, 2) : ''
+
+    ;(async () => {
+      let audioUrl = null
+      try {
+        const r = await fetch('/api/tts', {
+          method: 'POST',
+          credentials: 'include',
+          headers: ttsHeaders,
+          body: JSON.stringify({ text: last.content, lang: hint }),
+          signal: controller.signal,
+        })
+        if (!r.ok) throw new Error(`TTS ${r.status}`)
+        const blob = await r.blob()
+        audioUrl = URL.createObjectURL(blob)
+        const audio = new Audio(audioUrl)
+        ttsAudioRef.current = audio
+        audio.onplay = () => {
+          if (ttsRafRef.current) cancelAnimationFrame(ttsRafRef.current)
+          drive()
+        }
+        const cleanup = () => {
+          stopDrive()
+          if (audioUrl) { try { URL.revokeObjectURL(audioUrl) } catch (_) {} audioUrl = null }
+        }
+        audio.onended = cleanup
+        audio.onerror = cleanup
+        audio.onpause = () => { stopDrive() }
+        await audio.play()
+      } catch (err) {
+        if (err.name === 'AbortError') return
+        // Hard fallback: if /api/tts fails (no key configured, rate limit,
+        // network), speak with the browser synth so the user still hears
+        // *something*. This is the old behaviour and intentionally a last
+        // resort — the voice on Windows may be female.
+        try {
+          if (typeof window !== 'undefined' && window.speechSynthesis) {
+            const utt = new SpeechSynthesisUtterance(last.content)
+            utt.rate = 1.0; utt.pitch = 1.0; utt.volume = 1.0
+            try {
+              const voices = window.speechSynthesis.getVoices()
+              // Best-effort male voice pick + locale match.
+              const pref = voices.find((v) =>
+                v.lang && v.lang.toLowerCase().startsWith(hint) &&
+                /male|daniel|alex|george|david|mark/i.test(v.name))
+                || voices.find((v) => v.lang && v.lang.toLowerCase().startsWith(hint))
+                || voices.find((v) => /male|daniel|alex|george|david|mark/i.test(v.name))
+              if (pref) utt.voice = pref
+            } catch (_) { /* best-effort */ }
+            utt.onstart = () => { if (ttsRafRef.current) cancelAnimationFrame(ttsRafRef.current); drive() }
+            utt.onend = stopDrive
+            utt.onerror = stopDrive
+            window.speechSynthesis.speak(utt)
+          }
+        } catch (_) { stopDrive() }
+      }
+    })()
+
+    return () => {
+      try { controller.abort() } catch (_) {}
+      if (ttsAudioRef.current) { try { ttsAudioRef.current.pause() } catch (_) {} ttsAudioRef.current = null }
+      stopDrive()
+    }
   }, [chatMessages, chatBusy])
 
   // Max of voice-chat lipsync and text-chat TTS envelope feeds the avatar.
