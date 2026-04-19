@@ -451,11 +451,10 @@ function useNYCSkylineTexture() {
 // re-renders with the new URL.
 function StageMonitorContent() {
   // Idle default — identical shape to what monitorStore keeps internally.
-  // We intentionally do NOT read the store synchronously here: doing so at
-  // module-scope in a bundle-split build caused a `ReferenceError:
-  // getMonitorState is not defined` in production (Vite tree-shook it
-  // while keeping the `subscribeMonitor` symbol). Pulling only
-  // `subscribeMonitor` keeps the cross-chunk binding stable.
+  // We import only `subscribeMonitor` (not `getMonitorState`) and rely on
+  // the store invoking the listener immediately on subscribe to catch any
+  // state that was set before this component mounted. Keeps the surface
+  // minimal and avoids cross-chunk reads at render time.
   const [m, setM] = useState({ kind: null, src: null, title: null, embedType: 'iframe', updatedAt: 0 })
   useEffect(() => subscribeMonitor((s) => setM({ ...s })), [])
 

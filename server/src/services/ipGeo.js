@@ -11,6 +11,26 @@
 const CACHE = new Map(); // ip -> { expires, data }
 const TTL_MS = 60 * 60 * 1000; // 1 hour
 const LOOKUP_TIMEOUT_MS = 1500; // don't stall token mint if ipapi is slow
+// Hard cap on unique IPs held in memory. Expired entries are evicted on every
+// read; if the Map is still growing past MAX_CACHE_ENTRIES (e.g. sudden burst
+// of unique IPs inside a single TTL window), we drop the oldest-inserted
+// entries first. Keeps the footprint bounded regardless of traffic shape.
+const MAX_CACHE_ENTRIES = 2000;
+
+function evictExpired(now) {
+  for (const [ip, entry] of CACHE) {
+    if (entry.expires <= now) CACHE.delete(ip);
+  }
+}
+
+function enforceCap() {
+  while (CACHE.size > MAX_CACHE_ENTRIES) {
+    // Map iteration order is insertion order, so the first key is the oldest.
+    const oldest = CACHE.keys().next().value;
+    if (oldest === undefined) break;
+    CACHE.delete(oldest);
+  }
+}
 
 function clientIp(req) {
   // Prefer Cloudflare's CF-Connecting-IP, fall back to Railway/standard x-forwarded-for.
@@ -67,6 +87,7 @@ async function lookup(ip) {
       languages: j.languages || null,
     };
     CACHE.set(ip, { expires: Date.now() + TTL_MS, data });
+    enforceCap();
     return data;
   } catch {
     return null;
