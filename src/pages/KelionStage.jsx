@@ -53,18 +53,31 @@ function readVoiceStyleCookie() {
 }
 
 // ───── Avatar with idle animation + lipsync + Stage 6 emotion morphs ─────
-// Arm baseline is CAPTURED at mount from the GLB's authored bind pose —
-// whatever rotation the glTF exporter wrote for each arm bone becomes the
-// "rest" pose, and gestures are applied as additive deltas on top. This is
-// rig-agnostic: hand-picked numeric values (x=1.30, or zero) were wrong for
-// THIS particular `kelion-rpm_e27cb94d.glb` export and caused the avatar to
-// show either arms-forward or arms-overhead at load. The bind pose of the
-// GLB is the artist's intended rest, so trust it.
+// Arm rest pose. Values derived empirically from the shipped RPM GLB
+// (`kelion-rpm_e27cb94d.glb`). The GLB bind pose stores LeftArm as a pure Z
+// rotation of ~+1.20 rad (≈69°) and RightArm as −1.20 rad, which renders
+// visually as a T-pose (arms horizontal). To reach a natural A-pose (arms
+// hanging along the sides with a small outward splay) we rotate further in
+// the same direction — z ≈ ±2.6 rad (≈ ±149°). Forearms get a slight X
+// bend so elbows look relaxed. These are ABSOLUTE final rotations, not
+// offsets, to avoid any Euler composition surprises.
 const ARM_BONE_NAMES = {
   LeftArm:      ['LeftArm', 'LeftUpperArm', 'mixamorigLeftArm'],
   RightArm:     ['RightArm', 'RightUpperArm', 'mixamorigRightArm'],
   LeftForeArm:  ['LeftForeArm', 'mixamorigLeftForeArm'],
   RightForeArm: ['RightForeArm', 'mixamorigRightForeArm'],
+}
+// GLB bind pose has upper-arms reaching FORWARD (not T-pose as first assumed).
+// Bone length direction = local +Y. LeftArm world-dir at bind = (0.37, 0.07, 0.93),
+// i.e. forward and slightly lateral. To hang the arms DOWN (world -Y) we solved
+// for the local rotation that maps the bone's +Y axis to (0,-1,0), then backed
+// off 10° for a natural A-pose (shoulders relaxed, small outward splay).
+// Computed via three.js in /tmp/compute-pose.mjs from the actual GLB skeleton.
+const ARM_REST_ABS = {
+  LeftArm:      { x:  1.477, y:  0.973, z: -0.147 },
+  RightArm:     { x:  1.477, y: -0.973, z:  0.147 },
+  LeftForeArm:  { x:  0.200, y:  0,     z:  0 },
+  RightForeArm: { x:  0.200, y:  0,     z:  0 },
 }
 
 // Curated gesture palette — each entry is a small additive delta (radians)
@@ -90,13 +103,13 @@ function AvatarModel({ mouthOpen = 0, status = 'idle', emotion = null, presentin
   const bonesRef = useRef({})
   const morphsRef = useRef([])
   const blinkRef = useRef({ t: 0, nextBlinkAt: 2 + Math.random() * 4, duration: 0.18, phase: 0 })
-  // Captured at mount from the GLB bind pose — one { x, y, z } per arm bone
-  // key in ARM_BONE_NAMES. Gestures are additive deltas on top of this.
+  // Absolute rest-pose rotations for the four arm bones. Initialised from
+  // ARM_REST_ABS; gestures are additive deltas on top (with envelope weight).
   const armBaselineRef = useRef({
-    LeftArm:      { x: 0, y: 0, z: 0 },
-    RightArm:     { x: 0, y: 0, z: 0 },
-    LeftForeArm:  { x: 0, y: 0, z: 0 },
-    RightForeArm: { x: 0, y: 0, z: 0 },
+    LeftArm:      { ...ARM_REST_ABS.LeftArm },
+    RightArm:     { ...ARM_REST_ABS.RightArm },
+    LeftForeArm:  { ...ARM_REST_ABS.LeftForeArm },
+    RightForeArm: { ...ARM_REST_ABS.RightForeArm },
   })
   // Gesture scheduler — one gesture at a time, fade-in → hold → fade-out,
   // with a quiet window between gestures so speaking looks measured, not twitchy.
@@ -136,23 +149,22 @@ function AvatarModel({ mouthOpen = 0, status = 'idle', emotion = null, presentin
     bonesRef.current = bones
     morphsRef.current = morphs
 
-    // Capture the GLB's authored bind-pose rotation for each arm bone, so
-    // we can layer gesture deltas on top without fighting the artist. This
-    // is rig-agnostic and works for any future GLB swap — no hardcoded
-    // radians. If a bone isn't found we store zero (no-op baseline).
-    const capture = (names) => {
+    // Immediately snap each arm bone to the absolute rest rotation so the
+    // very first rendered frame is in A-pose (no T-pose flash). useFrame
+    // keeps the bones at this baseline every frame thereafter.
+    const snapArm = (names, target) => {
       for (const n of names) {
         const bone = bones[n]
-        if (bone) return { x: bone.rotation.x, y: bone.rotation.y, z: bone.rotation.z }
+        if (bone) {
+          bone.rotation.set(target.x, target.y, target.z, bone.rotation.order || 'XYZ')
+          break
+        }
       }
-      return { x: 0, y: 0, z: 0 }
     }
-    armBaselineRef.current = {
-      LeftArm:      capture(ARM_BONE_NAMES.LeftArm),
-      RightArm:     capture(ARM_BONE_NAMES.RightArm),
-      LeftForeArm:  capture(ARM_BONE_NAMES.LeftForeArm),
-      RightForeArm: capture(ARM_BONE_NAMES.RightForeArm),
-    }
+    snapArm(ARM_BONE_NAMES.LeftArm,      ARM_REST_ABS.LeftArm)
+    snapArm(ARM_BONE_NAMES.RightArm,     ARM_REST_ABS.RightArm)
+    snapArm(ARM_BONE_NAMES.LeftForeArm,  ARM_REST_ABS.LeftForeArm)
+    snapArm(ARM_BONE_NAMES.RightForeArm, ARM_REST_ABS.RightForeArm)
   }, [scene])
 
   useFrame((state, delta) => {
