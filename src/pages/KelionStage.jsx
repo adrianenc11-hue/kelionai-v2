@@ -610,6 +610,17 @@ export default function KelionStage() {
 
   // Stage 3 — auth + memory state
   const [authState, setAuthState] = useState({ signedIn: false, user: null })
+  // JWT bearer-token fallback. register/login return a `token` in the body
+  // and also set the httpOnly `kelion.token` cookie. In some browsers the
+  // cookie may not make it back on the very next request (adblockers
+  // stripping Set-Cookie, Safari ITP, strict privacy extensions, corporate
+  // proxies rewriting headers). When that happens, the next authenticated
+  // call (e.g. POST /api/chat) returns 401 and the UI flips to
+  // "Session expired" seconds after the user signed in. Storing the token
+  // in-memory and attaching it as `Authorization: Bearer …` on authenticated
+  // fetches closes that gap — the server middleware already reads either
+  // the header or the cookie, whichever is present.
+  const authTokenRef = useRef(null)
   const [memoryOpen, setMemoryOpen] = useState(false)
   const [memoryItems, setMemoryItems] = useState([])
   const [memoryLoading, setMemoryLoading] = useState(false)
@@ -824,10 +835,14 @@ export default function KelionStage() {
     if (fileInputRef.current) fileInputRef.current.value = ''
     setChatBusy(true)
     try {
+      const chatHeaders = { 'Content-Type': 'application/json' }
+      if (authTokenRef.current) {
+        chatHeaders['Authorization'] = `Bearer ${authTokenRef.current}`
+      }
       const r = await fetch('/api/chat', {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: chatHeaders,
         body: JSON.stringify({
           messages: next,
           datetime: new Date().toISOString(),
@@ -1147,6 +1162,7 @@ export default function KelionStage() {
 
   const handleSignOut = useCallback(async () => {
     await signOut().catch(() => {})
+    authTokenRef.current = null
     setAuthState({ signedIn: false, user: null })
     setMemoryItems([])
     setMemoryOpen(false)
@@ -1851,12 +1867,18 @@ export default function KelionStage() {
         open={signInModalOpen}
         onClose={() => setSignInModalOpen(false)}
         passkeySupported={supportsPasskey()}
-        onAuthenticated={async (user) => {
-          // Login succeeded. Re-fetch /api/auth/passkey/me so we get the
-          // canonical { isAdmin } flag computed server-side (covers the
-          // admin email allow-list). Fall back to the raw response if the
-          // probe fails — at worst the admin-only UI pieces won't render
-          // until next reload.
+        onAuthenticated={async (user, token) => {
+          // Login succeeded. Stash the JWT in memory so subsequent calls
+          // (chat, TTS, etc.) can fall back to Bearer-header auth if the
+          // httpOnly cookie doesn't make it back (adblockers / privacy
+          // extensions / Safari ITP). The server's requireAuth middleware
+          // accepts either the header or the cookie.
+          if (token) authTokenRef.current = token
+          // Re-fetch /api/auth/passkey/me so we get the canonical
+          // { isAdmin } flag computed server-side (covers the admin email
+          // allow-list). Fall back to the raw response if the probe fails
+          // — at worst the admin-only UI pieces won't render until next
+          // reload.
           setSignInModalOpen(false)
           try {
             const me = await fetchMe()

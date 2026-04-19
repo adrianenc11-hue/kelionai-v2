@@ -97,7 +97,11 @@ export default function SignInModal({
       if (!resp.ok) {
         throw new Error(json.error || `Request failed (${resp.status})`)
       }
-      onAuthenticated && onAuthenticated(json.user || null)
+      // Pass the raw JWT back to the parent too — the frontend uses it as
+      // a Bearer-header fallback for the first few authenticated requests
+      // after login, in case the browser drops the Set-Cookie header
+      // (adblockers, Safari ITP, corporate proxies, strict privacy modes).
+      onAuthenticated && onAuthenticated(json.user || null, json.token || null)
     } catch (err) {
       setError(err.message || 'Something went wrong. Try again.')
     } finally {
