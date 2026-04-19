@@ -6,6 +6,7 @@ import { useLipSync } from '../lib/lipSync'
 import { subscribeMonitor } from '../lib/monitorStore'
 import { STATUS_COLORS, STATUS_PULSE_HZ } from '../lib/kelionStatus'
 import { useGeminiLive } from '../lib/geminiLive'
+import { useClientGeo } from '../lib/useClientGeo'
 import SignInModal from '../components/SignInModal'
 import {
   supportsPasskey,
@@ -194,9 +195,14 @@ function AvatarModel({ mouthOpen = 0, status = 'idle', emotion = null, presentin
       head.rotation.z = Math.cos(t * 0.38) * 0.02
     }
 
-    // Lipsync — drive jaw + viseme morphs
+    // Lip-sync — drive jaw + viseme morphs. `mouthOpen` is the smoothed
+    // 0..1 envelope from useLipSync; scaling here is tuned so a mid-level
+    // vowel (envelope ≈ 0.5) reads as a clearly visible open mouth rather
+    // than the previous almost-imperceptible 0.04 rad jaw nudge. Both the
+    // bone rotation and the viseme morph are driven because some RPM /
+    // Mixamo exports only expose one or the other.
     const jaw = b['Jaw'] || b['mixamorigJaw']
-    if (jaw) jaw.rotation.x = mouthOpen * 0.08
+    if (jaw) jaw.rotation.x = mouthOpen * 0.22
 
     // Natural blink cycle
     const blink = blinkRef.current
@@ -226,7 +232,7 @@ function AvatarModel({ mouthOpen = 0, status = 'idle', emotion = null, presentin
       if (!d) continue
       const mouthIdx = d['mouthOpen'] ?? d['viseme_aa'] ?? d['viseme_AA'] ?? d['jawOpen']
       if (mouthIdx !== undefined) {
-        m.morphTargetInfluences[mouthIdx] = mouthOpen * 0.45
+        m.morphTargetInfluences[mouthIdx] = Math.min(1, mouthOpen * 0.85)
       }
       const baseSmile = status === 'listening' ? 0.08 : 0.04
       const emotionSmile = emoMorphs ? (emoMorphs.mouthSmile || emoMorphs.mouthSmileLeft || 0) * emoScale : 0
@@ -671,6 +677,12 @@ function CameraRig() {
 // ───── Main page ─────
 export default function KelionStage() {
   const audioRef = useRef(null)
+  // Real client GPS (falls back to null → server uses IP-geo instead).
+  // The hook fires once on mount; if the browser remembers a previous
+  // grant there is no prompt, otherwise the browser shows its standard
+  // one-time permission dialog. Coords are cached in localStorage so
+  // refreshes don't re-ping the OS.
+  const clientGeo = useClientGeo()
   const [voiceLevel, setVoiceLevel] = useState(0)
   const [transcriptOpen, setTranscriptOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -1153,7 +1165,7 @@ export default function KelionStage() {
     stopCamera,
     startScreen,
     stopScreen,
-  } = useGeminiLive({ audioRef })
+  } = useGeminiLive({ audioRef, coords: clientGeo })
 
   const cameraVideoRef = useRef(null)
   useEffect(() => {

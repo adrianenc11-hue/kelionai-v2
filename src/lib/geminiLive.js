@@ -36,7 +36,7 @@ function bytesFromBase64(b64) {
   return out
 }
 
-export function useGeminiLive({ audioRef }) {
+export function useGeminiLive({ audioRef, coords = null }) {
   const [status, setStatus] = useState('idle') // idle, requesting, connecting, listening, thinking, speaking, error
   const [error, setError] = useState(null)
   const [turns, setTurns] = useState([]) // [{ role: 'user'|'assistant', text }]
@@ -285,7 +285,14 @@ export function useGeminiLive({ audioRef }) {
       //    VAD, transcription) is baked into the token's liveConnectConstraints
       //    server-side, so the client does NOT send a setup message.
       const langHint = navigator.language || 'en-US'
-      const tokenRes = await fetch(`/api/realtime/gemini-token?lang=${encodeURIComponent(langHint)}`, { credentials: 'include' })
+      // Append real GPS coords if the client resolved them via
+      // navigator.geolocation. The server prefers these over IP-geo when
+      // building the persona, so Kelion gets 20-m accuracy instead of the
+      // 25-50 km ipapi.co city centroid.
+      const geoQuery = (coords && Number.isFinite(coords.lat) && Number.isFinite(coords.lon))
+        ? `&lat=${coords.lat.toFixed(6)}&lon=${coords.lon.toFixed(6)}&acc=${Math.round(coords.accuracy || 0)}`
+        : ''
+      const tokenRes = await fetch(`/api/realtime/gemini-token?lang=${encodeURIComponent(langHint)}${geoQuery}`, { credentials: 'include' })
       if (!tokenRes.ok) {
         const txt = await tokenRes.text()
         throw new Error(`Token fetch failed: ${tokenRes.status} ${txt}`)
