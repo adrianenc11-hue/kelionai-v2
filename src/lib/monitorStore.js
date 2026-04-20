@@ -6,6 +6,14 @@
 // Intentionally dependency-free so both runTool() (outside React) and
 // React components (via a useSyncExternalStore hook below) can use it.
 
+import { getLatestCoords } from './useClientGeo'
+
+// Queries that mean "show the user's current location" — we treat them as
+// a signal to drop the browser's last GPS fix into the Google Maps embed
+// so "harta unde mă aflu" actually lands on the user's street, not on a
+// generic world map. Covers RO / EN / ES / FR / IT / DE.
+const HERE_QUERY_RE = /^(here|current|where\s*am\s*i|my\s*location|unde\s*m[\u0103a]?\s*aflu|aici|locatia\s*mea|locația\s*mea|mi\s*ubicaci[oó]n|donde\s*estoy|ma\s*position|o[ùu]\s*suis|dove\s*sono|wo\s*bin\s*ich)[\s.?!]*$/i
+
 const state = {
   kind: null,        // 'map' | 'weather' | 'video' | 'image' | 'wiki' | 'web' | null
   src: null,         // string — final URL (iframe) or image URL
@@ -62,6 +70,19 @@ function resolveMonitor(kind, query) {
       return { kind: null, src: null, title: null, embedType: 'iframe' };
 
     case 'map': {
+      // "harta unde mă aflu" / "where am I" / empty — try to use the last
+      // GPS fix we have for this tab. If we have no fix yet we fall back
+      // to a generic map request so the iframe still loads (better than a
+      // broken icon). When we DO have coords we pass them as `lat,lon` to
+      // Google Maps' embed URL and ask for zoom 15 so the user sees their
+      // neighborhood, not a country-level view.
+      const isHere = !q || HERE_QUERY_RE.test(q);
+      const coords = isHere ? getLatestCoords() : null;
+      if (coords && Number.isFinite(coords.lat) && Number.isFinite(coords.lon)) {
+        const ll = `${coords.lat.toFixed(5)},${coords.lon.toFixed(5)}`;
+        const src = `https://www.google.com/maps?q=${ll}&z=15&output=embed`;
+        return { kind: 'map', src, title: `Map — your location`, embedType: 'iframe' };
+      }
       if (!q) return null;
       // Google Maps embed without an API key — `?output=embed` works for
       // arbitrary queries, handles places, addresses, coords.
@@ -70,10 +91,31 @@ function resolveMonitor(kind, query) {
     }
 
     case 'weather': {
+      // We now render a server-side HTML dashboard driven by Open-Meteo
+      // (ICON-D2 ~2.2 km resolution over Central Europe vs ~10 km for
+      // OpenWeather/wttr.in). Free, no API key, CORS-open. Two paths:
+      //   (a) "vremea aici" / empty query → use latest GPS fix directly
+      //   (b) explicit city/place → geocode via Open-Meteo's free
+      //       geocoding API at render time on the server (we pass the
+      //       raw query through ?name= and let /api/weather/embed look
+      //       up the coords). For now we only implement (a); (b) falls
+      //       back to wttr.in until the server-side geocoder lands.
+      const isHere = !q || HERE_QUERY_RE.test(q);
+      const coords = isHere ? getLatestCoords() : null;
+      if (coords && Number.isFinite(coords.lat) && Number.isFinite(coords.lon)) {
+        const params = new URLSearchParams({
+          lat: coords.lat.toFixed(4),
+          lon: coords.lon.toFixed(4),
+          name: 'Your location',
+        });
+        const src = `/api/weather/embed?${params.toString()}`;
+        return { kind: 'weather', src, title: `Weather — your location`, embedType: 'iframe' };
+      }
       if (!q) return null;
-      // wttr.in renders a styled forecast page, no key, iframe-friendly.
-      // 0-flag = minimal today/tomorrow view; m = metric units.
-      const src = `https://wttr.in/${encodeURIComponent(q)}?m`;
+      // Explicit city / place — pass it through ?q= and let the server
+      // resolve it to lat/lon via Open-Meteo's free geocoding API.
+      const params = new URLSearchParams({ q, name: q });
+      const src = `/api/weather/embed?${params.toString()}`;
       return { kind: 'weather', src, title: `Weather — ${q}`, embedType: 'iframe' };
     }
 
@@ -98,10 +140,12 @@ function resolveMonitor(kind, query) {
 
     case 'image': {
       if (!q) return null;
-      // Unsplash's "source" endpoint returns an image directly — perfect for
-      // an <img>. No key, free, CORS-friendly.
-      const src = `https://source.unsplash.com/1280x720/?${encodeURIComponent(q)}`;
-      return { kind: 'image', src, title: `Image — ${q}`, embedType: 'image' };
+      // Google Images result page renders in an iframe better than the
+      // old source.unsplash.com shortcut (which was deprecated in 2024
+      // and now returns a broken-image redirect). Using an iframe gives
+      // the user a full grid of results and avoids stale <img> failures.
+      const src = `https://www.google.com/search?igu=1&tbm=isch&q=${encodeURIComponent(q)}`;
+      return { kind: 'image', src, title: `Images — ${q}`, embedType: 'iframe' };
     }
 
     case 'wiki': {
@@ -138,4 +182,12 @@ export function handleShowOnMonitor(args = {}) {
   setState(resolved);
   if (resolved.kind === null) return 'Monitor cleared.';
   return `Monitor now showing: ${resolved.title || resolved.kind}.`;
+}
+
+// Manually reset the monitor to its idle state (no content). Used by
+// the on-screen close button and on sign-out so stale content from a
+// previous voice session (e.g. a broken image left over from an old
+// tool call) doesn't persist into a fresh session.
+export function clearMonitor() {
+  setState({ kind: null, src: null, title: null, embedType: 'iframe' });
 }
