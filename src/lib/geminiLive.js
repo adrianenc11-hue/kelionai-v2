@@ -303,16 +303,23 @@ export function useGeminiLive({ audioRef, coords = null }) {
       if (!token) throw new Error('No ephemeral token returned')
       if (!setupPayload) throw new Error('No live-connect setup returned')
 
-      // 3. Connect WebSocket on the plain `BidiGenerateContent` endpoint.
-      // Rationale: after PRs #65/#66/#67 we confirmed Google rejects ANY
-      // rich field (systemInstruction, tools, transcription, speechConfig,
-      // realtimeInputConfig) inside ephemeral-token constraints with close
-      // code 1007 "token-based requests cannot use project-scoped features
-      // such as tuned models". The server now mints tokens WITHOUT any
-      // `bidiGenerateContentSetup` constraints and returns the full live-
-      // connect setup to us; we send it as the first WS frame on open.
-      // Docs: https://ai.google.dev/gemini-api/docs/live-api/get-started-websocket
-      const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?access_token=${encodeURIComponent(token)}`
+      // 3. Connect WebSocket on the `BidiGenerateContentConstrained` endpoint.
+      // Verified against the official @google/genai SDK v1.37.0 source
+      // (src/live.ts lines 164-179): whenever the apiKey starts with
+      // "auth_tokens/" (i.e. an ephemeral token), the SDK switches to
+      // `BidiGenerateContentConstrained` and passes it via
+      // `?access_token=<token>`. The plain `BidiGenerateContent` endpoint
+      // rejects ephemeral tokens with close code 1008 "Method doesn't allow
+      // unregistered callers. Please use API Key." — it only accepts raw
+      // API keys.
+      //
+      // The Constrained endpoint does NOT require the token to carry any
+      // constraints. When minted without `bidiGenerateContentSetup` (as the
+      // server now does after PR #68), the client-sent setup frame is
+      // accepted verbatim with all the rich fields (systemInstruction,
+      // tools, transcription, realtimeInputConfig, speechConfig) that used
+      // to trigger close code 1007 when baked into the token.
+      const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained?access_token=${encodeURIComponent(token)}`
       const ws = new WebSocket(wsUrl)
       wsRef.current = ws
 
