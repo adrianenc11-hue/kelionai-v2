@@ -199,9 +199,31 @@ router.post('/checkout', requireAuth, async (req, res) => {
   body.append('metadata[user_id]', String(req.user.id));
   body.append('metadata[package_id]', pkg.id);
   body.append('metadata[minutes]', String(pkg.minutes));
-  // Stripe automatically collects/remits EU VAT when Stripe Tax is enabled
-  // on the account. We pass automatic_tax so the math happens server-side.
-  body.append('automatic_tax[enabled]', 'true');
+
+  // Billing address is REQUIRED for EU cards (Romania, most EU issuers).
+  // Without it, banks often decline at SCA / 3D Secure because the issuer
+  // cannot match AVS. Stripe will surface the address form on the hosted
+  // checkout page; user cannot skip it.
+  body.append('billing_address_collection', 'required');
+
+  // Explicit payment methods. Stripe chose the UX already (card + Link)
+  // but older accounts default to card-only with no Link. Enabling
+  // automatic_payment_methods lets Stripe pick the optimal list for the
+  // user's region while still defaulting to card. `allow_redirects=never`
+  // keeps us on a single-page flow (no iDEAL / Sofort redirects that break
+  // the SPA return).
+  body.append('automatic_payment_methods[enabled]', 'true');
+  body.append('automatic_payment_methods[allow_redirects]', 'never');
+
+  // Stripe Tax is OPT-IN. It requires the account to have registered tax
+  // locations + origin address configured under Settings → Tax. If it is
+  // not configured and we pass automatic_tax=true, Stripe rejects the
+  // checkout creation with 400. We default to false and let the operator
+  // opt in via STRIPE_AUTOMATIC_TAX=1 once Stripe Tax is live on the
+  // account.
+  if (process.env.STRIPE_AUTOMATIC_TAX === '1' || process.env.STRIPE_AUTOMATIC_TAX === 'true') {
+    body.append('automatic_tax[enabled]', 'true');
+  }
 
   try {
     const r = await fetch('https://api.stripe.com/v1/checkout/sessions', {
@@ -215,7 +237,23 @@ router.post('/checkout', requireAuth, async (req, res) => {
     if (!r.ok) {
       const text = await r.text().catch(() => '');
       console.error('[credits/checkout] Stripe error:', r.status, text.slice(0, 400));
-      return res.status(502).json({ error: 'Stripe rejected the request' });
+      // Surface Stripe's own error message/code to the client so debugging
+      // the first live-mode attempt doesn't require SSHing into logs.
+      // Common cases we want to see in the UI:
+      //   - account not activated for live payments
+      //   - automatic_tax requested but Stripe Tax not configured
+      //   - invalid currency for the account's country
+      let stripeMessage = '';
+      let stripeCode = '';
+      try {
+        const parsed = JSON.parse(text);
+        stripeMessage = (parsed && parsed.error && parsed.error.message) || '';
+        stripeCode = (parsed && parsed.error && parsed.error.code) || '';
+      } catch (_) { /* not JSON */ }
+      return res.status(502).json({
+        error: stripeMessage || 'Stripe rejected the request',
+        code: stripeCode || undefined,
+      });
     }
     const session = await r.json();
     res.json({ url: session.url, sessionId: session.id });
