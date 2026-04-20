@@ -3,7 +3,7 @@
 const { Router } = require('express');
 const { getUserById, getAllUsers, updateUser, deleteUser, getCreditRevenueSummary, getDb } = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
-const { getAllCredits, probeStripe } = require('../services/aiCredits');
+const { getAllCredits, probeStripe, buildRevenueSplit } = require('../services/aiCredits');
 const { sendEmailAlert } = require('../services/emailAlerts');
 const { bootstrapAdmin } = require('../services/adminBootstrap');
 
@@ -53,6 +53,28 @@ router.get('/business', async (req, res) => {
   } catch (err) {
     console.error('[admin/business] Error:', err && err.message);
     res.status(500).json({ error: 'Failed to load business metrics' });
+  }
+});
+
+/**
+ * GET /api/admin/revenue-split
+ * Returns the 50/50 (configurable via AI_ALLOCATION_FRACTION) split
+ * snapshot: revenue collected from top-ups in the window, how much of
+ * it is earmarked for AI provider spend, how much is known-spent (so
+ * far only ElevenLabs can be auto-measured; Gemini is manual because
+ * AI Studio keys don't expose billing), and the remaining budget.
+ * This is the single source of truth the admin dashboard renders next
+ * to the raw provider cards.
+ */
+router.get('/revenue-split', async (req, res) => {
+  try {
+    const days = Math.min(365, Math.max(1, Number(req.query.days) || 30));
+    const summary = await getCreditRevenueSummary(days);
+    const split = await buildRevenueSplit(summary, { days });
+    res.json(split);
+  } catch (err) {
+    console.error('[admin/revenue-split] Error:', err && err.message);
+    res.status(500).json({ error: 'Failed to compute revenue split' });
   }
 });
 

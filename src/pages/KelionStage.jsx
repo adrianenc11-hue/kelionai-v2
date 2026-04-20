@@ -784,21 +784,31 @@ export default function KelionStage() {
   const [creditsCards, setCreditsCards] = useState([])
   const [creditsLoading, setCreditsLoading] = useState(false)
   const [creditsError, setCreditsError] = useState(null)
+  // Revenue-split snapshot (50/50 by default between AI provider spend
+  // and owner net). Loaded from /api/admin/revenue-split in parallel
+  // with the raw provider cards so the overlay can show both without
+  // a waterfall. null = not loaded yet; populated object after success.
+  const [revenueSplit, setRevenueSplit] = useState(null)
+  const [revenueSplitLoading, setRevenueSplitLoading] = useState(false)
+  const [revenueSplitError, setRevenueSplitError] = useState(null)
   const isAdmin = Boolean(authState.user && authState.user.isAdmin)
   const openCredits = useCallback(async () => {
     setCreditsOpen(true)
     setCreditsLoading(true)
     setCreditsError(null)
-    try {
-      const r = await fetch('/api/admin/credits', { credentials: 'include' })
-      if (!r.ok) throw new Error(`HTTP ${r.status}`)
-      const j = await r.json()
-      setCreditsCards(Array.isArray(j.cards) ? j.cards : [])
-    } catch (err) {
-      setCreditsError(err.message || 'Could not load AI credits')
-    } finally {
-      setCreditsLoading(false)
-    }
+    setRevenueSplitLoading(true)
+    setRevenueSplitError(null)
+    const cardsPromise = fetch('/api/admin/credits', { credentials: 'include' })
+      .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
+      .then((j) => setCreditsCards(Array.isArray(j.cards) ? j.cards : []))
+      .catch((err) => setCreditsError(err.message || 'Could not load AI credits'))
+      .finally(() => setCreditsLoading(false))
+    const splitPromise = fetch('/api/admin/revenue-split?days=30', { credentials: 'include' })
+      .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
+      .then((j) => setRevenueSplit(j))
+      .catch((err) => setRevenueSplitError(err.message || 'Could not load revenue split'))
+      .finally(() => setRevenueSplitLoading(false))
+    await Promise.allSettled([cardsPromise, splitPromise])
   }, [])
 
   // Stage 7 — monetization. User-facing top-up modal (Stripe Checkout)
@@ -2897,6 +2907,119 @@ export default function KelionStage() {
               padding: '10px 12px', borderRadius: 10, marginBottom: 12,
             }}>{creditsError}</div>
           )}
+
+          {/* Revenue-split panel — shows how much of the last 30 days of
+              top-up revenue is earmarked for AI provider spend vs owner
+              net, and compares against the known portion of that spend
+              (ElevenLabs via API; Gemini is manual). Renders above the
+              provider cards so the admin sees the budget context first.
+              */}
+          {revenueSplitLoading && (
+            <div style={{
+              marginBottom: 16, padding: '12px 14px',
+              borderRadius: 12, border: '1px solid rgba(167, 139, 250, 0.25)',
+              background: 'rgba(167, 139, 250, 0.05)',
+              fontSize: 12, opacity: 0.6,
+            }}>Computing revenue split…</div>
+          )}
+          {!revenueSplitLoading && revenueSplitError && (
+            <div style={{
+              marginBottom: 16, padding: '10px 12px',
+              borderRadius: 10, background: 'rgba(80, 14, 14, 0.6)',
+              color: '#fecaca', fontSize: 12,
+            }}>Revenue split: {revenueSplitError}</div>
+          )}
+          {!revenueSplitLoading && revenueSplit && (() => {
+            const pct = Math.round((revenueSplit.fraction || 0.5) * 100)
+            const deltaStatus = revenueSplit.delta?.status || 'ok'
+            const deltaPalette = {
+              ok:   { bg: 'rgba(34, 197, 94, 0.10)',  border: 'rgba(34, 197, 94, 0.45)',  text: '#bbf7d0' },
+              warn: { bg: 'rgba(245, 158, 11, 0.12)', border: 'rgba(245, 158, 11, 0.5)',  text: '#fde68a' },
+              over: { bg: 'rgba(239, 68, 68, 0.12)',  border: 'rgba(239, 68, 68, 0.55)',  text: '#fecaca' },
+            }[deltaStatus] || { bg: 'rgba(148,163,184,0.1)', border: 'rgba(148,163,184,0.4)', text: '#cbd5e1' }
+            const row = (label, value, opts = {}) => (
+              <div style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+                gap: 10, padding: '4px 0',
+                fontSize: 13,
+                opacity: opts.dim ? 0.7 : 1,
+                fontWeight: opts.bold ? 600 : 400,
+              }}>
+                <span style={{ opacity: 0.75 }}>{label}</span>
+                <span style={{ fontVariantNumeric: 'tabular-nums', color: opts.color }}>
+                  {value}
+                </span>
+              </div>
+            )
+            return (
+              <div style={{
+                marginBottom: 18,
+                padding: '14px 16px',
+                borderRadius: 14,
+                background: 'rgba(167, 139, 250, 0.06)',
+                border: '1px solid rgba(167, 139, 250, 0.25)',
+              }}>
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  marginBottom: 8,
+                }}>
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>Revenue split ({pct}% → AI)</div>
+                  <span style={{
+                    fontSize: 10, letterSpacing: '0.1em', fontWeight: 600,
+                    padding: '3px 8px', borderRadius: 999,
+                    background: deltaPalette.bg,
+                    color: deltaPalette.text,
+                    border: `1px solid ${deltaPalette.border}`,
+                  }}>
+                    {deltaStatus === 'ok' ? 'IN BUDGET'
+                      : deltaStatus === 'warn' ? '80% USED'
+                      : 'OVER BUDGET'}
+                  </span>
+                </div>
+                <div style={{ fontSize: 11, opacity: 0.55, marginBottom: 10 }}>
+                  Last {revenueSplit.window?.days ?? 30} days · {revenueSplit.revenue?.topups ?? 0} top-ups
+                </div>
+                {row('Gross revenue', revenueSplit.revenue?.grossDisplay || '—', { bold: true })}
+                {row(`AI allocation (${pct}%)`, revenueSplit.allocation?.display || '—', { color: '#c4b5fd' })}
+                {row('Owner net', revenueSplit.allocation?.ownerDisplay || '—', { dim: true })}
+                <div style={{
+                  height: 1, background: 'rgba(167, 139, 250, 0.2)',
+                  margin: '8px 0',
+                }} />
+                <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 4 }}>Known AI spend (auto-measured):</div>
+                {row('  ElevenLabs (est.)',
+                  revenueSplit.spend?.elevenlabs?.configured
+                    ? (revenueSplit.spend?.elevenlabs?.estSpendDisplay || '—')
+                    : 'not configured',
+                  { dim: true })}
+                {row('  Gemini',
+                  'manual — open GCP Billing',
+                  { dim: true })}
+                <div style={{
+                  height: 1, background: 'rgba(167, 139, 250, 0.2)',
+                  margin: '8px 0',
+                }} />
+                {row('Remaining AI budget',
+                  revenueSplit.delta?.display || '—',
+                  { bold: true, color: deltaPalette.text })}
+                <a
+                  href="https://console.cloud.google.com/billing"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: 'inline-block',
+                    marginTop: 10,
+                    fontSize: 11,
+                    color: '#c4b5fd',
+                    textDecoration: 'none',
+                    opacity: 0.8,
+                  }}
+                >
+                  Open GCP Billing dashboard →
+                </a>
+              </div>
+            )
+          })()}
 
           {!creditsLoading && creditsCards.map((c) => {
             const badge = {
