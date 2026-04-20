@@ -296,13 +296,20 @@ router.get('/gemini-token', async (req, res) => {
           },
           inputAudioTranscription: {},
           outputAudioTranscription: {},
-          // Stage 4 — tools. googleSearch is a built-in grounding tool
-            // (model runs it server-side, returns grounded answer w/ citations).
-            // functionDeclarations route tool calls back to OUR backend via the
-            // client, which executes them and returns a tool_response. Keep this
-            // list stable server-side so users cannot swap tools client-side.
+          // Stage 4 — tools. functionDeclarations route tool calls back to
+            // OUR backend via the client, which executes them and returns a
+            // tool_response. Keep this list stable server-side so users
+            // cannot swap tools client-side.
+            //
+            // NOTE: `{googleSearch: {}}` was previously in this list but is
+            // a *project-scoped grounding feature* — Google rejects ephemeral
+            // token sessions that reference it with close code 1007:
+            // "token-based requests cannot use project-scoped features such
+            // as tuned models". Web search is instead handled by the
+            // `browse_web` function-declaration tool, which routes through
+            // our own server (via `/api/tools/browse_web`) — no grounding
+            // product from Google AI Studio required.
             tools: [
-              { googleSearch: {} },
               {
                 functionDeclarations: [
                   {
