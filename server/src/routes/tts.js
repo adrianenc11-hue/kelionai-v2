@@ -4,18 +4,106 @@ const { Router } = require('express');
 const router = Router();
 
 const ELEVENLABS_URL          = 'https://api.elevenlabs.io/v1/text-to-speech';
-const DEFAULT_ELEVENLABS_VOICE = 'pNInz6obpgDQGcFmaJgB'; // Adam (male, multilingual)
+const DEFAULT_ELEVENLABS_VOICE = 'pNInz6obpgDQGcFmaJgB'; // Adam (American male, multilingual)
 
-// Per-language ElevenLabs voice overrides. `eleven_multilingual_v2` lets
-// a single voice speak 29+ languages natively, but Adrian asked for each
-// language to use its own native voice. Operators set voice IDs from the
-// ElevenLabs Voice Library via Railway env vars; when unset we fall back to
-// the global default (Adam + multilingual_v2).
+// Native male voice per language.
+//
+// `eleven_multilingual_v2` can speak 29 languages with any voice, but the
+// accent bleeds through — e.g. Adam (American) speaking Italian sounds
+// Italian-American, not Italian. Adrian asked for a native-sounding male
+// voice per language.
+//
+// Strategy: curate ElevenLabs' public default library (available to every
+// ElevenLabs account without extra subscription) into language families,
+// picking voices whose natural accent is closest to the target language.
+// Where no close match exists in the default library (Arabic, Chinese,
+// Japanese, Korean, Hindi, Bengali, Thai, Vietnamese, Indonesian,
+// Filipino, Tamil, Malay, Hebrew), the operator should set a clone/library
+// voice ID via `ELEVENLABS_VOICE_<LANG>` Railway env var; fallback is Adam
+// (multilingual_v2) which at least speaks the language natively, just
+// with an American male timbre.
+//
+// ElevenLabs default male voice IDs (all publicly available on every account):
+//   Adam     pNInz6obpgDQGcFmaJgB  American English, deep, narrator
+//   Antoni   ErXwobaYiN019PkySvjV  American English, warm, well-rounded
+//   Arnold   VR6AewLTigWG4xSOukaG  American English, crisp
+//   Brian    nPczCjzI2devNBz1zQrb  American English, deep narrator
+//   Callum   N2lVS1w4EtoT3dr4eOWO  Scottish, intense (great for Celtic)
+//   Charlie  IKne3meq5aSn9XLyUdCD  Australian, natural
+//   Clyde    2EiwWnXFnvU5JabPnv8n  American English, war veteran
+//   Daniel   onwK4e9ZLuTAKqWW03F9  British English, authoritative (BBC-style)
+//   Ethan    g5CIjZEefAph4nQFvHAz  American English, young whisper
+//   Fin      D38z5RcWu1voky8WS1ja  Irish English, old sailor
+//   George   JBFqnCBsd6RMkjVDRZzb  British English, warm
+//   Giovanni zcAOhNBS3c14rBihAFp1  Italian-accented English (closest to IT native)
+//   Liam     TX3LPaxmHKxFdv7VOQHJ  American English, young articulate
+//   Sam      yoZ06aMxZJJ28mfd3POQ  American English, neutral / news
+//
+// Operators override ANY mapping via env vars: ELEVENLABS_VOICE_RO,
+// ELEVENLABS_VOICE_EN, ELEVENLABS_VOICE_ES, etc. The env var wins over the
+// curated mapping below, and ELEVENLABS_VOICE_ID wins as a global override.
+const NATIVE_MALE_VOICES = {
+  // Germanic (Anglo)
+  'en':    'JBFqnCBsd6RMkjVDRZzb', // George — warm British English, sounds native for neutral EN
+  'en-US': 'pNInz6obpgDQGcFmaJgB', // Adam — American default
+  'en-GB': 'onwK4e9ZLuTAKqWW03F9', // Daniel — BBC British
+  'en-AU': 'IKne3meq5aSn9XLyUdCD', // Charlie — Australian native
+  'en-IE': 'D38z5RcWu1voky8WS1ja', // Fin — Irish
+  // Germanic (Continental)
+  'de':    'VR6AewLTigWG4xSOukaG', // Arnold — crisp, handles German consonants well
+  'nl':    'VR6AewLTigWG4xSOukaG', // Arnold — Dutch (Germanic family)
+  'sv':    'VR6AewLTigWG4xSOukaG', // Swedish
+  'no':    'VR6AewLTigWG4xSOukaG', // Norwegian
+  'da':    'VR6AewLTigWG4xSOukaG', // Danish
+  // Romance
+  'es':    'ErXwobaYiN019PkySvjV', // Antoni — Latin warmth, works for Spanish
+  'pt':    'ErXwobaYiN019PkySvjV', // Antoni — Portuguese
+  'it':    'zcAOhNBS3c14rBihAFp1', // Giovanni — Italian-accented, closest to IT native
+  'fr':    'ErXwobaYiN019PkySvjV', // Antoni — French
+  'ro':    'ErXwobaYiN019PkySvjV', // Antoni — Romanian (Romance family)
+  // Slavic
+  'ru':    'nPczCjzI2devNBz1zQrb', // Brian — deeper register suits Slavic
+  'uk':    'nPczCjzI2devNBz1zQrb', // Ukrainian
+  'pl':    'nPczCjzI2devNBz1zQrb', // Polish
+  'cs':    'nPczCjzI2devNBz1zQrb', // Czech
+  'sk':    'nPczCjzI2devNBz1zQrb', // Slovak
+  'bg':    'nPczCjzI2devNBz1zQrb', // Bulgarian
+  'hr':    'nPczCjzI2devNBz1zQrb', // Croatian
+  'sr':    'nPczCjzI2devNBz1zQrb', // Serbian
+  // Finno-Ugric
+  'hu':    'TX3LPaxmHKxFdv7VOQHJ', // Liam — young articulate, fits Hungarian cadence
+  'fi':    'TX3LPaxmHKxFdv7VOQHJ', // Finnish
+  // Hellenic
+  'el':    'yoZ06aMxZJJ28mfd3POQ', // Sam — neutral, Greek
+  // Turkic
+  'tr':    'ErXwobaYiN019PkySvjV', // Antoni — Mediterranean feel
+  // Semitic / Asian (no native defaults — fall back to Adam; override via env)
+  'ar':    'pNInz6obpgDQGcFmaJgB',
+  'he':    'pNInz6obpgDQGcFmaJgB',
+  'hi':    'pNInz6obpgDQGcFmaJgB',
+  'bn':    'pNInz6obpgDQGcFmaJgB',
+  'ta':    'pNInz6obpgDQGcFmaJgB',
+  'zh':    'pNInz6obpgDQGcFmaJgB',
+  'ja':    'pNInz6obpgDQGcFmaJgB',
+  'ko':    'pNInz6obpgDQGcFmaJgB',
+  'th':    'pNInz6obpgDQGcFmaJgB',
+  'vi':    'pNInz6obpgDQGcFmaJgB',
+  'id':    'pNInz6obpgDQGcFmaJgB',
+  'ms':    'pNInz6obpgDQGcFmaJgB',
+  'fil':   'pNInz6obpgDQGcFmaJgB',
+};
+
 function elevenLabsVoiceFor(lang) {
-  const perLangEnv = `ELEVENLABS_VOICE_${String(lang || 'en').toUpperCase()}`;
+  const normalized = String(lang || 'en').toLowerCase();
+  // Check most-specific first (en-GB) then base (en)
+  const perLangEnv = `ELEVENLABS_VOICE_${normalized.replace('-', '_').toUpperCase()}`;
+  const baseEnv    = `ELEVENLABS_VOICE_${normalized.split('-')[0].toUpperCase()}`;
   return (
     process.env[perLangEnv] ||
+    process.env[baseEnv] ||
     process.env.ELEVENLABS_VOICE_ID ||
+    NATIVE_MALE_VOICES[normalized] ||
+    NATIVE_MALE_VOICES[normalized.split('-')[0]] ||
     DEFAULT_ELEVENLABS_VOICE
   );
 }
