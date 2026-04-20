@@ -2,6 +2,8 @@
 
 const { Router } = require('express');
 const { getAI, getDefaultChatModel } = require('../utils/openai');
+const { getCreditsBalance, findById } = require('../db');
+const { isAdminEmail } = require('../middleware/subscription');
 const ipGeo = require('../services/ipGeo');
 const { trialStatus, stampTrialIfFresh } = require('../services/trialQuota');
 
@@ -42,27 +44,72 @@ router.post('/', async (req, res) => {
     return res.status(503).json({ error: 'AI service not configured. Set GEMINI_API_KEY or OPENAI_API_KEY.' });
   }
 
-  // Guest trial quota — same 15-min/day IP window used by the Gemini Live
-  // token mint. Adrian: "aplica si la chat scris aceleasi reguli" / the
-  // timer must tick on the FIRST free-tier interaction whether that's a
-  // text message or Tap-to-talk, not only when the mic is pressed.
-  // Signed-in users skip entirely (admin OR regular — both are governed
-  // by the credits system / unlimited admin bypass). softAuth upstream
-  // already populated req.user when a valid JWT is present, so we just
-  // use that (Copilot review pr-74).
+  // Gating matrix (mirrors /api/realtime):
+  //   - guest (no JWT):          15-min/day IP window, 7-day lifetime cap
+  //   - signed-in non-admin:     credits balance > 0 (402 if not)
+  //   - admin:                   unlimited, never gated
+  //
+  // Adrian: "daca ti-ai facut user nu trebuie sa functioneze daca nu ai
+  // cumparat credit. Functioneaza free fara credit 15 min/zi, maxim 1
+  // saptamina. Dupa ce iti faci user nu functioneaza, da mesaj ca trebuie
+  // cumparat credit". Text chat goes through the same gate as voice now.
   const isGuest = !req.user;
   if (isGuest) {
     const ip = ipGeo.clientIp(req) || req.ip || '';
     const status = trialStatus(ip);
     if (!status.allowed) {
-      return res.status(429).json({
-        error: 'Free trial exhausted for today. Sign in or purchase credits to continue.',
-        trial: { allowed: false, remainingMs: 0, nextWindowMs: status.nextWindowMs },
-      });
+      // Two reasons the guest trial denies:
+      //   - window_expired: 15-min daily chunk used up, come back tomorrow
+      //   - lifetime_expired: 7 days of free access consumed, must sign up
+      // We surface `reason` so the client can swap the error message from
+      // "try again tomorrow" to "create an account to keep talking".
+      const isLifetime = status.reason === 'lifetime_expired';
+      const body = {
+        error: isLifetime
+          ? 'Your 7-day free trial has ended. Please create an account and buy credits to keep chatting with Kelion.'
+          : 'Free trial for today is used up. Come back tomorrow or sign in to continue.',
+        trial: {
+          allowed: false,
+          reason:  status.reason || 'window_expired',
+          remainingMs: 0,
+          ...(status.nextWindowMs != null ? { nextWindowMs: status.nextWindowMs } : {}),
+        },
+      };
+      return res.status(429).json(body);
     }
     // Stamp on the first text message — this is what kicks off the 15-min
     // countdown for text-first users (who may never press Tap-to-talk).
     stampTrialIfFresh(ip, status);
+  } else {
+    // Signed-in users: admin is unlimited, everyone else needs credits > 0.
+    // We skip the DB admin-email lookup when the JWT already claims the
+    // `admin` role (fast path for the vast majority of admin requests).
+    let isAdmin = req.user.role === 'admin';
+    if (!isAdmin) {
+      try {
+        const full = await findById(req.user.id);
+        isAdmin = Boolean(
+          full && (full.role === 'admin' || isAdminEmail(full.email))
+        );
+      } catch (_) { /* DB glitch — treat as non-admin; credit gate still runs */ }
+    }
+    if (!isAdmin) {
+      try {
+        const balance = await getCreditsBalance(req.user.id);
+        if (!Number.isFinite(balance) || balance <= 0) {
+          return res.status(402).json({
+            error: 'No credits left. Buy a package to keep chatting with Kelion.',
+            balance_minutes: 0,
+            action: 'buy_credits',
+          });
+        }
+      } catch (err) {
+        // DB glitch — fail open so a transient outage doesn't kill paying
+        // users' text chat. The /api/credits/consume heartbeat on voice
+        // sessions is the second line of defense.
+        console.warn('[chat] credits-balance lookup failed', err && err.message);
+      }
+    }
   }
 
   // IP-based geolocation — no browser permission prompt. Uses Cloudflare /
