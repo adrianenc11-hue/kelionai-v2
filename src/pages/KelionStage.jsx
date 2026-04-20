@@ -1657,6 +1657,75 @@ export default function KelionStage() {
         )
       })()}
 
+      {/* Live voice chat bubble — mirrors the text-chat bubble above but
+          reads from `turns` (populated by useGeminiLive from the Gemini Live
+          inputTranscription / outputTranscription stream). Adrian: "logat
+          vocea e cea corecta dar nu e chat live, nu afiseaza absolut nimic
+          pe ecran". Previously the turns only rendered inside the transcript
+          panel (closed by default) — so live voice users heard Kelion but
+          saw nothing. This bubble shows the last user utterance + the
+          streaming assistant reply while a voice session is active. It is
+          hidden when the text-chat bubble is shown to avoid two overlapping
+          panels. */}
+      {status !== 'idle' && status !== 'error' && turns.length > 0 && !(chatMessages.length > 0 && bubbleVisible) && (() => {
+        const lastAssistant = [...turns].reverse().find((t) => t.role === 'assistant')
+        const lastUser = [...turns].reverse().find((t) => t.role === 'user')
+        return (
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: 'absolute',
+              bottom: 'calc(max(32px, env(safe-area-inset-bottom)) + 110px)',
+              left: '50%', transform: 'translateX(-50%)',
+              width: 'min(680px, 92vw)',
+              maxHeight: '42vh', overflowY: 'auto',
+              display: 'flex', flexDirection: 'column', gap: 8,
+              padding: 14,
+              borderRadius: 16,
+              background: 'rgba(10, 8, 20, 0.72)',
+              backdropFilter: 'blur(14px)',
+              border: '1px solid rgba(167, 139, 250, 0.22)',
+              color: '#ede9fe',
+              fontSize: 14, lineHeight: 1.45,
+              fontFamily: 'system-ui, -apple-system, sans-serif',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+              zIndex: 4,
+            }}
+          >
+            {lastUser && lastUser.text && (
+              <div style={{
+                alignSelf: 'flex-end', maxWidth: '88%',
+                padding: '8px 12px', borderRadius: 12,
+                background: 'rgba(124, 58, 237, 0.25)',
+                border: '1px solid rgba(167, 139, 250, 0.3)',
+                fontSize: 13,
+              }}>{lastUser.text}</div>
+            )}
+            {lastAssistant && lastAssistant.text && (
+              <div style={{
+                alignSelf: 'flex-start', maxWidth: '92%',
+                padding: '8px 12px', borderRadius: 12,
+                background: 'rgba(167, 139, 250, 0.08)',
+                border: '1px solid rgba(167, 139, 250, 0.18)',
+                whiteSpace: 'pre-wrap',
+              }}>{lastAssistant.text}</div>
+            )}
+            {!lastAssistant && status === 'thinking' && (
+              <div style={{
+                alignSelf: 'flex-start', fontSize: 13, opacity: 0.7,
+                padding: '8px 12px',
+              }}>Kelion is thinking…</div>
+            )}
+            {!lastUser && !lastAssistant && status === 'listening' && (
+              <div style={{
+                alignSelf: 'center', fontSize: 13, opacity: 0.7,
+                padding: '8px 12px',
+              }}>Listening…</div>
+            )}
+          </div>
+        )
+      })()}
+
       {/* Text chat composer — bottom center, above the status pill.
           Narrower (420px) than the old 680px because the wider pill was
           overlapping the stage monitor on the left. Stops click

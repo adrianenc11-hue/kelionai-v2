@@ -1,7 +1,7 @@
 'use strict';
 
 const { Router } = require('express');
-const { listMemoryItems } = require('../db');
+const { listMemoryItems, getCreditsBalance } = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { peekSignedInUser, isAdminUser } = require('../middleware/optionalAuth');
 const ipGeo = require('../services/ipGeo');
@@ -186,9 +186,16 @@ router.get('/gemini-token', async (req, res) => {
     return res.status(503).json({ error: 'GEMINI_API_KEY not configured' });
   }
 
-  // Guest trial quota. Only non-signed-in users are subject to the
-  // 15-min/day limit — signed-in users (even without admin) go through
-  // the credits/subscription path instead. Admin users always skip.
+  // Gating matrix:
+  //   - guests (no JWT)            → 15-min/day IP trial window
+  //   - signed-in non-admin        → credits balance must be > 0 (402 if not)
+  //   - admin                      → unlimited, never gated
+  //
+  // Adrian: "la logare se respecta credit cumparat si la admin nelimitat".
+  // Previously signed-in non-admins skipped every gate, so 1 bought credit
+  // = unlimited sessions. The client heartbeats /api/credits/consume every
+  // 60 s while the session is open, so this upfront balance check just
+  // prevents a user with 0 credits from even starting a session.
   const isGuest = !adminUser;
   let trial = null;
   if (isGuest && !isAdmin) {
@@ -206,6 +213,25 @@ router.get('/gemini-token', async (req, res) => {
       remainingMs: status.remainingMs,
       windowMs:    TRIAL_WINDOW_MS,
     };
+  } else if (adminUser && !isAdmin) {
+    // Signed-in non-admin: require a positive credits balance. We only
+    // block when the user explicitly has zero; any positive balance allows
+    // the session to start and the client-side heartbeat takes over.
+    try {
+      const balance = await getCreditsBalance(adminUser.id);
+      if (!Number.isFinite(balance) || balance <= 0) {
+        return res.status(402).json({
+          error: 'No credits left. Buy a package to keep talking.',
+          balance_minutes: 0,
+        });
+      }
+    } catch (err) {
+      // DB lookup failed — log, but don't block the session. Treat this
+      // as "unable to verify, allow session" so a transient DB glitch
+      // doesn't kill a paying user's voice chat. The consume heartbeat
+      // will still enforce per-minute billing.
+      console.warn('[realtime] credits-balance lookup failed', err && err.message);
+    }
   }
 
   try {
