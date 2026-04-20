@@ -303,16 +303,21 @@ export function useGeminiLive({ audioRef, coords = null }) {
       if (!token) throw new Error('No ephemeral token returned')
       if (!setupPayload) throw new Error('No live-connect setup returned')
 
-      // 3. Connect WebSocket on the plain `BidiGenerateContent` endpoint.
-      // Rationale: after PRs #65/#66/#67 we confirmed Google rejects ANY
-      // rich field (systemInstruction, tools, transcription, speechConfig,
-      // realtimeInputConfig) inside ephemeral-token constraints with close
-      // code 1007 "token-based requests cannot use project-scoped features
-      // such as tuned models". The server now mints tokens WITHOUT any
-      // `bidiGenerateContentSetup` constraints and returns the full live-
-      // connect setup to us; we send it as the first WS frame on open.
+      // 3. Connect WebSocket on the `BidiGenerateContentConstrained` endpoint.
+      // Ephemeral tokens are only accepted by this endpoint — the plain
+      // `BidiGenerateContent` path rejects them with close code 1008
+      // "Method doesn't allow unregistered callers" (requires an API key).
+      // However, the Constrained endpoint does NOT require the token to
+      // actually carry constraints: when minted with an empty
+      // `bidiGenerateContentSetup`, the client-sent setup frame is accepted
+      // verbatim (no "field locked by token" rejection). After PR #65/#66/#67
+      // we confirmed rich fields (systemInstruction, tools, transcription,
+      // realtimeInputConfig, speechConfig) cannot live inside the token —
+      // they trigger close code 1007 "project-scoped features". They CAN
+      // live in the client-sent setup frame on the Constrained endpoint, as
+      // long as the token itself is unconstrained.
       // Docs: https://ai.google.dev/gemini-api/docs/live-api/get-started-websocket
-      const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?access_token=${encodeURIComponent(token)}`
+      const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained?access_token=${encodeURIComponent(token)}`
       const ws = new WebSocket(wsUrl)
       wsRef.current = ws
 
