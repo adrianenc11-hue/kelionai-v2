@@ -301,12 +301,16 @@ export function useGeminiLive({ audioRef, coords = null }) {
       if (!token) throw new Error('No ephemeral token returned')
 
       // 3. Connect WebSocket — constraints come from the token.
-      // Ephemeral tokens are v1alpha-only (the SDK itself warns: "The SDK's
-      // ephemeral token support is in v1alpha only"). Using the v1beta path
-      // here silently closes the socket with HTTP 404 before onopen fires,
-      // which is exactly the "voice chat doesn't work" symptom Adrian saw
-      // after PR #55. See https://github.com/googleapis/js-genai/issues/1257
-      const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?access_token=${encodeURIComponent(token)}`
+      // Ephemeral tokens are v1alpha-only AND must use the *Constrained*
+      // endpoint when the token was minted with `bidiGenerateContentSetup`
+      // (which we always do — persona + voice + tools are locked server-side).
+      // The plain `BidiGenerateContent` path accepts the connection briefly
+      // and then closes it with code 1008, which is exactly the "Tap to talk
+      // doesn't stay pressed" symptom Adrian saw (the status flips from
+      // 'connecting' back to 'idle' within ~500 ms and the audio worklet logs
+      // "WebSocket is already in CLOSING or CLOSED state" on the next chunk).
+      // Docs: https://ai.google.dev/gemini-api/docs/live-api/get-started-websocket#authentication-with-ephemeral-tokens
+      const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained?access_token=${encodeURIComponent(token)}`
       const ws = new WebSocket(wsUrl)
       wsRef.current = ws
 
@@ -314,6 +318,7 @@ export function useGeminiLive({ audioRef, coords = null }) {
 
       ws.onopen = () => {
         // no-op — server-side constraints auto-initialize the session.
+        // (The Constrained endpoint will reject any client-sent setup message.)
       }
 
       ws.onmessage = (event) => handleMessage(event.data)
@@ -322,10 +327,25 @@ export function useGeminiLive({ audioRef, coords = null }) {
         setError('Connection error')
         setStatus('error')
       }
-      ws.onclose = () => {
-        if (statusRef.current !== 'idle') {
-          setStatus((s) => s === 'error' ? 'error' : 'idle')
+      ws.onclose = (e) => {
+        // Surface Google's close code + reason so bad-endpoint or
+        // expired-token failures show up in the console instead of being
+        // silently flipped back to 'idle'. 1000 = normal, 1005/1006 = no
+        // status / abnormal, 1008 = policy (wrong endpoint / bad token).
+        console.warn('[geminiLive] ws close', { code: e?.code, reason: e?.reason, wasClean: e?.wasClean })
+        if (statusRef.current === 'idle') return
+        // If we never reached 'listening' (i.e. the session died before
+        // setupComplete), keep the error visible rather than bouncing back
+        // to the "Tap to talk" label — otherwise the user thinks nothing
+        // happened.
+        const neverOpened = statusRef.current === 'connecting' || statusRef.current === 'requesting'
+        if (statusRef.current === 'error') return
+        if (neverOpened) {
+          setError(`Connection closed (${e?.code || 'unknown'})${e?.reason ? `: ${e.reason}` : ''}`)
+          setStatus('error')
+          return
         }
+        setStatus('idle')
       }
 
       // 4. Pipe mic → WS at 16kHz PCM16
