@@ -841,6 +841,39 @@ export default function KelionStage() {
     return () => clearInterval(id)
   }, [creditsOpen, isAdmin, refreshLedger])
 
+  // Admin-only — Visitors overlay. One row per SPA page load recorded by
+  // the server-side `visitorLog` middleware. Shows IP, country, UA,
+  // referer, path, user email (if signed in), timestamp. Auto-refresh
+  // every 10s while open so Adrian can watch the live flow.
+  const [visitorsOpen, setVisitorsOpen] = useState(false)
+  const [visitorsRows, setVisitorsRows] = useState([])
+  const [visitorsStats, setVisitorsStats] = useState(null)
+  const [visitorsLoading, setVisitorsLoading] = useState(false)
+  const [visitorsError, setVisitorsError] = useState(null)
+  const refreshVisitors = useCallback(async () => {
+    try {
+      const r = await fetch('/api/admin/visitors?limit=200&windowHours=24', { credentials: 'include' })
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      const j = await r.json()
+      setVisitorsRows(Array.isArray(j.visits) ? j.visits : [])
+      setVisitorsStats(j.stats || null)
+      setVisitorsError(null)
+    } catch (err) {
+      setVisitorsError(err.message || 'Could not load visitors')
+    }
+  }, [])
+  const openVisitors = useCallback(async () => {
+    setVisitorsOpen(true)
+    setVisitorsLoading(true)
+    await refreshVisitors()
+    setVisitorsLoading(false)
+  }, [refreshVisitors])
+  useEffect(() => {
+    if (!visitorsOpen || !isAdmin) return undefined
+    const id = setInterval(() => { refreshVisitors() }, 10000)
+    return () => clearInterval(id)
+  }, [visitorsOpen, isAdmin, refreshVisitors])
+
   // Stage 7 — monetization. User-facing top-up modal (Stripe Checkout)
   // and live balance. `buyOpen` shows the package picker; `buyBusy` is
   // true while we create the Stripe Checkout session; `balance` is
@@ -2259,6 +2292,14 @@ export default function KelionStage() {
                   <MenuItem onClick={() => { openBusiness(); setMenuOpen(false) }}>
                     Business metrics (admin)
                   </MenuItem>
+                  {/* Visitor analytics — Adrian 2026-04-20: "nu vad buton
+                      vizite reale cine a vizitat situl, ip tara restul
+                      datelor lor". One row per SPA page load with IP,
+                      country, user-agent, referer, and (if signed in)
+                      email. */}
+                  <MenuItem onClick={() => { openVisitors(); setMenuOpen(false) }}>
+                    Visitors (admin)
+                  </MenuItem>
                 </>
               )}
               {/* Sign out moved to the top-right action bar. */}
@@ -3255,6 +3296,192 @@ export default function KelionStage() {
 
           {!creditsLoading && creditsCards.length === 0 && !creditsError && (
             <div style={{ opacity: 0.55, fontSize: 14 }}>No providers configured.</div>
+          )}
+        </div>
+      )}
+
+      {/* Admin-only — Visitors drawer. Shows one row per SPA page load
+          (IP, country, user-agent, referer, path, user email if signed
+          in, timestamp). Auto-refresh 10s. Adrian 2026-04-20: "nu vad
+          buton vizite reale cine a vizitat situl, ip tara restul
+          datelor lor". */}
+      {visitorsOpen && (
+        <div
+          onClick={() => setVisitorsOpen(false)}
+          style={{
+            position: 'absolute', inset: 0,
+            background: 'rgba(3, 4, 10, 0.35)',
+            zIndex: 25,
+          }}
+        />
+      )}
+      {visitorsOpen && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: 'absolute', top: 0, right: 0, bottom: 0,
+            width: 'min(640px, 98vw)',
+            background: 'rgba(10, 8, 20, 0.92)',
+            backdropFilter: 'blur(22px)',
+            borderLeft: '1px solid rgba(167, 139, 250, 0.2)',
+            padding: '70px 20px 24px 20px',
+            overflowY: 'auto',
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+            zIndex: 26,
+            color: '#ede9fe',
+          }}
+        >
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            marginBottom: 14,
+          }}>
+            <div style={{ fontSize: 11, opacity: 0.6, letterSpacing: '0.15em' }}>
+              VISITORS — ADMIN
+            </div>
+            <button
+              onClick={() => setVisitorsOpen(false)}
+              style={{
+                background: 'transparent', border: 'none', color: '#ede9fe',
+                fontSize: 20, cursor: 'pointer', opacity: 0.7,
+              }}
+              aria-label="Close"
+            >✕</button>
+          </div>
+
+          {/* Stats header — last 24h summary. */}
+          {visitorsStats && (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: 8,
+              marginBottom: 16,
+            }}>
+              <div style={{
+                padding: '10px 12px', borderRadius: 10,
+                background: 'rgba(167, 139, 250, 0.06)',
+                border: '1px solid rgba(167, 139, 250, 0.2)',
+              }}>
+                <div style={{ fontSize: 10, opacity: 0.6, letterSpacing: '0.1em' }}>
+                  VISITS ({visitorsStats.windowHours}H)
+                </div>
+                <div style={{ fontSize: 22, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                  {visitorsStats.totalVisits}
+                </div>
+              </div>
+              <div style={{
+                padding: '10px 12px', borderRadius: 10,
+                background: 'rgba(167, 139, 250, 0.06)',
+                border: '1px solid rgba(167, 139, 250, 0.2)',
+              }}>
+                <div style={{ fontSize: 10, opacity: 0.6, letterSpacing: '0.1em' }}>
+                  UNIQUE IPS
+                </div>
+                <div style={{ fontSize: 22, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                  {visitorsStats.uniqueIps}
+                </div>
+              </div>
+              <div style={{
+                padding: '10px 12px', borderRadius: 10,
+                background: 'rgba(167, 139, 250, 0.06)',
+                border: '1px solid rgba(167, 139, 250, 0.2)',
+              }}>
+                <div style={{ fontSize: 10, opacity: 0.6, letterSpacing: '0.1em' }}>
+                  TOP COUNTRIES
+                </div>
+                <div style={{ fontSize: 13, marginTop: 4 }}>
+                  {Array.isArray(visitorsStats.topCountries) && visitorsStats.topCountries.length > 0
+                    ? visitorsStats.topCountries.map((c) => `${c.country} (${c.n})`).join(', ')
+                    : <span style={{ opacity: 0.55 }}>—</span>}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {visitorsLoading && (
+            <div style={{ opacity: 0.55, fontSize: 14 }}>Loading visitors…</div>
+          )}
+          {visitorsError && !visitorsLoading && (
+            <div style={{
+              fontSize: 13, color: '#fecaca',
+              background: 'rgba(80, 14, 14, 0.6)',
+              padding: '10px 12px', borderRadius: 10, marginBottom: 12,
+            }}>{visitorsError}</div>
+          )}
+
+          {!visitorsLoading && visitorsRows.length === 0 && !visitorsError && (
+            <div style={{ opacity: 0.55, fontSize: 14 }}>
+              No visits recorded yet. This panel starts filling up as soon as
+              the middleware sees a real HTML page load (not API calls).
+            </div>
+          )}
+
+          {/* Scrollable table. Fixed-width font for IP and timestamp so
+              columns align. */}
+          {!visitorsLoading && visitorsRows.length > 0 && (
+            <div style={{
+              borderRadius: 12,
+              border: '1px solid rgba(167, 139, 250, 0.18)',
+              overflow: 'hidden',
+            }}>
+              {visitorsRows.map((v) => {
+                const when = v.ts ? new Date(v.ts) : null
+                const whenShort = when && !Number.isNaN(when.getTime())
+                  ? when.toLocaleString('en-GB', { hour12: false })
+                  : '—'
+                const uaShort = (v.userAgent || '').slice(0, 80)
+                return (
+                  <div
+                    key={v.id}
+                    style={{
+                      padding: '10px 12px',
+                      borderBottom: '1px solid rgba(167, 139, 250, 0.08)',
+                      fontSize: 12,
+                      lineHeight: 1.45,
+                    }}
+                  >
+                    <div style={{
+                      display: 'flex', justifyContent: 'space-between',
+                      gap: 10, marginBottom: 2,
+                    }}>
+                      <div style={{
+                        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                        fontVariantNumeric: 'tabular-nums',
+                        opacity: 0.75,
+                      }}>{whenShort}</div>
+                      <div style={{
+                        fontSize: 11, opacity: 0.55, letterSpacing: '0.05em',
+                      }}>
+                        {v.country || '??'} · {v.ip || '—'}
+                      </div>
+                    </div>
+                    <div style={{ marginBottom: 2 }}>
+                      <span style={{ opacity: 0.55, marginRight: 6 }}>path</span>
+                      <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>
+                        {v.path || '/'}
+                      </span>
+                      {v.userEmail && (
+                        <span style={{
+                          marginLeft: 8, padding: '1px 6px',
+                          borderRadius: 6,
+                          background: 'rgba(167, 139, 250, 0.15)',
+                          fontSize: 11,
+                        }}>{v.userEmail}</span>
+                      )}
+                    </div>
+                    {uaShort && (
+                      <div style={{ opacity: 0.55, fontSize: 11 }}>
+                        {uaShort}{v.userAgent && v.userAgent.length > 80 ? '…' : ''}
+                      </div>
+                    )}
+                    {v.referer && (
+                      <div style={{ opacity: 0.45, fontSize: 11 }}>
+                        ← {v.referer.slice(0, 100)}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
           )}
         </div>
       )}
