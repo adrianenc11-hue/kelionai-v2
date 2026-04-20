@@ -42,3 +42,21 @@ data/
 .env.backup.*
 *.env.backup.*
 server/.env.backup.*
+
+# Capacitor / native builds
+android/app/build/
+android/build/
+android/.gradle/
+android/local.properties
+android/app/release/
+android/app/debug/
+android/.idea/
+android/captures/
+android/.cxx/
+ios/App/build/
+ios/App/Pods/
+ios/App/.build/
+ios/DerivedData/
+*.ipa
+*.apk
+*.aab
