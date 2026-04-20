@@ -2,7 +2,7 @@
 
 const jwt = require('jsonwebtoken');
 const config = require('../config');
-const { getUserByGoogleId, findById, findByEmail } = require('../db');
+const { getUserByGoogleId, findById, findByEmail, getUserByEmail } = require('../db');
 
 /**
  * Middleware pentru verificarea autentificării.
@@ -47,14 +47,52 @@ async function requireAuth(req, res, next) {
             // overwrite the cookie. The request proceeds normally so
             // actions like POST /api/credits/checkout don't fail.
             let migratedUser = null;
+            let migrationTrace = { triedEmail: null, emailErr: null, triedGoogleId: null, googleErr: null };
             if (decoded.email) {
+              migrationTrace.triedEmail = String(decoded.email).toLowerCase();
               try {
                 migratedUser = await findByEmail(decoded.email);
-              } catch (_) { migratedUser = null; }
+              } catch (e) {
+                migrationTrace.emailErr = e && e.message;
+                migratedUser = null;
+              }
+              // Case-insensitive fallback — some legacy tokens carry the
+              // email in the original case from Google while the DB row
+              // was lowercased at insert time (or vice-versa).
+              if (!migratedUser) {
+                try {
+                  migratedUser = await findByEmail(String(decoded.email).toLowerCase());
+                } catch (_) {}
+              }
+            }
+            if (!migratedUser) {
+              // Fallback: the non-numeric sub may BE the Google OAuth UUID
+              // for this user (pre-Postgres sign-ins stored Google `sub`
+              // directly). Look them up by google_id.
+              migrationTrace.triedGoogleId = String(rawSub);
+              try {
+                migratedUser = await getUserByGoogleId(String(rawSub));
+              } catch (e) {
+                migrationTrace.googleErr = e && e.message;
+              }
             }
             if (!migratedUser || !migratedUser.id) {
+              // Log ONCE per failure so Railway logs expose WHY migration
+              // failed for this session. Zero PII beyond the email claim
+              // (which the user already typed themselves at sign-in).
+              try {
+                console.warn('[auth] JWT migration failed', JSON.stringify({
+                  rawSub: String(rawSub).slice(0, 40),
+                  hasEmail: !!decoded.email,
+                  trace: migrationTrace,
+                }));
+              } catch (_) {}
               res.clearCookie('kelion.token', { path: '/' });
-              return res.status(401).json({ error: 'Stale token — please sign in again.' });
+              return res.status(401).json({
+                error: 'Stale token — please sign in again.',
+                code: 'stale_token',
+                hint: 'Sign out, close the tab, open a new tab and sign in again with email + password.',
+              });
             }
             const freshToken = jwt.sign(
               {

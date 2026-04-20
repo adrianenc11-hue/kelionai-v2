@@ -12,10 +12,99 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
-const { getUserByEmail, getDb } = require('../db');
+const jwt = require('jsonwebtoken');
+const config = require('../config');
+const { getUserByEmail, getUserByGoogleId, findByEmail, getDb } = require('../db');
 const { getLastBootstrapResult, bootstrapAdmin } = require('../services/adminBootstrap');
 
 const router = express.Router();
+
+/**
+ * GET /api/diag/whoami — decodes the kelion.token cookie (or Bearer
+ * Authorization header) for the calling browser and reports the JWT
+ * claims + what the JWT migration path in middleware/auth.js would find
+ * in the database. Zero secrets exposed — the token is NEVER echoed
+ * back, only its claims (email/name/role are already visible to the
+ * user in their own browser).
+ *
+ * This lets us see, from a user's own browser, exactly why the
+ * transparent migration might be failing for their session without
+ * needing Railway log access.
+ */
+router.get('/whoami', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization || '';
+    const rawToken = authHeader.startsWith('Bearer ')
+      ? authHeader.substring(7)
+      : (req.cookies && req.cookies['kelion.token']) || null;
+
+    if (!rawToken) {
+      return res.json({
+        now: new Date().toISOString(),
+        hasToken: false,
+        note: 'No kelion.token cookie or Authorization: Bearer header on this request.',
+      });
+    }
+
+    let decoded = null;
+    let verifyError = null;
+    try {
+      decoded = jwt.verify(rawToken, config.jwt.secret);
+    } catch (err) {
+      verifyError = err && err.message;
+      try { decoded = jwt.decode(rawToken); } catch (_) {}
+    }
+
+    const rawSub = decoded && decoded.sub;
+    const numericSub = Number.parseInt(rawSub, 10);
+    const isNumeric = Number.isFinite(numericSub) && String(numericSub) === String(rawSub);
+
+    let byEmail = null, byEmailErr = null;
+    let byEmailLC = null, byEmailLCErr = null;
+    let byGoogle = null, byGoogleErr = null;
+    if (decoded && decoded.email) {
+      try { byEmail = await findByEmail(decoded.email); }
+      catch (e) { byEmailErr = e && e.message; }
+      try { byEmailLC = await findByEmail(String(decoded.email).toLowerCase()); }
+      catch (e) { byEmailLCErr = e && e.message; }
+    }
+    if (rawSub) {
+      try { byGoogle = await getUserByGoogleId(String(rawSub)); }
+      catch (e) { byGoogleErr = e && e.message; }
+    }
+
+    res.json({
+      now: new Date().toISOString(),
+      hasToken: true,
+      verifyError,
+      usesPostgres: !!process.env.DATABASE_URL,
+      jwt: decoded ? {
+        sub: rawSub,
+        subIsNumeric: isNumeric,
+        email: decoded.email || null,
+        name: decoded.name || null,
+        role: decoded.role || null,
+        iat: decoded.iat || null,
+        exp: decoded.exp || null,
+      } : null,
+      dbLookup: {
+        byEmail: byEmail ? { id: byEmail.id, email: byEmail.email, role: byEmail.role, googleId: byEmail.google_id ? 'set' : null } : null,
+        byEmailErr,
+        byEmailLowercase: byEmailLC ? { id: byEmailLC.id, email: byEmailLC.email } : null,
+        byEmailLCErr,
+        byGoogleId: byGoogle ? { id: byGoogle.id, email: byGoogle.email } : null,
+        byGoogleErr,
+      },
+      wouldMigrate: isNumeric
+        ? 'no — sub is already numeric, request would pass straight through'
+        : (byEmail || byEmailLC || byGoogle)
+          ? 'yes — a DB row was found, fresh JWT would be issued and request would proceed'
+          : 'NO — no DB row matches; "Stale token" would be returned',
+    });
+  } catch (err) {
+    res.status(500).json({ error: err && err.message });
+  }
+});
 
 /**
  * GET /api/diag/db-path — returns where SQLite is persisted and whether
