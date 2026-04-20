@@ -593,9 +593,16 @@ function StudioDecor() {
           — raised Y from 0.35 → 0.95 so the bezel's bottom edge clears
           the "Type to Kelion…" composer and any error banner sitting
           above it at 1080p/desktop framing.
+          Adrian 2026-04-20 (follow-up): "monitorul un pic mai la dreapta
+          si mai jos sa fie incadrat la stanga si stanga sus" — after
+          the raise, the top-left corner of the bezel fell outside the
+          camera frustum at standard framing. Nudged X from -1.1 → -0.8
+          (closer to centre) and Y from 0.95 → 0.65 (lower) so the
+          top edge is visible and the left edge sits cleanly inside
+          the viewport.
           When Gemini Live calls the `show_on_monitor` tool, <StageMonitor/>
           renders an iframe / image on the inner plane via drei <Html transform>. */}
-      <group position={[-1.1, 0.95, -0.35]} rotation={[0, Math.PI / 9, 0]}>
+      <group position={[-0.8, 0.65, -0.35]} rotation={[0, Math.PI / 9, 0]}>
         {/* Bezel / outer frame */}
         <mesh position={[0, 0, -0.03]}>
           <planeGeometry args={[3.2, 2.1]} />
