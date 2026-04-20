@@ -91,20 +91,31 @@ function resolveMonitor(kind, query) {
     }
 
     case 'weather': {
-      // "vremea aici" / "weather here" / empty → use the GPS fix so the
-      // forecast matches where the user actually is, not a random city.
-      // wttr.in accepts `lat,lon` directly.
+      // We now render a server-side HTML dashboard driven by Open-Meteo
+      // (ICON-D2 ~2.2 km resolution over Central Europe vs ~10 km for
+      // OpenWeather/wttr.in). Free, no API key, CORS-open. Two paths:
+      //   (a) "vremea aici" / empty query → use latest GPS fix directly
+      //   (b) explicit city/place → geocode via Open-Meteo's free
+      //       geocoding API at render time on the server (we pass the
+      //       raw query through ?name= and let /api/weather/embed look
+      //       up the coords). For now we only implement (a); (b) falls
+      //       back to wttr.in until the server-side geocoder lands.
       const isHere = !q || HERE_QUERY_RE.test(q);
       const coords = isHere ? getLatestCoords() : null;
       if (coords && Number.isFinite(coords.lat) && Number.isFinite(coords.lon)) {
-        const ll = `${coords.lat.toFixed(4)},${coords.lon.toFixed(4)}`;
-        const src = `https://wttr.in/${ll}?m`;
+        const params = new URLSearchParams({
+          lat: coords.lat.toFixed(4),
+          lon: coords.lon.toFixed(4),
+          name: 'Your location',
+        });
+        const src = `/api/weather/embed?${params.toString()}`;
         return { kind: 'weather', src, title: `Weather — your location`, embedType: 'iframe' };
       }
       if (!q) return null;
-      // wttr.in renders a styled forecast page, no key, iframe-friendly.
-      // 0-flag = minimal today/tomorrow view; m = metric units.
-      const src = `https://wttr.in/${encodeURIComponent(q)}?m`;
+      // Explicit city / place — pass it through ?q= and let the server
+      // resolve it to lat/lon via Open-Meteo's free geocoding API.
+      const params = new URLSearchParams({ q, name: q });
+      const src = `/api/weather/embed?${params.toString()}`;
       return { kind: 'weather', src, title: `Weather — ${q}`, embedType: 'iframe' };
     }
 

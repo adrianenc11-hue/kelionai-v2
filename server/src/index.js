@@ -279,6 +279,14 @@ app.use('/api/trial', chatLimiter, trialRouter);
 app.use('/api/credits', creditsRouter);
 app.use('/api/diag', diagRouter);
 
+// Weather dashboard — server-rendered Open-Meteo HTML for the stage
+// monitor. Public and rate-limited; clients hit this via an <iframe>
+// when the user asks "vremea aici" / "weather here". ICON-D2 gives
+// ~2.2 km resolution over Central Europe which is why we prefer this
+// over wttr.in's OpenWeather wrapper.
+const weatherRouter = require('./routes/weather');
+app.use('/api/weather', chatLimiter, weatherRouter);
+
 // Stage 3 — M13 passkey (public — register/auth flows need to be reachable
 // without auth) + M14/M16/M17 memory (signed-in users only).
 // Rate-limited because POST /register/options creates a new user row on
