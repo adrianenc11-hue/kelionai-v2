@@ -11,11 +11,36 @@ const router = Router();
 // Stage 3 — read user from JWT cookie without gating the route.
 // (The realtime endpoints are public for guests; if a cookie is present
 // and valid we enrich the session with long-term memory.)
+//
+// IMPORTANT: this helper is the *optional* cousin of `requireAuth` in
+// server/src/middleware/auth.js. It must apply the same "numeric sub"
+// guard, otherwise stale pre-Postgres JWTs (passkey credential hashes
+// / UUIDs stored in `sub`) leak straight into `listMemoryItems(user.id)`
+// which passes them to a BIGINT column and every Gemini Live token mint
+// floods the logs with:
+//   [realtime] memory load failed invalid input syntax for type bigint: "<uuid>"
+// (See PR #61 for the matching guard on the hard-auth path.)
 async function peekSignedInUser(req) {
   try {
     const token = req.cookies?.['kelion.token'];
     if (!token) return null;
     const decoded = jwt.verify(token, config.jwt.secret);
+    const USE_POSTGRES = !!process.env.DATABASE_URL;
+    if (USE_POSTGRES) {
+      const sub = decoded.sub;
+      const numeric = Number.parseInt(sub, 10);
+      if (!Number.isFinite(numeric) || String(numeric) !== String(sub)) {
+        // Treat the cookie as if it wasn't there — the guest
+        // experience is fine (Kelion still greets, just without
+        // personalised memory) and we skip the bigint crash.
+        return null;
+      }
+      return {
+        id: numeric,
+        name: decoded.name,
+        email: decoded.email,
+      };
+    }
     return {
       id: decoded.sub,
       name: decoded.name,
