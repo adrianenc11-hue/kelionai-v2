@@ -3,7 +3,7 @@ import { useGLTF, Environment, ContactShadows, Float, Html } from '@react-three/
 import { Suspense, useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback } from 'react'
 import * as THREE from 'three'
 import { useLipSync } from '../lib/lipSync'
-import { subscribeMonitor } from '../lib/monitorStore'
+import { subscribeMonitor, clearMonitor } from '../lib/monitorStore'
 import { STATUS_COLORS, STATUS_PULSE_HZ } from '../lib/kelionStatus'
 import { useGeminiLive } from '../lib/geminiLive'
 import { useTrial } from '../lib/useTrial'
@@ -780,7 +780,24 @@ export default function KelionStage() {
   const [creditsCards, setCreditsCards] = useState([])
   const [creditsLoading, setCreditsLoading] = useState(false)
   const [creditsError, setCreditsError] = useState(null)
-  const isAdmin = Boolean(authState.user && authState.user.isAdmin)
+  // Defense-in-depth admin check. The server returns `isAdmin` on every
+  // auth response, but older JWTs / a stale cookie can hydrate an admin
+  // user without that flag (Adrian reported the "Credits" pill still
+  // showing for his signed-in admin session). When the flag is missing
+  // we also compare the email against the hard-coded owner + the build-
+  // time ADMIN_EMAILS env list (exposed via VITE_ADMIN_EMAILS at build).
+  const ADMIN_EMAIL_ALLOWLIST = [
+    'adrianenc11@gmail.com',
+    ...((import.meta.env.VITE_ADMIN_EMAILS || '')
+      .split(',').map((e) => e.trim().toLowerCase()).filter(Boolean)),
+  ]
+  const isAdmin = Boolean(
+    authState.user && (
+      authState.user.isAdmin === true ||
+      authState.user.role === 'admin' ||
+      (authState.user.email && ADMIN_EMAIL_ALLOWLIST.includes(String(authState.user.email).toLowerCase()))
+    )
+  )
   const openCredits = useCallback(async () => {
     setCreditsOpen(true)
     setCreditsLoading(true)

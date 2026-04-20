@@ -28,6 +28,20 @@ const STORAGE_KEY = 'kelion.geo.v1'
 const CACHE_MAX_AGE_MS = 10 * 60 * 1000       // 10 min
 const LOOKUP_TIMEOUT_MS = 12_000              // allow a full GPS cold-lock on mobile
 
+// Module-level latest coords snapshot so non-React code (kelionTools,
+// monitorStore) can read the user's current GPS without routing through
+// React context. Updated synchronously every time the hook writes new
+// coords to localStorage. Seeded lazily from cache on first access.
+let latestCoords = null
+export function getLatestCoords() {
+  if (latestCoords) return latestCoords
+  try {
+    const cached = readCache()
+    if (cached) latestCoords = cached
+  } catch { /* ignore */ }
+  return latestCoords
+}
+
 function readCache() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
@@ -42,6 +56,10 @@ function readCache() {
 }
 
 function writeCache(coords) {
+  // Keep the module-level snapshot in sync so `getLatestCoords()` always
+  // returns the freshest fix the hook has produced in this tab (used by
+  // monitorStore to resolve "where am I" map queries to real lat,lon).
+  latestCoords = coords ? { ...coords } : null
   try {
     localStorage.setItem(
       STORAGE_KEY,
