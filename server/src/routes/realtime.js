@@ -3,7 +3,7 @@
 const { Router } = require('express');
 const jwt = require('jsonwebtoken');
 const config = require('../config');
-const { listMemoryItems } = require('../db');
+const { listMemoryItems, findById } = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const ipGeo = require('../services/ipGeo');
 const router = Router();
@@ -197,14 +197,50 @@ router.get('/token', async (req, res) => {
 // Docs: https://ai.google.dev/gemini-api/docs/ephemeral-tokens
 // Client cannot override system prompt / voice — stays secure.
 // ──────────────────────────────────────────────────────────────────
+// Resolve whether the current request is an admin (DB role OR env
+// ADMIN_EMAILS OR the hard-coded default admin). Mirrors `requireAdmin`
+// in middleware/auth.js but works on the optional-auth `peekSignedInUser`
+// so we can bypass quota checks on public endpoints without forcing auth.
+async function isAdminUser(user) {
+  if (!user) return false;
+  try {
+    const dbUser = await findById(user.id);
+    if (dbUser && dbUser.role === 'admin') return true;
+  } catch (_) { /* fall through to email allow-list */ }
+  const defaultAdmins = ['adrianenc11@gmail.com'];
+  const adminEmails = (process.env.ADMIN_EMAILS || '')
+    .split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+  const allAdmins = new Set([...defaultAdmins, ...adminEmails]);
+  return !!(user.email && allAdmins.has(user.email.toLowerCase()));
+}
+
 router.get('/gemini-token', async (req, res) => {
-  const apiKey = process.env.GEMINI_API_KEY;
+  // Admin key-override path: when `GEMINI_API_KEY_ADMIN` is set AND the
+  // current caller is an admin, mint the ephemeral token against the
+  // admin's own GCP project. Rationale: Gemini Live (v1alpha, preview)
+  // has strict per-project quotas — when public users exhaust them Google
+  // closes the WS with code 1011 "You exceeded your current quota…". The
+  // owner of the app should not be blocked by users' usage, so we let
+  // them plug a separate billing project via env and route their
+  // sessions through it. Public users keep hitting the shared key.
+  const adminUser = await peekSignedInUser(req);
+  const isAdmin   = await isAdminUser(adminUser);
+  const apiKey    = (isAdmin && process.env.GEMINI_API_KEY_ADMIN)
+    ? process.env.GEMINI_API_KEY_ADMIN
+    : process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return res.status(503).json({ error: 'GEMINI_API_KEY not configured' });
   }
 
   try {
-    const voice = process.env.GEMINI_LIVE_VOICE_KELION || 'Kore';
+    // Default voice for the Kelion avatar: `Charon` is a deeper, masculine
+    // Gemini Live prebuilt voice. The previous default `Kore` is clearly
+    // female — a voice/avatar mismatch Adrian flagged explicitly. The male
+    // voice matches the avatar out of the box; operators can override via
+    // GEMINI_LIVE_VOICE_KELION. Other masculine Gemini Live options:
+    // `Puck` (bright, playful) and `Fenrir` (gravelly). Feminine options
+    // include `Kore`, `Aoede`, `Leda`.
+    const voice = process.env.GEMINI_LIVE_VOICE_KELION || 'Charon';
     // Default to the newest Gemini Live model documented by Google
     // (https://ai.google.dev/gemini-api/docs/live-api/ephemeral-tokens —
     // the official example uses this exact name). Override via Railway env
@@ -220,8 +256,9 @@ router.get('/gemini-token', async (req, res) => {
     const voiceStyle = resolveVoiceStyle(styleFromCookie || styleFromQuery);
 
     // Stage 3 — pull memory for signed-in users so Gemini Live starts
-    // with the user's durable facts already in the system prompt.
-    const user = await peekSignedInUser(req);
+    // with the user's durable facts already in the system prompt. Reuse
+    // the `adminUser` we already peeked above for the admin-key decision.
+    const user = adminUser;
     let memoryItems = [];
     if (user) {
       try { memoryItems = await listMemoryItems(user.id, 60); }
