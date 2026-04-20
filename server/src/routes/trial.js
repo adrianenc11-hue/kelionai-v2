@@ -17,17 +17,17 @@
 
 const { Router } = require('express');
 const ipGeo = require('../services/ipGeo');
-const { peekSignedInUser, isAdminUser } = require('../middleware/optionalAuth');
+const { peekSignedInUser } = require('../middleware/optionalAuth');
 const { TRIAL_WINDOW_MS, trialStatus } = require('../services/trialQuota');
 
 const router = Router();
 
-router.get('/status', async (req, res) => {
+router.get('/status', (req, res) => {
+  // Anyone with a valid JWT — admin OR regular — is not subject to the
+  // guest trial, so we don't need the admin DB lookup here (Copilot
+  // review pr-74): `applicable: false` is identical for both.
   const user = peekSignedInUser(req);
-  const admin = await isAdminUser(user);
-  if (user || admin) {
-    // Signed in (whether admin or regular): trial doesn't apply.
-    // The client uses `applicable: false` to hide the HUD entirely.
+  if (user) {
     return res.json({
       applicable: false,
       allowed:    true,

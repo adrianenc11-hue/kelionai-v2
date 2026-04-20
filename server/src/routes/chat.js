@@ -3,8 +3,7 @@
 const { Router } = require('express');
 const { getAI, getDefaultChatModel } = require('../utils/openai');
 const ipGeo = require('../services/ipGeo');
-const { peekSignedInUser, isAdminUser } = require('../middleware/optionalAuth');
-const { TRIAL_WINDOW_MS, trialStatus, stampTrialIfFresh } = require('../services/trialQuota');
+const { trialStatus, stampTrialIfFresh } = require('../services/trialQuota');
 
 const router = Router();
 
@@ -47,11 +46,11 @@ router.post('/', async (req, res) => {
   // token mint. Adrian: "aplica si la chat scris aceleasi reguli" / the
   // timer must tick on the FIRST free-tier interaction whether that's a
   // text message or Tap-to-talk, not only when the mic is pressed.
-  // Signed-in / admin users skip entirely — their usage is governed by
-  // the credits system / unlimited admin bypass respectively.
-  const requestUser = peekSignedInUser(req);
-  const requestIsAdmin = await isAdminUser(requestUser);
-  const isGuest = !requestUser && !requestIsAdmin;
+  // Signed-in users skip entirely (admin OR regular — both are governed
+  // by the credits system / unlimited admin bypass). softAuth upstream
+  // already populated req.user when a valid JWT is present, so we just
+  // use that (Copilot review pr-74).
+  const isGuest = !req.user;
   if (isGuest) {
     const ip = ipGeo.clientIp(req) || req.ip || '';
     const status = trialStatus(ip);
