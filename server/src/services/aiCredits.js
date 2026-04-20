@@ -275,6 +275,179 @@ async function getAllCredits() {
   return [gemini, openai, elevenlabs, stripe, railway];
 }
 
+/**
+ * Revenue-split contract: for every credit top-up the user pays, a
+ * fixed fraction (default 50%) is earmarked for AI provider spend
+ * (Google Gemini, ElevenLabs, OpenAI). The remainder is the owner's
+ * net. We do NOT transfer money automatically — Stripe cannot pay GCP
+ * directly. Instead we compute the allocation off the existing credit
+ * ledger and surface it next to the raw provider cards so the admin
+ * can cross-check against GCP billing and top up manually before the
+ * allocation dips below actual spend.
+ *
+ * Input sources:
+ *   - Ledger (credit_transactions): authoritative revenue in window.
+ *   - ElevenLabs API (/v1/user/subscription): exact characters spent.
+ *     Converted to USD using ElevenLabs Creator tier pricing (≈ $0.30
+ *     per 1k chars, which is the effective rate for pay-as-you-go
+ *     overage; real tier pricing varies, but this is a conservative
+ *     upper bound suitable for budget tracking).
+ *   - Gemini: Google does NOT expose per-project spend via any public
+ *     API that works with AI Studio keys. The only option is the
+ *     Google Cloud Billing API with a service-account + billing
+ *     account ID (most users don't bother). We report "unknown" and
+ *     link to the Cloud Billing console so the admin can enter /
+ *     cross-check manually.
+ *
+ * Output shape is deliberately flat so the UI can show one row per
+ * line item.
+ */
+const DEFAULT_AI_ALLOCATION_FRACTION = Number(
+  process.env.AI_ALLOCATION_FRACTION || 0.5,
+);
+
+function formatMinorCurrency(cents, currency = 'gbp') {
+  if (typeof cents !== 'number' || !Number.isFinite(cents)) return '—';
+  const sym = String(currency || '').toUpperCase();
+  const value = (cents / 100).toFixed(2);
+  return `${value} ${sym}`;
+}
+
+async function probeElevenLabsSpend() {
+  const apiKey = process.env.ELEVENLABS_API_KEY || '';
+  const out = {
+    configured: Boolean(apiKey),
+    charsUsed: null,
+    charsLimit: null,
+    tier: null,
+    // Conservative overage rate for Creator/pay-as-you-go. Real tier
+    // pricing varies; we pick a rate that slightly over-estimates spend
+    // so the budget alert fires a little early (safer).
+    estSpendCents: null,
+    currency: 'usd',
+    status: 'unknown',
+    message: null,
+  };
+  if (!apiKey) {
+    out.status = 'error';
+    out.message = 'ELEVENLABS_API_KEY not set';
+    return out;
+  }
+  try {
+    const r = await fetchWithTimeout('https://api.elevenlabs.io/v1/user/subscription', {
+      method: 'GET',
+      headers: { 'xi-api-key': apiKey },
+    });
+    if (!r.ok) {
+      const body = await r.text().catch(() => '');
+      out.status = 'error';
+      out.message = `HTTP ${r.status}: ${body.slice(0, 160)}`;
+      return out;
+    }
+    const j = await r.json();
+    const used = Number(j.character_count || 0);
+    const limit = Number(j.character_limit || 0);
+    out.charsUsed = used;
+    out.charsLimit = limit;
+    out.tier = typeof j.tier === 'string' ? j.tier : null;
+    // $0.30 per 1k chars = 30 cents per 1k = 3 cents per 100 chars.
+    // 1 char => 0.03 cents = 0.0003 dollars.
+    out.estSpendCents = Math.round(used * 0.03);
+    out.status = 'ok';
+    return out;
+  } catch (err) {
+    out.status = 'error';
+    out.message = err && err.message ? err.message : 'network error';
+    return out;
+  }
+}
+
+/**
+ * Build the revenue-split snapshot. `revenueSummary` is the object
+ * returned by db.getCreditRevenueSummary(days) so the route can reuse
+ * the same query it already uses for /api/admin/business.
+ */
+async function buildRevenueSplit(revenueSummary, { days = 30, currency = 'gbp' } = {}) {
+  const topupsCount = Number(revenueSummary?.topups || 0);
+  // db.getCreditRevenueSummary returns `revenueCents` (camelCase); the
+  // raw SQL alias is `revenue_cents` but the helper normalises it.
+  const revenueCents = Number(
+    revenueSummary?.revenueCents ?? revenueSummary?.revenue_cents ?? 0,
+  );
+  const fraction = DEFAULT_AI_ALLOCATION_FRACTION;
+  const allocatedCents = Math.round(revenueCents * fraction);
+  const ownerCents = revenueCents - allocatedCents;
+
+  const elevenlabs = await probeElevenLabsSpend();
+
+  // ElevenLabs tier is priced in USD. We don't do FX conversion here —
+  // the admin dashboard shows both values side-by-side with their
+  // currencies explicit so the admin can eyeball the buffer.
+  const knownSpendCents = Number(elevenlabs.estSpendCents || 0);
+
+  // Gemini cost is unknown from our side. Honest "null" so UI can
+  // render a manual-entry placeholder instead of pretending $0.
+  const gemini = {
+    source: 'manual',
+    note: 'Gemini spend is not exposed via AI Studio keys. Use GCP Billing dashboard to cross-check.',
+    billingUrl: 'https://console.cloud.google.com/billing',
+  };
+
+  // Delta compares allocated revenue against *known* spend only. When
+  // Gemini cost is added manually we'll subtract it from this delta.
+  // Status is conservative: if known spend already eats > 80% of
+  // allocation, we flag warn; over 100%, over.
+  let status = 'ok';
+  if (allocatedCents > 0) {
+    const ratio = knownSpendCents / allocatedCents;
+    if (ratio >= 1) status = 'over';
+    else if (ratio >= 0.8) status = 'warn';
+  } else if (knownSpendCents > 0) {
+    status = 'over';
+  }
+
+  return {
+    window: { days, since: new Date(Date.now() - days * 86400000).toISOString() },
+    fraction,
+    revenue: {
+      topups: topupsCount,
+      grossCents: revenueCents,
+      grossDisplay: formatMinorCurrency(revenueCents, currency),
+      currency,
+    },
+    allocation: {
+      fraction,
+      cents: allocatedCents,
+      display: formatMinorCurrency(allocatedCents, currency),
+      ownerCents,
+      ownerDisplay: formatMinorCurrency(ownerCents, currency),
+    },
+    spend: {
+      gemini,
+      elevenlabs: {
+        configured: elevenlabs.configured,
+        status: elevenlabs.status,
+        message: elevenlabs.message,
+        charsUsed: elevenlabs.charsUsed,
+        charsLimit: elevenlabs.charsLimit,
+        tier: elevenlabs.tier,
+        estSpendCents: elevenlabs.estSpendCents,
+        estSpendDisplay: formatMinorCurrency(elevenlabs.estSpendCents, elevenlabs.currency),
+        currency: elevenlabs.currency,
+      },
+      knownTotalCents: knownSpendCents,
+      knownTotalDisplay: formatMinorCurrency(knownSpendCents, 'usd'),
+    },
+    delta: {
+      // Positive = budget remaining (allocation > known spend).
+      // Negative = over budget.
+      cents: allocatedCents - knownSpendCents,
+      display: formatMinorCurrency(allocatedCents - knownSpendCents, currency),
+      status, // 'ok' | 'warn' | 'over'
+    },
+  };
+}
+
 module.exports = {
   getAllCredits,
   probeGemini,
@@ -282,4 +455,6 @@ module.exports = {
   probeElevenLabs,
   probeStripe,
   probeRailway,
+  probeElevenLabsSpend,
+  buildRevenueSplit,
 };
