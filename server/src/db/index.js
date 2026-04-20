@@ -200,6 +200,28 @@ async function initDb() {
   // Guard against double-fulfillment when Stripe retries webhooks.
   await db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_credit_tx_session ON credit_transactions(stripe_session_id) WHERE stripe_session_id IS NOT NULL');
 
+  // Visitor analytics — Adrian 2026-04-20: "nu vad buton vizite reale cine a
+  // vizitat situl, ip tara restul datelor lor". One row per SPA page load
+  // (not per API call — we explicitly do NOT log API hits). Country comes
+  // from the CDN header (`cf-ipcountry`, `x-vercel-ip-country`, etc) if
+  // available; we never do external IP→country lookups on the hot path.
+  // IP is stored for admin audit — admin dashboard only, never exposed to
+  // end users. Old rows are pruned opportunistically in `listRecentVisitors`.
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS visitor_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ts DATETIME DEFAULT CURRENT_TIMESTAMP,
+      path TEXT,
+      ip TEXT,
+      country TEXT,
+      user_agent TEXT,
+      referer TEXT,
+      user_id INTEGER,
+      user_email TEXT
+    )
+  `);
+  await db.exec('CREATE INDEX IF NOT EXISTS idx_visitor_events_ts ON visitor_events(ts DESC)');
+
   return db;
 }
 
@@ -497,6 +519,77 @@ function generateShortCode() {
   return out;
 }
 
+// ─── Visitor analytics helpers ─────────────────────────────────────
+// Adrian 2026-04-20: "nu vad buton vizite reale cine a vizitat situl,
+// ip tara restul datelor lor". One row per SPA page load, admin-only.
+async function recordVisitorEvent({
+  path: pPath = null,
+  ip = null,
+  country = null,
+  userAgent = null,
+  referer = null,
+  userId = null,
+  userEmail = null,
+} = {}) {
+  try {
+    await db.run(
+      `INSERT INTO visitor_events (path, ip, country, user_agent, referer, user_id, user_email)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [pPath, ip, country, userAgent, referer, userId, userEmail]
+    );
+  } catch (err) {
+    // Never let analytics failures break a page load.
+    console.warn('[db] recordVisitorEvent failed:', err && err.message);
+  }
+}
+
+async function listRecentVisitors(limit = 100) {
+  const safeLimit = Math.min(500, Math.max(1, Number(limit) || 100));
+  try {
+    return await db.all(
+      `SELECT id, ts, path, ip, country, user_agent, referer, user_id, user_email
+       FROM visitor_events
+       ORDER BY ts DESC
+       LIMIT ?`,
+      [safeLimit]
+    );
+  } catch (err) {
+    console.warn('[db] listRecentVisitors failed:', err && err.message);
+    return [];
+  }
+}
+
+async function getVisitorStats({ windowHours = 24 } = {}) {
+  // Lightweight aggregate for the admin dashboard header. Safe to call
+  // on every refresh — all operations are indexed on `ts`.
+  const safeHours = Math.min(24 * 30, Math.max(1, Number(windowHours) || 24));
+  try {
+    const since = new Date(Date.now() - safeHours * 3600 * 1000).toISOString();
+    const [totalRow, uniqueRow, topCountries] = await Promise.all([
+      db.get('SELECT COUNT(*) AS n FROM visitor_events WHERE ts >= ?', [since]),
+      db.get('SELECT COUNT(DISTINCT ip) AS n FROM visitor_events WHERE ts >= ? AND ip IS NOT NULL', [since]),
+      db.all(
+        `SELECT country, COUNT(*) AS n
+         FROM visitor_events
+         WHERE ts >= ? AND country IS NOT NULL AND country <> ''
+         GROUP BY country
+         ORDER BY n DESC
+         LIMIT 5`,
+        [since]
+      ),
+    ]);
+    return {
+      windowHours: safeHours,
+      totalVisits: Number((totalRow && totalRow.n) || 0),
+      uniqueIps: Number((uniqueRow && uniqueRow.n) || 0),
+      topCountries: Array.isArray(topCountries) ? topCountries : [],
+    };
+  } catch (err) {
+    console.warn('[db] getVisitorStats failed:', err && err.message);
+    return { windowHours: safeHours, totalVisits: 0, uniqueIps: 0, topCountries: [] };
+  }
+}
+
 module.exports = {
   initDb,
   getDb,
@@ -549,7 +642,12 @@ module.exports = {
   getCreditsBalance,
   addCreditsTransaction,
   listCreditTransactions,
+  listRecentCreditTransactions,
   getCreditRevenueSummary,
+  // Visitor analytics
+  recordVisitorEvent,
+  listRecentVisitors,
+  getVisitorStats,
 };
 
 // ─── Stage 5 helpers ────────────────────────────────────────────────
@@ -727,6 +825,43 @@ async function listCreditTransactions(userId, limit = 50) {
      FROM credit_transactions WHERE user_id = ? ORDER BY created_at DESC LIMIT ?`,
     [userId, limit],
   );
+}
+
+/**
+ * Admin-only — list the most recent N credit transactions across ALL
+ * users. Joins on `users` to surface the human-readable email/name so
+ * the admin "Live Usage" panel can render a single flat feed without
+ * N+1 lookups. Supports filtering by `kind` (e.g. 'consumption',
+ * 'topup', 'admin_grant') so the refund UI can show only the grants
+ * Adrian issued, and the abuse monitor can show only consumption.
+ *
+ * Used by /api/admin/credits/ledger.
+ */
+async function listRecentCreditTransactions({ limit = 50, kind = null, sinceMs = null } = {}) {
+  const cappedLimit = Math.min(500, Math.max(1, Number(limit) || 50));
+  const params = [];
+  const where = [];
+  if (kind) {
+    where.push('t.kind = ?');
+    params.push(kind);
+  }
+  if (sinceMs) {
+    where.push('t.created_at > ?');
+    params.push(new Date(Number(sinceMs)).toISOString());
+  }
+  const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
+  const sql = `
+    SELECT t.id, t.user_id, t.delta_minutes, t.amount_cents, t.currency,
+           t.kind, t.stripe_session_id, t.note, t.created_at,
+           u.email AS user_email, u.name AS user_name,
+           u.credits_balance_minutes AS user_balance
+      FROM credit_transactions t
+      LEFT JOIN users u ON u.id = t.user_id
+      ${whereClause}
+     ORDER BY t.created_at DESC
+     LIMIT ?`;
+  params.push(cappedLimit);
+  return db.all(sql, params);
 }
 
 /**

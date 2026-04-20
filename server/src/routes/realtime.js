@@ -261,7 +261,15 @@ router.get('/gemini-token', async (req, res) => {
     // tried include `gemini-live-2.5-flash-preview` which returns 404 from
     // the v1alpha auth_tokens provisioning endpoint.
     const model = process.env.GEMINI_LIVE_MODEL || 'gemini-3.1-flash-live-preview';
+    // Adrian 2026-04-20: "nu asteapta sa identifice limba, pleaca in engleza
+    // direct". Force English (en-US) regardless of what the browser's
+    // `navigator.language` says, so the session never pauses on language
+    // auto-detection at the beginning. The client still passes the hint
+    // in ?lang for logging (we use it in the error-path log below), but
+    // the speechConfig locks Kelion to en-US. Override via KELION_FORCE_LANG
+    // env var if a later requirement flips this.
     const browserLang = (req.query.lang || 'en-US').toString().slice(0, 16);
+    const forcedLang = (process.env.KELION_FORCE_LANG || 'en-US').toString().slice(0, 16);
     // Stage 6 — M26: voice style preset chosen by the user via the menu.
     // Cookie first (survives refresh), then ?style= query, then default warm.
     const styleFromCookie = req.cookies?.['kelion.voice_style'];
@@ -326,7 +334,11 @@ router.get('/gemini-token', async (req, res) => {
         responseModalities: ['AUDIO'],
         speechConfig: {
           voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } },
-          languageCode: browserLang,
+          // Force English — see note above `forcedLang`. Previously we
+          // passed `browserLang` (e.g. `ro-RO` for Romanian users) which
+          // made Gemini wait on the first utterance to confirm the
+          // spoken language before answering.
+          languageCode: forcedLang,
         },
         temperature: 0.85,
       },

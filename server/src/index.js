@@ -9,6 +9,7 @@ const rateLimit = require('express-rate-limit');
 
 const config = require('./config');
 const { csrfSeed } = require('./middleware/csrf');
+const { visitorLog } = require('./middleware/visitorLog');
 const { requireAuth } = require('./middleware/auth');
 const { checkSubscription, getPlans } = require('./middleware/subscription');
 const { initDb } = require('./db');
@@ -120,6 +121,11 @@ app.use((req, res, next) => {
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(csrfSeed);
+
+// Visitor analytics — fires only on HTML page loads, never on API / static
+// requests. Wrapped internally so failure can't break a page load. See
+// middleware/visitorLog.js for filtering rules.
+app.use(visitorLog);
 
 // Auth routes (no auth required)
 app.use('/auth', authRouter);

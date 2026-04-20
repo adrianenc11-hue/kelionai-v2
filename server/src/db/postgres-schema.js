@@ -93,4 +93,17 @@ CREATE INDEX IF NOT EXISTS idx_credit_tx_user ON credit_transactions(user_id, cr
 CREATE UNIQUE INDEX IF NOT EXISTS idx_credit_tx_session
   ON credit_transactions(stripe_session_id)
   WHERE stripe_session_id IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS visitor_events (
+  id          BIGSERIAL PRIMARY KEY,
+  ts          TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  path        TEXT,
+  ip          TEXT,
+  country     TEXT,
+  user_agent  TEXT,
+  referer     TEXT,
+  user_id     BIGINT,
+  user_email  TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_visitor_events_ts ON visitor_events(ts DESC);
 `;

@@ -50,6 +50,13 @@ createRoot(document.getElementById('root')).render(
         <Suspense fallback={<Loader />}>
           <Routes>
             <Route path="/" element={<KelionStage />} />
+            {/* Contact route — previously missing from the router, so
+                the "Contact us" menu entry (which calls
+                window.location.assign('/contact')) fell through to
+                the catch-all below and redirected back to "/". The
+                ContactPage component has always existed
+                (src/pages/ContactPage.jsx), it just wasn't wired in. */}
+            <Route path="/contact" element={<ContactPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>

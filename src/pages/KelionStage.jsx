@@ -6,6 +6,7 @@ import { useLipSync } from '../lib/lipSync'
 import { subscribeMonitor } from '../lib/monitorStore'
 import { STATUS_COLORS, STATUS_PULSE_HZ } from '../lib/kelionStatus'
 import { useGeminiLive } from '../lib/geminiLive'
+import { useWakeWord } from '../lib/useWakeWord'
 import { useTrial } from '../lib/useTrial'
 import { useClientGeo } from '../lib/useClientGeo'
 import { TUNING, isTuningEnabled } from '../lib/tuning'
@@ -798,13 +799,34 @@ export default function KelionStage() {
   const [revenueSplit, setRevenueSplit] = useState(null)
   const [revenueSplitLoading, setRevenueSplitLoading] = useState(false)
   const [revenueSplitError, setRevenueSplitError] = useState(null)
+  // Live usage ledger — most recent credit transactions across all
+  // users. Auto-refreshed every 5s while the credits overlay is open
+  // so Adrian can watch consumption tick in real time. Added after
+  // the 2026-04-20 charge-on-open bug drained a £10 pack in seconds;
+  // visibility is now a standing requirement ("permanent la toti
+  // userii").
+  const [ledgerRows, setLedgerRows] = useState([])
+  const [ledgerError, setLedgerError] = useState(null)
+  const [ledgerLoading, setLedgerLoading] = useState(false)
   const isAdmin = Boolean(authState.user && authState.user.isAdmin)
+  const refreshLedger = useCallback(async () => {
+    try {
+      const r = await fetch('/api/admin/credits/ledger?limit=50', { credentials: 'include' })
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      const j = await r.json()
+      setLedgerRows(Array.isArray(j.rows) ? j.rows : [])
+      setLedgerError(null)
+    } catch (err) {
+      setLedgerError(err.message || 'Could not load ledger')
+    }
+  }, [])
   const openCredits = useCallback(async () => {
     setCreditsOpen(true)
     setCreditsLoading(true)
     setCreditsError(null)
     setRevenueSplitLoading(true)
     setRevenueSplitError(null)
+    setLedgerLoading(true)
     const cardsPromise = fetch('/api/admin/credits', { credentials: 'include' })
       .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
       .then((j) => setCreditsCards(Array.isArray(j.cards) ? j.cards : []))
@@ -815,8 +837,50 @@ export default function KelionStage() {
       .then((j) => setRevenueSplit(j))
       .catch((err) => setRevenueSplitError(err.message || 'Could not load revenue split'))
       .finally(() => setRevenueSplitLoading(false))
-    await Promise.allSettled([cardsPromise, splitPromise])
+    const ledgerPromise = refreshLedger().finally(() => setLedgerLoading(false))
+    await Promise.allSettled([cardsPromise, splitPromise, ledgerPromise])
+  }, [refreshLedger])
+
+  // Poll ledger every 5s while overlay is open. Cleared on close /
+  // unmount so we never leak an interval.
+  useEffect(() => {
+    if (!creditsOpen || !isAdmin) return undefined
+    const id = setInterval(() => { refreshLedger() }, 5000)
+    return () => clearInterval(id)
+  }, [creditsOpen, isAdmin, refreshLedger])
+
+  // Admin-only — Visitors overlay. One row per SPA page load recorded by
+  // the server-side `visitorLog` middleware. Shows IP, country, UA,
+  // referer, path, user email (if signed in), timestamp. Auto-refresh
+  // every 10s while open so Adrian can watch the live flow.
+  const [visitorsOpen, setVisitorsOpen] = useState(false)
+  const [visitorsRows, setVisitorsRows] = useState([])
+  const [visitorsStats, setVisitorsStats] = useState(null)
+  const [visitorsLoading, setVisitorsLoading] = useState(false)
+  const [visitorsError, setVisitorsError] = useState(null)
+  const refreshVisitors = useCallback(async () => {
+    try {
+      const r = await fetch('/api/admin/visitors?limit=200&windowHours=24', { credentials: 'include' })
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      const j = await r.json()
+      setVisitorsRows(Array.isArray(j.visits) ? j.visits : [])
+      setVisitorsStats(j.stats || null)
+      setVisitorsError(null)
+    } catch (err) {
+      setVisitorsError(err.message || 'Could not load visitors')
+    }
   }, [])
+  const openVisitors = useCallback(async () => {
+    setVisitorsOpen(true)
+    setVisitorsLoading(true)
+    await refreshVisitors()
+    setVisitorsLoading(false)
+  }, [refreshVisitors])
+  useEffect(() => {
+    if (!visitorsOpen || !isAdmin) return undefined
+    const id = setInterval(() => { refreshVisitors() }, 10000)
+    return () => clearInterval(id)
+  }, [visitorsOpen, isAdmin, refreshVisitors])
 
   // Stage 7 — monetization. User-facing top-up modal (Stripe Checkout)
   // and live balance. `buyOpen` shows the package picker; `buyBusy` is
@@ -1275,7 +1339,16 @@ export default function KelionStage() {
     // shared /api/trial/status endpoint so the timer also ticks for
     // text-chat-only guests who never touch the mic.
     trial: voiceTrial,
-  } = useGeminiLive({ audioRef, coords: clientGeo })
+  } = useGeminiLive({
+    audioRef,
+    coords: clientGeo,
+    // Live HUD: every successful consume response carries the
+    // post-deduction balance. Pipe it straight into the top-right
+    // "Credits · N" chip so users see the credit tick down per minute
+    // without a page refresh. Admins get `null` (exempt) and the
+    // hook skips the update — chip stays on whatever /balance loaded.
+    onBalanceUpdate: (minutes) => setBalance(minutes),
+  })
 
   // Unified trial HUD source of truth. Applies to both voice AND text
   // chat via the shared 15-min/day IP window on the server. Collapses
@@ -1622,6 +1695,30 @@ export default function KelionStage() {
       }
     }
   }, [menuOpen, status, start, geoPermission, requestGeo, authState.signedIn, trialHud])
+
+  // ───── Wake-word "Kelion" ─────
+  // Adrian: "cind zic kelion se auto porneste butonul de chat".
+  // When the status is idle (no live session yet, or a previous error
+  // cleared the state), run a background recogniser that listens for
+  // the hotword and triggers the same entry point as the tap-to-talk
+  // click. The hook is a no-op on browsers without the Web Speech API
+  // (Safari iOS, Firefox), so the manual tap flow stays untouched for
+  // those users.
+  useWakeWord({
+    enabled: status === 'idle' || status === 'error',
+    onDetect: () => {
+      if (status === 'idle' || status === 'error') {
+        try { start() } catch (_) { /* banner surfaces failure */ }
+        if (!authState.signedIn) {
+          if (trialRefreshTimerRef.current) clearTimeout(trialRefreshTimerRef.current)
+          trialRefreshTimerRef.current = setTimeout(() => {
+            trialRefreshTimerRef.current = null
+            trialHud.refresh()
+          }, 600)
+        }
+      }
+    },
+  })
 
   return (
     <div
@@ -2226,6 +2323,14 @@ export default function KelionStage() {
                   </MenuItem>
                   <MenuItem onClick={() => { openBusiness(); setMenuOpen(false) }}>
                     Business metrics (admin)
+                  </MenuItem>
+                  {/* Visitor analytics — Adrian 2026-04-20: "nu vad buton
+                      vizite reale cine a vizitat situl, ip tara restul
+                      datelor lor". One row per SPA page load with IP,
+                      country, user-agent, referer, and (if signed in)
+                      email. */}
+                  <MenuItem onClick={() => { openVisitors(); setMenuOpen(false) }}>
+                    Visitors (admin)
                   </MenuItem>
                 </>
               )}
@@ -3028,6 +3133,140 @@ export default function KelionStage() {
             )
           })()}
 
+          {/* ───── Live Usage — Adrian: "analiza pe consum credite in timp
+               real permanent la toti userii". Flat feed of the most
+               recent ledger entries across every user, auto-refreshed
+               every 5 s. Added after the 2026-04-20 charge-on-open
+               incident so consumption is now observable the moment it
+               happens, not post-mortem. ───── */}
+          <div style={{
+            marginBottom: 16, padding: 14,
+            borderRadius: 14,
+            background: 'rgba(167, 139, 250, 0.05)',
+            border: '1px solid rgba(167, 139, 250, 0.22)',
+          }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              marginBottom: 8,
+            }}>
+              <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: 0.1 }}>
+                Live Usage
+              </div>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                fontSize: 10, opacity: 0.65,
+              }}>
+                <span style={{
+                  width: 6, height: 6, borderRadius: '50%',
+                  background: '#22c55e',
+                  boxShadow: '0 0 6px rgba(34,197,94,0.9)',
+                }} />
+                auto-refresh 5 s
+              </div>
+            </div>
+            {ledgerError && (
+              <div style={{
+                fontSize: 11, color: '#fca5a5',
+                padding: '6px 10px',
+                background: 'rgba(239, 68, 68, 0.1)',
+                borderRadius: 8,
+                marginBottom: 8,
+              }}>{ledgerError}</div>
+            )}
+            {ledgerLoading && ledgerRows.length === 0 && (
+              <div style={{ fontSize: 12, opacity: 0.5 }}>Loading ledger…</div>
+            )}
+            {!ledgerLoading && ledgerRows.length === 0 && !ledgerError && (
+              <div style={{ fontSize: 12, opacity: 0.5 }}>No transactions yet.</div>
+            )}
+            {ledgerRows.length > 0 && (() => {
+              // Abuse heuristic: flag any user who burned >5 credits
+              // in the last 5 minutes via plain consumption. Clean
+              // finish-of-session is 1 credit / 60 s, so >5/5 min
+              // means either a bug or tampering — exactly the fraud
+              // path that hit user Kelion on 2026-04-20.
+              const now = Date.now()
+              const windowMs = 5 * 60 * 1000
+              const byUser = new Map()
+              for (const row of ledgerRows) {
+                if (row.kind !== 'consumption') continue
+                const ts = row.created_at ? Date.parse(row.created_at) : 0
+                if (!ts || now - ts > windowMs) continue
+                const key = row.user_email || `user-${row.user_id}`
+                const agg = byUser.get(key) || { drained: 0, last: 0 }
+                agg.drained += Math.abs(Number(row.delta_minutes) || 0)
+                if (ts > agg.last) agg.last = ts
+                byUser.set(key, agg)
+              }
+              const suspects = [...byUser.entries()]
+                .filter(([, v]) => v.drained > 5)
+                .sort((a, b) => b[1].drained - a[1].drained)
+              return (
+                <>
+                  {suspects.length > 0 && (
+                    <div style={{
+                      padding: '8px 10px', marginBottom: 10,
+                      borderRadius: 8,
+                      background: 'rgba(239, 68, 68, 0.12)',
+                      border: '1px solid rgba(239, 68, 68, 0.5)',
+                      color: '#fecaca',
+                      fontSize: 12,
+                    }}>
+                      <div style={{ fontWeight: 700, marginBottom: 4 }}>
+                        ⚠ Abnormal drain in last 5 min
+                      </div>
+                      {suspects.slice(0, 3).map(([who, v]) => (
+                        <div key={who} style={{ opacity: 0.9 }}>
+                          {who} — {v.drained} credits
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div style={{
+                    maxHeight: 220, overflowY: 'auto',
+                    borderRadius: 8,
+                    background: 'rgba(0, 0, 0, 0.22)',
+                  }}>
+                    {ledgerRows.slice(0, 30).map((row) => {
+                      const delta = Number(row.delta_minutes) || 0
+                      const positive = delta > 0
+                      const color = positive
+                        ? '#bbf7d0'
+                        : row.kind === 'admin_grant'
+                          ? '#c4b5fd'
+                          : '#fecaca'
+                      const ts = row.created_at ? new Date(row.created_at) : null
+                      const tsLabel = ts
+                        ? `${ts.getHours().toString().padStart(2, '0')}:${ts.getMinutes().toString().padStart(2, '0')}:${ts.getSeconds().toString().padStart(2, '0')}`
+                        : ''
+                      return (
+                        <div key={row.id} style={{
+                          display: 'grid',
+                          gridTemplateColumns: '60px 1fr 70px 60px',
+                          gap: 8, alignItems: 'center',
+                          padding: '6px 10px',
+                          fontSize: 11,
+                          borderBottom: '1px solid rgba(167, 139, 250, 0.08)',
+                        }}>
+                          <span style={{ opacity: 0.55, fontFamily: 'monospace' }}>{tsLabel}</span>
+                          <span style={{ opacity: 0.85, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {row.user_email || `user-${row.user_id}`}
+                          </span>
+                          <span style={{ opacity: 0.65, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.05 }}>
+                            {row.kind}
+                          </span>
+                          <span style={{ color, fontWeight: 600, textAlign: 'right', fontFamily: 'monospace' }}>
+                            {positive ? '+' : ''}{delta}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </>
+              )
+            })()}
+          </div>
+
           {!creditsLoading && creditsCards.map((c) => {
             const badge = {
               ok: { bg: 'rgba(34, 197, 94, 0.12)', border: 'rgba(34, 197, 94, 0.55)', text: '#bbf7d0', label: 'OK' },
@@ -3089,6 +3328,192 @@ export default function KelionStage() {
 
           {!creditsLoading && creditsCards.length === 0 && !creditsError && (
             <div style={{ opacity: 0.55, fontSize: 14 }}>No providers configured.</div>
+          )}
+        </div>
+      )}
+
+      {/* Admin-only — Visitors drawer. Shows one row per SPA page load
+          (IP, country, user-agent, referer, path, user email if signed
+          in, timestamp). Auto-refresh 10s. Adrian 2026-04-20: "nu vad
+          buton vizite reale cine a vizitat situl, ip tara restul
+          datelor lor". */}
+      {visitorsOpen && (
+        <div
+          onClick={() => setVisitorsOpen(false)}
+          style={{
+            position: 'absolute', inset: 0,
+            background: 'rgba(3, 4, 10, 0.35)',
+            zIndex: 25,
+          }}
+        />
+      )}
+      {visitorsOpen && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: 'absolute', top: 0, right: 0, bottom: 0,
+            width: 'min(640px, 98vw)',
+            background: 'rgba(10, 8, 20, 0.92)',
+            backdropFilter: 'blur(22px)',
+            borderLeft: '1px solid rgba(167, 139, 250, 0.2)',
+            padding: '70px 20px 24px 20px',
+            overflowY: 'auto',
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+            zIndex: 26,
+            color: '#ede9fe',
+          }}
+        >
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            marginBottom: 14,
+          }}>
+            <div style={{ fontSize: 11, opacity: 0.6, letterSpacing: '0.15em' }}>
+              VISITORS — ADMIN
+            </div>
+            <button
+              onClick={() => setVisitorsOpen(false)}
+              style={{
+                background: 'transparent', border: 'none', color: '#ede9fe',
+                fontSize: 20, cursor: 'pointer', opacity: 0.7,
+              }}
+              aria-label="Close"
+            >✕</button>
+          </div>
+
+          {/* Stats header — last 24h summary. */}
+          {visitorsStats && (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: 8,
+              marginBottom: 16,
+            }}>
+              <div style={{
+                padding: '10px 12px', borderRadius: 10,
+                background: 'rgba(167, 139, 250, 0.06)',
+                border: '1px solid rgba(167, 139, 250, 0.2)',
+              }}>
+                <div style={{ fontSize: 10, opacity: 0.6, letterSpacing: '0.1em' }}>
+                  VISITS ({visitorsStats.windowHours}H)
+                </div>
+                <div style={{ fontSize: 22, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                  {visitorsStats.totalVisits}
+                </div>
+              </div>
+              <div style={{
+                padding: '10px 12px', borderRadius: 10,
+                background: 'rgba(167, 139, 250, 0.06)',
+                border: '1px solid rgba(167, 139, 250, 0.2)',
+              }}>
+                <div style={{ fontSize: 10, opacity: 0.6, letterSpacing: '0.1em' }}>
+                  UNIQUE IPS
+                </div>
+                <div style={{ fontSize: 22, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                  {visitorsStats.uniqueIps}
+                </div>
+              </div>
+              <div style={{
+                padding: '10px 12px', borderRadius: 10,
+                background: 'rgba(167, 139, 250, 0.06)',
+                border: '1px solid rgba(167, 139, 250, 0.2)',
+              }}>
+                <div style={{ fontSize: 10, opacity: 0.6, letterSpacing: '0.1em' }}>
+                  TOP COUNTRIES
+                </div>
+                <div style={{ fontSize: 13, marginTop: 4 }}>
+                  {Array.isArray(visitorsStats.topCountries) && visitorsStats.topCountries.length > 0
+                    ? visitorsStats.topCountries.map((c) => `${c.country} (${c.n})`).join(', ')
+                    : <span style={{ opacity: 0.55 }}>—</span>}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {visitorsLoading && (
+            <div style={{ opacity: 0.55, fontSize: 14 }}>Loading visitors…</div>
+          )}
+          {visitorsError && !visitorsLoading && (
+            <div style={{
+              fontSize: 13, color: '#fecaca',
+              background: 'rgba(80, 14, 14, 0.6)',
+              padding: '10px 12px', borderRadius: 10, marginBottom: 12,
+            }}>{visitorsError}</div>
+          )}
+
+          {!visitorsLoading && visitorsRows.length === 0 && !visitorsError && (
+            <div style={{ opacity: 0.55, fontSize: 14 }}>
+              No visits recorded yet. This panel starts filling up as soon as
+              the middleware sees a real HTML page load (not API calls).
+            </div>
+          )}
+
+          {/* Scrollable table. Fixed-width font for IP and timestamp so
+              columns align. */}
+          {!visitorsLoading && visitorsRows.length > 0 && (
+            <div style={{
+              borderRadius: 12,
+              border: '1px solid rgba(167, 139, 250, 0.18)',
+              overflow: 'hidden',
+            }}>
+              {visitorsRows.map((v) => {
+                const when = v.ts ? new Date(v.ts) : null
+                const whenShort = when && !Number.isNaN(when.getTime())
+                  ? when.toLocaleString('en-GB', { hour12: false })
+                  : '—'
+                const uaShort = (v.userAgent || '').slice(0, 80)
+                return (
+                  <div
+                    key={v.id}
+                    style={{
+                      padding: '10px 12px',
+                      borderBottom: '1px solid rgba(167, 139, 250, 0.08)',
+                      fontSize: 12,
+                      lineHeight: 1.45,
+                    }}
+                  >
+                    <div style={{
+                      display: 'flex', justifyContent: 'space-between',
+                      gap: 10, marginBottom: 2,
+                    }}>
+                      <div style={{
+                        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                        fontVariantNumeric: 'tabular-nums',
+                        opacity: 0.75,
+                      }}>{whenShort}</div>
+                      <div style={{
+                        fontSize: 11, opacity: 0.55, letterSpacing: '0.05em',
+                      }}>
+                        {v.country || '??'} · {v.ip || '—'}
+                      </div>
+                    </div>
+                    <div style={{ marginBottom: 2 }}>
+                      <span style={{ opacity: 0.55, marginRight: 6 }}>path</span>
+                      <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>
+                        {v.path || '/'}
+                      </span>
+                      {v.userEmail && (
+                        <span style={{
+                          marginLeft: 8, padding: '1px 6px',
+                          borderRadius: 6,
+                          background: 'rgba(167, 139, 250, 0.15)',
+                          fontSize: 11,
+                        }}>{v.userEmail}</span>
+                      )}
+                    </div>
+                    {uaShort && (
+                      <div style={{ opacity: 0.55, fontSize: 11 }}>
+                        {uaShort}{v.userAgent && v.userAgent.length > 80 ? '…' : ''}
+                      </div>
+                    )}
+                    {v.referer && (
+                      <div style={{ opacity: 0.45, fontSize: 11 }}>
+                        ← {v.referer.slice(0, 100)}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
           )}
         </div>
       )}
