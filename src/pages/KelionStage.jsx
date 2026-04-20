@@ -588,9 +588,13 @@ function StudioDecor() {
           Adrian: "monitor mai spre el" — moved closer to center (-1.1 from
           -1.7) and slightly forward (-0.35 from -0.8) so the monitor reads
           as the avatar's screen, not a separate fixture on the wall.
+          Adrian 2026-04-20: "muta monitorul un pic mai sus acopera chatul"
+          — raised Y from 0.35 → 0.95 so the bezel's bottom edge clears
+          the "Type to Kelion…" composer and any error banner sitting
+          above it at 1080p/desktop framing.
           When Gemini Live calls the `show_on_monitor` tool, <StageMonitor/>
           renders an iframe / image on the inner plane via drei <Html transform>. */}
-      <group position={[-1.1, 0.35, -0.35]} rotation={[0, Math.PI / 9, 0]}>
+      <group position={[-1.1, 0.95, -0.35]} rotation={[0, Math.PI / 9, 0]}>
         {/* Bezel / outer frame */}
         <mesh position={[0, 0, -0.03]}>
           <planeGeometry args={[3.2, 2.1]} />
