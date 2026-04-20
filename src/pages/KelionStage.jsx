@@ -1,6 +1,7 @@
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { useGLTF, Environment, ContactShadows, Float, Html } from '@react-three/drei'
 import { Suspense, useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import * as THREE from 'three'
 import { useLipSync } from '../lib/lipSync'
 import { subscribeMonitor } from '../lib/monitorStore'
@@ -740,6 +741,15 @@ function CameraRig() {
 
 // ───── Main page ─────
 export default function KelionStage() {
+  // React-router navigator. Used for in-app route changes (e.g. the
+  // "Contact us" menu item) so we stay inside the SPA and preserve
+  // auth state, mic state, etc. — full-page reloads via
+  // `window.location.assign` discarded the React tree and the browser
+  // back button then returned to a freshly-mounted, effectively
+  // logged-out-looking page until `/api/auth/me` re-resolved. Adrian
+  // 2026-04-20: "cind esti logat si folosesti butonul back, te
+  // intorci in pagina anterioara, dar logat".
+  const navigate = useNavigate()
   const audioRef = useRef(null)
   // Real client GPS (falls back to null → server uses IP-geo instead).
   // The hook fires once on mount; if the browser remembers a previous
@@ -2335,7 +2345,7 @@ export default function KelionStage() {
           <MenuItem onClick={() => { setTranscriptOpen((v) => !v); setMenuOpen(false) }}>
             {transcriptOpen ? '📝 Hide transcript' : '📝 Show transcript'}
           </MenuItem>
-          <MenuItem onClick={() => { window.location.assign('/contact'); setMenuOpen(false) }}>
+          <MenuItem onClick={() => { navigate('/contact'); setMenuOpen(false) }}>
             ✉️ Contact us
           </MenuItem>
           <div
@@ -2456,7 +2466,9 @@ export default function KelionStage() {
 
       {/* Contact moved to the top-bar as an icon (✉️) per Adrian's
           request — the old bottom-strip was cluttering the stage. The
-          top-bar entry calls window.location.assign('/contact') directly. */}
+          menu entry now routes via react-router `navigate('/contact')`
+          so the SPA stays mounted and auth state survives the browser
+          back button. */}
 
       {/* F17 — camera self-view removed from the page per Adrian's request:
           "am cerut sa nu fie vizibila informatia pe pagina". The camera
