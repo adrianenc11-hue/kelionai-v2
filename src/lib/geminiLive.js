@@ -36,7 +36,12 @@ function bytesFromBase64(b64) {
   return out
 }
 
-export function useGeminiLive({ audioRef, coords = null }) {
+export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null }) {
+  // Kept in a ref so the parent can pass a fresh closure (e.g. a useState
+  // setter wrapped in useCallback) without tearing down the WS or the
+  // credits heartbeat every render.
+  const onBalanceUpdateRef = useRef(onBalanceUpdate)
+  onBalanceUpdateRef.current = onBalanceUpdate
   const [status, setStatus] = useState('idle') // idle, requesting, connecting, listening, thinking, speaking, error
   const [error, setError] = useState(null)
   const [turns, setTurns] = useState([]) // [{ role: 'user'|'assistant', text }]
@@ -59,6 +64,16 @@ export function useGeminiLive({ audioRef, coords = null }) {
   // socket and surface a friendly "buy credits" error. Admins get
   // `exempt: true` on every response and stay unlimited.
   const creditsIntervalRef = useRef(null)
+  // Charge-on-proof: set to true the first time Google sends real
+  // `serverContent` (audio / transcript / turn complete) for this
+  // session. Only then do we deduct the first credit and start the
+  // per-minute heartbeat. Prevents the catastrophic refund case where
+  // Google 1011s immediately after `onopen`: previously every retry
+  // was -1 credit with zero minutes of AI served → 33 retries burned
+  // an entire £10 pack with no actual service delivered. The charge
+  // only fires when Kelion has demonstrably served something.
+  const creditsStartedRef = useRef(false)
+  const creditsStartFnRef = useRef(null)
 
   const wsRef = useRef(null)
   const audioCtxRef = useRef(null)       // 16kHz capture context for Gemini — MUST match SAMPLE_RATE_IN
@@ -194,6 +209,18 @@ export function useGeminiLive({ audioRef, coords = null }) {
     // Server-sent audio chunk (inline_data) + transcripts
     if (msg.serverContent) {
       const sc = msg.serverContent
+
+      // Charge-on-proof — this is the first moment we KNOW Google
+      // accepted the session and is serving content back. Before this
+      // point, every `onopen` could be a dead session (1011 quota,
+      // 1008 bad token, 1006 abnormal close) and charging there burns
+      // credits for zero service delivered. Safe to call multiple
+      // times: the ref is idempotent (returns early after the first
+      // run). No-op on `idle`/post-stop, because stop() nukes the
+      // callback ref.
+      if (creditsStartFnRef.current) {
+        try { creditsStartFnRef.current() } catch (_) { /* never break the message pump */ }
+      }
 
       // Interruption — user spoke over Kelion
       if (sc.interrupted) {
@@ -398,15 +425,25 @@ export function useGeminiLive({ audioRef, coords = null }) {
           console.error('[geminiLive] failed to send setup frame', err)
         }
 
-        // Start credits heartbeat. Fires every 60 s while the session is
-        // open. Server auto-exempts admins (exempt:true → no deduction)
-        // and returns 402 / exhausted:true for signed-in non-admins when
-        // balance hits 0, at which point we close the socket and set an
-        // error the HUD can render.
+        // Prepare the credits heartbeat but DO NOT start it yet.
+        //
+        // Previous design deducted 1 credit here on `onopen`. That was a
+        // fraud-grade bug: when Google closed the WS with 1011 (quota
+        // exceeded, auth, etc.) microseconds after `onopen`, the user
+        // had already been charged. Every retry burned another credit
+        // for zero minutes of served AI. A £10 pack (33 credits) could
+        // drain to 0 with 33 clicks and not a single second of Kelion
+        // ever responding. We now defer the first charge until the
+        // first real `serverContent` frame arrives (`markSessionActive`
+        // called from handleMessage), proving Google accepted the
+        // session and is serving content. If the WS dies before that,
+        // no credit is ever taken — Adrian: "ne duce la frauda si
+        // amenzi colosale".
         if (creditsIntervalRef.current) {
           clearInterval(creditsIntervalRef.current)
           creditsIntervalRef.current = null
         }
+        creditsStartedRef.current = false
         const consumeCredits = async () => {
           try {
             const r = await fetch('/api/credits/consume', {
@@ -439,6 +476,16 @@ export function useGeminiLive({ audioRef, coords = null }) {
               return
             }
             const body = await r.json().catch(() => null)
+            // Live HUD refresh — Adrian: "actualizarea creditului pe
+            // interfata user se actualizeaza in timp real". The server
+            // returns the post-deduction balance in every successful
+            // consume response; pipe it to the parent so the top-right
+            // chip ticks down without a page refresh or extra GET.
+            // Admins get `balance_minutes: null` (exempt) so we skip
+            // those — otherwise the HUD would flash blank every 60 s.
+            if (body && typeof body.balance_minutes === 'number' && onBalanceUpdateRef.current) {
+              try { onBalanceUpdateRef.current(body.balance_minutes) } catch (_) { /* never let consumer kill the heartbeat */ }
+            }
             if (body && body.exhausted) {
               if (creditsIntervalRef.current) {
                 clearInterval(creditsIntervalRef.current)
@@ -457,11 +504,16 @@ export function useGeminiLive({ audioRef, coords = null }) {
             console.warn('[geminiLive] credits/consume failed', err && err.message)
           }
         }
-        // Deduct the first minute immediately when the session actually
-        // opens (previously we only ticked at +60 s, which gave a free
-        // first minute per reconnect). Subsequent ticks run every 60 s.
-        consumeCredits()
-        creditsIntervalRef.current = setInterval(consumeCredits, 60_000)
+        // Expose the starter to handleMessage via a ref so the first
+        // real serverContent frame can flip us live. Kept in a ref so
+        // handleMessage (defined with useCallback higher up) captures
+        // the same closure across re-renders.
+        creditsStartFnRef.current = () => {
+          if (creditsStartedRef.current) return
+          creditsStartedRef.current = true
+          consumeCredits()
+          creditsIntervalRef.current = setInterval(consumeCredits, 60_000)
+        }
       }
 
       ws.onmessage = (event) => handleMessage(event.data)
@@ -733,6 +785,11 @@ export function useGeminiLive({ audioRef, coords = null }) {
       clearInterval(creditsIntervalRef.current)
       creditsIntervalRef.current = null
     }
+    // Reset charge-on-proof guards. Without this, a stop() followed by
+    // a fresh start() would see `creditsStartedRef=true` from the prior
+    // session and never start the heartbeat on the new one.
+    creditsStartedRef.current = false
+    creditsStartFnRef.current = null
     setUserLevel(0)
     setStatus('idle')
     setError(null)
