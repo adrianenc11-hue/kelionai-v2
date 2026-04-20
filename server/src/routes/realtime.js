@@ -256,62 +256,51 @@ router.get('/gemini-token', async (req, res) => {
     const newSessionExpireTime = new Date(now + 60 * 1000).toISOString();
     const expireTime            = new Date(now + 30 * 60 * 1000).toISOString();
 
-    // Ephemeral tokens live under v1alpha only — v1beta/auth_tokens returns 404.
-    // See https://ai.google.dev/gemini-api/docs/live-api/ephemeral-tokens
-    // (Python SDK sets http_options={'api_version': 'v1alpha'}).
-    const url = 'https://generativelanguage.googleapis.com/v1alpha/auth_tokens?key=' + encodeURIComponent(apiKey);
-    const r = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        uses: 1,
-        expireTime,
-        newSessionExpireTime,
-        // The REST provisioning endpoint calls this field
-        // `bidiGenerateContentSetup` (matching the WebSocket setup message
-        // https://ai.google.dev/api/live#BidiGenerateContentSetup). The Python
-        // SDK's `liveConnectConstraints` is an SDK-side alias — the raw HTTP
-        // API rejects it with 400 "Unknown name liveConnectConstraints".
-        // Inside the setup object, generationConfig is its own nested field
-        // (responseModalities / speechConfig / temperature / mediaResolution),
-        // while systemInstruction / realtimeInputConfig / tools /
-        // inputAudioTranscription / outputAudioTranscription live at the
-        // top level of the setup message.
-        bidiGenerateContentSetup: {
-          model,
-          generationConfig: {
-            responseModalities: ['AUDIO'],
-            speechConfig: {
-              voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } },
-              languageCode: browserLang,
-            },
-            temperature: 0.85,
-          },
-          systemInstruction: {
-            parts: [{ text: buildKelionPersona({ user, memoryItems, voiceStyle, geo }) }],
-          },
-          realtimeInputConfig: {
-            automaticActivityDetection: { disabled: false },
-            turnCoverage: 'TURN_INCLUDES_ALL_INPUT',
-          },
-          inputAudioTranscription: {},
-          outputAudioTranscription: {},
-          // Stage 4 — tools. functionDeclarations route tool calls back to
-            // OUR backend via the client, which executes them and returns a
-            // tool_response. Keep this list stable server-side so users
-            // cannot swap tools client-side.
-            //
-            // NOTE: `{googleSearch: {}}` was previously in this list but is
-            // a *project-scoped grounding feature* — Google rejects ephemeral
-            // token sessions that reference it with close code 1007:
-            // "token-based requests cannot use project-scoped features such
-            // as tuned models". Web search is instead handled by the
-            // `browse_web` function-declaration tool, which routes through
-            // our own server (via `/api/tools/browse_web`) — no grounding
-            // product from Google AI Studio required.
-            tools: [
-              {
-                functionDeclarations: [
+    // Build the FULL live-connect setup object. We return it to the client
+    // verbatim and let it send it as the first WS frame instead of locking
+    // it into the ephemeral token. After 3 iterations (PR #65/#66/#67) we
+    // confirmed Google rejects ephemeral-token sessions that reference ANY
+    // rich setup field (systemInstruction, tools, inputAudioTranscription,
+    // outputAudioTranscription, realtimeInputConfig, speechConfig) with
+    // close code 1007 "token-based requests cannot use project-scoped
+    // features such as tuned models". Token constraints only accept a tiny
+    // subset (model + responseModalities + temperature + sessionResumption)
+    // per the official docs:
+    //   https://ai.google.dev/gemini-api/docs/ephemeral-tokens#create-ephemeral-token
+    // Trade-off: the persona text is now visible in the client Network tab.
+    // Acceptable — the persona is a prompt, not a credential, and moving
+    // it to the client is what finally unlocks voice chat end-to-end.
+    const fullSetup = {
+      model: 'models/' + model,
+      generationConfig: {
+        responseModalities: ['AUDIO'],
+        speechConfig: {
+          voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } },
+          languageCode: browserLang,
+        },
+        temperature: 0.85,
+      },
+      systemInstruction: {
+        parts: [{ text: buildKelionPersona({ user, memoryItems, voiceStyle, geo }) }],
+      },
+      realtimeInputConfig: {
+        automaticActivityDetection: { disabled: false },
+        turnCoverage: 'TURN_INCLUDES_ALL_INPUT',
+      },
+      inputAudioTranscription: {},
+      outputAudioTranscription: {},
+      // Stage 4 — tools. functionDeclarations route tool calls back to
+      // OUR backend via the client, which executes them and returns a
+      // tool_response.
+      //
+      // NOTE: `{googleSearch: {}}` was removed earlier — it's a
+      // project-scoped grounding feature that is rejected on ephemeral
+      // token sessions with close code 1007. Web search is instead handled
+      // by the `browse_web` function-declaration tool, which routes through
+      // our own server (via `/api/tools/browse_web`).
+      tools: [
+        {
+          functionDeclarations: [
                   {
                     name: 'browse_web',
                     description: 'Run an autonomous web-browsing agent in a real browser. Use when the user asks Kelion to open a site, fill a form, extract info from a page behind JS, compare products, book/reserve, etc. Returns a short summary + optional URL.',
@@ -423,10 +412,24 @@ router.get('/gemini-token', async (req, res) => {
                       required: ['kind'],
                     },
                   },
-                ],
-              },
-            ],
+          ],
         },
+      ],
+    };
+
+    // Ephemeral tokens live under v1alpha only — v1beta/auth_tokens returns 404.
+    // We mint the token with NO bidiGenerateContentSetup constraints so we can
+    // use the plain `BidiGenerateContent` WebSocket endpoint and ship the full
+    // setup (above) from the client. This sidesteps the 1007 "project-scoped
+    // features" rejection entirely.
+    const url = 'https://generativelanguage.googleapis.com/v1alpha/auth_tokens?key=' + encodeURIComponent(apiKey);
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        uses: 1,
+        expireTime,
+        newSessionExpireTime,
       }),
     });
 
@@ -447,15 +450,16 @@ router.get('/gemini-token', async (req, res) => {
 
     const data = await r.json();
     res.json({
-      token:     data.name,
-      expiresAt: expireTime,
+      token:       data.name,
+      expiresAt:   expireTime,
       model,
       voice,
-      provider:  'gemini',
-      signedIn:  !!user,
-      userName:  user?.name || null,
+      provider:    'gemini',
+      signedIn:    !!user,
+      userName:    user?.name || null,
       memoryCount: memoryItems.length,
-      voiceStyle: voiceStyle.label,
+      voiceStyle:  voiceStyle.label,
+      setup:       fullSetup,
     });
   } catch (err) {
     console.error('[realtime] Gemini error:', err.message);
