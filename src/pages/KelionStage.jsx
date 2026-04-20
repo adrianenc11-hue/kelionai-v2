@@ -734,7 +734,10 @@ export default function KelionStage() {
   // grant there is no prompt, otherwise the browser shows its standard
   // one-time permission dialog. Coords are cached in localStorage so
   // refreshes don't re-ping the OS.
-  const clientGeo = useClientGeo()
+  // useClientGeo v2 exposes { coords, permission, lastError, requestNow }.
+  // Alias to the names already used elsewhere in this file (clientGeo /
+  // geoPermission / requestGeo).
+  const { coords: clientGeo, permission: geoPermission, requestNow: requestGeo } = useClientGeo()
   const [voiceLevel, setVoiceLevel] = useState(0)
   const [transcriptOpen, setTranscriptOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -1243,6 +1246,16 @@ export default function KelionStage() {
   // (`applicable: false`) the moment the user signs in.
   const trialHud = useTrial({ signedIn: !!authState.signedIn })
   const trialRemainingMs = trialHud.remainingMs
+  // Tap-to-talk schedules a 600 ms setTimeout to refresh the HUD; we
+  // keep the id in a ref and clear it on unmount so we don't setState
+  // on an unmounted component (Copilot review pr-74).
+  const trialRefreshTimerRef = useRef(null)
+  useEffect(() => () => {
+    if (trialRefreshTimerRef.current) {
+      clearTimeout(trialRefreshTimerRef.current)
+      trialRefreshTimerRef.current = null
+    }
+  }, [])
   // Kick the Gemini Live hook's local trial state when the server flips
   // to exhausted on either surface — prevents a just-started voice
   // session from running past the shared quota that a text-chat user
@@ -1514,8 +1527,15 @@ export default function KelionStage() {
       if (!authState.signedIn) {
         // Small delay so the server has time to stamp on the token mint
         // request before we poll. 600 ms is well under the first audio
-        // chunk, so the HUD update feels instant.
-        setTimeout(() => trialHud.refresh(), 600)
+        // chunk, so the HUD update feels instant. Tracked in a ref so
+        // we can clear it on unmount (Copilot review pr-74) — otherwise
+        // a quick navigation mid-delay would setState on an unmounted
+        // useTrial consumer.
+        if (trialRefreshTimerRef.current) clearTimeout(trialRefreshTimerRef.current)
+        trialRefreshTimerRef.current = setTimeout(() => {
+          trialRefreshTimerRef.current = null
+          trialHud.refresh()
+        }, 600)
       }
     }
   }, [menuOpen, status, start, geoPermission, requestGeo, authState.signedIn, trialHud])

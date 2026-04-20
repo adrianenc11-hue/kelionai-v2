@@ -24,9 +24,36 @@
 
 const TRIAL_WINDOW_MS   = 15 * 60 * 1000;       // 15 min per day
 const TRIAL_COOLDOWN_MS = 24 * 60 * 60 * 1000;  // 24 h between windows
+// Hard cap to prevent unbounded growth (Copilot review pr-74). Entries
+// past the 24-hour cooldown are normally evicted by trialStatus() on
+// read, but a stream of unique IPs that never re-visit would never hit
+// that path. When we exceed MAX_ENTRIES we drop the oldest firstStampAt
+// (naturally it's also the one closest to / past its cooldown).
+const MAX_ENTRIES = 50_000;
 
 // ip -> { firstStampAt: number }
 const trialUsage = new Map();
+
+function evictExpired(now) {
+  for (const [ip, rec] of trialUsage) {
+    if (now - rec.firstStampAt >= TRIAL_COOLDOWN_MS) {
+      trialUsage.delete(ip);
+    }
+  }
+}
+
+function enforceCap() {
+  if (trialUsage.size <= MAX_ENTRIES) return;
+  // Maps preserve insertion order. Drop the oldest entries until we're
+  // back under the cap. Safe because we only insert on stamp and never
+  // rewrite — so oldest == most-expired.
+  const excess = trialUsage.size - MAX_ENTRIES;
+  const it = trialUsage.keys();
+  for (let i = 0; i < excess; i += 1) {
+    const k = it.next().value;
+    if (k !== undefined) trialUsage.delete(k);
+  }
+}
 
 // trialStatus(ip) — returns the current state for an IP WITHOUT
 // mutating the store. Callers render a countdown from this and then
@@ -68,7 +95,12 @@ function trialStatus(ip) {
 // window. This is what starts the 15-minute countdown.
 function stampTrialIfFresh(ip, status) {
   if (!ip || !status.fresh) return;
-  trialUsage.set(ip, { firstStampAt: Date.now() });
+  const now = Date.now();
+  trialUsage.set(ip, { firstStampAt: now });
+  // Opportunistic sweep on writes — cheap when the map is small and
+  // keeps it bounded under adversarial unique-IP load (Copilot review).
+  if (trialUsage.size > MAX_ENTRIES / 2) evictExpired(now);
+  enforceCap();
 }
 
 // Test / diagnostic helper — wipe everything. Not wired to any route.

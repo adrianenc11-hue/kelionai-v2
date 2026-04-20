@@ -258,7 +258,10 @@ app.use('/api/realtime', chatLimiter, realtimeRouter);
 // countdown HUD. Read-only; never stamps. Returns { applicable, allowed,
 // remainingMs, windowMs, stamped }. See trial.js for semantics.
 const trialRouter = require('./routes/trial');
-app.use('/api/trial', trialRouter);
+// Rate-limited like other public endpoints (Copilot review pr-74): the
+// client polls every 10 s so a small limiter is fine, but we still want
+// to cap abusive crawlers.
+app.use('/api/trial', chatLimiter, trialRouter);
 
 // Credits (Stage 7 — monetization). The webhook sub-route uses its own
 // raw-body parser; /packages is public, /balance and /checkout require

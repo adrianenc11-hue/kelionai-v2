@@ -37,6 +37,11 @@ export function useTrial({ signedIn } = {}) {
     loaded:      false,
   });
   const lastFetchAtRef = useRef(0);
+  // Guard against setState-after-unmount (Copilot review pr-74). We
+  // don't bother aborting in-flight fetches — they're <1 kB JSON and
+  // the server is cheap — but we do skip state updates once unmounted.
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -46,6 +51,7 @@ export function useTrial({ signedIn } = {}) {
       });
       if (!r.ok) return;
       const data = await r.json();
+      if (!mountedRef.current) return;
       lastFetchAtRef.current = Date.now();
       setState({
         applicable:   !!data.applicable,
