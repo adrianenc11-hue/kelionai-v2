@@ -317,8 +317,20 @@ export function useGeminiLive({ audioRef, coords = null }) {
       ws.binaryType = 'blob'
 
       ws.onopen = () => {
-        // no-op — server-side constraints auto-initialize the session.
-        // (The Constrained endpoint will reject any client-sent setup message.)
+        // Even on the Constrained endpoint the client MUST send a setup
+        // frame first — Google enforces this with close code 1007 "setup
+        // must be the first message and only the first" (exactly the error
+        // Adrian observed 2026-04-20). The locked fields (model, voice,
+        // systemInstruction, tools, generationConfig, realtimeInputConfig)
+        // are merged server-side from the token's `bidiGenerateContentSetup`,
+        // so we only need to send an empty setup envelope here. Sending a
+        // model / system_instruction from the client would be rejected by
+        // the Constrained endpoint as "field locked by token".
+        try {
+          ws.send(JSON.stringify({ setup: {} }))
+        } catch (err) {
+          console.error('[geminiLive] failed to send setup frame', err)
+        }
       }
 
       ws.onmessage = (event) => handleMessage(event.data)
