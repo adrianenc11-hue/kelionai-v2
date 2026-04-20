@@ -1,9 +1,20 @@
 'use strict';
 
 const { Router } = require('express');
-const { getUserById, getAllUsers, updateUser, deleteUser, getCreditRevenueSummary, getDb } = require('../db');
+const {
+  getUserById,
+  getAllUsers,
+  updateUser,
+  deleteUser,
+  getCreditRevenueSummary,
+  getDb,
+  listRecentCreditTransactions,
+  addCreditsTransaction,
+  getUserByEmail,
+  getCreditsBalance,
+} = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
-const { getAllCredits, probeStripe } = require('../services/aiCredits');
+const { getAllCredits, probeStripe, buildRevenueSplit } = require('../services/aiCredits');
 const { sendEmailAlert } = require('../services/emailAlerts');
 const { bootstrapAdmin } = require('../services/adminBootstrap');
 
@@ -53,6 +64,114 @@ router.get('/business', async (req, res) => {
   } catch (err) {
     console.error('[admin/business] Error:', err && err.message);
     res.status(500).json({ error: 'Failed to load business metrics' });
+  }
+});
+
+/**
+ * GET /api/admin/revenue-split
+ * Returns the 50/50 (configurable via AI_ALLOCATION_FRACTION) split
+ * snapshot: revenue collected from top-ups in the window, how much of
+ * it is earmarked for AI provider spend, how much is known-spent (so
+ * far only ElevenLabs can be auto-measured; Gemini is manual because
+ * AI Studio keys don't expose billing), and the remaining budget.
+ * This is the single source of truth the admin dashboard renders next
+ * to the raw provider cards.
+ */
+/**
+ * GET /api/admin/credits/ledger
+ * Flat feed of the most recent credit-ledger entries across every
+ * user. Backs the admin "Live Usage" panel, which auto-refreshes every
+ * 5 seconds so Adrian can watch consumption tick in real time — and
+ * catch another fraud window like 2026-04-20 the moment it opens,
+ * not after the fact.
+ *
+ * Query:
+ *   limit?  (1..500, default 50)
+ *   kind?   (topup | consumption | admin_grant | ...) — optional filter
+ *   sinceMs? (epoch ms) — only rows newer than this
+ *
+ * Response: { rows: [...], ts }
+ */
+router.get('/credits/ledger', async (req, res) => {
+  try {
+    const limit = Math.min(500, Math.max(1, Number(req.query.limit) || 50));
+    const kind = req.query.kind ? String(req.query.kind) : null;
+    const sinceMs = req.query.sinceMs ? Number(req.query.sinceMs) : null;
+    const rows = await listRecentCreditTransactions({ limit, kind, sinceMs });
+    res.json({ rows, ts: new Date().toISOString() });
+  } catch (err) {
+    console.error('[admin/credits/ledger] Error:', err && err.message);
+    res.status(500).json({ error: 'Failed to load credit ledger' });
+  }
+});
+
+/**
+ * POST /api/admin/credits/grant
+ * Admin-issued refund / comp. Idempotency is NOT enforced (same as
+ * existing admin endpoints — the caller owns the dedupe).
+ *
+ * Body: { email: string, minutes: number, note?: string }
+ *   - minutes > 0  → grant (top-up effect)
+ *   - minutes < 0  → claw back (not expected to be used often)
+ *   - minutes == 0 → 400
+ *
+ * Primary use case: refund the 33 credits user "Kelion" lost to the
+ * 1011 charge-on-open bug on 2026-04-20. Also useful for comp'ing
+ * early adopters, promo credits, and anything else that doesn't flow
+ * through Stripe.
+ *
+ * The transaction is tagged `kind='admin_grant'` and includes the
+ * admin's email in `note` so the ledger has a full audit trail.
+ */
+router.post('/credits/grant', async (req, res) => {
+  try {
+    const { email, minutes, note } = req.body || {};
+    if (!email || typeof email !== 'string') {
+      return res.status(400).json({ error: 'email (string) is required' });
+    }
+    const mins = Number(minutes);
+    if (!Number.isFinite(mins) || mins === 0) {
+      return res.status(400).json({ error: 'minutes must be a non-zero number' });
+    }
+    const user = await getUserByEmail(email.toLowerCase());
+    if (!user) {
+      return res.status(404).json({ error: `No user with email ${email}` });
+    }
+    const adminEmail = (req.user && req.user.email) || 'unknown';
+    const rounded = Math.trunc(mins);
+    const safeNote = [
+      `admin_grant by ${adminEmail}`,
+      note ? `— ${String(note).slice(0, 200)}` : '',
+    ].filter(Boolean).join(' ');
+    const result = await addCreditsTransaction({
+      userId: user.id,
+      deltaMinutes: rounded,
+      kind: 'admin_grant',
+      note: safeNote,
+    });
+    return res.json({
+      userId: user.id,
+      email: user.email,
+      deltaMinutes: rounded,
+      balanceMinutes: result.balance,
+      previous: result.previous,
+      note: safeNote,
+    });
+  } catch (err) {
+    console.error('[admin/credits/grant] Error:', err && err.message);
+    res.status(500).json({ error: err && err.message || 'Failed to grant credits' });
+  }
+});
+
+router.get('/revenue-split', async (req, res) => {
+  try {
+    const days = Math.min(365, Math.max(1, Number(req.query.days) || 30));
+    const summary = await getCreditRevenueSummary(days);
+    const split = await buildRevenueSplit(summary, { days });
+    res.json(split);
+  } catch (err) {
+    console.error('[admin/revenue-split] Error:', err && err.message);
+    res.status(500).json({ error: 'Failed to compute revenue split' });
   }
 });
 
