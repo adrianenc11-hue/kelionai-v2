@@ -733,7 +733,12 @@ export default function KelionStage() {
   // grant there is no prompt, otherwise the browser shows its standard
   // one-time permission dialog. Coords are cached in localStorage so
   // refreshes don't re-ping the OS.
-  const clientGeo = useClientGeo()
+  // useClientGeo exposes { coords, permission, lastError, requestNow }.
+  // We forward just `coords` to the Gemini Live hook (the pipeline only
+  // needs lat/lon), but the top-level stage also wires `requestNow` to
+  // the first user gesture so iOS Safari actually shows the permission
+  // prompt — see handling in onStageClick below.
+  const { coords: clientGeo, permission: geoPermission, requestNow: requestGeo } = useClientGeo()
   const [voiceLevel, setVoiceLevel] = useState(0)
   const [transcriptOpen, setTranscriptOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -1479,8 +1484,18 @@ export default function KelionStage() {
 
   const onStageClick = useCallback(() => {
     if (menuOpen) return setMenuOpen(false)
+    // First user gesture → kick the geolocation permission prompt.
+    // iOS Safari silently skips `getCurrentPosition` called outside a
+    // real gesture, so the passive on-mount request in useClientGeo
+    // often never shows a dialog on iPhone/iPad. Calling it from this
+    // click handler makes iOS render the permission dialog reliably.
+    // No-op once permission is already 'granted' (requestNow short-
+    // circuits on repeat).
+    if (geoPermission !== 'granted') {
+      try { requestGeo() } catch { /* ignore — hook logs internally */ }
+    }
     if (status === 'idle' || status === 'error') start()
-  }, [menuOpen, status, start])
+  }, [menuOpen, status, start, geoPermission, requestGeo])
 
   return (
     <div
