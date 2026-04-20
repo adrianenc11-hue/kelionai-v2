@@ -7,6 +7,8 @@ import { subscribeMonitor } from '../lib/monitorStore'
 import { STATUS_COLORS, STATUS_PULSE_HZ } from '../lib/kelionStatus'
 import { useGeminiLive } from '../lib/geminiLive'
 import { useClientGeo } from '../lib/useClientGeo'
+import { TUNING, isTuningEnabled } from '../lib/tuning'
+import TuningPanel from '../components/TuningPanel'
 import SignInModal from '../components/SignInModal'
 import {
   supportsPasskey,
@@ -202,7 +204,7 @@ function AvatarModel({ mouthOpen = 0, status = 'idle', emotion = null, presentin
     // bone rotation and the viseme morph are driven because some RPM /
     // Mixamo exports only expose one or the other.
     const jaw = b['Jaw'] || b['mixamorigJaw']
-    if (jaw) jaw.rotation.x = mouthOpen * 0.22
+    if (jaw) jaw.rotation.x = mouthOpen * TUNING.jawAmplitude
 
     // Natural blink cycle
     const blink = blinkRef.current
@@ -232,7 +234,7 @@ function AvatarModel({ mouthOpen = 0, status = 'idle', emotion = null, presentin
       if (!d) continue
       const mouthIdx = d['mouthOpen'] ?? d['viseme_aa'] ?? d['viseme_AA'] ?? d['jawOpen']
       if (mouthIdx !== undefined) {
-        m.morphTargetInfluences[mouthIdx] = Math.min(1, mouthOpen * 0.85)
+        m.morphTargetInfluences[mouthIdx] = Math.min(1, mouthOpen * TUNING.morphAmplitude)
       }
       const baseSmile = status === 'listening' ? 0.08 : 0.04
       const emotionSmile = emoMorphs ? (emoMorphs.mouthSmile || emoMorphs.mouthSmileLeft || 0) * emoScale : 0
@@ -265,16 +267,14 @@ function AvatarModel({ mouthOpen = 0, status = 'idle', emotion = null, presentin
 
     // ───── Presenting body yaw ─────
     // When Kelion is presenting (or speaking and content is on the monitor),
-    // rotate the whole body by ~8° toward the monitor on the left. Smooth
-    // lerp so transitions in/out of the presenting state are never snappy.
-    //
-    // Adrian: "rotește avatarul cu fața la mine 3 grade la stânga" — the
-    // rig's default forward vector aims a few degrees camera-right of the
-    // user's centerline, so we shift the resting orientation by an extra
-    // -3° (≈ -0.0524 rad) on Y. The presenting yaw carries the same offset
-    // so the relative swing toward the monitor is unchanged.
-    const BASE_FACING_OFFSET = -0.0524 // -3° toward camera-left
-    const yawTarget = (presenting ? -0.14 : 0) + BASE_FACING_OFFSET
+    // rotate the whole body toward the monitor on the left. Smooth lerp so
+    // transitions in/out of the presenting state are never snappy. Base
+    // offset + presenting swing both read from the TUNING store so the
+    // Leva debug panel can tweak them live. Defaults match the values
+    // Adrian approved in PR #62: -3° idle (so Kelion faces the camera
+    // directly, not the rig's natural right-of-center forward), -8°
+    // additional when presenting.
+    const yawTarget = (presenting ? TUNING.avatarPresentingYaw : 0) + TUNING.avatarBaseYaw
     const yawK = 1 - Math.exp(-delta * 2.5)  // frame-independent easing (~2.5 Hz)
     bodyYawRef.current += (yawTarget - bodyYawRef.current) * yawK
     if (root.current) root.current.rotation.y = bodyYawRef.current
@@ -1430,6 +1430,9 @@ export default function KelionStage() {
         userSelect: 'none',
       }}
     >
+      {/* Debug-only Leva tuning drawer. Renders null unless the URL
+          carries ?debug=1 or ?tune=1; zero cost for real users. */}
+      {isTuningEnabled() && <TuningPanel />}
       <Canvas
         shadows
         camera={{ position: [0, 0.2, 4.2], fov: 36 }}
