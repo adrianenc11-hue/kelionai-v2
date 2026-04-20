@@ -201,6 +201,56 @@ router.get('/token', async (req, res) => {
 // ADMIN_EMAILS OR the hard-coded default admin). Mirrors `requireAdmin`
 // in middleware/auth.js but works on the optional-auth `peekSignedInUser`
 // so we can bypass quota checks on public endpoints without forcing auth.
+// ──────────────────────────────────────────────────────────────────
+// Guest trial quota — 15 minutes of Gemini Live per IP per 24 hours.
+// Adrian: "free fara logare … ar trebuie sa aibe timer pe ecran 15
+// min /zi free ,sau creiere user cu cumparare credit". The public
+// mint endpoint previously let anyone mint unlimited ephemeral tokens
+// → anonymous users could hammer our shared GCP quota for free.
+//
+// Tracking: in-memory Map<ip, { firstMintAt }>. On the first mint we
+// stamp the clock; for the next 15 minutes we return the remaining
+// allowance so the client can render a live countdown; after the
+// 15-minute window expires but before 24 hours have passed we refuse
+// with 429 and tell the client to prompt sign-in / credit purchase;
+// once 24 hours have elapsed since firstMintAt we reset the slot and
+// the IP gets a fresh 15-minute window.
+//
+// Why IP instead of session: an unauthenticated user has no stable
+// identity. IP is imperfect (shared NAT, VPN) but it's the only
+// reliable handle for a public endpoint. When this runs on multiple
+// instances we'll need to move the map to Redis; for now Railway is
+// a single instance so in-memory is fine.
+//
+// Signed-in users skip this entirely (different `if` branch below):
+// their quota is governed by the credits system / subscription.
+const TRIAL_WINDOW_MS = 15 * 60 * 1000;   //  15 min per session
+const TRIAL_COOLDOWN_MS = 24 * 60 * 60 * 1000; // before next window
+const trialUsage = new Map(); // ip -> { firstMintAt }
+function trialStatus(ip) {
+  if (!ip) return { allowed: true, remainingMs: TRIAL_WINDOW_MS };
+  const now = Date.now();
+  const rec = trialUsage.get(ip);
+  if (!rec) return { allowed: true, remainingMs: TRIAL_WINDOW_MS, fresh: true };
+  const sinceFirst = now - rec.firstMintAt;
+  if (sinceFirst >= TRIAL_COOLDOWN_MS) {
+    trialUsage.delete(ip);
+    return { allowed: true, remainingMs: TRIAL_WINDOW_MS, fresh: true };
+  }
+  if (sinceFirst < TRIAL_WINDOW_MS) {
+    return { allowed: true, remainingMs: TRIAL_WINDOW_MS - sinceFirst, fresh: false };
+  }
+  return {
+    allowed: false,
+    remainingMs: 0,
+    nextWindowMs: TRIAL_COOLDOWN_MS - sinceFirst,
+  };
+}
+function stampTrialIfFresh(ip, status) {
+  if (!ip || !status.fresh) return;
+  trialUsage.set(ip, { firstMintAt: Date.now() });
+}
+
 async function isAdminUser(user) {
   if (!user) return false;
   try {
@@ -230,6 +280,28 @@ router.get('/gemini-token', async (req, res) => {
     : process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return res.status(503).json({ error: 'GEMINI_API_KEY not configured' });
+  }
+
+  // Guest trial quota. Only non-signed-in users are subject to the
+  // 15-min/day limit — signed-in users (even without admin) go through
+  // the credits/subscription path instead. Admin users always skip.
+  const isGuest = !adminUser;
+  let trial = null;
+  if (isGuest && !isAdmin) {
+    const ip = ipGeo.clientIp(req) || req.ip || '';
+    const status = trialStatus(ip);
+    if (!status.allowed) {
+      return res.status(429).json({
+        error:         'Free trial exhausted for today. Sign in or purchase credits to continue.',
+        trial:         { allowed: false, remainingMs: 0, nextWindowMs: status.nextWindowMs },
+      });
+    }
+    stampTrialIfFresh(ip, status);
+    trial = {
+      allowed:     true,
+      remainingMs: status.remainingMs,
+      windowMs:    TRIAL_WINDOW_MS,
+    };
   }
 
   try {
@@ -497,6 +569,11 @@ router.get('/gemini-token', async (req, res) => {
       memoryCount: memoryItems.length,
       voiceStyle:  voiceStyle.label,
       setup:       fullSetup,
+      // Trial info: null for signed-in / admin; object with
+      // { allowed, remainingMs, windowMs } for guests. Client uses
+      // remainingMs to render a visible countdown HUD (15:00 → 0:00)
+      // and auto-stops the session when it hits zero.
+      trial,
     });
   } catch (err) {
     console.error('[realtime] Gemini error:', err.message);

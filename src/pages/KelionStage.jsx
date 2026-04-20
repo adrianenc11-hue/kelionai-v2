@@ -1216,7 +1216,27 @@ export default function KelionStage() {
     stopCamera,
     startScreen,
     stopScreen,
+    // Guest trial countdown (null for signed-in users).
+    trial,
   } = useGeminiLive({ audioRef, coords: clientGeo })
+
+  // Drive a live 1Hz tick for the trial HUD. We don't persist the tick
+  // in the Gemini Live hook because the hook would re-render the whole
+  // pipeline 15 × 60 times per session for nothing; here it only
+  // re-renders the small countdown label.
+  const [trialTick, setTrialTick] = useState(0)
+  useEffect(() => {
+    if (!trial || !trial.active) return undefined
+    const id = setInterval(() => setTrialTick((n) => n + 1), 1000)
+    return () => clearInterval(id)
+  }, [trial])
+  const trialRemainingMs = trial && trial.active
+    ? Math.max(0, trial.expiresAt - Date.now())
+    : 0
+  // Silence react-hooks/exhaustive-deps: trialTick is read implicitly
+  // via Date.now() on every render; we list it here so the compiler
+  // doesn't complain about an unused state var.
+  void trialTick
 
   const cameraVideoRef = useRef(null)
   useEffect(() => {
@@ -1715,6 +1735,48 @@ export default function KelionStage() {
         }} />
         {statusLabel}
       </div>
+
+      {/* Guest trial countdown — only rendered while the hook reports an
+          active trial (signed-out users). Adrian: "free fara logare …
+          trebuie sa aibe timer pe ecran 15 min/zi free". We show the
+          remaining mm:ss, and when the window is exhausted the HUD
+          flips to a sign-in / buy-credits nudge (the WS is already
+          torn down by the hook's auto-stop). */}
+      {trial && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: 'absolute',
+            bottom: 'calc(max(32px, env(safe-area-inset-bottom)) + 56px)',
+            left: '50%', transform: 'translateX(-50%)',
+            padding: '6px 14px',
+            borderRadius: 999,
+            background: 'rgba(10, 8, 20, 0.6)',
+            backdropFilter: 'blur(10px)',
+            border: trial.exhausted
+              ? '1px solid rgba(239, 68, 68, 0.55)'
+              : '1px solid rgba(167, 139, 250, 0.35)',
+            color: trial.exhausted ? '#fecaca' : '#e9d5ff',
+            fontSize: 12, fontFamily: 'system-ui, -apple-system, sans-serif',
+            letterSpacing: '0.02em',
+            zIndex: 15,
+          }}
+          role="status"
+          aria-live="polite"
+        >
+          {trial.exhausted
+            ? <>Free trial used up — <button
+                onClick={() => setSignInModalOpen(true)}
+                style={{
+                  background: 'transparent', border: 'none',
+                  color: '#fca5a5', textDecoration: 'underline',
+                  cursor: 'pointer', padding: 0, font: 'inherit',
+                }}
+              >sign in</button> to continue.</>
+            : <>Free trial · {Math.floor(trialRemainingMs / 60000)}:{String(Math.floor((trialRemainingMs % 60000) / 1000)).padStart(2, '0')} left</>
+          }
+        </div>
+      )}
 
       {/* Top-right action bar — Adrian: "panoul cu butoane e gândit
           greșit". Simplified to: Credits/Admin pill + Sign in/out + ⋯.

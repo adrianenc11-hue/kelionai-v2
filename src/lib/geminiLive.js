@@ -44,6 +44,14 @@ export function useGeminiLive({ audioRef, coords = null }) {
   const [cameraStream, setCameraStream] = useState(null) // MediaStream for preview
   const [screenStream, setScreenStream] = useState(null) // MediaStream for screen share (no preview)
   const [visionError, setVisionError] = useState(null)
+  // Guest trial state. Set from the token mint response on every start():
+  //   - null    → signed-in / admin / no limit to display
+  //   - object  → { active, remainingMs, expiresAt } for a non-signed-in IP
+  //               (15-min countdown). Client auto-stops when it reaches 0.
+  // `expiresAt` is a UTC ms timestamp computed from server-returned
+  // remainingMs so the HUD can tick locally without a poll loop.
+  const [trial, setTrial] = useState(null)
+  const trialTimeoutRef = useRef(null)
 
   const wsRef = useRef(null)
   const audioCtxRef = useRef(null)       // 16kHz capture context for Gemini — MUST match SAMPLE_RATE_IN
@@ -293,6 +301,16 @@ export function useGeminiLive({ audioRef, coords = null }) {
         ? `&lat=${coords.lat.toFixed(6)}&lon=${coords.lon.toFixed(6)}&acc=${Math.round(coords.accuracy || 0)}`
         : ''
       const tokenRes = await fetch(`/api/realtime/gemini-token?lang=${encodeURIComponent(langHint)}${geoQuery}`, { credentials: 'include' })
+      // Guest trial exhaustion — propagate a clean user-facing error so
+      // the HUD can render "Sign in / buy credits" instead of a raw
+      // "HTTP 429".
+      if (tokenRes.status === 429) {
+        let body = null
+        try { body = await tokenRes.json() } catch (_) { /* fall through */ }
+        const msg = body?.error || 'Free trial used up for today. Sign in or buy credits to keep talking.'
+        setTrial({ active: false, remainingMs: 0, expiresAt: 0, exhausted: true })
+        throw new Error(msg)
+      }
       if (!tokenRes.ok) {
         const txt = await tokenRes.text()
         throw new Error(`Token fetch failed: ${tokenRes.status} ${txt}`)
@@ -302,6 +320,33 @@ export function useGeminiLive({ audioRef, coords = null }) {
       const setupPayload = tokenBody?.setup
       if (!token) throw new Error('No ephemeral token returned')
       if (!setupPayload) throw new Error('No live-connect setup returned')
+
+      // Trial countdown. Server returns tokenBody.trial = null for
+      // signed-in / admin users and { allowed, remainingMs, windowMs }
+      // for guests. Store expiresAt (absolute ms) so the HUD can tick
+      // locally via setInterval, and schedule an auto-stop at the
+      // deadline so we never keep the WS open past the trial window.
+      if (tokenBody.trial && tokenBody.trial.allowed) {
+        const remainingMs = Math.max(0, Number(tokenBody.trial.remainingMs) || 0)
+        const expiresAt = Date.now() + remainingMs
+        setTrial({ active: true, remainingMs, expiresAt, exhausted: false })
+        if (trialTimeoutRef.current) clearTimeout(trialTimeoutRef.current)
+        trialTimeoutRef.current = setTimeout(() => {
+          // stop() is defined below; use the ref path instead to avoid a
+          // hoisting dance. We close the socket directly — the top-level
+          // cleanup effect handles the rest when status flips.
+          try {
+            if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+              wsRef.current.close(1000, 'trial-expired')
+            }
+          } catch (_) { /* swallow */ }
+          setTrial((t) => (t ? { ...t, active: false, remainingMs: 0, exhausted: true } : t))
+          setError('Free trial used up for today. Sign in or buy credits to keep talking.')
+          setStatus('error')
+        }, remainingMs)
+      } else {
+        setTrial(null)
+      }
 
       // 3. Connect WebSocket on the `BidiGenerateContentConstrained` endpoint.
       // Verified against the official @google/genai SDK v1.37.0 source
@@ -595,6 +640,13 @@ export function useGeminiLive({ audioRef, coords = null }) {
       try { meterCtxRef.current.close() } catch {}
       meterCtxRef.current = null
     }
+    // Cancel any pending trial auto-stop so it doesn't fire after the
+    // user manually stopped the session. We keep the `trial` state so
+    // the "used N of 15 min" HUD lingers until the next start().
+    if (trialTimeoutRef.current) {
+      clearTimeout(trialTimeoutRef.current)
+      trialTimeoutRef.current = null
+    }
     setUserLevel(0)
     setStatus('idle')
     setError(null)
@@ -608,5 +660,7 @@ export function useGeminiLive({ audioRef, coords = null }) {
     // Stage 2
     cameraStream, screenStream, visionError,
     startCamera, stopCamera, startScreen, stopScreen,
+    // Trial countdown (null for signed-in users, object for guests).
+    trial,
   }
 }
