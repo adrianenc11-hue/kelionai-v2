@@ -1556,7 +1556,10 @@ export default function KelionStage() {
           carries ?debug=1 or ?tune=1; zero cost for real users. */}
       {isTuningEnabled() && <TuningPanel />}
       <Canvas
-        shadows
+        /* THREE 0.183 deprecated PCFSoftShadowMap (the r3f default when
+           `shadows` is passed bare). Switch to VSMShadowMap — softer
+           results and no console warning. */
+        shadows={{ type: THREE.VSMShadowMap }}
         camera={{ position: [0, 0.2, 4.2], fov: 36 }}
         dpr={[1, 2]}
         gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, outputColorSpace: THREE.SRGBColorSpace }}

@@ -12,6 +12,10 @@
          (iOS Safari / Android Chrome / desktop Chrome). Avoids App Store /
          Play Store fees per the approved Stage 7 monetization plan. -->
     <link rel="manifest" href="/manifest.webmanifest" />
+    <!-- Chrome 125+ deprecated the apple-prefixed meta; include the
+         standard one first and keep the apple-prefixed one for iOS
+         Safari backwards-compat. -->
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Kelion" />
