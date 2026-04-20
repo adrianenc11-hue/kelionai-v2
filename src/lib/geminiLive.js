@@ -629,18 +629,50 @@ export function useGeminiLive({ audioRef, coords = null }) {
   const startCamera = useCallback(async () => {
     setVisionError(null)
     if (cameraStreamRef.current) return
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
-        audio: false,
-      })
-      cameraStreamRef.current = stream
-      setCameraStream(stream)
-      startFrameSender(stream, 'camera')
-    } catch (e) {
-      console.error('[geminiLive] camera start failed', e)
-      setVisionError(e.message || 'Camera access denied')
+    // Ladder of progressively looser constraints. The first rung is what
+    // we actually want (front-camera 640×480); the fallbacks exist
+    // because Chromium on Windows/Edge throws NotReadableError with
+    // the unhelpful message "Could not start video source" when the
+    // *constraint set* is incompatible with the specific camera
+    // driver — e.g. a laptop with a shared front/back camera that
+    // doesn't advertise `facingMode`, or a virtual camera (OBS,
+    // NVIDIA Broadcast) that only honours default constraints. Trying
+    // `facingMode: 'user'` explicitly is a known offender on
+    // external webcams. Dropping constraints almost always recovers.
+    const constraintLadder = [
+      { video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }, audio: false },
+      { video: { width: { ideal: 640 }, height: { ideal: 480 } }, audio: false },
+      { video: true, audio: false },
+    ]
+    let lastError = null
+    for (const constraints of constraintLadder) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia(constraints)
+        cameraStreamRef.current = stream
+        setCameraStream(stream)
+        startFrameSender(stream, 'camera')
+        return
+      } catch (e) {
+        lastError = e
+        // NotAllowedError = user denied permission → no point retrying.
+        // SecurityError   = not a secure context / feature policy → same.
+        if (e && (e.name === 'NotAllowedError' || e.name === 'SecurityError')) break
+      }
     }
+    console.error('[geminiLive] camera start failed', lastError)
+    // Translate Chromium's opaque errors into something the user can
+    // act on. The raw DOMException messages ("Could not start video
+    // source") aren't helpful; map them to a concrete remedy.
+    const name = lastError && lastError.name
+    let friendly = lastError && lastError.message ? lastError.message : 'Camera access denied'
+    if (name === 'NotAllowedError') {
+      friendly = 'Camera blocked. Click the camera icon in the address bar and allow access.'
+    } else if (name === 'NotFoundError' || name === 'OverconstrainedError') {
+      friendly = 'No camera detected on this device.'
+    } else if (name === 'NotReadableError' || /could not start video source/i.test(friendly)) {
+      friendly = 'Camera is in use by another app (Teams, Zoom, OBS…). Close it and try again.'
+    }
+    setVisionError(friendly)
   }, [startFrameSender])
 
   const stopCamera = useCallback(() => {
