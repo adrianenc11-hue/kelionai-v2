@@ -206,14 +206,14 @@ router.post('/checkout', requireAuth, async (req, res) => {
   // checkout page; user cannot skip it.
   body.append('billing_address_collection', 'required');
 
-  // Explicit payment methods. Stripe chose the UX already (card + Link)
-  // but older accounts default to card-only with no Link. Enabling
-  // automatic_payment_methods lets Stripe pick the optimal list for the
-  // user's region while still defaulting to card. `allow_redirects=never`
-  // keeps us on a single-page flow (no iDEAL / Sofort redirects that break
-  // the SPA return).
-  body.append('automatic_payment_methods[enabled]', 'true');
-  body.append('automatic_payment_methods[allow_redirects]', 'never');
+  // NOTE: `automatic_payment_methods` is ONLY valid on PaymentIntents,
+  // NOT on Checkout Sessions. Passing it here makes Stripe reject the
+  // whole request with 400 "Received unknown parameter:
+  // automatic_payment_methods" and the user sees "HTTP 502" in the UI.
+  // For Checkout Sessions, payment methods are configured per-account
+  // under Stripe Dashboard → Settings → Payment methods (card + Link
+  // are enabled by default on new accounts). If you need to pin an
+  // explicit list, use `payment_method_types[]=card` instead.
 
   // Stripe Tax is OPT-IN. It requires the account to have registered tax
   // locations + origin address configured under Settings → Tax. If it is
