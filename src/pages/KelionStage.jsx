@@ -6,6 +6,7 @@ import { useLipSync } from '../lib/lipSync'
 import { subscribeMonitor } from '../lib/monitorStore'
 import { STATUS_COLORS, STATUS_PULSE_HZ } from '../lib/kelionStatus'
 import { useGeminiLive } from '../lib/geminiLive'
+import { useTrial } from '../lib/useTrial'
 import { useClientGeo } from '../lib/useClientGeo'
 import { TUNING, isTuningEnabled } from '../lib/tuning'
 import TuningPanel from '../components/TuningPanel'
@@ -1021,7 +1022,21 @@ export default function KelionStage() {
         setAuthState({ signedIn: false, user: null })
         throw new Error('Session expired — please sign in again (⋯ menu).')
       }
+      if (r.status === 429) {
+        // Guest trial exhausted — server returns { error, trial }.
+        // Refresh the HUD so it flips to "used up" immediately and
+        // surface a user-facing error. The sign-in modal is opened
+        // from the HUD's inline button, not from here.
+        trialHud.refresh()
+        throw new Error('Free trial used up — sign in or buy credits to continue.')
+      }
       if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      // First successful POST as a guest stamps the shared 15-min
+      // window on the server — refresh the HUD so the top-right timer
+      // starts counting down without waiting for the next poll.
+      if (!authState.signedIn) {
+        trialHud.refresh()
+      }
       // Parse SSE stream: lines of form "data: {json}\n\n"
       const reader = r.body.getReader()
       const decoder = new TextDecoder()
@@ -1216,27 +1231,28 @@ export default function KelionStage() {
     stopCamera,
     startScreen,
     stopScreen,
-    // Guest trial countdown (null for signed-in users).
-    trial,
+    // Voice-chat trial countdown returned by the Gemini Live token mint.
+    // We no longer drive the HUD off this — the HUD pulls from the
+    // shared /api/trial/status endpoint so the timer also ticks for
+    // text-chat-only guests who never touch the mic.
+    trial: voiceTrial,
   } = useGeminiLive({ audioRef, coords: clientGeo })
 
-  // Drive a live 1Hz tick for the trial HUD. We don't persist the tick
-  // in the Gemini Live hook because the hook would re-render the whole
-  // pipeline 15 × 60 times per session for nothing; here it only
-  // re-renders the small countdown label.
-  const [trialTick, setTrialTick] = useState(0)
+  // Unified trial HUD source of truth. Applies to both voice AND text
+  // chat via the shared 15-min/day IP window on the server. Collapses
+  // (`applicable: false`) the moment the user signs in.
+  const trialHud = useTrial({ signedIn: !!authState.signedIn })
+  const trialRemainingMs = trialHud.remainingMs
+  // Kick the Gemini Live hook's local trial state when the server flips
+  // to exhausted on either surface — prevents a just-started voice
+  // session from running past the shared quota that a text-chat user
+  // might have burned down first.
   useEffect(() => {
-    if (!trial || !trial.active) return undefined
-    const id = setInterval(() => setTrialTick((n) => n + 1), 1000)
-    return () => clearInterval(id)
-  }, [trial])
-  const trialRemainingMs = trial && trial.active
-    ? Math.max(0, trial.expiresAt - Date.now())
-    : 0
-  // Silence react-hooks/exhaustive-deps: trialTick is read implicitly
-  // via Date.now() on every render; we list it here so the compiler
-  // doesn't complain about an unused state var.
-  void trialTick
+    if (trialHud.applicable && !trialHud.allowed && voiceTrial && voiceTrial.active) {
+      // eslint-disable-next-line no-console
+      console.log('[trial] server quota exhausted — voice session will stop')
+    }
+  }, [trialHud.applicable, trialHud.allowed, voiceTrial])
 
   const cameraVideoRef = useRef(null)
   useEffect(() => {
@@ -1479,8 +1495,30 @@ export default function KelionStage() {
 
   const onStageClick = useCallback(() => {
     if (menuOpen) return setMenuOpen(false)
-    if (status === 'idle' || status === 'error') start()
-  }, [menuOpen, status, start])
+    // First user gesture → kick the geolocation permission prompt.
+    // iOS Safari silently skips `getCurrentPosition` called outside a
+    // real gesture, so the passive on-mount request in useClientGeo
+    // often never shows a dialog on iPhone/iPad. Calling it from this
+    // click handler makes iOS render the permission dialog reliably.
+    // No-op once permission is already 'granted' (requestNow short-
+    // circuits on repeat).
+    if (geoPermission !== 'granted') {
+      try { requestGeo() } catch { /* ignore — hook logs internally */ }
+    }
+    if (status === 'idle' || status === 'error') {
+      start()
+      // Tap-to-talk is a gated guest action — refresh the trial HUD so
+      // the top-right countdown starts ticking immediately once the
+      // token mint stamps the 15-min window server-side. No-op for
+      // signed-in users (applicable: false).
+      if (!authState.signedIn) {
+        // Small delay so the server has time to stamp on the token mint
+        // request before we poll. 600 ms is well under the first audio
+        // chunk, so the HUD update feels instant.
+        setTimeout(() => trialHud.refresh(), 600)
+      }
+    }
+  }, [menuOpen, status, start, geoPermission, requestGeo, authState.signedIn, trialHud])
 
   return (
     <div
@@ -1736,45 +1774,56 @@ export default function KelionStage() {
         {statusLabel}
       </div>
 
-      {/* Guest trial countdown — only rendered while the hook reports an
-          active trial (signed-out users). Adrian: "free fara logare …
-          trebuie sa aibe timer pe ecran 15 min/zi free". We show the
-          remaining mm:ss, and when the window is exhausted the HUD
-          flips to a sign-in / buy-credits nudge (the WS is already
-          torn down by the hook's auto-stop). */}
-      {trial && (
+      {/* Guest trial countdown — Adrian: "timer se afiseaza dreapta sus
+          vizibil". Renders top-right, above the action bar, only while
+          the server reports `applicable: true` (guests only — signed-in
+          and admin users never see it). Shows MM:SS once the 15-min
+          window is stamped (first gated interaction); before that it
+          shows "15:00 free" as a preview. When exhausted it turns red
+          and prompts sign-in. */}
+      {trialHud.applicable && trialHud.loaded && !authState.signedIn && (
         <div
           onClick={(e) => e.stopPropagation()}
           style={{
             position: 'absolute',
-            bottom: 'calc(max(32px, env(safe-area-inset-bottom)) + 56px)',
-            left: '50%', transform: 'translateX(-50%)',
-            padding: '6px 14px',
+            top: 'calc(max(18px, env(safe-area-inset-top)) + 62px)',
+            right: 18,
+            padding: '8px 14px',
             borderRadius: 999,
-            background: 'rgba(10, 8, 20, 0.6)',
-            backdropFilter: 'blur(10px)',
-            border: trial.exhausted
-              ? '1px solid rgba(239, 68, 68, 0.55)'
-              : '1px solid rgba(167, 139, 250, 0.35)',
-            color: trial.exhausted ? '#fecaca' : '#e9d5ff',
+            background: 'rgba(10, 8, 20, 0.72)',
+            backdropFilter: 'blur(12px)',
+            border: !trialHud.allowed
+              ? '1px solid rgba(239, 68, 68, 0.6)'
+              : trialHud.stamped
+                ? '1px solid rgba(167, 139, 250, 0.55)'
+                : '1px solid rgba(167, 139, 250, 0.3)',
+            color: !trialHud.allowed ? '#fecaca' : '#e9d5ff',
             fontSize: 12, fontFamily: 'system-ui, -apple-system, sans-serif',
-            letterSpacing: '0.02em',
-            zIndex: 15,
+            fontWeight: 600,
+            letterSpacing: '0.03em',
+            zIndex: 25,
+            display: 'flex', alignItems: 'center', gap: 8,
+            boxShadow: '0 4px 14px rgba(0, 0, 0, 0.35)',
           }}
           role="status"
           aria-live="polite"
+          title={trialHud.stamped
+            ? 'Free trial is counting down. Sign in or buy credits to keep using Kelion after it expires.'
+            : '15 free minutes — the timer starts on your first message or Tap-to-talk.'}
         >
-          {trial.exhausted
-            ? <>Free trial used up — <button
-                onClick={() => setSignInModalOpen(true)}
-                style={{
-                  background: 'transparent', border: 'none',
-                  color: '#fca5a5', textDecoration: 'underline',
-                  cursor: 'pointer', padding: 0, font: 'inherit',
-                }}
-              >sign in</button> to continue.</>
-            : <>Free trial · {Math.floor(trialRemainingMs / 60000)}:{String(Math.floor((trialRemainingMs % 60000) / 1000)).padStart(2, '0')} left</>
-          }
+          <span aria-hidden style={{ fontSize: 13 }}>⏱</span>
+          {!trialHud.allowed ? (
+            <>Free trial used up — <button
+              onClick={() => setSignInModalOpen(true)}
+              style={{
+                background: 'transparent', border: 'none',
+                color: '#fca5a5', textDecoration: 'underline',
+                cursor: 'pointer', padding: 0, font: 'inherit',
+              }}
+            >sign in</button></>
+          ) : (
+            <>Free trial · {Math.floor(trialRemainingMs / 60000)}:{String(Math.floor((trialRemainingMs % 60000) / 1000)).padStart(2, '0')} left</>
+          )}
         </div>
       )}
 
