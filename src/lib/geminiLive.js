@@ -339,6 +339,28 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
 
     if (msg.setupComplete) {
       setStatus('listening')
+      // Kickstart: make Kelion speak first instead of waiting for the
+      // user to break the ice. We send a tiny synthetic user turn right
+      // after Google confirms setup is done so Gemini responds with a
+      // short English greeting. MUST be sent only after `setupComplete`
+      // — sending it right after our own `setup` frame (as we used to)
+      // violates Google's protocol and triggers close-code 1007. If
+      // send fails we silently skip; next user utterance still triggers
+      // a response like before. Adrian 2026-04-20.
+      const ws = wsRef.current
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        try {
+          ws.send(JSON.stringify({
+            clientContent: {
+              turns: [{
+                role: 'user',
+                parts: [{ text: 'Greet me with a short friendly hello in English and ask what I need. One sentence.' }],
+              }],
+              turnComplete: true,
+            },
+          }))
+        } catch (_) { /* best-effort */ }
+      }
     }
 
     if (msg.error || msg.errorMessage) {
@@ -465,28 +487,16 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
           console.error('[geminiLive] failed to send setup frame', err)
         }
 
-        // Kickstart: make Kelion speak first instead of waiting for the
-        // user to break the ice. Adrian 2026-04-20: "nu asteapta sa
-        // identifice limba, pleaca in engleza direct, trebuie sa astept
-        // userul sa zica ceva si dupa intra el". We send a tiny synthetic
-        // user turn right after setup so Gemini responds immediately with
-        // a short English greeting. This is the documented way to trigger
-        // a model turn without user audio on the Live API. The text is
-        // intentionally minimal so the persona's systemInstruction drives
-        // the actual content of the greeting (tone, wording, memories).
-        // If send fails, we silently skip — next user utterance will
-        // still trigger a response like before.
-        try {
-          ws.send(JSON.stringify({
-            clientContent: {
-              turns: [{
-                role: 'user',
-                parts: [{ text: 'Greet me with a short friendly hello in English and ask what I need. One sentence.' }],
-              }],
-              turnComplete: true,
-            },
-          }))
-        } catch (_) { /* best-effort, never break the session */ }
+        // NOTE: the greet-first `clientContent` kickstart used to live here,
+        // sent synchronously right after `setup`. That caused Gemini to
+        // close the socket with 1007 "setup must be the first message and
+        // only the first" because Google treats any non-setup frame
+        // arriving before its own `setupComplete` ack as a protocol
+        // violation. We now defer the kickstart into the `setupComplete`
+        // branch of `handleMessage` below, which is the documented moment
+        // the session is ready for turns. Adrian 2026-04-20: "crapa
+        // chatul — Connection closed (1007): setup must be the first
+        // message and only the first".
 
         // Prepare the credits heartbeat but DO NOT start it yet.
         //
