@@ -1928,15 +1928,57 @@ export default function KelionStage() {
           type="text"
           value={chatInput}
           onChange={(e) => setChatInput(e.target.value)}
+          // Explicit paste handler — Adrian 2026-04-20: "trebuie sa
+          // pot face paste la orice in tab de scris". On some
+          // Capacitor / WebView builds (and occasionally on Chrome
+          // when a focused 3D canvas sibling intercepts the keyboard
+          // shortcut), the native `input` event from Ctrl+V never
+          // fires and the input stays empty. We read the clipboard
+          // directly from the event, splice it into the current
+          // value at the caret position, and call setState so React
+          // renders the new text. `preventDefault` blocks any
+          // duplicate insertion from the browser's default handler.
+          // Right-click → Paste from the browser menu also fires
+          // this event, so both paths work.
+          onPaste={(e) => {
+            try {
+              const text = (e.clipboardData || window.clipboardData)?.getData('text')
+              if (text == null || text === '') return
+              e.preventDefault()
+              const el = e.currentTarget
+              const start = typeof el.selectionStart === 'number' ? el.selectionStart : chatInput.length
+              const end = typeof el.selectionEnd === 'number' ? el.selectionEnd : chatInput.length
+              const next = chatInput.slice(0, start) + text + chatInput.slice(end)
+              setChatInput(next)
+              // Restore caret right after the pasted text so the user
+              // can keep typing without clicking again.
+              requestAnimationFrame(() => {
+                try { el.setSelectionRange(start + text.length, start + text.length) } catch (_) { /* ignore */ }
+              })
+            } catch (_) {
+              // If anything goes wrong, fall back to the browser's
+              // default paste handler so we never make things worse
+              // than before.
+            }
+          }}
           placeholder="Type to Kelion…"
           disabled={chatBusy}
           autoComplete="off"
+          autoCorrect="off"
+          spellCheck={false}
           style={{
             flex: 1,
             background: 'transparent', border: 'none', outline: 'none',
             color: '#ede9fe',
             fontSize: 15, fontFamily: 'system-ui, -apple-system, sans-serif',
             padding: '8px 2px',
+            // Allow text selection / right-click menu on the input
+            // itself even though the surrounding stage uses
+            // `user-select: none`. Without this, some Chromium
+            // builds disable the clipboard context menu on nested
+            // inputs.
+            userSelect: 'text',
+            WebkitUserSelect: 'text',
           }}
         />
         <button
