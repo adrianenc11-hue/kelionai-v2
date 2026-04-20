@@ -202,12 +202,136 @@ router.post('/mcp/files', async (req, res) => {
   return res.status(200).json({ ok: false, error: 'MCP files not configured yet.' });
 });
 
+// ─── deep_think (M29) ─────────────────────────────────────────────
+// Router tool: Flash Live is optimized for voice latency, not deep
+// reasoning. When the user asks something that needs real thinking
+// (analysis, planning, multi-step explanation, structured comparison,
+// fact-heavy "what happened / what is true" questions), Flash calls
+// this tool with the full question. We run it through Gemini 3.1 Pro
+// + Google Search grounding via the generateContent API — a SEPARATE
+// HTTP call that never touches the Live WebSocket — and return the
+// answer as plain text. Flash then narrates it to the user in his
+// own voice. No voice overlap, no streaming, no risk to barge-in.
+//
+// If GEMINI_API_KEY is missing or Pro returns an error we respond
+// with a plain-English unavailable message so Flash can gracefully
+// tell the user it couldn't reason deeply right now, rather than
+// crashing the session.
+router.post('/deep-think', async (req, res) => {
+  const ip = req.ip || 'anon';
+  // 30 Pro calls / hour / IP is generous for a voice session while
+  // still capping runaway loops that could burn budget. Adjust if
+  // real usage shows it's too tight.
+  if (!rateOk(`deep_think:${ip}`, 30, 60 * 60 * 1000)) {
+    return res.status(429).json({ ok: false, error: 'Too many deep-think requests in the last hour.' });
+  }
+
+  const apiKey = process.env.GEMINI_API_KEY_ADMIN || process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    return res.status(200).json({
+      ok: false,
+      unavailable: true,
+      error: 'Deeper thinking is not available right now (no Gemini API key configured).',
+    });
+  }
+
+  const question = typeof req.body?.question === 'string' ? req.body.question.trim() : '';
+  if (question.length < 3) {
+    return res.status(400).json({ ok: false, error: 'Missing or empty question.' });
+  }
+  const context = typeof req.body?.context === 'string' ? req.body.context.slice(0, 4000) : '';
+
+  // Default to the current Pro preview; operators can bump via env when
+  // Google ships a newer one. If the chosen model 404s we surface the
+  // error so Flash tells the user truthfully ("I couldn't reach my
+  // thinking model just now") instead of inventing.
+  const model = process.env.GEMINI_DEEP_THINK_MODEL || 'gemini-3.1-pro-preview';
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+
+  // System instruction keeps Pro's answer VOICE-friendly — Flash will
+  // speak this out loud, so no markdown, no bullet lists, no citations
+  // inline. Sources are surfaced separately via groundingMetadata.
+  const systemText = [
+    'You are the deep-reasoning engine behind Kelion, a voice assistant.',
+    'Your answer will be spoken out loud by Kelion\'s voice. Keep it natural and conversational.',
+    'Rules: no markdown, no bullet points, no numbered lists, no URLs, no citations in the text, no headings.',
+    'Be concrete and structured, but write as continuous spoken sentences — 3 to 8 sentences for most questions.',
+    'If the question needs fresh facts, use Google Search grounding. Do not mention that you searched.',
+    'If you are not confident, say so plainly.',
+  ].join(' ');
+
+  const userText = context
+    ? `Recent conversation context (for grounding, do not quote):\n${context}\n\nQuestion: ${question}`
+    : question;
+
+  try {
+    const deadlineMs = 20_000;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), deadlineMs);
+    let r;
+    try {
+      r = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: systemText }] },
+          contents: [{ role: 'user', parts: [{ text: userText }] }],
+          tools: [{ googleSearch: {} }],
+        }),
+        signal: ctrl.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+
+    if (!r.ok) {
+      const txt = await r.text().catch(() => '');
+      console.error('[tools/deep-think] pro call failed', r.status, txt.slice(0, 500));
+      return res.status(200).json({
+        ok: false,
+        error: 'My thinking model could not be reached right now.',
+      });
+    }
+
+    const j = await r.json();
+    const cand = j?.candidates?.[0];
+    const parts = cand?.content?.parts || [];
+    const text = parts.map((p) => p?.text || '').join('').trim();
+    if (!text) {
+      return res.status(200).json({
+        ok: false,
+        error: 'I thought about it but got no clear answer.',
+      });
+    }
+
+    // Collect grounding sources (URIs + titles) if present.
+    const chunks = cand?.groundingMetadata?.groundingChunks || [];
+    const sources = chunks
+      .map((c) => c?.web ? { title: c.web.title || '', uri: c.web.uri || '' } : null)
+      .filter((s) => s && s.uri)
+      .slice(0, 8);
+
+    return res.json({
+      ok: true,
+      result: text.slice(0, 4000),
+      sources,
+    });
+  } catch (err) {
+    const msg = err && err.name === 'AbortError'
+      ? 'Thinking took too long, I gave up waiting.'
+      : 'My thinking model crashed on that one.';
+    console.error('[tools/deep-think] error', err && err.message);
+    return res.status(200).json({ ok: false, error: msg });
+  }
+});
+
 // Introspection — which tools are actually usable on this instance.
 // The frontend surfaces this in transcript meta / debug overlay.
 router.get('/status', (_req, res) => {
   res.json({
     google_search: true, // built into Gemini Live, always on
     browse_web: !!process.env.BROWSER_USE_API_KEY,
+    deep_think: !!(process.env.GEMINI_API_KEY_ADMIN || process.env.GEMINI_API_KEY),
     mcp: {
       calendar: !!process.env.MCP_ENABLED,
       email: !!process.env.MCP_ENABLED,
