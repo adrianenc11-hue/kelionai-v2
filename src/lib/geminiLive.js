@@ -297,37 +297,34 @@ export function useGeminiLive({ audioRef, coords = null }) {
         const txt = await tokenRes.text()
         throw new Error(`Token fetch failed: ${tokenRes.status} ${txt}`)
       }
-      const { token } = await tokenRes.json()
+      const tokenBody = await tokenRes.json()
+      const token = tokenBody?.token
+      const setupPayload = tokenBody?.setup
       if (!token) throw new Error('No ephemeral token returned')
+      if (!setupPayload) throw new Error('No live-connect setup returned')
 
-      // 3. Connect WebSocket — constraints come from the token.
-      // Ephemeral tokens are v1alpha-only AND must use the *Constrained*
-      // endpoint when the token was minted with `bidiGenerateContentSetup`
-      // (which we always do — persona + voice + tools are locked server-side).
-      // The plain `BidiGenerateContent` path accepts the connection briefly
-      // and then closes it with code 1008, which is exactly the "Tap to talk
-      // doesn't stay pressed" symptom Adrian saw (the status flips from
-      // 'connecting' back to 'idle' within ~500 ms and the audio worklet logs
-      // "WebSocket is already in CLOSING or CLOSED state" on the next chunk).
-      // Docs: https://ai.google.dev/gemini-api/docs/live-api/get-started-websocket#authentication-with-ephemeral-tokens
-      const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained?access_token=${encodeURIComponent(token)}`
+      // 3. Connect WebSocket on the plain `BidiGenerateContent` endpoint.
+      // Rationale: after PRs #65/#66/#67 we confirmed Google rejects ANY
+      // rich field (systemInstruction, tools, transcription, speechConfig,
+      // realtimeInputConfig) inside ephemeral-token constraints with close
+      // code 1007 "token-based requests cannot use project-scoped features
+      // such as tuned models". The server now mints tokens WITHOUT any
+      // `bidiGenerateContentSetup` constraints and returns the full live-
+      // connect setup to us; we send it as the first WS frame on open.
+      // Docs: https://ai.google.dev/gemini-api/docs/live-api/get-started-websocket
+      const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?access_token=${encodeURIComponent(token)}`
       const ws = new WebSocket(wsUrl)
       wsRef.current = ws
 
       ws.binaryType = 'blob'
 
       ws.onopen = () => {
-        // Even on the Constrained endpoint the client MUST send a setup
-        // frame first — Google enforces this with close code 1007 "setup
-        // must be the first message and only the first" (exactly the error
-        // Adrian observed 2026-04-20). The locked fields (model, voice,
-        // systemInstruction, tools, generationConfig, realtimeInputConfig)
-        // are merged server-side from the token's `bidiGenerateContentSetup`,
-        // so we only need to send an empty setup envelope here. Sending a
-        // model / system_instruction from the client would be rejected by
-        // the Constrained endpoint as "field locked by token".
+        // Google requires `setup` to be the FIRST and only setup message
+        // on the wire. The worklet's realtimeInput chunks are posted via
+        // MessageChannel (async), so this synchronous send(setup) always
+        // lands before the first audio frame.
         try {
-          ws.send(JSON.stringify({ setup: {} }))
+          ws.send(JSON.stringify({ setup: setupPayload }))
         } catch (err) {
           console.error('[geminiLive] failed to send setup frame', err)
         }
