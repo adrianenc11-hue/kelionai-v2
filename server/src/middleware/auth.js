@@ -76,6 +76,38 @@ async function requireAuth(req, res, next) {
                 migrationTrace.googleErr = e && e.message;
               }
             }
+            if (!migratedUser && decoded.email) {
+              // Last resort: the JWT signature is valid (verified above
+              // with our secret), so we trust its email+name claims.
+              // This user DID have a DB row once; it was wiped by a
+              // purge or schema reset. Re-create a shell row so the
+              // request can proceed — without this path, a legitimately
+              // signed-in user whose row was purged is permanently
+              // locked out even though their JWT is cryptographically
+              // valid and not expired.
+              migrationTrace.autoCreate = { email: String(decoded.email).toLowerCase() };
+              try {
+                const created = await createUser({
+                  google_id: String(rawSub),
+                  email: String(decoded.email).toLowerCase(),
+                  name: decoded.name || String(decoded.email).split('@')[0],
+                  picture: null,
+                });
+                if (created && created.id) {
+                  migratedUser = created;
+                  migrationTrace.autoCreate.id = created.id;
+                }
+              } catch (e) {
+                migrationTrace.autoCreateErr = e && e.message;
+                // Unique-email race: another concurrent request may have
+                // just created the row. Re-read and reuse.
+                if (/UNIQUE|duplicate/i.test(e && e.message || '')) {
+                  try {
+                    migratedUser = await findByEmail(String(decoded.email).toLowerCase());
+                  } catch (_) {}
+                }
+              }
+            }
             if (!migratedUser || !migratedUser.id) {
               // Log ONCE per failure so Railway logs expose WHY migration
               // failed for this session. Zero PII beyond the email claim
