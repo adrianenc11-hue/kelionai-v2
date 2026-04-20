@@ -593,9 +593,16 @@ function StudioDecor() {
           — raised Y from 0.35 → 0.95 so the bezel's bottom edge clears
           the "Type to Kelion…" composer and any error banner sitting
           above it at 1080p/desktop framing.
+          Adrian 2026-04-20 (follow-up): "monitorul un pic mai la dreapta
+          si mai jos sa fie incadrat la stanga si stanga sus" — after
+          the raise, the top-left corner of the bezel fell outside the
+          camera frustum at standard framing. Nudged X from -1.1 → -0.8
+          (closer to centre) and Y from 0.95 → 0.65 (lower) so the
+          top edge is visible and the left edge sits cleanly inside
+          the viewport.
           When Gemini Live calls the `show_on_monitor` tool, <StageMonitor/>
           renders an iframe / image on the inner plane via drei <Html transform>. */}
-      <group position={[-1.1, 0.95, -0.35]} rotation={[0, Math.PI / 9, 0]}>
+      <group position={[-0.8, 0.65, -0.35]} rotation={[0, Math.PI / 9, 0]}>
         {/* Bezel / outer frame */}
         <mesh position={[0, 0, -0.03]}>
           <planeGeometry args={[3.2, 2.1]} />
@@ -801,6 +808,15 @@ export default function KelionStage() {
   const [ledgerRows, setLedgerRows] = useState([])
   const [ledgerError, setLedgerError] = useState(null)
   const [ledgerLoading, setLedgerLoading] = useState(false)
+  // Grant / refund form — hits POST /api/admin/credits/grant.
+  // Added so Adrian can refund compromised accounts (e.g. Kelion's
+  // 33-credit loss from the 2026-04-20 charge-on-open incident)
+  // without having to touch the browser console or a raw curl.
+  const [grantEmail, setGrantEmail] = useState('')
+  const [grantMinutes, setGrantMinutes] = useState('')
+  const [grantNote, setGrantNote] = useState('')
+  const [grantBusy, setGrantBusy] = useState(false)
+  const [grantMessage, setGrantMessage] = useState(null) // { ok: bool, text: string }
   const isAdmin = Boolean(authState.user && authState.user.isAdmin)
   const refreshLedger = useCallback(async () => {
     try {
@@ -813,6 +829,52 @@ export default function KelionStage() {
       setLedgerError(err.message || 'Could not load ledger')
     }
   }, [])
+  // Submit handler for the Grant Credits form. Validates the inputs
+  // client-side (the server validates again), POSTs to the admin
+  // endpoint, and refreshes the ledger on success so the new
+  // admin_grant row appears immediately in Live Usage.
+  const doGrant = useCallback(async () => {
+    const email = grantEmail.trim().toLowerCase()
+    const minutes = Number(grantMinutes)
+    if (!email || !/.+@.+\..+/.test(email)) {
+      setGrantMessage({ ok: false, text: 'Enter a valid email.' })
+      return
+    }
+    if (!Number.isFinite(minutes) || minutes === 0) {
+      setGrantMessage({ ok: false, text: 'Enter a non-zero number of minutes (negative = clawback).' })
+      return
+    }
+    setGrantBusy(true)
+    setGrantMessage(null)
+    try {
+      const r = await fetch('/api/admin/credits/grant', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          minutes: Math.trunc(minutes),
+          note: grantNote.trim() || undefined,
+        }),
+      })
+      const j = await r.json().catch(() => ({}))
+      if (!r.ok) {
+        throw new Error(j.error || `HTTP ${r.status}`)
+      }
+      setGrantMessage({
+        ok: true,
+        text: `Granted ${j.deltaMinutes} min to ${j.email}. New balance: ${j.balanceMinutes} min.`,
+      })
+      setGrantEmail('')
+      setGrantMinutes('')
+      setGrantNote('')
+      refreshLedger().catch(() => {})
+    } catch (err) {
+      setGrantMessage({ ok: false, text: err.message || 'Grant failed.' })
+    } finally {
+      setGrantBusy(false)
+    }
+  }, [grantEmail, grantMinutes, grantNote, refreshLedger])
   const openCredits = useCallback(async () => {
     setCreditsOpen(true)
     setCreditsLoading(true)
@@ -3167,6 +3229,114 @@ export default function KelionStage() {
               </div>
             )
           })()}
+
+          {/* ───── Grant Credits — refund / comp / promo. Hits
+               POST /api/admin/credits/grant. Added on 2026-04-20 so
+               Adrian can refund the 33 credits lost by
+               contact@kelionai.app in the charge-on-open incident
+               without dropping into the browser console. Negative
+               minutes = clawback. Every submission creates an
+               admin_grant row in the ledger tagged with the admin's
+               email for audit. ───── */}
+          <div style={{
+            marginBottom: 16, padding: 14,
+            borderRadius: 14,
+            background: 'rgba(34, 197, 94, 0.06)',
+            border: '1px solid rgba(34, 197, 94, 0.28)',
+          }}>
+            <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>
+              Grant credits
+            </div>
+            <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 10 }}>
+              Refund, comp or clawback. Minutes = credits (1 min = 1 credit). Negative = remove.
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <input
+                type="email"
+                placeholder="user email (e.g. contact@kelionai.app)"
+                value={grantEmail}
+                onChange={(e) => setGrantEmail(e.target.value)}
+                disabled={grantBusy}
+                style={{
+                  padding: '8px 10px',
+                  borderRadius: 8,
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  background: 'rgba(0,0,0,0.28)',
+                  color: '#f8fafc',
+                  fontSize: 13,
+                  outline: 'none',
+                }}
+              />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  type="number"
+                  placeholder="minutes (e.g. 33)"
+                  value={grantMinutes}
+                  onChange={(e) => setGrantMinutes(e.target.value)}
+                  disabled={grantBusy}
+                  style={{
+                    flex: '0 0 120px',
+                    padding: '8px 10px',
+                    borderRadius: 8,
+                    border: '1px solid rgba(255,255,255,0.12)',
+                    background: 'rgba(0,0,0,0.28)',
+                    color: '#f8fafc',
+                    fontSize: 13,
+                    outline: 'none',
+                  }}
+                />
+                <input
+                  type="text"
+                  placeholder="note (optional — visible in ledger)"
+                  value={grantNote}
+                  onChange={(e) => setGrantNote(e.target.value)}
+                  disabled={grantBusy}
+                  style={{
+                    flex: 1,
+                    padding: '8px 10px',
+                    borderRadius: 8,
+                    border: '1px solid rgba(255,255,255,0.12)',
+                    background: 'rgba(0,0,0,0.28)',
+                    color: '#f8fafc',
+                    fontSize: 13,
+                    outline: 'none',
+                  }}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={doGrant}
+                disabled={grantBusy || !grantEmail.trim() || !grantMinutes}
+                style={{
+                  padding: '9px 14px',
+                  borderRadius: 8,
+                  border: '1px solid rgba(34,197,94,0.5)',
+                  background: grantBusy ? 'rgba(34,197,94,0.15)' : 'rgba(34,197,94,0.25)',
+                  color: '#ecfdf5',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: grantBusy ? 'progress' : 'pointer',
+                  opacity: (grantBusy || !grantEmail.trim() || !grantMinutes) ? 0.55 : 1,
+                }}
+              >
+                {grantBusy ? 'Granting…' : 'Grant'}
+              </button>
+              {grantMessage && (
+                <div style={{
+                  fontSize: 12,
+                  padding: '7px 10px',
+                  borderRadius: 8,
+                  background: grantMessage.ok
+                    ? 'rgba(34, 197, 94, 0.12)'
+                    : 'rgba(239, 68, 68, 0.12)',
+                  color: grantMessage.ok ? '#bbf7d0' : '#fecaca',
+                  border: `1px solid ${grantMessage.ok ? 'rgba(34,197,94,0.35)' : 'rgba(239,68,68,0.35)'}`,
+                }}>
+                  {grantMessage.text}
+                </div>
+              )}
+            </div>
+          </div>
 
           {/* ───── Live Usage — Adrian: "analiza pe consum credite in timp
                real permanent la toti userii". Flat feed of the most
