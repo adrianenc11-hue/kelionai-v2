@@ -202,9 +202,17 @@ router.get('/gemini-token', async (req, res) => {
     const ip = ipGeo.clientIp(req) || req.ip || '';
     const status = trialStatus(ip);
     if (!status.allowed) {
+      const isLifetime = status.reason === 'lifetime_expired';
       return res.status(429).json({
-        error:         'Free trial exhausted for today. Sign in or purchase credits to continue.',
-        trial:         { allowed: false, remainingMs: 0, nextWindowMs: status.nextWindowMs },
+        error: isLifetime
+          ? 'Your 7-day free trial has ended. Please create an account and buy credits to keep talking to Kelion.'
+          : 'Free trial for today is used up. Come back tomorrow or sign in to continue.',
+        trial: {
+          allowed: false,
+          reason:  status.reason || 'window_expired',
+          remainingMs: 0,
+          ...(status.nextWindowMs != null ? { nextWindowMs: status.nextWindowMs } : {}),
+        },
       });
     }
     stampTrialIfFresh(ip, status);
@@ -221,8 +229,9 @@ router.get('/gemini-token', async (req, res) => {
       const balance = await getCreditsBalance(adminUser.id);
       if (!Number.isFinite(balance) || balance <= 0) {
         return res.status(402).json({
-          error: 'No credits left. Buy a package to keep talking.',
+          error: 'No credits left. Buy a package to keep talking to Kelion.',
           balance_minutes: 0,
+          action: 'buy_credits',
         });
       }
     } catch (err) {

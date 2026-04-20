@@ -3,6 +3,8 @@
 const { Router } = require('express');
 const ipGeo = require('../services/ipGeo');
 const { trialStatus, stampTrialIfFresh } = require('../services/trialQuota');
+const { getCreditsBalance, findById } = require('../db');
+const { isAdminEmail } = require('../middleware/subscription');
 const router = Router();
 
 const ELEVENLABS_URL          = 'https://api.elevenlabs.io/v1/text-to-speech';
@@ -285,25 +287,56 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ error: 'Text is required and must be under 2000 characters' });
   }
 
-  // Guest trial quota — when the request arrives without a signed-in user
-  // (softAuth upstream skipped attaching req.user), enforce the same
-  // 15-min/day IP window that gates /api/chat and /api/realtime. This is
-  // what makes the Charon / ElevenLabs male voice accessible to free users
-  // on text chat (Adrian: "in mod free nu se aplica vocile") while still
-  // keeping the shared trial cap so guests can't exhaust TTS beyond their
-  // allotment. Signed-in users skip entirely — their gating is the
-  // subscription/credits system applied by the middleware chain upstream.
+  // Gating matrix (mirrors /api/chat and /api/realtime):
+  //   - guest (no JWT):          15-min/day IP window + 7-day lifetime cap
+  //   - signed-in non-admin:     credits balance > 0 (402 if not)
+  //   - admin:                   unlimited, never gated
   const isGuest = !req.user;
   if (isGuest) {
     const ip = ipGeo.clientIp(req) || req.ip || '';
     const status = trialStatus(ip);
     if (!status.allowed) {
+      const isLifetime = status.reason === 'lifetime_expired';
       return res.status(429).json({
-        error: 'Free trial exhausted for today. Sign in or purchase credits to continue.',
-        trial: { allowed: false, remainingMs: 0, nextWindowMs: status.nextWindowMs },
+        error: isLifetime
+          ? 'Your 7-day free trial has ended. Please create an account and buy credits to keep hearing Kelion.'
+          : 'Free trial for today is used up. Come back tomorrow or sign in to continue.',
+        trial: {
+          allowed: false,
+          reason:  status.reason || 'window_expired',
+          remainingMs: 0,
+          ...(status.nextWindowMs != null ? { nextWindowMs: status.nextWindowMs } : {}),
+        },
       });
     }
     stampTrialIfFresh(ip, status);
+  } else {
+    // Signed-in: admin unlimited, everyone else needs credits > 0. We keep
+    // the DB lookup cheap (single findById) and fail open on glitch — the
+    // /api/chat gate already ran before this call on normal text chats.
+    let isAdmin = req.user.role === 'admin';
+    if (!isAdmin) {
+      try {
+        const full = await findById(req.user.id);
+        isAdmin = Boolean(
+          full && (full.role === 'admin' || isAdminEmail(full.email))
+        );
+      } catch (_) { /* DB glitch — fail open */ }
+    }
+    if (!isAdmin) {
+      try {
+        const balance = await getCreditsBalance(req.user.id);
+        if (!Number.isFinite(balance) || balance <= 0) {
+          return res.status(402).json({
+            error: 'No credits left. Buy a package to keep hearing Kelion.',
+            balance_minutes: 0,
+            action: 'buy_credits',
+          });
+        }
+      } catch (err) {
+        console.warn('[tts] credits-balance lookup failed', err && err.message);
+      }
+    }
   }
 
   const hasGemini     = !!process.env.GEMINI_API_KEY;

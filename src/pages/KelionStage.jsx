@@ -1025,13 +1025,28 @@ export default function KelionStage() {
         setAuthState({ signedIn: false, user: null })
         throw new Error('Session expired — please sign in again (⋯ menu).')
       }
+      if (r.status === 402) {
+        // Signed-in user out of credits (Adrian: "daca ti-ai facut user nu
+        // trebuie sa functioneze daca nu ai cumparat credit"). Pop the
+        // buy-credits modal and surface a clear message. The modal is
+        // already wired below; we just trigger it here.
+        const body = await r.json().catch(() => ({}))
+        try { setBuyOpen(true) } catch (_) {}
+        throw new Error(body.error || 'No credits left — please buy a package to continue.')
+      }
       if (r.status === 429) {
-        // Guest trial exhausted — server returns { error, trial }.
-        // Refresh the HUD so it flips to "used up" immediately and
-        // surface a user-facing error. The sign-in modal is opened
-        // from the HUD's inline button, not from here.
+        // Guest trial exhausted. `reason` distinguishes the daily 15-min
+        // window from the 7-day lifetime cap. For lifetime_expired we show
+        // a "create account" message so the user knows free access is
+        // permanently gone from this IP.
+        const body = await r.json().catch(() => ({}))
+        const lifetime = body && body.trial && body.trial.reason === 'lifetime_expired'
         trialHud.refresh()
-        throw new Error('Free trial used up — sign in or buy credits to continue.')
+        if (lifetime) {
+          try { setSignInModalOpen(true) } catch (_) {}
+          throw new Error(body.error || 'Your 7-day free trial has ended — create an account and buy credits to continue.')
+        }
+        throw new Error(body.error || 'Free trial used up — sign in or buy credits to continue.')
       }
       if (!r.ok) throw new Error(`HTTP ${r.status}`)
       // First successful POST as a guest stamps the shared 15-min
@@ -1266,6 +1281,20 @@ export default function KelionStage() {
       console.log('[trial] server quota exhausted — voice session will stop')
     }
   }, [trialHud.applicable, trialHud.allowed, voiceTrial])
+
+  // Auto-open the Buy Credits modal when the voice session errors out
+  // with a credit-exhausted message (Adrian: "cind ajunge iar la 0 se
+  // trimite mesaj reincarca"). The Gemini Live hook already surfaces a
+  // clean message from the 402 token response; we match on it so a
+  // typical credit-gate trip surfaces the package picker immediately
+  // instead of leaving the user to find the Credits pill.
+  useEffect(() => {
+    if (!error || typeof error !== 'string') return
+    const low = error.toLowerCase()
+    if (low.includes('no credits') || low.includes('buy a package') || low.includes('buy credits')) {
+      setBuyOpen(true)
+    }
+  }, [error])
 
   const cameraVideoRef = useRef(null)
   useEffect(() => {
