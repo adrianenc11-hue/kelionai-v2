@@ -15,11 +15,26 @@ const router = Router();
 
 // Soft auth — most tool calls are allowed for guests, but MCP calls
 // that access a user's account only work when signed in.
+//
+// Mirrors the Postgres-only "numeric sub" guard from PR #61. A stale
+// pre-Postgres JWT (passkey credential-hash / UUID in `sub`) would
+// otherwise reach DB queries with BIGINT columns and crash with
+// `invalid input syntax for type bigint`. Treating those cookies as
+// absent here is equivalent to the user being signed out (exactly what
+// they need to do to get a fresh numeric-sub token anyway).
 async function peekUser(req) {
   try {
     const token = req.cookies?.['kelion.token'];
     if (!token) return null;
     const decoded = jwt.verify(token, config.jwt.secret);
+    if (process.env.DATABASE_URL) {
+      const sub = decoded.sub;
+      const numeric = Number.parseInt(sub, 10);
+      if (!Number.isFinite(numeric) || String(numeric) !== String(sub)) {
+        return null;
+      }
+      return { id: numeric, name: decoded.name, email: decoded.email };
+    }
     return { id: decoded.sub, name: decoded.name, email: decoded.email };
   } catch { return null; }
 }
