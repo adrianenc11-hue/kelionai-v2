@@ -234,12 +234,31 @@ app.get('/api/realtime/trial-token', async (req, res) => {
 // API routes (auth required)
 app.use('/api/users', requireAuth, usersRouter);
 app.use('/api/admin', requireAuth, adminRouter);
-app.use('/api/chat', requireAuth, chatLimiter, checkSubscription(), chatRouter);
+// Text chat is now a public endpoint that soft-authenticates (attaches
+// req.user if a JWT is present, no 401 for guests). Middleware chain:
+//   – softAuth: best-effort attach req.user
+//   – chatLimiter: per-IP rate limit (same as before)
+//   – checkSubscription: only runs for signed-in users; guests skip
+//     straight to the router where trial gating applies
+//   – chatRouter: for guests applies trial gating (shared 15-min/day
+//     IP window with Gemini Live); for users it already had req.user
+const { softAuth } = require('./middleware/optionalAuth');
+const subOnlyForUsers = checkSubscription();
+app.use('/api/chat', softAuth, chatLimiter, (req, res, next) => {
+  if (!req.user) return next();
+  return subOnlyForUsers(req, res, next);
+}, chatRouter);
 app.use('/api/tts', requireAuth, chatLimiter, checkSubscription(), ttsRouter);
 // Realtime router is PUBLIC in Stage 1 (no login/users/subs per product spec).
 // Rate limiting still applies to prevent abuse. Ephemeral-token endpoints only
 // hand back short-lived tokens; persona + config are baked in server-side.
 app.use('/api/realtime', chatLimiter, realtimeRouter);
+
+// Trial status — public endpoint the client polls to drive the top-right
+// countdown HUD. Read-only; never stamps. Returns { applicable, allowed,
+// remainingMs, windowMs, stamped }. See trial.js for semantics.
+const trialRouter = require('./routes/trial');
+app.use('/api/trial', trialRouter);
 
 // Credits (Stage 7 — monetization). The webhook sub-route uses its own
 // raw-body parser; /packages is public, /balance and /checkout require

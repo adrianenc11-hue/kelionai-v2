@@ -3,6 +3,8 @@
 const { Router } = require('express');
 const { getAI, getDefaultChatModel } = require('../utils/openai');
 const ipGeo = require('../services/ipGeo');
+const { peekSignedInUser, isAdminUser } = require('../middleware/optionalAuth');
+const { TRIAL_WINDOW_MS, trialStatus, stampTrialIfFresh } = require('../services/trialQuota');
 
 const router = Router();
 
@@ -39,6 +41,29 @@ router.post('/', async (req, res) => {
   const ai = getAI();
   if (!ai) {
     return res.status(503).json({ error: 'AI service not configured. Set GEMINI_API_KEY or OPENAI_API_KEY.' });
+  }
+
+  // Guest trial quota — same 15-min/day IP window used by the Gemini Live
+  // token mint. Adrian: "aplica si la chat scris aceleasi reguli" / the
+  // timer must tick on the FIRST free-tier interaction whether that's a
+  // text message or Tap-to-talk, not only when the mic is pressed.
+  // Signed-in / admin users skip entirely — their usage is governed by
+  // the credits system / unlimited admin bypass respectively.
+  const requestUser = peekSignedInUser(req);
+  const requestIsAdmin = await isAdminUser(requestUser);
+  const isGuest = !requestUser && !requestIsAdmin;
+  if (isGuest) {
+    const ip = ipGeo.clientIp(req) || req.ip || '';
+    const status = trialStatus(ip);
+    if (!status.allowed) {
+      return res.status(429).json({
+        error: 'Free trial exhausted for today. Sign in or purchase credits to continue.',
+        trial: { allowed: false, remainingMs: 0, nextWindowMs: status.nextWindowMs },
+      });
+    }
+    // Stamp on the first text message — this is what kicks off the 15-min
+    // countdown for text-first users (who may never press Tap-to-talk).
+    stampTrialIfFresh(ip, status);
   }
 
   // IP-based geolocation — no browser permission prompt. Uses Cloudflare /

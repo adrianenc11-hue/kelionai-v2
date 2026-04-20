@@ -289,13 +289,20 @@ router.post('/', async (req, res) => {
     return res.status(503).json({ error: 'TTS not configured. Set GEMINI_API_KEY or ELEVENLABS_API_KEY.' });
   }
 
-  // Adrian: "vocea nu este elevenlab, nativa, barbateasca, voce de femeie acum".
-  // Avatar Kelion is male-presenting — a female default voice breaks immersion.
-  // Prefer ElevenLabs ("Adam" male) when configured; fall back to Gemini
-  // ("Charon" male) only if ElevenLabs is not wired. Set TTS_PROVIDER=gemini
-  // to force Gemini even when both are configured.
-  const forceGemini = (process.env.TTS_PROVIDER || '').toLowerCase() === 'gemini';
-  const useElevenLabs = hasElevenLabs && !forceGemini;
+  // Adrian: "La chat scris […] aceeiasi voce ca la chat audio". Voice chat
+  // uses Gemini Live with the Charon prebuilt voice; text chat must match so
+  // Kelion sounds like the same person across modalities. Prefer Gemini
+  // Charon by default; only fall back to ElevenLabs if Gemini isn't
+  // configured, or if the operator explicitly opts into ElevenLabs with
+  // TTS_PROVIDER=elevenlabs.
+  const providerOverride = (process.env.TTS_PROVIDER || '').toLowerCase();
+  const forceElevenLabs  = providerOverride === 'elevenlabs' || providerOverride === '11labs';
+  const forceGemini      = providerOverride === 'gemini';
+  const useElevenLabs = forceElevenLabs
+    ? hasElevenLabs
+    : forceGemini
+      ? false
+      : !hasGemini && hasElevenLabs; // default: Gemini first, ElevenLabs only as fallback
   // Frontend may send a language hint (e.g. `navigator.language`). Trust any
   // well-formed ISO 639-1 code the client supplies; otherwise auto-detect
   // from the reply text itself.

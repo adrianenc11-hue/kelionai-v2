@@ -33,7 +33,12 @@ async function createUser() {
 }
 
 describe('POST /api/chat', () => {
-  it('401 unauthenticated',                           async () => { expect((await request(app).post('/api/chat').send({messages:[]})).status).toBe(401); });
+  // /api/chat is now a public endpoint — guests get trial-gated access
+  // via the shared 15-min/day IP window (see services/trialQuota.js).
+  // We assert the non-auth request no longer hard-401s; it either
+  // returns a trial-stamped 200/503 (AI call attempted) or a 429 if the
+  // quota is already exhausted for the test runner's IP.
+  it('guests pass soft auth (no 401)',                async () => { const s=(await request(app).post('/api/chat').send({messages:[]})).status; expect(s).not.toBe(401); expect([200,400,429,503]).toContain(s); });
   it('400 when messages is not array',                async () => { const {token}=await createUser(); expect((await request(app).post('/api/chat').set('Authorization',`Bearer ${token}`).send({messages:'bad'})).status).toBe(400); });
   it('200/503 with valid messages',                   async () => { const {token}=await createUser(); const r=await request(app).post('/api/chat').set('Authorization',`Bearer ${token}`).send({messages:[{role:'user',content:'hello'}],avatar:'kelion'}); expect([200,503]).toContain(r.status); });
   it('strips system role injection safely',           async () => { const {token}=await createUser(); const r=await request(app).post('/api/chat').set('Authorization',`Bearer ${token}`).send({messages:[{role:'system',content:'hack'},{role:'user',content:'hi'}]}); expect([200,503]).toContain(r.status); });

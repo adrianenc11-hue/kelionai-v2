@@ -1,53 +1,18 @@
 'use strict';
 
 const { Router } = require('express');
-const jwt = require('jsonwebtoken');
-const config = require('../config');
-const { listMemoryItems, findById } = require('../db');
+const { listMemoryItems } = require('../db');
 const { requireAuth } = require('../middleware/auth');
+const { peekSignedInUser, isAdminUser } = require('../middleware/optionalAuth');
 const ipGeo = require('../services/ipGeo');
+const trialQuota = require('../services/trialQuota');
 const router = Router();
 
 // Stage 3 — read user from JWT cookie without gating the route.
-// (The realtime endpoints are public for guests; if a cookie is present
-// and valid we enrich the session with long-term memory.)
-//
-// IMPORTANT: this helper is the *optional* cousin of `requireAuth` in
-// server/src/middleware/auth.js. It must apply the same "numeric sub"
-// guard, otherwise stale pre-Postgres JWTs (passkey credential hashes
-// / UUIDs stored in `sub`) leak straight into `listMemoryItems(user.id)`
-// which passes them to a BIGINT column and every Gemini Live token mint
-// floods the logs with:
-//   [realtime] memory load failed invalid input syntax for type bigint: "<uuid>"
-// (See PR #61 for the matching guard on the hard-auth path.)
-async function peekSignedInUser(req) {
-  try {
-    const token = req.cookies?.['kelion.token'];
-    if (!token) return null;
-    const decoded = jwt.verify(token, config.jwt.secret);
-    const USE_POSTGRES = !!process.env.DATABASE_URL;
-    if (USE_POSTGRES) {
-      const sub = decoded.sub;
-      const numeric = Number.parseInt(sub, 10);
-      if (!Number.isFinite(numeric) || String(numeric) !== String(sub)) {
-        // Treat the cookie as if it wasn't there — the guest
-        // experience is fine (Kelion still greets, just without
-        // personalised memory) and we skip the bigint crash.
-        return null;
-      }
-      return {
-        id: numeric,
-        name: decoded.name,
-        email: decoded.email,
-      };
-    }
-    return {
-      id: decoded.sub,
-      name: decoded.name,
-      email: decoded.email,
-    };
-  } catch { return null; }
-}
+// The realtime endpoints are public for guests; if a cookie is present
+// and valid we enrich the session with long-term memory. The actual
+// implementation lives in ../middleware/optionalAuth so the chat route
+// can reuse it — see the module header for the numeric-sub guard.
 
 // Kelion persona — injected server-side into every Gemini Live session
 // so users cannot jailbreak by replacing the system prompt.
@@ -197,72 +162,11 @@ router.get('/token', async (req, res) => {
 // Docs: https://ai.google.dev/gemini-api/docs/ephemeral-tokens
 // Client cannot override system prompt / voice — stays secure.
 // ──────────────────────────────────────────────────────────────────
-// Resolve whether the current request is an admin (DB role OR env
-// ADMIN_EMAILS OR the hard-coded default admin). Mirrors `requireAdmin`
-// in middleware/auth.js but works on the optional-auth `peekSignedInUser`
-// so we can bypass quota checks on public endpoints without forcing auth.
-// ──────────────────────────────────────────────────────────────────
-// Guest trial quota — 15 minutes of Gemini Live per IP per 24 hours.
-// Adrian: "free fara logare … ar trebuie sa aibe timer pe ecran 15
-// min /zi free ,sau creiere user cu cumparare credit". The public
-// mint endpoint previously let anyone mint unlimited ephemeral tokens
-// → anonymous users could hammer our shared GCP quota for free.
-//
-// Tracking: in-memory Map<ip, { firstMintAt }>. On the first mint we
-// stamp the clock; for the next 15 minutes we return the remaining
-// allowance so the client can render a live countdown; after the
-// 15-minute window expires but before 24 hours have passed we refuse
-// with 429 and tell the client to prompt sign-in / credit purchase;
-// once 24 hours have elapsed since firstMintAt we reset the slot and
-// the IP gets a fresh 15-minute window.
-//
-// Why IP instead of session: an unauthenticated user has no stable
-// identity. IP is imperfect (shared NAT, VPN) but it's the only
-// reliable handle for a public endpoint. When this runs on multiple
-// instances we'll need to move the map to Redis; for now Railway is
-// a single instance so in-memory is fine.
-//
-// Signed-in users skip this entirely (different `if` branch below):
-// their quota is governed by the credits system / subscription.
-const TRIAL_WINDOW_MS = 15 * 60 * 1000;   //  15 min per session
-const TRIAL_COOLDOWN_MS = 24 * 60 * 60 * 1000; // before next window
-const trialUsage = new Map(); // ip -> { firstMintAt }
-function trialStatus(ip) {
-  if (!ip) return { allowed: true, remainingMs: TRIAL_WINDOW_MS };
-  const now = Date.now();
-  const rec = trialUsage.get(ip);
-  if (!rec) return { allowed: true, remainingMs: TRIAL_WINDOW_MS, fresh: true };
-  const sinceFirst = now - rec.firstMintAt;
-  if (sinceFirst >= TRIAL_COOLDOWN_MS) {
-    trialUsage.delete(ip);
-    return { allowed: true, remainingMs: TRIAL_WINDOW_MS, fresh: true };
-  }
-  if (sinceFirst < TRIAL_WINDOW_MS) {
-    return { allowed: true, remainingMs: TRIAL_WINDOW_MS - sinceFirst, fresh: false };
-  }
-  return {
-    allowed: false,
-    remainingMs: 0,
-    nextWindowMs: TRIAL_COOLDOWN_MS - sinceFirst,
-  };
-}
-function stampTrialIfFresh(ip, status) {
-  if (!ip || !status.fresh) return;
-  trialUsage.set(ip, { firstMintAt: Date.now() });
-}
-
-async function isAdminUser(user) {
-  if (!user) return false;
-  try {
-    const dbUser = await findById(user.id);
-    if (dbUser && dbUser.role === 'admin') return true;
-  } catch (_) { /* fall through to email allow-list */ }
-  const defaultAdmins = ['adrianenc11@gmail.com'];
-  const adminEmails = (process.env.ADMIN_EMAILS || '')
-    .split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
-  const allAdmins = new Set([...defaultAdmins, ...adminEmails]);
-  return !!(user.email && allAdmins.has(user.email.toLowerCase()));
-}
+// Trial quota state & helpers live in ../services/trialQuota so the
+// text chat route can share the same per-IP window. See that module
+// for semantics. We pull out the constants + functions we need here.
+// isAdminUser / peekSignedInUser now come from ../middleware/optionalAuth.
+const { TRIAL_WINDOW_MS, trialStatus, stampTrialIfFresh } = trialQuota;
 
 router.get('/gemini-token', async (req, res) => {
   // Admin key-override path: when `GEMINI_API_KEY_ADMIN` is set AND the
