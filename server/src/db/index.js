@@ -42,7 +42,12 @@ function logAndMigrateDbLocation() {
         console.warn(`[db] legacy migration failed (continuing fresh):`, err && err.message);
       }
     }
-    console.log(`[db] using SQLite at ${absPath} (exists=${fs.existsSync(absPath)})`);
+    const looksPersistent = /^\/(data|mnt|app\/server\/data)\b/.test(absPath);
+    console.log(`[db] using SQLite at ${absPath} (exists=${fs.existsSync(absPath)}, looksPersistent=${looksPersistent})`);
+    if (!looksPersistent) {
+      console.warn('[db] *** WARNING: SQLite path is NOT under a typical Railway volume mount.');
+      console.warn('[db] *** Data WILL be wiped on every redeploy. Attach a Railway Volume to /app/server/data, OR set DATABASE_URL to a managed Postgres and redeploy.');
+    }
   } catch (err) {
     console.warn('[db] startup location check failed:', err && err.message);
   }

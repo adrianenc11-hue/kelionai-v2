@@ -15,7 +15,7 @@ const path = require('path');
 const jwt = require('jsonwebtoken');
 const config = require('../config');
 const { getUserByEmail, getUserByGoogleId, findByEmail, getDb } = require('../db');
-const { getLastBootstrapResult, bootstrapAdmin } = require('../services/adminBootstrap');
+const { getLastBootstrapResult, bootstrapAdmin, getLastCreditHealResult } = require('../services/adminBootstrap');
 
 const router = express.Router();
 
@@ -175,6 +175,7 @@ router.get('/admin-bootstrap', async (req, res) => {
         passwordHasLeadingOrTrailingWhitespace: envLen !== envTrimmedLen,
       },
       lastBootstrap: getLastBootstrapResult(),
+      lastCreditHeal: getLastCreditHealResult(),
       dbUser: userRow ? {
         exists: true,
         id: userRow.id,

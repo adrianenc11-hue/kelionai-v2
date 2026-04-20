@@ -27,7 +27,7 @@ const pushRouter       = require('./routes/push');
 const creditsRouter    = require('./routes/credits');
 const diagRouter       = require('./routes/diag');
 const proactive        = require('./services/proactive');
-const { bootstrapAdmin } = require('./services/adminBootstrap');
+const { bootstrapAdmin, healAdminCredits } = require('./services/adminBootstrap');
 
 const app = express();
 app.disable('x-powered-by');
@@ -44,6 +44,19 @@ initDb().then(async () => {
     }
   } catch (err) {
     console.warn('[kelion-startup] admin bootstrap failed:', err && err.message);
+  }
+  // After the admin user row is guaranteed to exist, ensure he has a working
+  // credits balance. This is the permanent fix for "iar au disparut creditele
+  // lui kelion" — every Railway redeploy wipes SQLite, so after each redeploy
+  // we auto-top-up the admin back to a configurable floor. Fully idempotent
+  // (no-op when balance is already above the floor).
+  try {
+    const h = await healAdminCredits();
+    if (h && h.healed) {
+      console.log(`[kelion-startup] admin credit auto-heal: granted ${h.granted} min (balance=${h.balance})`);
+    }
+  } catch (err) {
+    console.warn('[kelion-startup] admin credit auto-heal failed:', err && err.message);
   }
 }).catch(err => {
   console.error('[kelion-startup] Database initialization failed:', err.message);
