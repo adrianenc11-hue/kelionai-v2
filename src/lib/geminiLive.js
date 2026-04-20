@@ -425,6 +425,29 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
           console.error('[geminiLive] failed to send setup frame', err)
         }
 
+        // Kickstart: make Kelion speak first instead of waiting for the
+        // user to break the ice. Adrian 2026-04-20: "nu asteapta sa
+        // identifice limba, pleaca in engleza direct, trebuie sa astept
+        // userul sa zica ceva si dupa intra el". We send a tiny synthetic
+        // user turn right after setup so Gemini responds immediately with
+        // a short English greeting. This is the documented way to trigger
+        // a model turn without user audio on the Live API. The text is
+        // intentionally minimal so the persona's systemInstruction drives
+        // the actual content of the greeting (tone, wording, memories).
+        // If send fails, we silently skip — next user utterance will
+        // still trigger a response like before.
+        try {
+          ws.send(JSON.stringify({
+            clientContent: {
+              turns: [{
+                role: 'user',
+                parts: [{ text: 'Greet me with a short friendly hello in English and ask what I need. One sentence.' }],
+              }],
+              turnComplete: true,
+            },
+          }))
+        } catch (_) { /* best-effort, never break the session */ }
+
         // Prepare the credits heartbeat but DO NOT start it yet.
         //
         // Previous design deducted 1 credit here on `onopen`. That was a
