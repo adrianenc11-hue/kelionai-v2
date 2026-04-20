@@ -4,7 +4,7 @@
  * Credits — monetization routes.
  *
  * Adrian's approved model: 1 credit = 1 minute of Kelion Live (voice +
- * tools). User tops up via Stripe Checkout at 0.30 €/min. Standard
+ * tools). User tops up via Stripe Checkout at £0.30/min. Standard
  * packages are defined below; any of them can be overridden via env
  * vars without a code change.
  *
@@ -40,8 +40,8 @@ const {
 
 const router = Router();
 
-/** Standard credit packages (EUR cents + whole minutes). Calibrated to
- *  a 0.30 €/min retail rate with a volume discount for larger bundles. */
+/** Standard credit packages (GBP pence + whole minutes). Calibrated to
+ *  a £0.30/min retail rate with a volume discount for larger bundles. */
 function getPackages() {
   const fromEnv = process.env.CREDIT_PACKAGES_JSON;
   if (fromEnv) {
@@ -56,24 +56,24 @@ function getPackages() {
     {
       id: 'starter',
       name: 'Starter',
-      priceCents: 1000,           // 10 €
-      minutes: 33,                // ~0.30 €/min
+      priceCents: 1000,           // £10
+      minutes: 33,                // ~£0.30/min
       highlight: false,
       description: 'About 33 minutes of conversation.',
     },
     {
       id: 'standard',
       name: 'Standard',
-      priceCents: 2500,           // 25 €
-      minutes: 100,               // 0.25 €/min
+      priceCents: 2500,           // £25
+      minutes: 100,               // £0.25/min
       highlight: true,
       description: 'About 100 minutes. Best for most.',
     },
     {
       id: 'pro',
       name: 'Pro',
-      priceCents: 10000,          // 100 €
-      minutes: 400,               // 0.25 €/min
+      priceCents: 10000,          // £100
+      minutes: 400,               // £0.25/min
       highlight: false,
       description: 'About 400 minutes. Power users.',
     },
@@ -191,7 +191,7 @@ router.post('/checkout', requireAuth, async (req, res) => {
   body.append('cancel_url', cancelUrl);
   body.append('client_reference_id', String(req.user.id));
   if (req.user.email) body.append('customer_email', req.user.email);
-  body.append('line_items[0][price_data][currency]', 'eur');
+  body.append('line_items[0][price_data][currency]', 'gbp');
   body.append('line_items[0][price_data][product_data][name]', `Kelion credits — ${pkg.name}`);
   body.append('line_items[0][price_data][product_data][description]', `${pkg.minutes} minutes of Kelion Live`);
   body.append('line_items[0][price_data][unit_amount]', String(pkg.priceCents));
@@ -342,7 +342,7 @@ const webhookHandler = async (req, res) => {
         userId,
         deltaMinutes: minutes,
         amountCents: Number(session.amount_total || 0),
-        currency: (session.currency || 'eur').toLowerCase(),
+        currency: (session.currency || 'gbp').toLowerCase(),
         kind: 'topup',
         stripeSessionId: session.id,
         stripePaymentIntent: session.payment_intent || null,

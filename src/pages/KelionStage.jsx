@@ -2614,7 +2614,7 @@ export default function KelionStage() {
 
             <div style={{ display: 'grid', gap: 10 }}>
               {packages.map((pkg) => {
-                const euros = (pkg.priceCents / 100).toFixed(2).replace(/\.00$/, '')
+                const amount = (pkg.priceCents / 100).toFixed(2).replace(/\.00$/, '')
                 const perCredit = (pkg.priceCents / 100 / pkg.minutes).toFixed(2)
                 return (
                   <button
@@ -2642,10 +2642,10 @@ export default function KelionStage() {
                       justifyContent: 'space-between', marginBottom: 4,
                     }}>
                       <div style={{ fontSize: 15, fontWeight: 700 }}>{pkg.name}</div>
-                      <div style={{ fontSize: 18, fontWeight: 700 }}>{euros} €</div>
+                      <div style={{ fontSize: 18, fontWeight: 700 }}>£{amount}</div>
                     </div>
                     <div style={{ fontSize: 12, opacity: 0.65 }}>
-                      {pkg.minutes} credits · {perCredit} €/credit
+                      {pkg.minutes} credits · £{perCredit}/credit
                     </div>
                     {pkg.description && (
                       <div style={{ fontSize: 12, opacity: 0.55, marginTop: 4 }}>
@@ -2663,8 +2663,8 @@ export default function KelionStage() {
             <div style={{
               fontSize: 11, opacity: 0.5, marginTop: 16, lineHeight: 1.5,
             }}>
-              You'll be redirected to Stripe's secure checkout. EU VAT is
-              handled automatically. Credits never expire.
+              You'll be redirected to Stripe's secure checkout.
+              Credits never expire.
             </div>
 
             {!installed && !installPromptEvent && (
@@ -2738,20 +2738,20 @@ export default function KelionStage() {
           )}
 
           {!businessLoading && businessData && (() => {
-            const revenueEur = (businessData.ledger.revenueCents / 100).toFixed(2)
+            const revenueGbp = (businessData.ledger.revenueCents / 100).toFixed(2)
             // 50/50 split: half goes to AI vendors, half to us. This is a
             // gross estimate — actual AI spend is visible on the provider
             // cards. Stripe/tax fees will trim our half ~3%.
-            const platformEstEur = (businessData.ledger.revenueCents / 200).toFixed(2)
+            const platformEstGbp = (businessData.ledger.revenueCents / 200).toFixed(2)
             const minutesSold = businessData.ledger.minutesSold
             const minutesConsumed = businessData.ledger.minutesConsumed
             const topups = businessData.ledger.topups
             const rows = [
               { label: 'Credit top-ups', value: topups, hint: 'Stripe Checkout sessions completed' },
-              { label: 'Gross revenue', value: `${revenueEur} €`, hint: 'Sum of paid Stripe sessions' },
+              { label: 'Gross revenue', value: `£${revenueGbp}`, hint: 'Sum of paid Stripe sessions' },
               { label: 'Minutes sold', value: `${minutesSold} min`, hint: 'Credits granted to users' },
               { label: 'Minutes consumed', value: `${minutesConsumed} min`, hint: 'Live conversation time used' },
-              { label: 'Platform share (est.)', value: `${platformEstEur} €`, hint: '50% of gross, before Stripe/VAT' },
+              { label: 'Platform share (est.)', value: `£${platformEstGbp}`, hint: '50% of gross, before Stripe fees' },
             ]
             return (
               <>

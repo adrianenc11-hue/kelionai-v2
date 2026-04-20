@@ -186,8 +186,8 @@ async function initDb() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
       delta_minutes INTEGER NOT NULL,           -- + for top-up, - for consumption
-      amount_cents INTEGER,                     -- EUR cents charged by Stripe (null for consumption)
-      currency TEXT DEFAULT 'eur',
+      amount_cents INTEGER,                     -- Minor units (e.g. GBP pence) charged by Stripe (null for consumption)
+      currency TEXT DEFAULT 'gbp',
       kind TEXT NOT NULL,                       -- 'topup' | 'consume' | 'bonus' | 'refund'
       stripe_session_id TEXT,
       stripe_payment_intent TEXT,
@@ -639,7 +639,7 @@ function addCreditsTransaction({
   userId,
   deltaMinutes,
   amountCents = null,
-  currency = 'eur',
+  currency = 'gbp',
   kind,
   stripeSessionId = null,
   stripePaymentIntent = null,

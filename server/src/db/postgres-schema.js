@@ -82,7 +82,7 @@ CREATE TABLE IF NOT EXISTS credit_transactions (
   user_id                BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   delta_minutes          INTEGER NOT NULL,
   amount_cents           INTEGER,
-  currency               TEXT DEFAULT 'eur',
+  currency               TEXT DEFAULT 'gbp',
   kind                   TEXT NOT NULL,
   stripe_session_id      TEXT,
   stripe_payment_intent  TEXT,
