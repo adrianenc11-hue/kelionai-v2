@@ -12,6 +12,8 @@ const {
   addCreditsTransaction,
   getUserByEmail,
   getCreditsBalance,
+  listRecentVisitors,
+  getVisitorStats,
 } = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { getAllCredits, probeStripe, buildRevenueSplit } = require('../services/aiCredits');
@@ -205,6 +207,44 @@ router.get('/credits', async (req, res) => {
   } catch (err) {
     console.error('[admin/credits] Error:', err && err.message);
     res.status(500).json({ error: 'Failed to fetch AI credits' });
+  }
+});
+
+/**
+ * GET /api/admin/visitors
+ * Recent visitor events — one row per SPA page load, captured by the
+ * `visitorLog` middleware. Returns IP, country, user-agent, referer,
+ * path, and the associated user email if the visitor was signed in.
+ *
+ * Adrian 2026-04-20: "nu vad buton vizite reale cine a vizitat situl,
+ * ip tara restul datelor lor". Admin-only — IP is considered PII.
+ */
+router.get('/visitors', async (req, res) => {
+  try {
+    const limit = Math.min(500, Math.max(1, Number(req.query.limit) || 100));
+    const windowHours = Math.min(24 * 30, Math.max(1, Number(req.query.windowHours) || 24));
+    const [rows, stats] = await Promise.all([
+      listRecentVisitors(limit),
+      getVisitorStats({ windowHours }),
+    ]);
+    res.json({
+      visits: rows.map((r) => ({
+        id: r.id,
+        ts: r.ts,
+        path: r.path,
+        ip: r.ip,
+        country: r.country,
+        userAgent: r.user_agent,
+        referer: r.referer,
+        userId: r.user_id,
+        userEmail: r.user_email,
+      })),
+      stats,
+      ts: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error('[admin/visitors] Error:', err && err.message);
+    res.status(500).json({ error: 'Failed to fetch visitors' });
   }
 });
 
