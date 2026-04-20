@@ -98,6 +98,70 @@ router.get('/balance', requireAuth, async (req, res) => {
 });
 
 /**
+ * POST /api/credits/consume
+ *
+ * Deduct live-session minutes from a signed-in user's balance. Called
+ * by the client as a 60s heartbeat while a Gemini Live voice session
+ * is running (useGeminiLive.js). Admins are auto-exempt (`exempt: true`
+ * in the response so the client doesn't need to know who's admin).
+ *
+ * Body: { minutes?: number }   — default 1, capped at 5 per call
+ * Returns:
+ *   { balance_minutes, deducted, exempt: true|false }   on success
+ *   { balance_minutes: 0, deducted: 0, exhausted: true } when balance is
+ *                                                        already at zero
+ *
+ * Adrian: "la logare se respecta credit cumparat". Before this route, a
+ * signed-in non-admin could hold a voice session open indefinitely — no
+ * deduction, no cap. Now: the client ticks every 60 s and the session
+ * auto-stops when balance hits 0.
+ */
+router.post('/consume', requireAuth, async (req, res) => {
+  try {
+    const { isAdminEmail } = require('../middleware/subscription');
+    const { findById } = require('../db');
+    const user = await findById(req.user.id).catch(() => null);
+    const isAdmin = (req.user && req.user.role === 'admin')
+      || isAdminEmail((user && user.email) || req.user.email)
+      || (user && (user.role === 'admin' || isAdminEmail(user.email)));
+    if (isAdmin) {
+      // Admins never burn credits. Short-circuit so the client loop keeps
+      // running without any DB writes.
+      return res.json({ balance_minutes: null, deducted: 0, exempt: true });
+    }
+
+    const raw = Number(req.body && req.body.minutes);
+    const minutes = Number.isFinite(raw) && raw > 0 ? Math.min(Math.ceil(raw), 5) : 1;
+
+    const current = await getCreditsBalance(req.user.id);
+    if (current <= 0) {
+      return res.status(402).json({
+        balance_minutes: 0,
+        deducted: 0,
+        exhausted: true,
+        error: 'Insufficient credits',
+      });
+    }
+    const take = Math.min(minutes, current);
+    const result = await addCreditsTransaction({
+      userId: req.user.id,
+      deltaMinutes: -take,
+      kind: 'consumption',
+      note: 'Gemini Live session',
+    });
+    return res.json({
+      balance_minutes: result.balance,
+      deducted: take,
+      exempt: false,
+      exhausted: result.balance <= 0,
+    });
+  } catch (err) {
+    console.error('[credits/consume] error:', err && err.message);
+    res.status(500).json({ error: 'Failed to consume credits' });
+  }
+});
+
+/**
  * POST /api/credits/checkout
  * Body: { packageId: string }
  * Returns: { url: string }  — redirect the user here

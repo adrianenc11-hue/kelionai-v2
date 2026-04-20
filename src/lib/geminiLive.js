@@ -52,6 +52,13 @@ export function useGeminiLive({ audioRef, coords = null }) {
   // remainingMs so the HUD can tick locally without a poll loop.
   const [trial, setTrial] = useState(null)
   const trialTimeoutRef = useRef(null)
+  // Credits heartbeat (signed-in non-admin only). While a Gemini Live
+  // session is open we POST /api/credits/consume every 60s to deduct
+  // one minute from the user's balance. When the server reports
+  // `exhausted: true` (balance hit 0) or returns 402 we close the
+  // socket and surface a friendly "buy credits" error. Admins get
+  // `exempt: true` on every response and stay unlimited.
+  const creditsIntervalRef = useRef(null)
 
   const wsRef = useRef(null)
   const audioCtxRef = useRef(null)       // 16kHz capture context for Gemini — MUST match SAMPLE_RATE_IN
@@ -311,6 +318,16 @@ export function useGeminiLive({ audioRef, coords = null }) {
         setTrial({ active: false, remainingMs: 0, expiresAt: 0, exhausted: true })
         throw new Error(msg)
       }
+      // Signed-in non-admin with 0 credits — server gates the mint with
+      // 402 so we never even open the WS. Surface a clean "buy credits"
+      // message; the HUD already renders a "0 min left" pill from the
+      // credits endpoint.
+      if (tokenRes.status === 402) {
+        let body = null
+        try { body = await tokenRes.json() } catch (_) { /* fall through */ }
+        const msg = body?.error || 'No credits left. Buy a package to keep talking.'
+        throw new Error(msg)
+      }
       if (!tokenRes.ok) {
         const txt = await tokenRes.text()
         throw new Error(`Token fetch failed: ${tokenRes.status} ${txt}`)
@@ -380,6 +397,71 @@ export function useGeminiLive({ audioRef, coords = null }) {
         } catch (err) {
           console.error('[geminiLive] failed to send setup frame', err)
         }
+
+        // Start credits heartbeat. Fires every 60 s while the session is
+        // open. Server auto-exempts admins (exempt:true → no deduction)
+        // and returns 402 / exhausted:true for signed-in non-admins when
+        // balance hits 0, at which point we close the socket and set an
+        // error the HUD can render.
+        if (creditsIntervalRef.current) {
+          clearInterval(creditsIntervalRef.current)
+          creditsIntervalRef.current = null
+        }
+        const consumeCredits = async () => {
+          try {
+            const r = await fetch('/api/credits/consume', {
+              method: 'POST',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ minutes: 1 }),
+            })
+            if (r.status === 401) {
+              // Guest (no JWT) — nothing to deduct, stop polling.
+              if (creditsIntervalRef.current) {
+                clearInterval(creditsIntervalRef.current)
+                creditsIntervalRef.current = null
+              }
+              return
+            }
+            if (r.status === 402) {
+              // Zero balance. Close the session cleanly and tell the HUD.
+              if (creditsIntervalRef.current) {
+                clearInterval(creditsIntervalRef.current)
+                creditsIntervalRef.current = null
+              }
+              try {
+                if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                  wsRef.current.close(1000, 'credits-exhausted')
+                }
+              } catch (_) { /* swallow */ }
+              setError('No credits left. Buy a package to keep talking.')
+              setStatus('error')
+              return
+            }
+            const body = await r.json().catch(() => null)
+            if (body && body.exhausted) {
+              if (creditsIntervalRef.current) {
+                clearInterval(creditsIntervalRef.current)
+                creditsIntervalRef.current = null
+              }
+              try {
+                if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                  wsRef.current.close(1000, 'credits-exhausted')
+                }
+              } catch (_) { /* swallow */ }
+              setError('Your last minute of credits was used. Buy more to keep talking.')
+              setStatus('error')
+            }
+          } catch (err) {
+            // Network hiccup — keep ticking; we'll try again in 60 s.
+            console.warn('[geminiLive] credits/consume failed', err && err.message)
+          }
+        }
+        // Deduct the first minute immediately when the session actually
+        // opens (previously we only ticked at +60 s, which gave a free
+        // first minute per reconnect). Subsequent ticks run every 60 s.
+        consumeCredits()
+        creditsIntervalRef.current = setInterval(consumeCredits, 60_000)
       }
 
       ws.onmessage = (event) => handleMessage(event.data)
@@ -646,6 +728,10 @@ export function useGeminiLive({ audioRef, coords = null }) {
     if (trialTimeoutRef.current) {
       clearTimeout(trialTimeoutRef.current)
       trialTimeoutRef.current = null
+    }
+    if (creditsIntervalRef.current) {
+      clearInterval(creditsIntervalRef.current)
+      creditsIntervalRef.current = null
     }
     setUserLevel(0)
     setStatus('idle')

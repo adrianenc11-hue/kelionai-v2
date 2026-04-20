@@ -248,7 +248,17 @@ app.use('/api/chat', softAuth, chatLimiter, (req, res, next) => {
   if (!req.user) return next();
   return subOnlyForUsers(req, res, next);
 }, chatRouter);
-app.use('/api/tts', requireAuth, chatLimiter, checkSubscription(), ttsRouter);
+// /api/tts — Adrian: "in mod free nu se aplica vocile". Previously mounted
+// under `requireAuth`, which meant guests received a 401 and the client fell
+// back to `window.speechSynthesis` (browser default voice, female on
+// Windows). Now public via softAuth so the Charon / ElevenLabs male voice
+// plays for guests too; the trial-quota gate inside tts.js enforces the
+// shared 15-min/day IP window (same policy as /api/chat).
+const subForTtsUsers = checkSubscription();
+app.use('/api/tts', softAuth, chatLimiter, (req, res, next) => {
+  if (!req.user) return next();
+  return subForTtsUsers(req, res, next);
+}, ttsRouter);
 // Realtime router is PUBLIC in Stage 1 (no login/users/subs per product spec).
 // Rate limiting still applies to prevent abuse. Ephemeral-token endpoints only
 // hand back short-lived tokens; persona + config are baked in server-side.

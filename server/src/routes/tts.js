@@ -1,6 +1,8 @@
 'use strict';
 
 const { Router } = require('express');
+const ipGeo = require('../services/ipGeo');
+const { trialStatus, stampTrialIfFresh } = require('../services/trialQuota');
 const router = Router();
 
 const ELEVENLABS_URL          = 'https://api.elevenlabs.io/v1/text-to-speech';
@@ -281,6 +283,27 @@ router.post('/', async (req, res) => {
 
   if (!text || typeof text !== 'string' || text.length > 2000) {
     return res.status(400).json({ error: 'Text is required and must be under 2000 characters' });
+  }
+
+  // Guest trial quota — when the request arrives without a signed-in user
+  // (softAuth upstream skipped attaching req.user), enforce the same
+  // 15-min/day IP window that gates /api/chat and /api/realtime. This is
+  // what makes the Charon / ElevenLabs male voice accessible to free users
+  // on text chat (Adrian: "in mod free nu se aplica vocile") while still
+  // keeping the shared trial cap so guests can't exhaust TTS beyond their
+  // allotment. Signed-in users skip entirely — their gating is the
+  // subscription/credits system applied by the middleware chain upstream.
+  const isGuest = !req.user;
+  if (isGuest) {
+    const ip = ipGeo.clientIp(req) || req.ip || '';
+    const status = trialStatus(ip);
+    if (!status.allowed) {
+      return res.status(429).json({
+        error: 'Free trial exhausted for today. Sign in or purchase credits to continue.',
+        trial: { allowed: false, remainingMs: 0, nextWindowMs: status.nextWindowMs },
+      });
+    }
+    stampTrialIfFresh(ip, status);
   }
 
   const hasGemini     = !!process.env.GEMINI_API_KEY;
