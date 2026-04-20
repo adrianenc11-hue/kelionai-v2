@@ -2,7 +2,7 @@
 
 const jwt = require('jsonwebtoken');
 const config = require('../config');
-const { getUserByGoogleId, findById } = require('../db');
+const { getUserByGoogleId, findById, findByEmail } = require('../db');
 
 /**
  * Middleware pentru verificarea autentificării.
@@ -34,15 +34,60 @@ async function requireAuth(req, res, next) {
         // break every authenticated test.
         const rawSub = decoded.sub;
         const USE_POSTGRES = !!process.env.DATABASE_URL;
+        let effectiveSub = rawSub;
         if (USE_POSTGRES) {
           const numericSub = Number.parseInt(rawSub, 10);
-          if (!Number.isFinite(numericSub) || String(numericSub) !== String(rawSub)) {
-            res.clearCookie('kelion.token', { path: '/' });
-            return res.status(401).json({ error: 'Stale token — please sign in again.' });
+          const isNumeric = Number.isFinite(numericSub) && String(numericSub) === String(rawSub);
+          if (!isNumeric) {
+            // Legacy token (pre-migration Google OAuth UUID sub, or stale
+            // string id). Instead of locking the user out with "Stale
+            // token — please sign in again.", transparently migrate the
+            // session: look them up by the email claim in the same JWT,
+            // re-issue a fresh token carrying the numeric user.id, and
+            // overwrite the cookie. The request proceeds normally so
+            // actions like POST /api/credits/checkout don't fail.
+            let migratedUser = null;
+            if (decoded.email) {
+              try {
+                migratedUser = await findByEmail(decoded.email);
+              } catch (_) { migratedUser = null; }
+            }
+            if (!migratedUser || !migratedUser.id) {
+              res.clearCookie('kelion.token', { path: '/' });
+              return res.status(401).json({ error: 'Stale token — please sign in again.' });
+            }
+            const freshToken = jwt.sign(
+              {
+                sub: migratedUser.id,
+                email: migratedUser.email,
+                name: migratedUser.name,
+                role: migratedUser.role || decoded.role || 'user',
+              },
+              config.jwt.secret,
+              { expiresIn: config.jwt.expiresIn }
+            );
+            try {
+              res.cookie('kelion.token', freshToken, {
+                httpOnly: true,
+                secure: !!config.isProduction,
+                sameSite: 'lax',
+                maxAge: 7 * 24 * 60 * 60 * 1000,
+                path: '/',
+              });
+            } catch (_) { /* cookie setting is best-effort */ }
+            // Also expose the fresh token in a response header so the
+            // SPA can stash it as its Bearer fallback immediately — the
+            // next authenticated fetch will use the new token without
+            // waiting for a page reload.
+            try { res.setHeader('X-Kelion-Refreshed-Token', freshToken); } catch (_) {}
+            effectiveSub = migratedUser.id;
+            decoded.email = migratedUser.email;
+            decoded.name = migratedUser.name;
+            decoded.role = migratedUser.role || decoded.role || 'user';
           }
         }
         req.user = {
-          id: rawSub,
+          id: effectiveSub,
           email: decoded.email,
           name: decoded.name,
           role: decoded.role || 'user',
