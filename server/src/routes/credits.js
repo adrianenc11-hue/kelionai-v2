@@ -110,12 +110,28 @@ router.get('/balance', requireAuth, async (req, res) => {
  *   { balance_minutes, deducted, exempt: true|false }   on success
  *   { balance_minutes: 0, deducted: 0, exhausted: true } when balance is
  *                                                        already at zero
+ *   { throttled: true, balance_minutes, retryAfterMs }   when the same
+ *                                                        user tried to
+ *                                                        consume again
+ *                                                        within the
+ *                                                        cooldown window
  *
- * Adrian: "la logare se respecta credit cumparat". Before this route, a
- * signed-in non-admin could hold a voice session open indefinitely — no
- * deduction, no cap. Now: the client ticks every 60 s and the session
- * auto-stops when balance hits 0.
+ * Anti-drain guard: we enforce a 50-second server-side cooldown per
+ * user. This is a defence in depth against the fraud path Adrian
+ * hit 2026-04-20: a buggy client (or someone tampering via devtools)
+ * could rapid-fire this endpoint and burn through a £10 top-up in
+ * seconds with zero service delivered. Real voice sessions only tick
+ * every 60 s, so a 50 s floor is a safe margin that never rejects a
+ * legitimate heartbeat. We reject fast repeats with 200 + throttled
+ * so the client's heartbeat doesn't escalate to a retry storm, and
+ * never touch the ledger.
+ *
+ * Adrian: "la logare se respecta credit cumparat". + "sa nu se mai
+ * repete ca dau de dracu".
  */
+const CONSUME_COOLDOWN_MS = 50 * 1000;
+const lastConsumeByUser = new Map(); // userId → epochMs of last successful deduction
+
 router.post('/consume', requireAuth, async (req, res) => {
   try {
     const { isAdminEmail } = require('../middleware/subscription');
@@ -128,6 +144,20 @@ router.post('/consume', requireAuth, async (req, res) => {
       // Admins never burn credits. Short-circuit so the client loop keeps
       // running without any DB writes.
       return res.json({ balance_minutes: null, deducted: 0, exempt: true });
+    }
+
+    const now = Date.now();
+    const last = lastConsumeByUser.get(req.user.id) || 0;
+    if (now - last < CONSUME_COOLDOWN_MS) {
+      // Return the current (un-deducted) balance so the HUD still has a
+      // truthful number — we just didn't charge again this tick.
+      const bal = await getCreditsBalance(req.user.id).catch(() => null);
+      return res.json({
+        balance_minutes: typeof bal === 'number' ? bal : null,
+        deducted: 0,
+        throttled: true,
+        retryAfterMs: CONSUME_COOLDOWN_MS - (now - last),
+      });
     }
 
     const raw = Number(req.body && req.body.minutes);
@@ -149,6 +179,7 @@ router.post('/consume', requireAuth, async (req, res) => {
       kind: 'consumption',
       note: 'Gemini Live session',
     });
+    lastConsumeByUser.set(req.user.id, now);
     return res.json({
       balance_minutes: result.balance,
       deducted: take,

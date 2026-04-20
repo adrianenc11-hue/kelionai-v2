@@ -791,13 +791,34 @@ export default function KelionStage() {
   const [revenueSplit, setRevenueSplit] = useState(null)
   const [revenueSplitLoading, setRevenueSplitLoading] = useState(false)
   const [revenueSplitError, setRevenueSplitError] = useState(null)
+  // Live usage ledger — most recent credit transactions across all
+  // users. Auto-refreshed every 5s while the credits overlay is open
+  // so Adrian can watch consumption tick in real time. Added after
+  // the 2026-04-20 charge-on-open bug drained a £10 pack in seconds;
+  // visibility is now a standing requirement ("permanent la toti
+  // userii").
+  const [ledgerRows, setLedgerRows] = useState([])
+  const [ledgerError, setLedgerError] = useState(null)
+  const [ledgerLoading, setLedgerLoading] = useState(false)
   const isAdmin = Boolean(authState.user && authState.user.isAdmin)
+  const refreshLedger = useCallback(async () => {
+    try {
+      const r = await fetch('/api/admin/credits/ledger?limit=50', { credentials: 'include' })
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      const j = await r.json()
+      setLedgerRows(Array.isArray(j.rows) ? j.rows : [])
+      setLedgerError(null)
+    } catch (err) {
+      setLedgerError(err.message || 'Could not load ledger')
+    }
+  }, [])
   const openCredits = useCallback(async () => {
     setCreditsOpen(true)
     setCreditsLoading(true)
     setCreditsError(null)
     setRevenueSplitLoading(true)
     setRevenueSplitError(null)
+    setLedgerLoading(true)
     const cardsPromise = fetch('/api/admin/credits', { credentials: 'include' })
       .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
       .then((j) => setCreditsCards(Array.isArray(j.cards) ? j.cards : []))
@@ -808,8 +829,17 @@ export default function KelionStage() {
       .then((j) => setRevenueSplit(j))
       .catch((err) => setRevenueSplitError(err.message || 'Could not load revenue split'))
       .finally(() => setRevenueSplitLoading(false))
-    await Promise.allSettled([cardsPromise, splitPromise])
-  }, [])
+    const ledgerPromise = refreshLedger().finally(() => setLedgerLoading(false))
+    await Promise.allSettled([cardsPromise, splitPromise, ledgerPromise])
+  }, [refreshLedger])
+
+  // Poll ledger every 5s while overlay is open. Cleared on close /
+  // unmount so we never leak an interval.
+  useEffect(() => {
+    if (!creditsOpen || !isAdmin) return undefined
+    const id = setInterval(() => { refreshLedger() }, 5000)
+    return () => clearInterval(id)
+  }, [creditsOpen, isAdmin, refreshLedger])
 
   // Stage 7 — monetization. User-facing top-up modal (Stripe Checkout)
   // and live balance. `buyOpen` shows the package picker; `buyBusy` is
@@ -1268,7 +1298,16 @@ export default function KelionStage() {
     // shared /api/trial/status endpoint so the timer also ticks for
     // text-chat-only guests who never touch the mic.
     trial: voiceTrial,
-  } = useGeminiLive({ audioRef, coords: clientGeo })
+  } = useGeminiLive({
+    audioRef,
+    coords: clientGeo,
+    // Live HUD: every successful consume response carries the
+    // post-deduction balance. Pipe it straight into the top-right
+    // "Credits · N" chip so users see the credit tick down per minute
+    // without a page refresh. Admins get `null` (exempt) and the
+    // hook skips the update — chip stays on whatever /balance loaded.
+    onBalanceUpdate: (minutes) => setBalance(minutes),
+  })
 
   // Unified trial HUD source of truth. Applies to both voice AND text
   // chat via the shared 15-min/day IP window on the server. Collapses
@@ -3020,6 +3059,140 @@ export default function KelionStage() {
               </div>
             )
           })()}
+
+          {/* ───── Live Usage — Adrian: "analiza pe consum credite in timp
+               real permanent la toti userii". Flat feed of the most
+               recent ledger entries across every user, auto-refreshed
+               every 5 s. Added after the 2026-04-20 charge-on-open
+               incident so consumption is now observable the moment it
+               happens, not post-mortem. ───── */}
+          <div style={{
+            marginBottom: 16, padding: 14,
+            borderRadius: 14,
+            background: 'rgba(167, 139, 250, 0.05)',
+            border: '1px solid rgba(167, 139, 250, 0.22)',
+          }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              marginBottom: 8,
+            }}>
+              <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: 0.1 }}>
+                Live Usage
+              </div>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                fontSize: 10, opacity: 0.65,
+              }}>
+                <span style={{
+                  width: 6, height: 6, borderRadius: '50%',
+                  background: '#22c55e',
+                  boxShadow: '0 0 6px rgba(34,197,94,0.9)',
+                }} />
+                auto-refresh 5 s
+              </div>
+            </div>
+            {ledgerError && (
+              <div style={{
+                fontSize: 11, color: '#fca5a5',
+                padding: '6px 10px',
+                background: 'rgba(239, 68, 68, 0.1)',
+                borderRadius: 8,
+                marginBottom: 8,
+              }}>{ledgerError}</div>
+            )}
+            {ledgerLoading && ledgerRows.length === 0 && (
+              <div style={{ fontSize: 12, opacity: 0.5 }}>Loading ledger…</div>
+            )}
+            {!ledgerLoading && ledgerRows.length === 0 && !ledgerError && (
+              <div style={{ fontSize: 12, opacity: 0.5 }}>No transactions yet.</div>
+            )}
+            {ledgerRows.length > 0 && (() => {
+              // Abuse heuristic: flag any user who burned >5 credits
+              // in the last 5 minutes via plain consumption. Clean
+              // finish-of-session is 1 credit / 60 s, so >5/5 min
+              // means either a bug or tampering — exactly the fraud
+              // path that hit user Kelion on 2026-04-20.
+              const now = Date.now()
+              const windowMs = 5 * 60 * 1000
+              const byUser = new Map()
+              for (const row of ledgerRows) {
+                if (row.kind !== 'consumption') continue
+                const ts = row.created_at ? Date.parse(row.created_at) : 0
+                if (!ts || now - ts > windowMs) continue
+                const key = row.user_email || `user-${row.user_id}`
+                const agg = byUser.get(key) || { drained: 0, last: 0 }
+                agg.drained += Math.abs(Number(row.delta_minutes) || 0)
+                if (ts > agg.last) agg.last = ts
+                byUser.set(key, agg)
+              }
+              const suspects = [...byUser.entries()]
+                .filter(([, v]) => v.drained > 5)
+                .sort((a, b) => b[1].drained - a[1].drained)
+              return (
+                <>
+                  {suspects.length > 0 && (
+                    <div style={{
+                      padding: '8px 10px', marginBottom: 10,
+                      borderRadius: 8,
+                      background: 'rgba(239, 68, 68, 0.12)',
+                      border: '1px solid rgba(239, 68, 68, 0.5)',
+                      color: '#fecaca',
+                      fontSize: 12,
+                    }}>
+                      <div style={{ fontWeight: 700, marginBottom: 4 }}>
+                        ⚠ Abnormal drain in last 5 min
+                      </div>
+                      {suspects.slice(0, 3).map(([who, v]) => (
+                        <div key={who} style={{ opacity: 0.9 }}>
+                          {who} — {v.drained} credits
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div style={{
+                    maxHeight: 220, overflowY: 'auto',
+                    borderRadius: 8,
+                    background: 'rgba(0, 0, 0, 0.22)',
+                  }}>
+                    {ledgerRows.slice(0, 30).map((row) => {
+                      const delta = Number(row.delta_minutes) || 0
+                      const positive = delta > 0
+                      const color = positive
+                        ? '#bbf7d0'
+                        : row.kind === 'admin_grant'
+                          ? '#c4b5fd'
+                          : '#fecaca'
+                      const ts = row.created_at ? new Date(row.created_at) : null
+                      const tsLabel = ts
+                        ? `${ts.getHours().toString().padStart(2, '0')}:${ts.getMinutes().toString().padStart(2, '0')}:${ts.getSeconds().toString().padStart(2, '0')}`
+                        : ''
+                      return (
+                        <div key={row.id} style={{
+                          display: 'grid',
+                          gridTemplateColumns: '60px 1fr 70px 60px',
+                          gap: 8, alignItems: 'center',
+                          padding: '6px 10px',
+                          fontSize: 11,
+                          borderBottom: '1px solid rgba(167, 139, 250, 0.08)',
+                        }}>
+                          <span style={{ opacity: 0.55, fontFamily: 'monospace' }}>{tsLabel}</span>
+                          <span style={{ opacity: 0.85, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {row.user_email || `user-${row.user_id}`}
+                          </span>
+                          <span style={{ opacity: 0.65, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.05 }}>
+                            {row.kind}
+                          </span>
+                          <span style={{ color, fontWeight: 600, textAlign: 'right', fontFamily: 'monospace' }}>
+                            {positive ? '+' : ''}{delta}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </>
+              )
+            })()}
+          </div>
 
           {!creditsLoading && creditsCards.map((c) => {
             const badge = {

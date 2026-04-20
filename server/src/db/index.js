@@ -549,6 +549,7 @@ module.exports = {
   getCreditsBalance,
   addCreditsTransaction,
   listCreditTransactions,
+  listRecentCreditTransactions,
   getCreditRevenueSummary,
 };
 
@@ -727,6 +728,43 @@ async function listCreditTransactions(userId, limit = 50) {
      FROM credit_transactions WHERE user_id = ? ORDER BY created_at DESC LIMIT ?`,
     [userId, limit],
   );
+}
+
+/**
+ * Admin-only — list the most recent N credit transactions across ALL
+ * users. Joins on `users` to surface the human-readable email/name so
+ * the admin "Live Usage" panel can render a single flat feed without
+ * N+1 lookups. Supports filtering by `kind` (e.g. 'consumption',
+ * 'topup', 'admin_grant') so the refund UI can show only the grants
+ * Adrian issued, and the abuse monitor can show only consumption.
+ *
+ * Used by /api/admin/credits/ledger.
+ */
+async function listRecentCreditTransactions({ limit = 50, kind = null, sinceMs = null } = {}) {
+  const cappedLimit = Math.min(500, Math.max(1, Number(limit) || 50));
+  const params = [];
+  const where = [];
+  if (kind) {
+    where.push('t.kind = ?');
+    params.push(kind);
+  }
+  if (sinceMs) {
+    where.push('t.created_at > ?');
+    params.push(new Date(Number(sinceMs)).toISOString());
+  }
+  const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
+  const sql = `
+    SELECT t.id, t.user_id, t.delta_minutes, t.amount_cents, t.currency,
+           t.kind, t.stripe_session_id, t.note, t.created_at,
+           u.email AS user_email, u.name AS user_name,
+           u.credits_balance_minutes AS user_balance
+      FROM credit_transactions t
+      LEFT JOIN users u ON u.id = t.user_id
+      ${whereClause}
+     ORDER BY t.created_at DESC
+     LIMIT ?`;
+  params.push(cappedLimit);
+  return db.all(sql, params);
 }
 
 /**
