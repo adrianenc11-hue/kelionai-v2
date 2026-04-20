@@ -6,6 +6,7 @@ import { useLipSync } from '../lib/lipSync'
 import { subscribeMonitor } from '../lib/monitorStore'
 import { STATUS_COLORS, STATUS_PULSE_HZ } from '../lib/kelionStatus'
 import { useGeminiLive } from '../lib/geminiLive'
+import { useWakeWord } from '../lib/useWakeWord'
 import { useTrial } from '../lib/useTrial'
 import { useClientGeo } from '../lib/useClientGeo'
 import { TUNING, isTuningEnabled } from '../lib/tuning'
@@ -1687,6 +1688,30 @@ export default function KelionStage() {
       }
     }
   }, [menuOpen, status, start, geoPermission, requestGeo, authState.signedIn, trialHud])
+
+  // ───── Wake-word "Kelion" ─────
+  // Adrian: "cind zic kelion se auto porneste butonul de chat".
+  // When the status is idle (no live session yet, or a previous error
+  // cleared the state), run a background recogniser that listens for
+  // the hotword and triggers the same entry point as the tap-to-talk
+  // click. The hook is a no-op on browsers without the Web Speech API
+  // (Safari iOS, Firefox), so the manual tap flow stays untouched for
+  // those users.
+  useWakeWord({
+    enabled: status === 'idle' || status === 'error',
+    onDetect: () => {
+      if (status === 'idle' || status === 'error') {
+        try { start() } catch (_) { /* banner surfaces failure */ }
+        if (!authState.signedIn) {
+          if (trialRefreshTimerRef.current) clearTimeout(trialRefreshTimerRef.current)
+          trialRefreshTimerRef.current = setTimeout(() => {
+            trialRefreshTimerRef.current = null
+            trialHud.refresh()
+          }, 600)
+        }
+      }
+    },
+  })
 
   return (
     <div
