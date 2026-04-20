@@ -75,6 +75,19 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
   const creditsStartedRef = useRef(false)
   const creditsStartFnRef = useRef(null)
 
+  // Protocol gate: Gemini Live requires `setup` to be the first frame and
+  // forbids ANY other frame (audio chunks, video chunks, clientContent,
+  // toolResponse) from hitting the wire before Google sends back
+  // `setupComplete`. Violating that closes the socket with code 1007:
+  // "setup must be the first message and only the first". PR #103 fixed
+  // the greet-first `clientContent` kickstart, but the mic worklet was
+  // still racing: `src.connect(node)` in start() fires audio frames the
+  // moment the user's voice is picked up, which can (and did) land before
+  // `setupComplete` arrives. Same race for the camera/screen video
+  // senders. This ref gates both pipes until setupComplete resolves.
+  // Adrian 2026-04-20: "iar crapa 1007".
+  const setupCompleteRef = useRef(false)
+
   const wsRef = useRef(null)
   const audioCtxRef = useRef(null)       // 16kHz capture context for Gemini — MUST match SAMPLE_RATE_IN
   const meterCtxRef = useRef(null)       // Separate default-rate context for the level meter analyser
@@ -338,6 +351,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
     }
 
     if (msg.setupComplete) {
+      setupCompleteRef.current = true
       setStatus('listening')
       // Kickstart: make Kelion speak first instead of waiting for the
       // user to break the ice. We send a tiny synthetic user turn right
@@ -374,6 +388,9 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
   const start = useCallback(async () => {
     setError(null)
     setStatus('requesting')
+    // Fresh session — nothing has been acked yet. Audio/video senders
+    // will stay muted until Google replies with `setupComplete`.
+    setupCompleteRef.current = false
     try {
       // 1. Request mic
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -635,6 +652,12 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
       const node = new AudioWorkletNode(ctx, 'kelion-capture', { numberOfInputs: 1, numberOfOutputs: 0 })
       node.port.onmessage = (e) => {
         if (ws.readyState !== WebSocket.OPEN) return
+        // 1007 guard — never send audio before Google acks `setup`.
+        // Dropping pre-ack chunks is safe: the worklet emits at 20ms
+        // cadence, so at most ~1-2 frames are lost during the sub-second
+        // setupComplete round-trip. The user is typically still raising
+        // their hand off "Tap to talk" anyway.
+        if (!setupCompleteRef.current) return
         const float = e.data
         const pcm16 = floatTo16BitPCM(float)
         const bytes = new Uint8Array(pcm16.buffer, pcm16.byteOffset, pcm16.byteLength)
@@ -698,6 +721,9 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
     const send = async () => {
       const ws = wsRef.current
       if (!ws || ws.readyState !== WebSocket.OPEN) return
+      // Same 1007 guard as the audio path — skip video frames until
+      // Google has acked `setup`.
+      if (!setupCompleteRef.current) return
       if (busy) return
       if (ws.bufferedAmount > BACKPRESSURE_BYTES) return
       if (!video.videoWidth || !video.videoHeight) return
@@ -912,6 +938,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
     // session and never start the heartbeat on the new one.
     creditsStartedRef.current = false
     creditsStartFnRef.current = null
+    setupCompleteRef.current = false
     setUserLevel(0)
     setStatus('idle')
     setError(null)
