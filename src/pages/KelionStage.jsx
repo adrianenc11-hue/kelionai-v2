@@ -1332,10 +1332,43 @@ export default function KelionStage() {
     if (cameraStream) return // already running (manual toggle or prior mount)
     if (typeof startCamera !== 'function') return
     cameraAutoStartedRef.current = true
-    // Some browsers gate getUserMedia to a user-gesture; attempt anyway
-    // — startCamera's own error handling surfaces a visionError banner.
-    try { startCamera() } catch (_) { /* swallowed; banner handles it */ }
-  }, [cameraStream, startCamera])
+    // First-visit Chrome/Safari gate getUserMedia behind a user-gesture,
+    // so the bare mount-time attempt below can fail silently (the user
+    // never clicked yet). We attempt immediately for return visitors who
+    // already granted permission, and install a one-shot gesture listener
+    // that retries on the very first pointer/key/touch so the camera lights
+    // up without the user ever seeing a "turn camera on" button.
+    let calledOnce = false
+    const tryOnce = () => {
+      if (calledOnce) return
+      calledOnce = true
+      try { startCamera() } catch (_) { /* banner surfaces the error */ }
+    }
+    const onGesture = () => {
+      tryOnce()
+      // One-shot: remove listeners whether the call succeeded or not; if
+      // it failed because permission was explicitly denied, retrying on
+      // every click would be user-hostile.
+      window.removeEventListener('pointerdown', onGesture, true)
+      window.removeEventListener('keydown', onGesture, true)
+      window.removeEventListener('touchstart', onGesture, true)
+    }
+    window.addEventListener('pointerdown', onGesture, true)
+    window.addEventListener('keydown', onGesture, true)
+    window.addEventListener('touchstart', onGesture, true)
+    // Initial attempt for returning users where permission is remembered.
+    // If it fails for lack of a user-gesture, the listeners above take over.
+    tryOnce()
+    return () => {
+      window.removeEventListener('pointerdown', onGesture, true)
+      window.removeEventListener('keydown', onGesture, true)
+      window.removeEventListener('touchstart', onGesture, true)
+    }
+    // We intentionally depend on `startCamera` only; cameraStream transitions
+    // reset the guard path through the early returns above, so adding it here
+    // would spin up a second attempt every time the stream object changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startCamera])
 
   // Stop the camera reactively when the user signs out. handleSignOut
   // only resets authState; it does NOT unmount KelionStage, so without

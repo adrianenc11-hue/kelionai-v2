@@ -98,9 +98,10 @@ function resolveMonitor(kind, query) {
 
     case 'image': {
       if (!q) return null;
-      // Unsplash's "source" endpoint returns an image directly — perfect for
-      // an <img>. No key, free, CORS-friendly.
-      const src = `https://source.unsplash.com/1280x720/?${encodeURIComponent(q)}`;
+      // LoremFlickr returns a topic-matching Flickr image directly, no key,
+      // CORS-friendly. Replaces source.unsplash.com which was retired by
+      // Unsplash in 2024 and now returns 503 for every request.
+      const src = `https://loremflickr.com/1280/720/${encodeURIComponent(q)}`;
       return { kind: 'image', src, title: `Image — ${q}`, embedType: 'image' };
     }
 
