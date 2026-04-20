@@ -85,6 +85,23 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
   const playbackQueueRef = useRef([])
   const playbackPlayingRef = useRef(false)
   const playbackEndTimeRef = useRef(0)
+  // Live AudioBufferSourceNodes that have been `start()`-ed but not
+  // ended yet. On interrupt (user speaks over Kelion) we must call
+  // `.stop()` on every one of them — simply resetting the playback
+  // clock doesn't actually stop audio already on the output graph, so
+  // the old voice keeps playing while the new turn's chunks start on
+  // top of it. See `clearAudioQueue` for the cleanup path. Adrian
+  // 2026-04-20: "vocea ai este unica nu pot fi mai multe voci ai in
+  // acelasi timp".
+  const activeSourcesRef = useRef(new Set())
+  // Generation counter — bumped on every interrupt. Audio chunks that
+  // arrive over the WebSocket carry the generation they belong to
+  // (closure-captured in the enqueue call); if their generation is
+  // older than the current one by the time they're actually scheduled,
+  // we drop them. Prevents late-arriving chunks from the interrupted
+  // turn (still in flight over the wire) from resuming playback after
+  // we've already called `.stop()` on the active sources.
+  const playbackGenerationRef = useRef(0)
   const mediaStreamDestRef = useRef(null)
   const turnActiveRef = useRef({ user: null, assistant: null })
   const analyserRef = useRef(null)
@@ -172,6 +189,12 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
       }
     }
 
+    // Drop any chunk that belongs to a superseded generation. See the
+    // comment on `playbackGenerationRef` above — protects against
+    // late-arriving chunks of an interrupted turn landing here after
+    // we've already stopped the audio graph for that turn.
+    const myGeneration = playbackGenerationRef.current
+
     const src = ctx.createBufferSource()
     src.buffer = buffer
     src.connect(outputGainRef.current)
@@ -180,12 +203,15 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
     const startAt = Math.max(now, playbackEndTimeRef.current)
     src.start(startAt)
     playbackEndTimeRef.current = startAt + buffer.duration
+    activeSourcesRef.current.add(src)
 
     if (!playbackPlayingRef.current) {
       playbackPlayingRef.current = true
       setStatus('speaking')
     }
     src.onended = () => {
+      activeSourcesRef.current.delete(src)
+      if (myGeneration !== playbackGenerationRef.current) return
       if (ctx.currentTime >= playbackEndTimeRef.current - 0.05) {
         playbackPlayingRef.current = false
       }
@@ -193,7 +219,21 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
   }, [audioRef])
 
   const clearAudioQueue = useCallback(() => {
-    // Server interrupted → reset playback clock to "now" so nothing queued plays further
+    // Server interrupted (user spoke over Kelion) → hard-stop every
+    // AudioBufferSourceNode we've already scheduled. Resetting the
+    // playback clock alone is NOT enough: sources that have been
+    // `start()`-ed continue to play until their buffer is exhausted,
+    // which produces the "two AI voices at once" bug when the next
+    // turn's chunks start arriving. We also bump the generation
+    // counter so any chunk still in flight from the interrupted turn
+    // is dropped on arrival (see `enqueueAudio`). Adrian 2026-04-20.
+    playbackGenerationRef.current += 1
+    for (const src of activeSourcesRef.current) {
+      try { src.onended = null } catch (_) { /* ignore */ }
+      try { src.stop(0) } catch (_) { /* already stopped */ }
+      try { src.disconnect() } catch (_) { /* already disconnected */ }
+    }
+    activeSourcesRef.current.clear()
     if (playbackCtxRef.current) {
       playbackEndTimeRef.current = playbackCtxRef.current.currentTime
     }
@@ -839,6 +879,23 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
     if (creditsIntervalRef.current) {
       clearInterval(creditsIntervalRef.current)
       creditsIntervalRef.current = null
+    }
+    // Hard-stop any audio still scheduled on the playback graph. Same
+    // reasoning as `clearAudioQueue` on interrupt: sources that have
+    // already been `start()`-ed keep playing until their buffer drains
+    // unless we call `.stop()` explicitly. Without this path, hitting
+    // the stop button mid-sentence leaves Kelion's voice trailing for
+    // a second or two after the session is visibly closed.
+    playbackGenerationRef.current += 1
+    for (const src of activeSourcesRef.current) {
+      try { src.onended = null } catch (_) { /* ignore */ }
+      try { src.stop(0) } catch (_) { /* already stopped */ }
+      try { src.disconnect() } catch (_) { /* already disconnected */ }
+    }
+    activeSourcesRef.current.clear()
+    playbackPlayingRef.current = false
+    if (playbackCtxRef.current) {
+      playbackEndTimeRef.current = playbackCtxRef.current.currentTime
     }
     // Reset charge-on-proof guards. Without this, a stop() followed by
     // a fresh start() would see `creditsStartedRef=true` from the prior
