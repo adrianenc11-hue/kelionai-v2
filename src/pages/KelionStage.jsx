@@ -1815,10 +1815,16 @@ export default function KelionStage() {
   // click. The hook is a no-op on browsers without the Web Speech API
   // (Safari iOS, Firefox), so the manual tap flow stays untouched for
   // those users.
+  // Wake-word is armed ONLY on 'idle' — not on 'error'. After a
+  // protocol failure (1007/1008/1011) the user must tap the stage to
+  // explicitly retry. Auto-retrying from 'error' re-opens a WS against
+  // the same failing token / quota / model and loops the same error,
+  // which is exactly the "crapa dupa 2 min de funtionare 1007" Adrian
+  // reported on 2026-04-20.
   useWakeWord({
-    enabled: status === 'idle' || status === 'error',
+    enabled: status === 'idle',
     onDetect: () => {
-      if (status === 'idle' || status === 'error') {
+      if (status === 'idle') {
         try { start() } catch (_) { /* banner surfaces failure */ }
         if (!authState.signedIn) {
           if (trialRefreshTimerRef.current) clearTimeout(trialRefreshTimerRef.current)
