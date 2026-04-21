@@ -254,17 +254,22 @@ router.get('/gemini-token', async (req, res) => {
     // `Puck` (bright, playful) and `Fenrir` (gravelly). Feminine options
     // include `Kore`, `Aoede`, `Leda`.
     const voice = process.env.GEMINI_LIVE_VOICE_KELION || 'Charon';
-    // Default to the GA stable Gemini Live model. The preview
-    // `gemini-3.1-flash-live-preview` kept emitting 1007 "setup must
-    // be the first message and only the first" about two minutes into
-    // a session (Adrian 2026-04-21: "Crapa dupa 2 min de funtionare
-    // 1007"). Preview models can change protocol without warning; GA
-    // models have a locked wire format. Override via Railway env
-    // GEMINI_LIVE_MODEL when a newer stable model ships.
+    // We tried `gemini-2.0-flash-live-001` in #112 hoping to escape the
+    // mid-session 1007 drift on preview, but Google's v1main
+    // bidiGenerateContent replied with 1008 "models/gemini-2.0-flash-
+    // live-001 is not found for API version v1main, or is not supported
+    // for bidiGenerateContent" (Adrian 2026-04-21 screenshot). The GA
+    // id that Google's own Live docs advertise does not actually accept
+    // bidi connections at /v1alpha for our project — the only Live model
+    // that returns setupComplete on our key is the preview.
+    // Reverting to the preview so the session at least opens again
+    // while we move the voice transport to OpenAI Realtime (plan C).
+    // Override via Railway env GEMINI_LIVE_MODEL when a newer stable
+    // model is announced and actually enabled on our key.
     // Docs: https://ai.google.dev/gemini-api/docs/live-api/ephemeral-tokens
-    // Previous fallback `gemini-live-2.5-flash-preview` returned 404
-    // from the v1alpha auth_tokens provisioning endpoint.
-    const model = process.env.GEMINI_LIVE_MODEL || 'gemini-2.0-flash-live-001';
+    // Previous fallback `gemini-live-2.5-flash-preview` also returned
+    // 404 from the v1alpha auth_tokens provisioning endpoint.
+    const model = process.env.GEMINI_LIVE_MODEL || 'gemini-3.1-flash-live-preview';
     // Language resolution for Gemini Live. `speechConfig.languageCode`
     // controls BOTH the TTS output voice locale AND biases the STT
     // model for the input audio — so if we hard-code en-US a user who
