@@ -1,10 +1,10 @@
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { useGLTF, Environment, ContactShadows, Float, Html } from '@react-three/drei'
+import { useGLTF, Environment, ContactShadows, Float } from '@react-three/drei'
 import { Suspense, useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import * as THREE from 'three'
 import { useLipSync } from '../lib/lipSync'
-import { subscribeMonitor } from '../lib/monitorStore'
+import { subscribeMonitor, handleShowOnMonitor } from '../lib/monitorStore'
 import { STATUS_COLORS, STATUS_PULSE_HZ } from '../lib/kelionStatus'
 import { useGeminiLive } from '../lib/geminiLive'
 import { useOpenAIRealtime } from '../lib/openaiRealtime'
@@ -460,78 +460,157 @@ function useNYCSkylineTexture() {
   }, [])
 }
 
-// StageMonitorContent — renders whatever `monitorStore` currently holds onto
-// the inner-screen plane of the presentation monitor. drei's <Html transform>
-// projects a real DOM subtree onto the 3D plane with correct perspective, so
-// users see an actual live iframe / image from the AI's vantage. Kelion calls
-// the `show_on_monitor` Gemini tool → monitorStore updates → this component
-// re-renders with the new URL.
+// StageMonitorContent — the inner-screen decor of the 3D presentation
+// monitor. It always renders an idle grid/watermark; the actual iframe /
+// image payload now lives in the 2D <MonitorOverlay/> half-page panel
+// (see below). Keeping the 3D plane as scenic decor instead of a second
+// iframe avoids loading the same map/video twice (e.g. double YouTube
+// autoplay) and keeps the overlay as the single source of truth for
+// what Kelion is showing.
 function StageMonitorContent() {
-  // Idle default — identical shape to what monitorStore keeps internally.
-  // We import only `subscribeMonitor` (not `getMonitorState`) and rely on
-  // the store invoking the listener immediately on subscribe to catch any
-  // state that was set before this component mounted. Keeps the surface
-  // minimal and avoids cross-chunk reads at render time.
+  return (
+    <>
+      {Array.from({ length: 6 }).map((_, i) => (
+        <mesh key={`mh-${i}`} position={[0, -0.75 + i * 0.3, 0.001]}>
+          <planeGeometry args={[2.9, 0.004]} />
+          <meshBasicMaterial color={'#1f1b3a'} toneMapped={false} opacity={0.4} transparent />
+        </mesh>
+      ))}
+      <mesh position={[0, 0, 0.002]}>
+        <circleGeometry args={[0.07, 32]} />
+        <meshBasicMaterial color={'#7c3aed'} toneMapped={false} opacity={0.55} transparent />
+      </mesh>
+    </>
+  )
+}
+
+// MonitorOverlay — half-page 2D panel that renders whatever `monitorStore`
+// currently holds. Anchored to the left 50vw of the viewport on desktop, or
+// as a bottom sheet (100vw × 55vh) on narrow screens so the avatar — which
+// sits on the right half of the stage — always stays visible and can keep
+// talking / listening while the content is on screen. Hidden entirely when
+// there is nothing to display.
+function MonitorOverlay() {
   const [m, setM] = useState({ kind: null, src: null, title: null, embedType: 'iframe', updatedAt: 0 })
+  const [isNarrow, setIsNarrow] = useState(() => (
+    typeof window !== 'undefined' && window.innerWidth < 900
+  ))
+
   useEffect(() => subscribeMonitor((s) => setM({ ...s })), [])
 
-  // Idle: faint grid + watermark, matches the previous static monitor look.
-  if (!m.src) {
-    return (
-      <>
-        {Array.from({ length: 6 }).map((_, i) => (
-          <mesh key={`mh-${i}`} position={[0, -0.75 + i * 0.3, 0.001]}>
-            <planeGeometry args={[2.9, 0.004]} />
-            <meshBasicMaterial color={'#1f1b3a'} toneMapped={false} opacity={0.4} transparent />
-          </mesh>
-        ))}
-        <mesh position={[0, 0, 0.002]}>
-          <circleGeometry args={[0.07, 32]} />
-          <meshBasicMaterial color={'#7c3aed'} toneMapped={false} opacity={0.55} transparent />
-        </mesh>
-      </>
-    )
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+    const onResize = () => setIsNarrow(window.innerWidth < 900)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
+  if (!m.src) return null
+
+  const isImage = m.embedType === 'image'
+  const onClose = (e) => {
+    e.stopPropagation()
+    handleShowOnMonitor({ kind: 'clear' })
   }
 
-  // Active: project a DOM iframe / image onto the screen plane. We downscale
-  // the DOM with `distanceFactor` so 3.0 x 1.9 world units ≈ 960 x 600 px.
-  const isImage = m.embedType === 'image'
+  const desktopStyle = {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    width: '50vw',
+    height: '100vh',
+  }
+  const mobileStyle = {
+    position: 'fixed',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100vw',
+    height: '55vh',
+  }
+
   return (
-    <Html
-      transform
-      occlude={false}
-      position={[0, 0, 0.01]}
-      distanceFactor={1.2}
-      zIndexRange={[10, 0]}
-      pointerEvents="none"
+    <div
+      onClick={(e) => e.stopPropagation()}
       style={{
-        width: 960,
-        height: 600,
-        border: 'none',
-        overflow: 'hidden',
-        background: '#0d0b1d',
-        borderRadius: 4,
-        boxShadow: '0 0 40px rgba(124, 58, 237, 0.35) inset',
+        ...(isNarrow ? mobileStyle : desktopStyle),
+        zIndex: 40,
+        display: 'flex',
+        flexDirection: 'column',
+        background: 'rgba(10, 8, 20, 0.96)',
+        backdropFilter: 'blur(14px)',
+        borderRight: isNarrow ? 'none' : '1px solid rgba(167, 139, 250, 0.28)',
+        borderTop: isNarrow ? '1px solid rgba(167, 139, 250, 0.28)' : 'none',
+        boxShadow: '0 0 40px rgba(0,0,0,0.55)',
+        color: '#ede9fe',
+        fontFamily: 'system-ui, -apple-system, sans-serif',
       }}
     >
-      {isImage ? (
-        <img
-          src={m.src}
-          alt={m.title || 'Monitor content'}
-          referrerPolicy="no-referrer"
-          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-        />
-      ) : (
-        <iframe
-          src={m.src}
-          title={m.title || 'Kelion monitor'}
-          referrerPolicy="no-referrer"
-          sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation"
-          allow="fullscreen; geolocation; autoplay; encrypted-media"
-          style={{ width: '100%', height: '100%', border: 'none', background: '#0d0b1d' }}
-        />
-      )}
-    </Html>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '10px 14px',
+          borderBottom: '1px solid rgba(167, 139, 250, 0.18)',
+          background: 'rgba(17, 12, 38, 0.7)',
+          flex: '0 0 auto',
+        }}
+      >
+        <div style={{
+          fontSize: 13,
+          fontWeight: 600,
+          letterSpacing: 0.3,
+          color: '#c4b5fd',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}>
+          {m.title || 'Monitor'}
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close monitor"
+          style={{
+            appearance: 'none',
+            border: '1px solid rgba(167, 139, 250, 0.35)',
+            background: 'rgba(124, 58, 237, 0.18)',
+            color: '#ede9fe',
+            width: 32,
+            height: 32,
+            borderRadius: 999,
+            cursor: 'pointer',
+            fontSize: 16,
+            lineHeight: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          ×
+        </button>
+      </div>
+      <div style={{ flex: '1 1 auto', minHeight: 0, background: '#0d0b1d' }}>
+        {isImage ? (
+          <img
+            src={m.src}
+            alt={m.title || 'Monitor content'}
+            referrerPolicy="no-referrer"
+            style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', background: '#0d0b1d' }}
+          />
+        ) : (
+          <iframe
+            src={m.src}
+            title={m.title || 'Kelion monitor'}
+            referrerPolicy="no-referrer"
+            sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation"
+            allow="fullscreen; geolocation; autoplay; encrypted-media"
+            style={{ width: '100%', height: '100%', border: 'none', background: '#0d0b1d', display: 'block' }}
+          />
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -603,7 +682,9 @@ function StudioDecor() {
           top edge is visible and the left edge sits cleanly inside
           the viewport.
           When Gemini Live calls the `show_on_monitor` tool, <StageMonitor/>
-          renders an iframe / image on the inner plane via drei <Html transform>. */}
+          is now rendered OUTSIDE the 3D canvas by <MonitorOverlay/> so the
+          screen is a full half-viewport DOM panel — the 3D plane here is
+          just decor (faint grid + purple dot). */}
       <group position={[-0.8, 0.65, -0.35]} rotation={[0, Math.PI / 9, 0]}>
         {/* Bezel / outer frame */}
         <mesh position={[0, 0, -0.03]}>
@@ -1989,6 +2070,14 @@ export default function KelionStage() {
           <ContactShadows position={[1.6, -1.65, 0]} opacity={0.55} scale={5} blur={2.6} far={2.5} />
         </Suspense>
       </Canvas>
+
+      {/* Half-page monitor overlay — when Kelion calls show_on_monitor (map /
+          video / image / wiki / web), the content is rendered here as a 2D
+          panel covering the LEFT half of the viewport on desktop (bottom
+          sheet on mobile). Adrian: "inlocuirea monitorului cu jumate de
+          pagina … avatarul pe dreapta". The small 3D monitor in the scene
+          stays as decor. */}
+      <MonitorOverlay />
 
       <audio ref={audioRef} autoPlay playsInline />
 
