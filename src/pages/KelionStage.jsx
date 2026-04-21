@@ -1450,59 +1450,71 @@ export default function KelionStage() {
     // also ticks for text-chat-only guests who never touch the mic.
     trial: voiceTrial,
   } = liveHook
+  // Hook refs — both useOpenAIRealtime and useGeminiLive return plain
+  // object literals without useMemo (geminiLive.js ~l.971, openaiRealtime.js
+  // ~l.575), so their identity changes every render. Holding them in refs
+  // and reading inside effects keeps the effects from re-firing on every
+  // keystroke and was the other half of why the #117 setTimeout-cleanup
+  // bug bit (Devin Review Info on #118, comment id 3116094529 also notes
+  // the prevProviderRef effect below shares this wart — same refs now).
+  const openaiHookRef = useRef(openaiHook)
+  const geminiHookRef = useRef(geminiHook)
+  openaiHookRef.current = openaiHook
+  geminiHookRef.current = geminiHook
+
   // Flip providers cleanly: stop whatever's live on the old provider
   // before the next tap spins up the new one. No-op when the switched-
   // away provider is idle.
   const prevProviderRef = useRef(liveProvider)
   useEffect(() => {
     if (prevProviderRef.current === liveProvider) return
-    const outgoing = prevProviderRef.current === 'openai' ? openaiHook : geminiHook
+    const outgoing = prevProviderRef.current === 'openai' ? openaiHookRef.current : geminiHookRef.current
     try { outgoing.stop() } catch (_) { /* hooks unmount-safe */ }
     prevProviderRef.current = liveProvider
-  }, [liveProvider, openaiHook, geminiHook])
+  }, [liveProvider])
 
   // Auto-fallback — silent provider swap on terminal transport error.
   //
-  // Original #117 version nested the `start()` call inside a
-  // `setTimeout` whose cleanup lived on the same effect that flipped
-  // `liveProvider`. Because `liveProvider` was in the deps array, the
-  // `setLiveProvider` call immediately re-ran the effect, whose
-  // cleanup cancelled the pending timer before `start()` could fire —
-  // so the provider flipped (and got persisted to localStorage) but
-  // the session never came back up. Codex + Copilot + Devin Review
-  // all flagged this as a P1.
+  // Original #117 nested `start()` inside a setTimeout whose cleanup
+  // lived on the same effect that flipped `liveProvider`. `liveProvider`
+  // was a dep, so setLiveProvider immediately re-ran the effect; cleanup
+  // clear()ed the timer before the 120 ms budget elapsed and start()
+  // never fired. Codex / Copilot / Devin Review all flagged it P1.
   //
-  // Fix: split into two effects.
-  //   1. When `status` transitions to 'error' with a transport-level
-  //      message, set a `pendingFallback` flag and flip `liveProvider`.
-  //   2. A separate effect on `liveProvider` notices the flag and
-  //      calls `.start()` on the now-active hook. Because effects run
-  //      in declaration order, the `prevProviderRef` effect (declared
-  //      above) has already stopped the outgoing hook by the time
-  //      this step runs — no `setTimeout` race.
+  // Fix (PR #118, refined here): split into two effects, no setTimeout.
+  //   1. On transport-level status='error', set pendingFallbackRef and
+  //      flip liveProvider.
+  //   2. A separate effect on [liveProvider] sees the flag and calls
+  //      .start() on the now-active hook. Because React runs effects
+  //      in declaration order within one component, the prevProviderRef
+  //      effect (declared just above) has already stopped the outgoing
+  //      transport on the same commit — no timer race.
   //
-  // The one-shot latch clears on 'requesting' and 'listening' so a
-  // fresh manual tap after both providers failed can retry fallback.
-  // Account-level errors (credits exhausted, trial expired, session
-  // revoked) bypass fallback entirely — swapping providers can't
-  // help, and doing so would race the Buy Credits modal / reauth
-  // redirect. Hook refs are held so the effect deps don't include
-  // the un-memoized hook return objects (which allocate new refs
-  // every render and would fire this effect on every keystroke).
-  const openaiHookRef = useRef(openaiHook)
-  const geminiHookRef = useRef(geminiHook)
-  openaiHookRef.current = openaiHook
-  geminiHookRef.current = geminiHook
+  // Latch: the one-shot `autoFallbackTriedRef` is intentionally reset
+  // ONLY on 'listening'. PR #118 also reset it on 'requesting' — but
+  // both transport hooks flip status to 'requesting' synchronously
+  // inside their own start() (openaiRealtime.js:290, geminiLive.js:411),
+  // which means the fallback's own start() call in effect (2) would
+  // clear the latch before the second provider's outcome is known.
+  // If that second attempt also errored, the error effect would see
+  // latch=false and flip providers again — infinite ping-pong between
+  // OpenAI and Gemini when both are genuinely down (Codex P1 +
+  // Devin Review P1 on #118). If a user is stuck after a double-failure,
+  // refreshing the page recreates the ref fresh (ref state doesn't
+  // survive unmount), so localStorage's last-persisted provider still
+  // gets one fresh fallback attempt on the next load.
+  //
+  // Account-level errors (credits / trial / auth) bypass fallback —
+  // swapping providers can't help those and doing so would race the
+  // Buy Credits modal / reauth redirect. The match list is aligned with
+  // setError(...) strings in src/lib/geminiLive.js + openaiRealtime.js;
+  // Devin Review (Info) flagged substring matching as fragile — a
+  // structured error code on the hook would be cleaner, but that's a
+  // cross-cutting refactor of both transport libs and out of scope.
   const autoFallbackTriedRef = useRef(false)
   const pendingFallbackRef = useRef(false)
   useEffect(() => {
-    // Reset the latch on any fresh attempt ('requesting' is the user
-    // explicitly tapping mic after a failure; 'listening' is a
-    // successful reconnection). Both clear the one-shot so an
-    // independent later failure can trigger another fallback.
-    if (status === 'requesting' || status === 'listening') {
-      autoFallbackTriedRef.current = false
-    }
+    if (status === 'listening') autoFallbackTriedRef.current = false
   }, [status])
   useEffect(() => {
     if (status !== 'error' || !error) return
@@ -1532,9 +1544,12 @@ export default function KelionStage() {
   useEffect(() => {
     if (!pendingFallbackRef.current) return
     pendingFallbackRef.current = false
-    // prevProviderRef effect (declared earlier) has already stopped
-    // the outgoing transport on this same commit; it's safe to start
-    // the new one synchronously now.
+    // prevProviderRef effect (declared earlier) already stop()-ed the
+    // outgoing transport on this same commit; it's safe to start the
+    // new one synchronously now. Effect declaration order is the
+    // coordination mechanism here — if this block is ever moved above
+    // prevProviderRef, the invariant breaks silently (Devin Review Info
+    // on #118). Keep this block below that effect.
     try {
       const active = liveProvider === 'openai' ? openaiHookRef.current : geminiHookRef.current
       active.start()
