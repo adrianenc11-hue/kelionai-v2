@@ -75,32 +75,6 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
   const creditsStartedRef = useRef(false)
   const creditsStartFnRef = useRef(null)
 
-  // Protocol gate: Gemini Live requires `setup` to be the first frame and
-  // forbids ANY other frame (audio chunks, video chunks, clientContent,
-  // toolResponse) from hitting the wire before Google sends back
-  // `setupComplete`. Violating that closes the socket with code 1007:
-  // "setup must be the first message and only the first". PR #103 fixed
-  // the greet-first `clientContent` kickstart, but the mic worklet was
-  // still racing: `src.connect(node)` in start() fires audio frames the
-  // moment the user's voice is picked up, which can (and did) land before
-  // `setupComplete` arrives. Same race for the camera/screen video
-  // senders. This ref gates both pipes until setupComplete resolves.
-  // Adrian 2026-04-20: "iar crapa 1007".
-  const setupCompleteRef = useRef(false)
-
-  // In-flight lock for start(). Tap-to-talk and wake-word both call start()
-  // from click/voice handlers that read `status` from a stale closure —
-  // React hasn't re-rendered between setStatus('requesting') and the second
-  // caller's check, so both can slip through and open TWO WebSockets in
-  // parallel. When that happens `wsRef.current` is overwritten by the
-  // second ws while the first ws's `setupComplete` handler still runs,
-  // and the greet-first `clientContent` kickstart lands on a ws that has
-  // NOT yet received its own setupComplete ack — Google kills it with
-  // 1007 "setup must be the first message and only the first". This lock
-  // gates the entire start() body and is released on completion or error.
-  // Adrian 2026-04-20: "chatul s-a distrus total".
-  const startInFlightRef = useRef(false)
-
   const wsRef = useRef(null)
   const audioCtxRef = useRef(null)       // 16kHz capture context for Gemini — MUST match SAMPLE_RATE_IN
   const meterCtxRef = useRef(null)       // Separate default-rate context for the level meter analyser
@@ -267,15 +241,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
   }, [])
 
   // ───── WebSocket handlers ─────
-  //
-  // `ws` is the concrete WebSocket instance that delivered this message.
-  // Previously we read `wsRef.current` to send toolResponses and the
-  // greet-first kickstart, which races when two starts overlap: the
-  // orphaned ws's setupComplete handler would target the LIVE ws (via
-  // the shared ref) before IT had received its own setupComplete ack,
-  // triggering 1007. Binding sends to the local ws keeps each session
-  // talking to itself.
-  const handleMessage = useCallback(async (raw, ws) => {
+  const handleMessage = useCallback(async (raw) => {
     let msg
     try { msg = JSON.parse(typeof raw === 'string' ? raw : await raw.text()) }
     catch { return }
@@ -336,6 +302,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
     // /api/tools/* backend endpoint, then send back a toolResponse with the
     // matching id so Gemini can continue the turn with the result.
     if (msg.toolCall?.functionCalls?.length) {
+      const ws = wsRef.current
       const fcs = msg.toolCall.functionCalls
       // Narrate to the transcript so the user SEES what Kelion is doing
       // (audio narration is handled by the model itself per the persona).
@@ -371,7 +338,6 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
     }
 
     if (msg.setupComplete) {
-      setupCompleteRef.current = true
       setStatus('listening')
       // Kickstart: make Kelion speak first instead of waiting for the
       // user to break the ice. We send a tiny synthetic user turn right
@@ -381,6 +347,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
       // violates Google's protocol and triggers close-code 1007. If
       // send fails we silently skip; next user utterance still triggers
       // a response like before. Adrian 2026-04-20.
+      const ws = wsRef.current
       if (ws && ws.readyState === WebSocket.OPEN) {
         try {
           ws.send(JSON.stringify({
@@ -405,25 +372,8 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
 
   // ───── Start full pipeline ─────
   const start = useCallback(async () => {
-    // Concurrent-call guard — see comment on `startInFlightRef`. Tap and
-    // wake-word both call start() off stale closures; without this lock
-    // two WebSockets open in parallel, wsRef gets clobbered, and the
-    // orphaned ws's setupComplete handler fires clientContent on the
-    // live ws BEFORE its own setup ack arrives → 1007.
-    if (startInFlightRef.current) return
-    // If a previous ws is still live (or in CONNECTING), tear it down
-    // before opening a new one — otherwise the old handlers keep firing
-    // against `wsRef.current` after we reassign it below.
-    if (wsRef.current && wsRef.current.readyState !== WebSocket.CLOSED) {
-      try { wsRef.current.close(1000, 'restart') } catch (_) { /* ignore */ }
-      wsRef.current = null
-    }
-    startInFlightRef.current = true
     setError(null)
     setStatus('requesting')
-    // Fresh session — nothing has been acked yet. Audio/video senders
-    // will stay muted until Google replies with `setupComplete`.
-    setupCompleteRef.current = false
     try {
       // 1. Request mic
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -639,7 +589,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
         }
       }
 
-      ws.onmessage = (event) => handleMessage(event.data, ws)
+      ws.onmessage = (event) => handleMessage(event.data)
       ws.onerror = (e) => {
         console.error('[geminiLive] ws error', e)
         setError('Connection error')
@@ -649,28 +599,8 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
         // Surface Google's close code + reason so bad-endpoint or
         // expired-token failures show up in the console instead of being
         // silently flipped back to 'idle'. 1000 = normal, 1005/1006 = no
-        // status / abnormal, 1007 = protocol violation (setup first
-        // rule, oversized frame, unsupported field on ephemeral token
-        // session), 1008 = policy (wrong endpoint / bad token), 1011 =
-        // quota exceeded. The reason string carried by 1007 is the
-        // ground truth for WHICH frame Google rejected — previously we
-        // threw it away and treated every 1007 like the same bug.
-        // Preserving it lets the next session surface the exact cause
-        // the very first time the regression shows up instead of
-        // requiring another DevTools dive. Adrian 2026-04-20: "3× ws
-        // close in console fără explicație utilă".
-        console.warn('[geminiLive] ws close', {
-          code: e?.code,
-          reason: e?.reason,
-          wasClean: e?.wasClean,
-          setupAcked: setupCompleteRef.current,
-          status: statusRef.current,
-        })
-        if (e?.code === 1007 && e?.reason) {
-          // Hard log so it never slips past the noise. The reason
-          // string is short (<200 chars) — safe to print as-is.
-          console.error('[geminiLive] 1007 protocol error from Google:', e.reason)
-        }
+        // status / abnormal, 1008 = policy (wrong endpoint / bad token).
+        console.warn('[geminiLive] ws close', { code: e?.code, reason: e?.reason, wasClean: e?.wasClean })
         if (statusRef.current === 'idle') return
         // If we never reached 'listening' (i.e. the session died before
         // setupComplete), keep the error visible rather than bouncing back
@@ -678,14 +608,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
         // happened.
         const neverOpened = statusRef.current === 'connecting' || statusRef.current === 'requesting'
         if (statusRef.current === 'error') return
-        // If the session had opened AND been acked by Google (setupComplete),
-        // a late close should NOT be surfaced as an error — that path covers
-        // normal "user stopped", trial-expired, credits-exhausted, etc. Only
-        // close codes that indicate a real protocol failure after ack are
-        // shown. 1011 (quota) and 1008 (policy) are always loud because the
-        // user cannot tell from a silent flip-to-idle that Google refused.
-        const hardFail = e?.code === 1007 || e?.code === 1008 || e?.code === 1011
-        if (neverOpened || hardFail) {
+        if (neverOpened) {
           setError(`Connection closed (${e?.code || 'unknown'})${e?.reason ? `: ${e.reason}` : ''}`)
           setStatus('error')
           return
@@ -712,12 +635,6 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
       const node = new AudioWorkletNode(ctx, 'kelion-capture', { numberOfInputs: 1, numberOfOutputs: 0 })
       node.port.onmessage = (e) => {
         if (ws.readyState !== WebSocket.OPEN) return
-        // 1007 guard — never send audio before Google acks `setup`.
-        // Dropping pre-ack chunks is safe: the worklet emits at 20ms
-        // cadence, so at most ~1-2 frames are lost during the sub-second
-        // setupComplete round-trip. The user is typically still raising
-        // their hand off "Tap to talk" anyway.
-        if (!setupCompleteRef.current) return
         const float = e.data
         const pcm16 = floatTo16BitPCM(float)
         const bytes = new Uint8Array(pcm16.buffer, pcm16.byteOffset, pcm16.byteLength)
@@ -735,10 +652,6 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
       console.error('[geminiLive] start error', e)
       setError(e.message || String(e))
       setStatus('error')
-    } finally {
-      // Always release the in-flight lock so a subsequent tap/wake-word
-      // can start a fresh session. Pairs with the guard at the top.
-      startInFlightRef.current = false
     }
   }, [handleMessage, startMicLevel])
 
@@ -785,9 +698,6 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
     const send = async () => {
       const ws = wsRef.current
       if (!ws || ws.readyState !== WebSocket.OPEN) return
-      // Same 1007 guard as the audio path — skip video frames until
-      // Google has acked `setup`.
-      if (!setupCompleteRef.current) return
       if (busy) return
       if (ws.bufferedAmount > BACKPRESSURE_BYTES) return
       if (!video.videoWidth || !video.videoHeight) return
@@ -1002,7 +912,6 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
     // session and never start the heartbeat on the new one.
     creditsStartedRef.current = false
     creditsStartFnRef.current = null
-    setupCompleteRef.current = false
     setUserLevel(0)
     setStatus('idle')
     setError(null)
