@@ -96,6 +96,12 @@ function writeActiveId(id) {
 
 let activeConversationId = readActiveId();
 
+// A guest id is prefixed `g-` in `guestNextId`; server ids are numeric.
+// Used to drop a stale active id when the auth mode changes between
+// sessions (e.g. signed-in user refreshes → app starts signed-out per
+// KelionStage mount effect → we must not keep a numeric server id).
+function isGuestId(id) { return typeof id === 'string' && id.startsWith('g-'); }
+
 export function getActiveConversationId() { return activeConversationId; }
 
 export function setActiveConversationId(id) {
@@ -113,6 +119,15 @@ export function startNewConversation() {
 // on the backend (or in localStorage), title it from the first message,
 // and remember it as active.
 export async function ensureActiveConversation(firstMessageHint) {
+  // Drop any active id that doesn't match the current auth mode. This
+  // prevents a guest `g-*` id from leaking into a signed-in session
+  // (which would silently skip the server path) and a numeric server
+  // id from leaking into a signed-out guest session after reload
+  // (which would try to POST to /api/conversations/:id with no auth).
+  if (activeConversationId) {
+    const mismatch = signedIn() ? isGuestId(activeConversationId) : !isGuestId(activeConversationId);
+    if (mismatch) setActiveConversationId(null);
+  }
   if (activeConversationId) return activeConversationId;
   const title = guestDeriveTitle(firstMessageHint);
 
@@ -158,13 +173,18 @@ export async function appendMessage({ role, content }) {
 
   if (signedIn() && !String(id).startsWith('g-')) {
     try {
-      await fetch(`/api/conversations/${encodeURIComponent(id)}/messages`, {
+      const r = await fetch(`/api/conversations/${encodeURIComponent(id)}/messages`, {
         method: 'POST',
         credentials: 'include',
         headers: authHeaders(),
         body: JSON.stringify({ role: cleanRole, content: cleanContent }),
       });
-      return;
+      if (r.ok) return;
+      // Non-OK (401 session expired, 404 thread deleted on another
+      // device, 5xx): drop the stale active id so the next turn starts
+      // a fresh thread, and fall through to the guest-store mirror so
+      // the message isn't silently lost.
+      if (r.status === 401 || r.status === 404) setActiveConversationId(null);
     } catch { /* fall through → mirror in guest store */ }
   }
 
