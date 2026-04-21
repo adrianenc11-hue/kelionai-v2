@@ -634,20 +634,29 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
         // Surface Google's close code + reason so bad-endpoint or
         // expired-token failures show up in the console instead of being
         // silently flipped back to 'idle'. 1000 = normal, 1005/1006 = no
-        // status / abnormal, 1008 = policy (wrong endpoint / bad token).
+        // status / abnormal, 1008 = policy (wrong endpoint / bad token),
+        // 1007 = protocol (double setup), 1011 = server / quota.
         console.warn('[geminiLive] ws close', { code: e?.code, reason: e?.reason, wasClean: e?.wasClean })
         if (statusRef.current === 'idle') return
+        if (statusRef.current === 'error') return
         // If we never reached 'listening' (i.e. the session died before
         // setupComplete), keep the error visible rather than bouncing back
         // to the "Tap to talk" label — otherwise the user thinks nothing
         // happened.
         const neverOpened = statusRef.current === 'connecting' || statusRef.current === 'requesting'
-        if (statusRef.current === 'error') return
-        if (neverOpened) {
+        // Protocol / auth / quota failures must never silently bounce to
+        // 'idle' — the wake-word is armed on 'idle' and will re-fire
+        // start(), which opens a new WS that hits the same 1007/1008/1011
+        // in a loop (Adrian 2026-04-20, "crapa dupa 2 min de funtionare
+        // 1007"). Surface the error and require a manual tap to retry.
+        const PROTOCOL_FAILURES = new Set([1007, 1008, 1011])
+        if (neverOpened || PROTOCOL_FAILURES.has(e?.code)) {
           setError(`Connection closed (${e?.code || 'unknown'})${e?.reason ? `: ${e.reason}` : ''}`)
           setStatus('error')
           return
         }
+        // Clean close mid-session (Google's idle timeout, user-initiated
+        // stop) — flip to idle so the HUD shows "Tap to talk" again.
         setStatus('idle')
       }
 

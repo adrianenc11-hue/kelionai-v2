@@ -456,10 +456,18 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
         if (st === 'failed' || st === 'disconnected' || st === 'closed') {
           if (statusRef.current === 'idle' || statusRef.current === 'error') return
           const neverOpened = statusRef.current === 'connecting' || statusRef.current === 'requesting'
-          if (neverOpened) {
+          // 'failed' is a hard peer-connection error (ICE failure, TURN
+          // unreachable, signalling broken). Treat it like a protocol
+          // failure on the Gemini side — surface the error and require a
+          // manual tap to retry so the wake-word (armed on 'idle') can't
+          // loop into the same underlying fault.
+          if (neverOpened || st === 'failed') {
             setError(`Connection closed (${st})`)
             setStatus('error')
           } else {
+            // Clean peer disconnect mid-session — mirror the Gemini
+            // handler and drop back to idle so the HUD shows
+            // "Tap to talk" again.
             setStatus('idle')
           }
         }
