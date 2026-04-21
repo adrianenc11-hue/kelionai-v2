@@ -75,6 +75,21 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
   const creditsStartedRef = useRef(false)
   const creditsStartFnRef = useRef(null)
 
+  // In-flight lock for start(). Tap-to-talk and wake-word both call start()
+  // from click/voice handlers that read `status` from a stale closure —
+  // React hasn't re-rendered between setStatus('requesting') and the second
+  // caller's check, so both can slip through and open TWO WebSockets in
+  // parallel. When that happens `wsRef.current` is overwritten by the
+  // second ws while the first ws's `setupComplete` handler still runs,
+  // and the greet-first `clientContent` kickstart lands on a ws that has
+  // NOT yet received its own setupComplete ack — Google kills it with
+  // 1007 "setup must be the first message and only the first". This lock
+  // gates the entire start() body and is released on completion or error.
+  // Adrian 2026-04-20: "problema apare doar pe admin" — admin's extra
+  // post-sign-in re-renders widen the stale-closure window that lets two
+  // concurrent starts slip past the status check.
+  const startInFlightRef = useRef(false)
+
   const wsRef = useRef(null)
   const audioCtxRef = useRef(null)       // 16kHz capture context for Gemini — MUST match SAMPLE_RATE_IN
   const meterCtxRef = useRef(null)       // Separate default-rate context for the level meter analyser
@@ -241,7 +256,15 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
   }, [])
 
   // ───── WebSocket handlers ─────
-  const handleMessage = useCallback(async (raw) => {
+  //
+  // `ws` is the concrete WebSocket instance that delivered this message.
+  // Previously we read `wsRef.current` to send toolResponses and the
+  // greet-first kickstart, which races when two starts overlap: the
+  // orphaned ws's setupComplete handler would target the LIVE ws (via
+  // the shared ref) before IT had received its own setupComplete ack,
+  // triggering 1007. Binding sends to the local ws keeps each session
+  // talking to itself.
+  const handleMessage = useCallback(async (raw, ws) => {
     let msg
     try { msg = JSON.parse(typeof raw === 'string' ? raw : await raw.text()) }
     catch { return }
@@ -302,7 +325,6 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
     // /api/tools/* backend endpoint, then send back a toolResponse with the
     // matching id so Gemini can continue the turn with the result.
     if (msg.toolCall?.functionCalls?.length) {
-      const ws = wsRef.current
       const fcs = msg.toolCall.functionCalls
       // Narrate to the transcript so the user SEES what Kelion is doing
       // (audio narration is handled by the model itself per the persona).
@@ -347,7 +369,6 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
       // violates Google's protocol and triggers close-code 1007. If
       // send fails we silently skip; next user utterance still triggers
       // a response like before. Adrian 2026-04-20.
-      const ws = wsRef.current
       if (ws && ws.readyState === WebSocket.OPEN) {
         try {
           ws.send(JSON.stringify({
@@ -372,6 +393,20 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
 
   // ───── Start full pipeline ─────
   const start = useCallback(async () => {
+    // Concurrent-call guard — see comment on `startInFlightRef`. Tap and
+    // wake-word both call start() off stale closures; without this lock
+    // two WebSockets open in parallel, wsRef gets clobbered, and the
+    // orphaned ws's setupComplete handler fires clientContent on the
+    // live ws BEFORE its own setup ack arrives → 1007.
+    if (startInFlightRef.current) return
+    // If a previous ws is still live (or in CONNECTING), tear it down
+    // before opening a new one — otherwise the old handlers keep firing
+    // against `wsRef.current` after we reassign it below.
+    if (wsRef.current && wsRef.current.readyState !== WebSocket.CLOSED) {
+      try { wsRef.current.close(1000, 'restart') } catch (_) { /* ignore */ }
+      wsRef.current = null
+    }
+    startInFlightRef.current = true
     setError(null)
     setStatus('requesting')
     try {
@@ -589,7 +624,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
         }
       }
 
-      ws.onmessage = (event) => handleMessage(event.data)
+      ws.onmessage = (event) => handleMessage(event.data, ws)
       ws.onerror = (e) => {
         console.error('[geminiLive] ws error', e)
         setError('Connection error')
@@ -652,6 +687,10 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
       console.error('[geminiLive] start error', e)
       setError(e.message || String(e))
       setStatus('error')
+    } finally {
+      // Always release the in-flight lock so a subsequent tap/wake-word
+      // can start a fresh session. Pairs with the guard at the top.
+      startInFlightRef.current = false
     }
   }, [handleMessage, startMicLevel])
 
