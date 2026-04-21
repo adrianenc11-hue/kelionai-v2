@@ -184,6 +184,14 @@ const KELION_TOOLS = [
     required: ['state', 'intensity'],
   },
   {
+    name: 'what_do_you_see',
+    description: "Describe what is currently visible in the user's camera. Call this ONLY when the user explicitly asks you to look (e.g. 'what do you see?', 'ce vezi?', 'can you see me?', 'describe what's in front of you', 'look at this'). The camera is kept silently on for this purpose — do NOT announce it, do NOT describe the camera unsolicited. When this tool is called the backend analyzes the current frame with Gemini Vision and returns a short description; integrate that description naturally into your spoken reply, do not read it verbatim.",
+    properties: {
+      focus: { type: 'string', description: "Optional phrase the user gave you (e.g. 'is the laptop open?', 'what color is my shirt?'). Pass it through so the vision model can focus its answer. Leave blank for a general description." },
+    },
+    required: [],
+  },
+  {
     name: 'show_on_monitor',
     description: "Display something on the big presentation monitor in the scene behind you. Use whenever the user asks (in any language) to see / open / show / display a map, the weather, a video, an image, a Wikipedia / reference page, or any web page. Pick the right `kind` — the client resolves it to the best embed URL. Call again with a new query to swap the content on screen.",
     properties: {
@@ -791,6 +799,125 @@ router.get('/openai-live-token', async (req, res) => {
   } catch (err) {
     console.error('[realtime] OpenAI error:', err.message);
     res.status(500).json({ error: 'Failed to create OpenAI live session' });
+  }
+});
+
+// ──────────────────────────────────────────────────────────────────
+// On-demand vision analysis — Gemini Vision as a side-car to OpenAI.
+//
+// The voice transport (OpenAI Realtime GA) does not accept live video.
+// When the user says "what do you see?" during an OpenAI voice session,
+// the model invokes the `what_do_you_see` tool (declared in KELION_TOOLS
+// above). The client handler in src/lib/kelionTools.js grabs the most
+// recent camera frame from the in-memory ring buffer and POSTs it here
+// as a base64 data URL. We forward the image to Gemini 2.5 Flash (cheap,
+// fast, good vision) with a short prompt and return the plain-text
+// description so the client can fold it back into OpenAI as a
+// function_call_output — OpenAI then vocalises a natural reply.
+//
+// Why not OpenAI Vision? OpenAI's GA Realtime function-calling loop can
+// accept an image via `conversation.item.create` of type `input_image`,
+// but that requires a separate non-Realtime /chat/completions hop for
+// an actual description (the Realtime model will refuse to describe
+// images it was just handed without a tool roundtrip). Routing the
+// vision call through Gemini keeps the image pipeline on the provider
+// that has a mature vision endpoint — OpenAI handles the voice, Gemini
+// handles the eyes. Matches Adrian's architectural intent:
+//   "livreaza ce am cerut ... voce + Gemini pe imagini, nu crapa".
+router.post('/vision', async (req, res) => {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    return res.status(503).json({ error: 'Gemini vision not configured' });
+  }
+
+  // Reuse the same gate as /openai-live-token so guests can't spam the
+  // vision endpoint outside a voice session. Signed-in non-admins need
+  // a credits balance; admin is unlimited; guests fall under the shared
+  // 15-min/day IP trial window.
+  const adminUser = await peekSignedInUser(req);
+  const isAdmin   = await isAdminUser(adminUser);
+  if (!adminUser && !isAdmin) {
+    const ip = ipGeo.clientIp(req) || req.ip || '';
+    const status = trialStatus(ip);
+    if (!status.allowed) {
+      return res.status(429).json({ error: 'Trial used up.' });
+    }
+  } else if (adminUser && !isAdmin) {
+    if (adminUser.id == null) {
+      res.clearCookie('kelion.token', { path: '/' });
+      return res.status(401).json({ error: 'Session expired.', action: 'reauth' });
+    }
+    try {
+      const balance = await getCreditsBalance(adminUser.id);
+      if (!Number.isFinite(balance) || balance <= 0) {
+        return res.status(402).json({ error: 'No credits left.', action: 'buy_credits' });
+      }
+    } catch (err) { /* fall through */ }
+  }
+
+  const frame = (req.body?.frame || '').toString();
+  const focus = (req.body?.focus || '').toString().slice(0, 200);
+  if (!frame || !frame.startsWith('data:image/')) {
+    return res.status(400).json({ error: 'Missing or malformed frame (expected data:image/* base64 URL).' });
+  }
+  // Parse "data:image/jpeg;base64,<b64>" → mimeType + b64 data.
+  const m = frame.match(/^data:([^;]+);base64,(.+)$/);
+  if (!m) {
+    return res.status(400).json({ error: 'Frame must be a base64 data URL.' });
+  }
+  const mimeType = m[1];
+  const b64 = m[2];
+  // Cap payload at ~4 MB decoded to keep the Gemini request small. The
+  // client already rescales to 480 px wide @ q=0.55 so a typical frame
+  // is well under 100 KB.
+  if (b64.length > 6 * 1024 * 1024) {
+    return res.status(413).json({ error: 'Frame too large.' });
+  }
+
+  const prompt = focus
+    ? `You are the "eyes" of a voice assistant called Kelion. The user asked: "${focus}". Answer in 1-3 short sentences, plain text, no markdown. If the requested detail is not visible, say so briefly.`
+    : 'You are the "eyes" of a voice assistant called Kelion. Describe briefly and concretely what is visible in this camera frame (who, what, where, mood). 1-3 short sentences, plain text, no markdown. If the image is too dark or blurry to tell, say so briefly.';
+
+  const model = process.env.KELION_VISION_MODEL || 'gemini-2.5-flash';
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15_000);
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          role: 'user',
+          parts: [
+            { text: prompt },
+            { inline_data: { mime_type: mimeType, data: b64 } },
+          ],
+        }],
+        generationConfig: { temperature: 0.4, maxOutputTokens: 200 },
+      }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    if (!r.ok) {
+      const txt = await r.text().catch(() => '');
+      console.warn('[realtime] vision upstream error', r.status, txt.slice(0, 200));
+      return res.status(502).json({
+        error: 'Vision upstream error',
+        description: "I can't see clearly right now. Can you describe what you'd like me to look at?",
+      });
+    }
+    const data = await r.json().catch(() => null);
+    const description = data?.candidates?.[0]?.content?.parts?.map(p => p.text).filter(Boolean).join(' ').trim()
+      || "I'm looking but I can't make out details right now.";
+    res.json({ ok: true, description });
+  } catch (err) {
+    console.warn('[realtime] vision exception', err && err.message);
+    res.status(502).json({
+      error: 'Vision call failed',
+      description: "I tried to look but the connection dropped. Let me know what you want me to focus on.",
+    });
   }
 });
 

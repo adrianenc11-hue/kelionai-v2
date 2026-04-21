@@ -27,6 +27,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { runTool } from './kelionTools'
+import { setLatestCameraFrame, clearLatestCameraFrame } from './cameraFrameBuffer'
 
 // Public signature matches useGeminiLive exactly so swapping is a
 // one-line change in KelionStage.
@@ -38,11 +39,16 @@ import { runTool } from './kelionTools'
 //                   startCamera, stopCamera, startScreen, stopScreen,
 //                   trial }
 //
-// Camera/screen-share are declared but no-op in this first transport
-// cut: OpenAI Realtime GA does not yet accept live video over
-// WebRTC the way Gemini does via `realtimeInput.video`. We keep the
-// shape so KelionStage's vision buttons remain safe to press; PR4
-// may wire it up via image attachments on `conversation.item.create`.
+// Camera is hybrid: OpenAI Realtime GA still doesn't accept live video
+// over WebRTC, but Kelion's camera feature is implemented anyway —
+// passively. While the camera is on we grab one JPEG per second into
+// a module-level ring buffer (cameraFrameBuffer.js). Nothing is
+// uploaded until the model calls the `what_do_you_see` tool; the
+// tool handler then sends the latest frame to Gemini Vision via our
+// /api/realtime/vision endpoint and returns the description to OpenAI
+// as a function_call_output. Result: OpenAI owns voice + reasoning,
+// Gemini owns vision, camera stays silent until the user asks.
+// Screen sharing remains a no-op stub (future work).
 export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = null }) {
   const onBalanceUpdateRef = useRef(onBalanceUpdate)
   onBalanceUpdateRef.current = onBalanceUpdate
@@ -67,6 +73,13 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
   const micStreamRef  = useRef(null)
   const remoteStreamRef = useRef(null)
   const trialTimeoutRef = useRef(null)
+  // Passive camera grabber refs. See startCamera/stopCamera at bottom of
+  // file for rationale — the camera is *silent* under OpenAI Realtime;
+  // frames land in cameraFrameBuffer.js and only get uploaded when the
+  // `what_do_you_see` tool is invoked by the model.
+  const cameraVideoRef      = useRef(null)
+  const cameraCanvasRef     = useRef(null)
+  const cameraGrabTimerRef  = useRef(null)
   const creditsIntervalRef = useRef(null)
   const creditsStartedRef  = useRef(false)
   const creditsStartFnRef  = useRef(null)
@@ -554,16 +567,129 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
 
   useEffect(() => () => { stop() }, [stop])
 
-  // Vision stubs — accepted but no-op so KelionStage's camera/screen
-  // buttons don't throw when the OpenAI transport is active. See
-  // module header.
-  const startCamera = useCallback(async () => {
-    setVisionError('Camera streaming is not available on the OpenAI transport yet.')
+  // Unmount cleanup for the passive camera grabber. stop() above is for
+  // the voice session only — users can keep the camera on across
+  // taps — but we must release the MediaStream when the component goes
+  // away or it leaks the underlying hardware + CPU timer.
+  useEffect(() => () => {
+    if (cameraGrabTimerRef.current) {
+      clearInterval(cameraGrabTimerRef.current)
+      cameraGrabTimerRef.current = null
+    }
+    if (cameraVideoRef.current) {
+      try { cameraVideoRef.current.pause() } catch (_) { /* ignore */ }
+      try { cameraVideoRef.current.srcObject = null } catch (_) { /* ignore */ }
+    }
+    clearLatestCameraFrame()
   }, [])
-  const stopCamera  = useCallback(() => {
-    setCameraStream(null)
+
+  // Passive camera grabber.
+  //
+  // OpenAI Realtime GA does not (yet) accept live video over WebRTC.
+  // Instead of refusing camera access entirely (the previous stub),
+  // we keep the camera on silently on the client: one JPEG every ~1s
+  // is drawn to an off-screen canvas and stashed in the module-level
+  // cameraFrameBuffer. Nothing is uploaded at this stage.
+  //
+  // When the user asks Kelion "what do you see?", the model calls the
+  // `what_do_you_see` tool (declared in server/src/routes/realtime.js);
+  // its handler in src/lib/kelionTools.js reads the latest frame and
+  // POSTs it to /api/realtime/vision, which forwards to Gemini Vision
+  // and returns a short description. OpenAI folds that description back
+  // into the conversation and vocalises a natural reply. The camera
+  // stays silent until the user asks.
+  //
+  // Why 1 Hz? Voice-triggered vision doesn't need motion; one recent
+  // still is plenty and keeps CPU / memory near zero while the user is
+  // just talking. MediaStream stays in cameraVideoRef so we return it
+  // to KelionStage (for preview thumbnails) without re-requesting.
+  const startCamera = useCallback(async () => {
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setVisionError('Camera not available in this browser.')
+        return
+      }
+      // Stop any prior capture first so start→stop→start is idempotent.
+      if (cameraGrabTimerRef.current) {
+        clearInterval(cameraGrabTimerRef.current)
+        cameraGrabTimerRef.current = null
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
+        audio: false,
+      })
+      setCameraStream(stream)
+      setVisionError(null)
+
+      // Hidden <video> playing the stream + off-screen <canvas> to grab
+      // JPEGs. We never attach the video to the DOM — it just acts as a
+      // decode source for drawImage. The canvas is reused across ticks
+      // to avoid allocating a new framebuffer each second.
+      if (!cameraVideoRef.current) {
+        const v = document.createElement('video')
+        v.autoplay = true
+        v.muted = true
+        v.playsInline = true
+        cameraVideoRef.current = v
+      }
+      if (!cameraCanvasRef.current) {
+        cameraCanvasRef.current = document.createElement('canvas')
+      }
+      const video = cameraVideoRef.current
+      video.srcObject = stream
+      try { await video.play() } catch (_) { /* play failures fall through to grab loop */ }
+
+      const canvas = cameraCanvasRef.current
+      const MAX_W = 480
+      const JPEG_Q = 0.6
+
+      const grab = () => {
+        if (!video.videoWidth || !video.videoHeight) return
+        const scale = Math.min(1, MAX_W / video.videoWidth)
+        canvas.width = Math.floor(video.videoWidth * scale)
+        canvas.height = Math.floor(video.videoHeight * scale)
+        const ctx = canvas.getContext('2d')
+        try {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+        } catch (_) {
+          return
+        }
+        try {
+          const dataUrl = canvas.toDataURL('image/jpeg', JPEG_Q)
+          setLatestCameraFrame(dataUrl)
+        } catch (_) { /* best-effort; a miss here just means the buffer keeps its previous frame */ }
+      }
+      // Prime immediately (don't wait 1s for the first frame) then tick.
+      setTimeout(grab, 250)
+      cameraGrabTimerRef.current = setInterval(grab, 1000)
+    } catch (err) {
+      console.warn('[openaiRealtime] startCamera failed', err && err.message)
+      setVisionError(err?.message || 'Unable to open the camera.')
+    }
+  }, [])
+
+  const stopCamera = useCallback(() => {
+    if (cameraGrabTimerRef.current) {
+      clearInterval(cameraGrabTimerRef.current)
+      cameraGrabTimerRef.current = null
+    }
+    if (cameraVideoRef.current) {
+      try { cameraVideoRef.current.pause() } catch (_) { /* ignore */ }
+      try { cameraVideoRef.current.srcObject = null } catch (_) { /* ignore */ }
+    }
+    setCameraStream((prev) => {
+      if (prev) {
+        try { prev.getTracks().forEach((t) => t.stop()) } catch (_) { /* ignore */ }
+      }
+      return null
+    })
+    clearLatestCameraFrame()
     setVisionError(null)
   }, [])
+
+  // Screen share stub — GA Realtime still has no video input path, and
+  // screen-capture + vision tool would need a second grabber in parallel
+  // with the camera one. Out of scope for the voice+camera delivery.
   const startScreen = useCallback(async () => {
     setVisionError('Screen sharing is not available on the OpenAI transport yet.')
   }, [])

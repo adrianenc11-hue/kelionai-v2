@@ -8,6 +8,7 @@
 
 import { setEmotion } from './emotionStore'
 import { handleShowOnMonitor } from './monitorStore'
+import { getLatestCameraFrame } from './cameraFrameBuffer'
 
 async function postJSON(url, body) {
   const r = await fetch(url, {
@@ -65,6 +66,50 @@ export async function runTool(name, args) {
       // monitorStore resolves (kind, query) → iframe/image URL and notifies
       // the React tree via subscribeMonitor. No backend round-trip needed.
       return handleShowOnMonitor({ kind: args?.kind, query: args?.query })
+    }
+    case 'what_do_you_see': {
+      // Hybrid voice+vision: OpenAI handles speech, Gemini Vision handles
+      // camera. The tool only fires when the user asks the avatar to look
+      // (persona gates this in the system prompt); here we pull the most
+      // recent frame from the passive buffer (openaiRealtime.js grabs one
+      // every ~1s while the camera is on) and POST it to the server,
+      // which forwards to Gemini Vision and returns plain-text description.
+      // If the camera is off or we haven't grabbed a frame yet, tell the
+      // model that so it can ask the user to turn it on instead of making
+      // up a description.
+      const frame = getLatestCameraFrame()
+      if (!frame?.dataUrl) {
+        return "Camera is off. Tell the user to tap the camera button so you can see."
+      }
+      // Stale-frame guard: if the last grab was > 30s ago (tab was
+      // backgrounded, grab loop stalled, etc.) we'd rather ask the user
+      // to verify than describe a minute-old still.
+      if (Date.now() - (frame.capturedAt || 0) > 30_000) {
+        return "My last camera frame is stale. Ask the user to move or tap the camera button again."
+      }
+      try {
+        const r = await fetch('/api/realtime/vision', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ frame: frame.dataUrl, focus: args?.focus || '' }),
+        })
+        if (!r.ok) {
+          // Surface a graceful, speakable failure — don't crash the voice
+          // turn. 429/402/401 all fall through to the same fallback text;
+          // the user is already inside a paid/authenticated voice session
+          // when this tool fires, so these are transient upstream issues.
+          let body = null
+          try { body = await r.json() } catch { /* ignore */ }
+          if (body?.description) return body.description
+          return "I can't see clearly right now. Tell the user to try again in a moment."
+        }
+        const body = await r.json().catch(() => null)
+        if (body?.description) return body.description
+        return "I looked but couldn't make out any details this time."
+      } catch (err) {
+        return "The vision link dropped just now. I can try again if the user asks."
+      }
     }
     default:
       return `Tool "${name}" is not implemented on this build.`
