@@ -274,8 +274,26 @@ router.get('/gemini-token', async (req, res) => {
     // greet-first clientContent trigger the client sends on ws.open —
     // see geminiLive.js. `KELION_FORCE_LANG` env var still overrides
     // everything if the operator wants to lock one language.
-    const browserLang = (req.query.lang || 'en-US').toString().slice(0, 16);
-    const forcedLang = (process.env.KELION_FORCE_LANG || browserLang).toString().slice(0, 16);
+    // Gemini Live `speechConfig.languageCode` only accepts a closed set of
+    // BCP-47 tags — passing anything else (e.g. `ro-RO` before Google added
+    // Romanian to the Live preview, or a malformed tag like `ro` /
+    // `ro-Latn-RO`) is rejected with close code 1007 on the first audio
+    // frame. Whitelist the known-good tags and fall back to `en-US` for
+    // everything else. The full supported list is documented here:
+    //   https://ai.google.dev/gemini-api/docs/live#languages
+    // Adrian 2026-04-20: 1007 reproduced on a fresh bundle — the setup
+    // payload is otherwise protocol-clean, so the most likely culprit
+    // remaining is a locale Google quietly dropped from the whitelist.
+    const GEMINI_LIVE_LANGS = new Set([
+      'en-US','en-GB','en-AU','en-IN',
+      'de-DE','es-ES','es-US','fr-FR','fr-CA',
+      'it-IT','ja-JP','ko-KR',
+      'pt-BR','ru-RU','tr-TR','zh-CN',
+      'ar-XA','hi-IN','id-ID','nl-NL','pl-PL','th-TH','vi-VN',
+    ]);
+    const rawLang = (req.query.lang || 'en-US').toString().slice(0, 16);
+    const safeLang = GEMINI_LIVE_LANGS.has(rawLang) ? rawLang : 'en-US';
+    const forcedLang = (process.env.KELION_FORCE_LANG || safeLang).toString().slice(0, 16);
     // Stage 6 — M26: voice style preset chosen by the user via the menu.
     // Cookie first (survives refresh), then ?style= query, then default warm.
     const styleFromCookie = req.cookies?.['kelion.voice_style'];
