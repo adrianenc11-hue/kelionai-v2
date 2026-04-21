@@ -905,7 +905,18 @@ router.post('/vision', async (req, res) => {
             { inline_data: { mime_type: mimeType, data: b64 } },
           ],
         }],
-        generationConfig: { temperature: 0.4, maxOutputTokens: 200 },
+        generationConfig: {
+          temperature: 0.4,
+          maxOutputTokens: 400,
+          // gemini-2.5-flash has "thinking mode" ON by default, and thinking
+          // tokens count against maxOutputTokens. For short descriptive
+          // vision calls that feed a live voice session, the model was
+          // burning the whole budget on internal thought and returning the
+          // description cut mid-sentence (e.g. "This frame shows a blue
+          // background with a"). Disable thinking so every token spent is
+          // output the user will hear.
+          thinkingConfig: { thinkingBudget: 0 },
+        },
       }),
       signal: controller.signal,
     });
