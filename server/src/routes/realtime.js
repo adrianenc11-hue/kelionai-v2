@@ -343,29 +343,39 @@ router.get('/gemini-token', async (req, res) => {
       windowMs:    TRIAL_WINDOW_MS,
     };
   } else if (adminUser && !isAdmin) {
+    // Non-admin with a stale JWT whose `sub` is not a numeric row id
+    // (pre-Postgres UUID). Without an id we can't look up a credits
+    // balance, and the /consume heartbeat is client-initiated — it may
+    // never fire. Pre-F1+F2 these users were quietly treated as guests;
+    // letting them through ungated would be a free-session bypass
+    // (Devin Review PR #115 caught this regression). Force a re-auth
+    // instead; the next sign-in mints a fresh JWT with a numeric sub.
+    if (adminUser.id == null) {
+      res.clearCookie('kelion.token', { path: '/' });
+      return res.status(401).json({
+        error: 'Session expired. Please sign in again to continue.',
+        action: 'reauth',
+      });
+    }
+
     // Signed-in non-admin: require a positive credits balance. We only
     // block when the user explicitly has zero; any positive balance allows
     // the session to start and the client-side heartbeat takes over.
-    // Skip the DB lookup when we don't have a numeric id (stale
-    // pre-Postgres JWT with a UUID sub); the /consume heartbeat will
-    // run the real per-minute gate once the session is live.
-    if (Number.isFinite(adminUser.id) || typeof adminUser.id === 'string') {
-      try {
-        const balance = await getCreditsBalance(adminUser.id);
-        if (!Number.isFinite(balance) || balance <= 0) {
-          return res.status(402).json({
-            error: 'No credits left. Buy a package to keep talking to Kelion.',
-            balance_minutes: 0,
-            action: 'buy_credits',
-          });
-        }
-      } catch (err) {
-        // DB lookup failed — log, but don't block the session. Treat this
-        // as "unable to verify, allow session" so a transient DB glitch
-        // doesn't kill a paying user's voice chat. The consume heartbeat
-        // will still enforce per-minute billing.
-        console.warn('[realtime] credits-balance lookup failed', err && err.message);
+    try {
+      const balance = await getCreditsBalance(adminUser.id);
+      if (!Number.isFinite(balance) || balance <= 0) {
+        return res.status(402).json({
+          error: 'No credits left. Buy a package to keep talking to Kelion.',
+          balance_minutes: 0,
+          action: 'buy_credits',
+        });
       }
+    } catch (err) {
+      // DB lookup failed — log, but don't block the session. Treat this
+      // as "unable to verify, allow session" so a transient DB glitch
+      // doesn't kill a paying user's voice chat. The consume heartbeat
+      // will still enforce per-minute billing.
+      console.warn('[realtime] credits-balance lookup failed', err && err.message);
     }
   }
 
@@ -621,22 +631,26 @@ router.get('/openai-live-token', async (req, res) => {
       windowMs:    TRIAL_WINDOW_MS,
     };
   } else if (adminUser && !isAdmin) {
-    // Same guard as /gemini-token: skip the DB balance lookup when the
-    // JWT sub is not a numeric row id. The /consume heartbeat will still
-    // run the per-minute gate as soon as the session is live.
-    if (Number.isFinite(adminUser.id) || typeof adminUser.id === 'string') {
-      try {
-        const balance = await getCreditsBalance(adminUser.id);
-        if (!Number.isFinite(balance) || balance <= 0) {
-          return res.status(402).json({
-            error: 'No credits left. Buy a package to keep talking to Kelion.',
-            balance_minutes: 0,
-            action: 'buy_credits',
-          });
-        }
-      } catch (err) {
-        console.warn('[realtime] credits-balance lookup failed', err && err.message);
+    // Mirror /gemini-token: non-admin with stale-UUID JWT → 401 re-auth,
+    // otherwise check credits balance.
+    if (adminUser.id == null) {
+      res.clearCookie('kelion.token', { path: '/' });
+      return res.status(401).json({
+        error: 'Session expired. Please sign in again to continue.',
+        action: 'reauth',
+      });
+    }
+    try {
+      const balance = await getCreditsBalance(adminUser.id);
+      if (!Number.isFinite(balance) || balance <= 0) {
+        return res.status(402).json({
+          error: 'No credits left. Buy a package to keep talking to Kelion.',
+          balance_minutes: 0,
+          action: 'buy_credits',
+        });
       }
+    } catch (err) {
+      console.warn('[realtime] credits-balance lookup failed', err && err.message);
     }
   }
 
