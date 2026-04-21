@@ -5,6 +5,14 @@
 //
 // Intentionally dependency-free so both runTool() (outside React) and
 // React components (via a useSyncExternalStore hook below) can use it.
+//
+// State is persisted to localStorage so that whatever the user had open on
+// the monitor (map, WebVM, wiki, video…) survives a hard refresh or tab
+// restore. Entries older than MAX_AGE_MS are dropped on load so we never
+// show a week-old embed.
+
+const STORAGE_KEY = 'kelion.monitor.v1';
+const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 const state = {
   kind: null,        // 'map' | 'weather' | 'video' | 'image' | 'wiki' | 'web' | null
@@ -13,6 +21,50 @@ const state = {
   embedType: 'iframe', // 'iframe' | 'image'
   updatedAt: 0,
 };
+
+function loadPersisted() {
+  if (typeof window === 'undefined' || !window.localStorage) return;
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return;
+    if (!parsed.src || !parsed.kind) return;
+    const updatedAt = Number(parsed.updatedAt) || 0;
+    if (!updatedAt || Date.now() - updatedAt > MAX_AGE_MS) {
+      window.localStorage.removeItem(STORAGE_KEY);
+      return;
+    }
+    state.kind = parsed.kind;
+    state.src = parsed.src;
+    state.title = parsed.title || null;
+    state.embedType = parsed.embedType === 'image' ? 'image' : 'iframe';
+    state.updatedAt = updatedAt;
+  } catch {
+    /* corrupt entry — ignore */
+  }
+}
+
+function savePersisted() {
+  if (typeof window === 'undefined' || !window.localStorage) return;
+  try {
+    if (!state.kind || !state.src) {
+      window.localStorage.removeItem(STORAGE_KEY);
+      return;
+    }
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      kind: state.kind,
+      src: state.src,
+      title: state.title,
+      embedType: state.embedType,
+      updatedAt: state.updatedAt,
+    }));
+  } catch {
+    /* quota / private mode — ignore */
+  }
+}
+
+loadPersisted();
 
 const listeners = new Set();
 
@@ -42,6 +94,7 @@ function setState(patch) {
   state.title = patch.title ?? null;
   state.embedType = patch.embedType || 'iframe';
   state.updatedAt = Date.now();
+  savePersisted();
   notify();
 }
 
