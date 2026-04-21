@@ -649,28 +649,8 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
         // Surface Google's close code + reason so bad-endpoint or
         // expired-token failures show up in the console instead of being
         // silently flipped back to 'idle'. 1000 = normal, 1005/1006 = no
-        // status / abnormal, 1007 = protocol violation (setup first
-        // rule, oversized frame, unsupported field on ephemeral token
-        // session), 1008 = policy (wrong endpoint / bad token), 1011 =
-        // quota exceeded. The reason string carried by 1007 is the
-        // ground truth for WHICH frame Google rejected — previously we
-        // threw it away and treated every 1007 like the same bug.
-        // Preserving it lets the next session surface the exact cause
-        // the very first time the regression shows up instead of
-        // requiring another DevTools dive. Adrian 2026-04-20: "3× ws
-        // close in console fără explicație utilă".
-        console.warn('[geminiLive] ws close', {
-          code: e?.code,
-          reason: e?.reason,
-          wasClean: e?.wasClean,
-          setupAcked: setupCompleteRef.current,
-          status: statusRef.current,
-        })
-        if (e?.code === 1007 && e?.reason) {
-          // Hard log so it never slips past the noise. The reason
-          // string is short (<200 chars) — safe to print as-is.
-          console.error('[geminiLive] 1007 protocol error from Google:', e.reason)
-        }
+        // status / abnormal, 1008 = policy (wrong endpoint / bad token).
+        console.warn('[geminiLive] ws close', { code: e?.code, reason: e?.reason, wasClean: e?.wasClean })
         if (statusRef.current === 'idle') return
         // If we never reached 'listening' (i.e. the session died before
         // setupComplete), keep the error visible rather than bouncing back
@@ -678,14 +658,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
         // happened.
         const neverOpened = statusRef.current === 'connecting' || statusRef.current === 'requesting'
         if (statusRef.current === 'error') return
-        // If the session had opened AND been acked by Google (setupComplete),
-        // a late close should NOT be surfaced as an error — that path covers
-        // normal "user stopped", trial-expired, credits-exhausted, etc. Only
-        // close codes that indicate a real protocol failure after ack are
-        // shown. 1011 (quota) and 1008 (policy) are always loud because the
-        // user cannot tell from a silent flip-to-idle that Google refused.
-        const hardFail = e?.code === 1007 || e?.code === 1008 || e?.code === 1011
-        if (neverOpened || hardFail) {
+        if (neverOpened) {
           setError(`Connection closed (${e?.code || 'unknown'})${e?.reason ? `: ${e.reason}` : ''}`)
           setStatus('error')
           return

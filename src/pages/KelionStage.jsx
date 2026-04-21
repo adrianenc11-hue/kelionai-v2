@@ -513,18 +513,8 @@ function StageMonitorContent() {
         boxShadow: '0 0 40px rgba(124, 58, 237, 0.35) inset',
       }}
     >
-      {/* Keyed on `updatedAt` so every new `show_on_monitor` call fully
-          remounts the iframe / image. Without the key, React sees the same
-          element type and keeps the old DOM node, changing only the `src`
-          attribute — which in Chromium leaves the previous iframe's
-          isolated renderer + heap allocated until GC pressure. After ~100
-          swaps the tab chokes (Adrian: "după ~100 de cereri nu mai merge").
-          Forcing remount drops the prior iframe's contentWindow so the
-          browser reclaims the associated process + memory. Adrian
-          2026-04-20. */}
       {isImage ? (
         <img
-          key={`mon-img-${m.updatedAt}`}
           src={m.src}
           alt={m.title || 'Monitor content'}
           referrerPolicy="no-referrer"
@@ -532,11 +522,9 @@ function StageMonitorContent() {
         />
       ) : (
         <iframe
-          key={`mon-ifr-${m.updatedAt}`}
           src={m.src}
           title={m.title || 'Kelion monitor'}
           referrerPolicy="no-referrer"
-          loading="lazy"
           sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation"
           allow="fullscreen; geolocation; autoplay; encrypted-media"
           style={{ width: '100%', height: '100%', border: 'none', background: '#0d0b1d' }}
@@ -1781,21 +1769,10 @@ export default function KelionStage() {
   // click. The hook is a no-op on browsers without the Web Speech API
   // (Safari iOS, Firefox), so the manual tap flow stays untouched for
   // those users.
-  // Wake-word gate. CRITICAL: only arm on `idle`, NEVER on `error`. When a
-  // session dies with 1007 (or any other close), status transitions to
-  // `error` and the HUD shows a banner. Previously we re-armed the hot-word
-  // in that state, so a user who had JUST said "Kelion" would have their
-  // transcript still echoing and `matchesWakeWord` would fire again → a
-  // fresh start() → another 1007 → another `error` → another wake-word
-  // arm → tight loop, three ws closes visible in the console within a
-  // second. The fix is to require an explicit user action (tap) to
-  // recover from `error`; the hot-word only gets you OUT of `idle`.
-  // Adrian 2026-04-20: "iar crapa 1007" with 3× `[geminiLive] ws close`
-  // stacked in the console.
   useWakeWord({
-    enabled: status === 'idle',
+    enabled: status === 'idle' || status === 'error',
     onDetect: () => {
-      if (status === 'idle') {
+      if (status === 'idle' || status === 'error') {
         try { start() } catch (_) { /* banner surfaces failure */ }
         if (!authState.signedIn) {
           if (trialRefreshTimerRef.current) clearTimeout(trialRefreshTimerRef.current)
