@@ -27,6 +27,16 @@ import {
   forgetAllMemory,
 } from '../lib/memoryClient'
 import {
+  configureConversationStore,
+  appendMessage as appendConversationMessage,
+  listConversations as listConversationsApi,
+  loadConversation as loadConversationApi,
+  deleteConversation as deleteConversationApi,
+  startNewConversation,
+  getActiveConversationId,
+  setActiveConversationId,
+} from '../lib/conversationStore'
+import {
   pushSupported,
   getPushStatus,
   enablePush,
@@ -1118,6 +1128,16 @@ export default function KelionStage() {
   const [chatMessages, setChatMessages] = useState([]) // [{ role, content }]
   const [chatBusy, setChatBusy] = useState(false)
   const [chatError, setChatError] = useState(null)
+  // Conversation history — user-requested ("sa aiba optiune de save").
+  // Signed-in users get server persistence via /api/conversations; guests
+  // fall back to localStorage. See src/lib/conversationStore.js.
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [historyItems, setHistoryItems] = useState([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyError, setHistoryError] = useState(null)
+  // Track how many messages we've already persisted so the save-effect
+  // only appends deltas (not the whole transcript on every turn).
+  const savedUpToRef = useRef(0)
   // F2 — "+" attach. Adrian: "lipseste + de introdus date". Accepts
   // images, PDFs and text files. For MVP we only surface the filename to
   // the model (as a bracketed note) and preview-pill it in the composer
@@ -1736,6 +1756,99 @@ export default function KelionStage() {
     if (!cancelled) setAuthState({ signedIn: false, user: null })
     return () => { cancelled = true }
   }, [])
+
+  // Wire conversation-history store to live auth state. authTokenRef is
+  // a ref so passing it lazily avoids re-wiring on every render. The
+  // store picks server vs localStorage based on `signedIn`; this
+  // effect is intentionally a one-time configuration, the getters stay
+  // live across auth transitions.
+  useEffect(() => {
+    configureConversationStore({
+      getAuthToken: () => authTokenRef.current,
+      getIsSignedIn: () => !!authState.signedIn,
+    })
+  }, [authState.signedIn])
+
+  // Auto-save new chat messages to the conversation history backend.
+  // `savedUpToRef` tracks the prefix of `chatMessages` that has already
+  // been persisted so this effect only POSTs the delta. Empty assistant
+  // placeholders (streaming not yet started) are skipped.
+  useEffect(() => {
+    const total = chatMessages.length
+    const start = savedUpToRef.current
+    if (total <= start) {
+      if (total < start) savedUpToRef.current = total // transcript was cleared
+      return
+    }
+    let cancelled = false
+    ;(async () => {
+      for (let i = start; i < chatMessages.length; i++) {
+        const m = chatMessages[i]
+        if (!m || !m.content || !String(m.content).trim()) continue
+        if (cancelled) return
+        try {
+          await appendConversationMessage({ role: m.role || 'user', content: m.content })
+        } catch { /* swallow — next delta will retry via ensureActiveConversation */ }
+      }
+      if (!cancelled) savedUpToRef.current = chatMessages.length
+    })()
+    return () => { cancelled = true }
+  }, [chatMessages])
+
+  // Load history list whenever the panel opens.
+  const refreshHistory = useCallback(async () => {
+    setHistoryLoading(true)
+    setHistoryError(null)
+    try {
+      const items = await listConversationsApi()
+      setHistoryItems(Array.isArray(items) ? items : [])
+    } catch (err) {
+      setHistoryError(err.message || 'Could not load history')
+    } finally {
+      setHistoryLoading(false)
+    }
+  }, [])
+  useEffect(() => {
+    if (!historyOpen) return
+    refreshHistory()
+  }, [historyOpen, refreshHistory, authState.signedIn])
+
+  // Actions invoked from the history panel.
+  const handleNewChat = useCallback(() => {
+    startNewConversation()
+    savedUpToRef.current = 0
+    setChatMessages([])
+    setChatError(null)
+    setHistoryOpen(false)
+  }, [])
+  const handleLoadHistory = useCallback(async (id) => {
+    setHistoryError(null)
+    try {
+      const conv = await loadConversationApi(id)
+      if (!conv) { setHistoryError('Conversation not found'); return }
+      const msgs = Array.isArray(conv.messages) ? conv.messages : []
+      setActiveConversationId(id)
+      // Mark the full loaded transcript as "already saved" so the
+      // auto-save effect doesn't re-append it as new turns.
+      savedUpToRef.current = msgs.length
+      setChatMessages(msgs.map((m) => ({ role: m.role, content: m.content })))
+      setHistoryOpen(false)
+    } catch (err) {
+      setHistoryError(err.message || 'Could not load conversation')
+    }
+  }, [])
+  const handleDeleteHistory = useCallback(async (id) => {
+    try {
+      await deleteConversationApi(id)
+    } finally {
+      if (getActiveConversationId() === id) {
+        setActiveConversationId(null)
+        savedUpToRef.current = 0
+        setChatMessages([])
+      }
+      refreshHistory()
+    }
+  }, [refreshHistory])
 
   // Stage 3 — after enough user turns, if not signed in, gently open the
   // "Remember me?" prompt ONCE. Dismissed permanently per-session on close.
@@ -2567,6 +2680,16 @@ export default function KelionStage() {
             </MenuItem>
           ))}
           <div style={{ height: 6 }} />
+          {/* Conversation history — works for guests (localStorage)
+              and signed-in users (server). Above the auth gate so guests
+              can find their saved threads too. */}
+          <MenuItem onClick={() => { setHistoryOpen(true); setMenuOpen(false) }}>
+            Conversation history
+          </MenuItem>
+          <MenuItem onClick={() => { handleNewChat(); setMenuOpen(false) }}>
+            New chat
+          </MenuItem>
+          <div style={{ height: 6 }} />
           {/* Stage 3 — memory + passkey */}
           {authState.signedIn ? (
             <>
@@ -2995,6 +3118,151 @@ export default function KelionStage() {
               }}
             >Forget everything</button>
           )}
+        </div>
+      )}
+
+      {/* Conversation history drawer — lists saved threads for both
+          guests (localStorage) and signed-in users (server). Clicking a
+          row replays that transcript into the chat log. */}
+      {historyOpen && (
+        <div
+          onClick={() => setHistoryOpen(false)}
+          style={{
+            position: 'absolute', inset: 0,
+            background: 'rgba(3, 4, 10, 0.35)',
+            zIndex: 23,
+          }}
+        />
+      )}
+      {historyOpen && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: 'absolute', top: 0, right: 0, bottom: 0,
+            width: 'min(460px, 94vw)',
+            background: 'rgba(10, 8, 20, 0.82)',
+            backdropFilter: 'blur(22px)',
+            borderLeft: '1px solid rgba(167, 139, 250, 0.2)',
+            padding: '70px 20px 20px 20px',
+            overflowY: 'auto',
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+            zIndex: 24,
+            color: '#ede9fe',
+          }}
+        >
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            marginBottom: 14,
+          }}>
+            <div style={{ fontSize: 11, opacity: 0.6, letterSpacing: '0.15em' }}>
+              CONVERSATION HISTORY
+            </div>
+            <button
+              onClick={() => setHistoryOpen(false)}
+              style={{
+                background: 'transparent', border: 'none', color: '#ede9fe',
+                fontSize: 20, cursor: 'pointer', opacity: 0.7,
+              }}
+              aria-label="Close"
+            >✕</button>
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+            <button
+              onClick={handleNewChat}
+              style={{
+                padding: '8px 12px', borderRadius: 10,
+                background: 'rgba(167, 139, 250, 0.18)',
+                border: '1px solid rgba(167, 139, 250, 0.35)',
+                color: '#ede9fe', cursor: 'pointer', fontSize: 13,
+              }}
+            >+ New chat</button>
+            <button
+              onClick={refreshHistory}
+              style={{
+                padding: '8px 12px', borderRadius: 10,
+                background: 'transparent',
+                border: '1px solid rgba(167, 139, 250, 0.25)',
+                color: '#ede9fe', cursor: 'pointer', fontSize: 13, opacity: 0.85,
+              }}
+            >Refresh</button>
+          </div>
+
+          {!authState.signedIn && (
+            <div style={{
+              marginBottom: 12, padding: '8px 12px', borderRadius: 10,
+              background: 'rgba(250, 204, 21, 0.08)',
+              border: '1px solid rgba(250, 204, 21, 0.25)',
+              fontSize: 12, lineHeight: 1.5, opacity: 0.9,
+            }}>
+              Signed-out — history is saved locally on this browser only. Sign in
+              to keep it across devices.
+            </div>
+          )}
+
+          {historyLoading && (
+            <div style={{ opacity: 0.5, fontSize: 14 }}>Loading…</div>
+          )}
+          {historyError && (
+            <div style={{
+              marginBottom: 10, padding: '8px 12px', borderRadius: 10,
+              background: 'rgba(239, 68, 68, 0.1)',
+              border: '1px solid rgba(239, 68, 68, 0.3)',
+              color: '#fecaca', fontSize: 13,
+            }}>{historyError}</div>
+          )}
+          {!historyLoading && historyItems.length === 0 && !historyError && (
+            <div style={{ opacity: 0.55, fontSize: 14, lineHeight: 1.5 }}>
+              No saved conversations yet. Your chat will be saved here
+              automatically as you talk.
+            </div>
+          )}
+          {historyItems.map((c) => {
+            const ts = c.updated_at ? new Date(c.updated_at) : null
+            const tsLabel = ts && !Number.isNaN(ts.getTime())
+              ? ts.toLocaleString()
+              : ''
+            return (
+              <div
+                key={c.id}
+                style={{
+                  marginBottom: 10, padding: '10px 12px',
+                  borderRadius: 10,
+                  background: 'rgba(167, 139, 250, 0.08)',
+                  borderLeft: '2px solid #a78bfa',
+                  fontSize: 14, lineHeight: 1.45,
+                  display: 'flex', alignItems: 'flex-start', gap: 10,
+                }}
+              >
+                <button
+                  onClick={() => handleLoadHistory(c.id)}
+                  style={{
+                    flex: 1, textAlign: 'left', background: 'transparent',
+                    border: 'none', color: '#ede9fe', cursor: 'pointer',
+                    padding: 0,
+                  }}
+                >
+                  <div style={{ fontWeight: 500, marginBottom: 2 }}>
+                    {c.title || '(untitled)'}
+                  </div>
+                  <div style={{ fontSize: 11, opacity: 0.55 }}>
+                    {c.message_count} {c.message_count === 1 ? 'message' : 'messages'}
+                    {tsLabel ? ` · ${tsLabel}` : ''}
+                  </div>
+                </button>
+                <button
+                  onClick={() => handleDeleteHistory(c.id)}
+                  style={{
+                    background: 'transparent',
+                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                    color: '#fecaca', cursor: 'pointer', fontSize: 12,
+                    padding: '4px 8px', borderRadius: 8,
+                  }}
+                  aria-label="Delete conversation"
+                >Delete</button>
+              </div>
+            )
+          })}
         </div>
       )}
 

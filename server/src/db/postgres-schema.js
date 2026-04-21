@@ -94,6 +94,28 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_credit_tx_session
   ON credit_transactions(stripe_session_id)
   WHERE stripe_session_id IS NOT NULL;
 
+-- Conversation history — persists the text chat transcript so a signed-in
+-- user can return later and pick up where they left off. One row in
+-- conversations per chat thread + a row in conversation_messages per
+-- turn. Guests get localStorage-only persistence handled on the client.
+CREATE TABLE IF NOT EXISTS conversations (
+  id         BIGSERIAL PRIMARY KEY,
+  user_id    BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title      TEXT,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_conversations_user ON conversations(user_id, updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS conversation_messages (
+  id              BIGSERIAL PRIMARY KEY,
+  conversation_id BIGINT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+  role            TEXT NOT NULL,
+  content         TEXT NOT NULL,
+  created_at      TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_conv_messages_conv ON conversation_messages(conversation_id, id);
+
 CREATE TABLE IF NOT EXISTS visitor_events (
   id          BIGSERIAL PRIMARY KEY,
   ts          TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,

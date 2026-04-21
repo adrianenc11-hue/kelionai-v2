@@ -222,6 +222,34 @@ async function initDb() {
   `);
   await db.exec('CREATE INDEX IF NOT EXISTS idx_visitor_events_ts ON visitor_events(ts DESC)');
 
+  // Conversation history — persists the text chat transcript so a
+  // signed-in user can return later and pick up where they left off.
+  // One row per thread in `conversations`, one row per turn in
+  // `conversation_messages`. Guests get localStorage-only persistence
+  // (handled on the client in src/lib/conversationStore.js).
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS conversations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      title TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+  await db.exec('CREATE INDEX IF NOT EXISTS idx_conversations_user ON conversations(user_id, updated_at DESC)');
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS conversation_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      conversation_id INTEGER NOT NULL,
+      role TEXT NOT NULL,
+      content TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
+    )
+  `);
+  await db.exec('CREATE INDEX IF NOT EXISTS idx_conv_messages_conv ON conversation_messages(conversation_id, id)');
+
   return db;
 }
 
@@ -264,6 +292,114 @@ async function deleteMemoryItem(userId, id) {
 async function clearMemoryForUser(userId) {
   const r = await db.run('DELETE FROM memory_items WHERE user_id = ?', [userId]);
   return r.changes;
+}
+
+// ─── Conversation history helpers ────────────────────────────────
+// Signed-in users get server-side persistence of the chat transcript.
+// Guests fall back to client localStorage (see src/lib/conversationStore.js).
+// Titles default to a short slice of the first user message so the
+// history list is scannable without forcing the LLM to title each thread.
+
+const MAX_CONV_TITLE   = 120;
+const MAX_MSG_CONTENT  = 16_000; // generous — fits long pasted code/URLs
+const MAX_CONV_PER_USR = 500;    // guardrail; pruned opportunistically
+const MAX_MSGS_PER_CONV = 4_000; // huge threads get trimmed on read
+
+async function createConversation(userId, title) {
+  const clean = (typeof title === 'string' ? title.trim() : '').slice(0, MAX_CONV_TITLE) || null;
+  const r = await db.run(
+    'INSERT INTO conversations (user_id, title) VALUES (?, ?)',
+    [userId, clean]
+  );
+  return {
+    id: r.lastID,
+    user_id: userId,
+    title: clean,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+}
+
+async function assertConversationOwner(userId, conversationId) {
+  const row = await db.get(
+    'SELECT id, user_id FROM conversations WHERE id = ?',
+    [conversationId]
+  );
+  if (!row) return null;
+  if (String(row.user_id) !== String(userId)) return null;
+  return row;
+}
+
+async function appendConversationMessage(userId, conversationId, role, content) {
+  const own = await assertConversationOwner(userId, conversationId);
+  if (!own) return null;
+  const cleanRole    = String(role || '').slice(0, 20) || 'user';
+  const cleanContent = String(content || '').slice(0, MAX_MSG_CONTENT);
+  if (!cleanContent) return null;
+  const r = await db.run(
+    'INSERT INTO conversation_messages (conversation_id, role, content) VALUES (?, ?, ?)',
+    [conversationId, cleanRole, cleanContent]
+  );
+  await db.run(
+    'UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+    [conversationId]
+  );
+  return {
+    id: r.lastID,
+    conversation_id: conversationId,
+    role: cleanRole,
+    content: cleanContent,
+    created_at: new Date().toISOString(),
+  };
+}
+
+async function listConversations(userId, limit = 50) {
+  const safeLimit = Math.max(1, Math.min(MAX_CONV_PER_USR, Number(limit) || 50));
+  return db.all(
+    `SELECT c.id, c.title, c.created_at, c.updated_at,
+            (SELECT COUNT(*) FROM conversation_messages m WHERE m.conversation_id = c.id) AS message_count
+     FROM conversations c
+     WHERE c.user_id = ?
+     ORDER BY c.updated_at DESC
+     LIMIT ?`,
+    [userId, safeLimit]
+  );
+}
+
+async function getConversationWithMessages(userId, conversationId) {
+  const own = await assertConversationOwner(userId, conversationId);
+  if (!own) return null;
+  const meta = await db.get(
+    'SELECT id, title, created_at, updated_at FROM conversations WHERE id = ?',
+    [conversationId]
+  );
+  const messages = await db.all(
+    `SELECT id, role, content, created_at
+     FROM conversation_messages
+     WHERE conversation_id = ?
+     ORDER BY id ASC
+     LIMIT ?`,
+    [conversationId, MAX_MSGS_PER_CONV]
+  );
+  return { ...meta, messages };
+}
+
+async function updateConversationTitle(userId, conversationId, title) {
+  const own = await assertConversationOwner(userId, conversationId);
+  if (!own) return false;
+  const clean = (typeof title === 'string' ? title.trim() : '').slice(0, MAX_CONV_TITLE) || null;
+  const r = await db.run(
+    'UPDATE conversations SET title = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+    [clean, conversationId]
+  );
+  return r.changes > 0;
+}
+
+async function deleteConversation(userId, conversationId) {
+  const own = await assertConversationOwner(userId, conversationId);
+  if (!own) return false;
+  const r = await db.run('DELETE FROM conversations WHERE id = ?', [conversationId]);
+  return r.changes > 0;
 }
 
 // Stage 3 — passkey helpers
@@ -622,6 +758,13 @@ module.exports = {
   listMemoryItems,
   deleteMemoryItem,
   clearMemoryForUser,
+  // Conversation history
+  createConversation,
+  appendConversationMessage,
+  listConversations,
+  getConversationWithMessages,
+  updateConversationTitle,
+  deleteConversation,
   // Stage 3 — passkey
   getUserPasskeys,
   addPasskey,
