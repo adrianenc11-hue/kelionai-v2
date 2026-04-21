@@ -1461,6 +1461,37 @@ export default function KelionStage() {
     prevProviderRef.current = liveProvider
   }, [liveProvider, openaiHook, geminiHook])
 
+  // Auto-fallback: if the active transport terminal-fails (Gemini 1007/
+  // 1008/1011, OpenAI WebRTC 'failed', 401/quota from /…-live-token),
+  // silently swap to the other provider and retry start() once. The
+  // user sees at most a brief "Reconnecting…" flicker; they never had
+  // to know the provider toggle existed. The one-shot latch prevents
+  // ping-pong if BOTH providers are down — after the single retry,
+  // the error stays visible and the next manual tap-to-talk uses the
+  // newly selected provider (also now persisted). Latch clears on the
+  // next successful 'listening' transition.
+  const autoFallbackTriedRef = useRef(false)
+  useEffect(() => {
+    if (status === 'listening') autoFallbackTriedRef.current = false
+  }, [status])
+  useEffect(() => {
+    if (status !== 'error' || !error) return
+    if (autoFallbackTriedRef.current) return
+    autoFallbackTriedRef.current = true
+    const nextProvider = liveProvider === 'openai' ? 'gemini' : 'openai'
+    console.warn('[kelionStage] live provider', liveProvider, 'failed — switching to', nextProvider, '·', String(error))
+    setLiveProvider(nextProvider)
+    // Wait for the provider-switch effect above to stop the outgoing
+    // hook, then kick off the next attempt on the other transport. The
+    // small 120ms budget covers React's commit + the outgoing hook's
+    // teardown without being perceptible to the user.
+    const t = setTimeout(() => {
+      try { (nextProvider === 'openai' ? openaiHook : geminiHook).start() }
+      catch (e) { console.warn('[kelionStage] auto-fallback start() threw', e) }
+    }, 120)
+    return () => clearTimeout(t)
+  }, [status, error, liveProvider, openaiHook, geminiHook])
+
   // Unified trial HUD source of truth. Applies to both voice AND text
   // chat via the shared 15-min/day IP window on the server. Collapses
   // (`applicable: false`) the moment the user signs in.
@@ -2270,34 +2301,16 @@ export default function KelionStage() {
           display: 'flex', alignItems: 'center', gap: 8,
         }}
       >
-        {/* Plan C — voice-transport pill. Click cycles OpenAI ↔ Gemini.
-            Kept next to the Credits pill so Adrian (or any user) can flip
-            providers without opening DevTools if the active one
-            misbehaves on prod. Label is short ("GPT"/"Gem") so it doesn't
-            crowd the HUD; full name + hint live in the tooltip. */}
-        <button
-          onClick={() => setLiveProvider((p) => (p === 'openai' ? 'gemini' : 'openai'))}
-          style={{
-            height: 36, padding: '0 10px', borderRadius: 999,
-            background: liveProvider === 'openai'
-              ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(59, 130, 246, 0.2))'
-              : 'linear-gradient(135deg, rgba(167, 139, 250, 0.2), rgba(236, 72, 153, 0.18))',
-            backdropFilter: 'blur(12px)',
-            border: liveProvider === 'openai'
-              ? '1px solid rgba(16, 185, 129, 0.45)'
-              : '1px solid rgba(167, 139, 250, 0.45)',
-            color: '#ede9fe', fontSize: 11, cursor: 'pointer',
-            display: 'flex', alignItems: 'center', gap: 6,
-            fontWeight: 600, letterSpacing: '0.03em',
-          }}
-          title={liveProvider === 'openai'
-            ? 'Voice: OpenAI Realtime (GA, stable). Click to switch to Gemini Live.'
-            : 'Voice: Gemini Live (preview). Click to switch to OpenAI Realtime.'}
-          aria-label={`Voice transport: ${liveProvider === 'openai' ? 'OpenAI Realtime' : 'Gemini Live'}. Click to switch.`}
-        >
-          <span style={{ fontSize: 13 }}>🎙️</span>
-          <span>{liveProvider === 'openai' ? 'GPT' : 'Gem'}</span>
-        </button>
+        {/* Plan C — voice-transport selection. Previously surfaced as a
+            "🎙️ GPT / Gem" pill next to the Credits chip so the active
+            provider could be flipped without DevTools. Adrian's feedback
+            ("de ce am 2 butoane de mic ... poate face functia asta dar
+            in spate automat, fara user sa vada, el vede doar butonul de
+            jos, de mic") asked for a single visible mic — the provider
+            swap is now done automatically on terminal failure (see the
+            auto-fallback effect where `liveProvider` is declared) and
+            persisted in localStorage so the next session starts on the
+            provider that last worked. Keyboard-quiet. */}
         {/* Credits pill — hidden for admins (they have unlimited access and
             no billing; showing "0 min" confused Adrian in testing). For
             regular signed-in users we still show balance + open the Stripe
