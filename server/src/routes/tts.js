@@ -256,16 +256,17 @@ async function synthesizeGemini(text, lang) {
 }
 
 // OpenAI TTS — used to unify the text-chat voice with the voice transport.
-// When the user talks to Kelion via the OpenAI Realtime API (cedar, a deep
-// masculine voice), text-chat TTS via Gemini Charon / ElevenLabs sounds like
-// a *different person*. Adrian reported this directly: "cind sunt in chat e
-// o voce cu un timbru, cind ii cer o harta apare o alta voce". OpenAI TTS
-// doesn't expose the Realtime `cedar` voice, but `onyx` is the deep masculine
-// standalone voice — it's the closest timbre match. Operator can override
-// via OPENAI_TTS_VOICE / OPENAI_TTS_MODEL.
+// When the user talks to Kelion via the OpenAI Realtime API and text chat
+// via TTS, the two must sound like the same person. `ash` is the one voice
+// available in BOTH the GA Realtime API and the standalone TTS endpoint
+// (`gpt-4o-mini-tts`), so we default to it on both sides (see also
+// server/src/routes/realtime.js `OPENAI_REALTIME_LIVE_VOICE`). The previous
+// default `onyx` exists only in TTS, not in Realtime — picking it there
+// gave Adrian two audibly different people across transports. Operator
+// can override via OPENAI_TTS_VOICE / OPENAI_TTS_MODEL.
 async function synthesizeOpenAI(text, _lang) {
   const apiKey = process.env.OPENAI_API_KEY;
-  const voice  = process.env.OPENAI_TTS_VOICE || 'onyx';
+  const voice  = process.env.OPENAI_TTS_VOICE || 'ash';
   const model  = process.env.OPENAI_TTS_MODEL || 'gpt-4o-mini-tts';
   const r = await fetch('https://api.openai.com/v1/audio/speech', {
     method: 'POST',

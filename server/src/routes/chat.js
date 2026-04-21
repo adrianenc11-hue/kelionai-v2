@@ -2,7 +2,7 @@
 
 const { Router } = require('express');
 const { getAI, getDefaultChatModel } = require('../utils/openai');
-const { getCreditsBalance, findById } = require('../db');
+const { getCreditsBalance, findById, listMemoryItems } = require('../db');
 const { isAdminEmail } = require('../middleware/subscription');
 const ipGeo = require('../services/ipGeo');
 const { trialStatus, stampTrialIfFresh } = require('../services/trialQuota');
@@ -184,7 +184,27 @@ router.post('/', async (req, res) => {
     }
   }
 
-  const systemPrompt = BASE_PROMPT + realtimeContext;
+  // Long-term memory injection — mirrors the realtime (voice) path at
+  // server/src/routes/realtime.js so text chat and voice chat share the
+  // same durable facts about the signed-in user. Without this, Kelion
+  // would forget the user's name, preferences, and ongoing projects the
+  // instant they switched from voice to typing. Guests have no memory
+  // row; we silently skip the lookup.
+  let memorySection = '';
+  if (req.user && (Number.isFinite(req.user.id) || typeof req.user.id === 'string')) {
+    try {
+      const memoryItems = await listMemoryItems(req.user.id, 60);
+      if (Array.isArray(memoryItems) && memoryItems.length) {
+        memorySection =
+          '\n\nKnown facts about the user (most recent first):\n' +
+          memoryItems.map((m) => `- [${m.kind}] ${m.fact}`).join('\n');
+      }
+    } catch (err) {
+      console.warn('[chat] memory load failed', err && err.message);
+    }
+  }
+
+  const systemPrompt = BASE_PROMPT + realtimeContext + memorySection;
   const model = getDefaultChatModel();
 
   // Sanitize message history
