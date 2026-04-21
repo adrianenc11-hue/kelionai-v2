@@ -119,9 +119,9 @@ describe('/api/realtime/openai-live-token', () => {
     expect(audio.input.turn_detection.interrupt_response).toBe(true);
     expect(audio.input.transcription).toBeDefined();
     expect(typeof audio.input.transcription.model).toBe('string');
-    // Output: 24 kHz PCM again; voice falls back to `marin` (GA-
-    // recommended neutral voice) when OPENAI_REALTIME_LIVE_VOICE is
-    // unset.
+    // Output: 24 kHz PCM again; voice falls back to `cedar` (deep
+    // masculine GA voice, closest match to Gemini Live `Charon`) when
+    // OPENAI_REALTIME_LIVE_VOICE is unset.
     expect(audio.output.format.type).toBe('audio/pcm');
     expect(audio.output.format.rate).toBe(24000);
     expect(typeof audio.output.voice).toBe('string');

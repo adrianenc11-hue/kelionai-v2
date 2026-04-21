@@ -656,11 +656,14 @@ router.get('/openai-live-token', async (req, res) => {
 
   try {
     // Voice: OpenAI GA Realtime voices include `marin`, `cedar`, `alloy`,
-    // `ash`, `ballad`, `coral`, `echo`, `sage`, `shimmer`, `verse`. `marin`
-    // is the new GA-recommended neutral voice; operators can override via
+    // `ash`, `ballad`, `coral`, `echo`, `sage`, `shimmer`, `verse`. `cedar`
+    // is the GA-recommended deep masculine voice on `gpt-realtime` — the
+    // closest match to Gemini Live's `Charon` (which is Kelion's default
+    // on the Gemini path), so the user-facing voice stays recognisably
+    // masculine across both transports. Operators can override via
     // OPENAI_REALTIME_LIVE_VOICE. The old beta `ash` used by /token is
     // kept for legacy.
-    const voice = process.env.OPENAI_REALTIME_LIVE_VOICE || 'marin';
+    const voice = process.env.OPENAI_REALTIME_LIVE_VOICE || 'cedar';
     // Model: `gpt-realtime` is the GA speech-to-speech model (August 2025
     // release). The previous `gpt-4o-realtime-preview` is kept only for
     // the legacy /token endpoint. Override via OPENAI_REALTIME_LIVE_MODEL.
