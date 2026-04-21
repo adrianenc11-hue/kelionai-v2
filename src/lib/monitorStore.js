@@ -18,9 +18,37 @@ const state = {
   kind: null,        // 'map' | 'weather' | 'video' | 'image' | 'wiki' | 'web' | null
   src: null,         // string — final URL (iframe) or image URL
   title: null,       // short label shown above the frame
-  embedType: 'iframe', // 'iframe' | 'image'
+  embedType: 'iframe', // 'iframe' | 'image' | 'external'
   updatedAt: 0,
 };
+
+// Some providers (WebVM/CheerpX, JSLinux, v86) require a
+// cross-origin-isolated document (COOP: same-origin + COEP: require-corp).
+// kelionai.app is NOT isolated — adding the headers would break Google
+// Maps/Wikipedia/LoremFlickr embeds which don't serve CORP. So we render
+// these hosts as an external "Open in new tab" card instead of a broken
+// iframe. The host list is a small allowlist updated as we learn.
+const EXTERNAL_ONLY_HOSTS = new Set([
+  'webvm.io',
+  'www.webvm.io',
+  'copy.sh',
+  'www.copy.sh',
+  'bellard.org',
+  'www.bellard.org',
+]);
+function requiresExternalTab(url) {
+  try { return EXTERNAL_ONLY_HOSTS.has(new URL(url).hostname.toLowerCase()); }
+  catch { return false; }
+}
+
+// Fallback geolocation provider — lets the React tree register the
+// current clientGeo so a voice command like "show me a map" without a
+// place name can still render a useful map centered on the user. Set by
+// KelionStage.jsx, read by resolveMonitor when kind='map' + empty query.
+let geoProvider = null;
+export function setMonitorGeoProvider(fn) {
+  geoProvider = typeof fn === 'function' ? fn : null;
+}
 
 function loadPersisted() {
   if (typeof window === 'undefined' || !window.localStorage) return;
@@ -115,11 +143,27 @@ function resolveMonitor(kind, query) {
       return { kind: null, src: null, title: null, embedType: 'iframe' };
 
     case 'map': {
-      if (!q) return null;
+      let label = q;
+      let mapQ = q;
+      // Empty query → center on the user's current coordinates if the
+      // React tree registered a geo provider. Lets voice commands like
+      // "arată-mi harta" (no place mentioned) resolve to the user's own
+      // location instead of a blank card. IP-geo coarse coords are a fine
+      // last resort since Google Maps still renders a usable city view.
+      if (!mapQ && geoProvider) {
+        try {
+          const g = geoProvider();
+          if (g && Number.isFinite(g.latitude) && Number.isFinite(g.longitude)) {
+            mapQ = `${g.latitude},${g.longitude}`;
+            label = 'current location';
+          }
+        } catch { /* ignore */ }
+      }
+      if (!mapQ) return null;
       // Google Maps embed without an API key — `?output=embed` works for
       // arbitrary queries, handles places, addresses, coords.
-      const src = `https://www.google.com/maps?q=${encodeURIComponent(q)}&output=embed`;
-      return { kind: 'map', src, title: `Map — ${q}`, embedType: 'iframe' };
+      const src = `https://www.google.com/maps?q=${encodeURIComponent(mapQ)}&output=embed`;
+      return { kind: 'map', src, title: `Map — ${label}`, embedType: 'iframe' };
     }
 
     case 'weather': {
@@ -174,6 +218,14 @@ function resolveMonitor(kind, query) {
       if (!src) return null;
       let label = src;
       try { label = new URL(src).hostname.replace(/^www\./, ''); } catch { /* ignore */ }
+      // Hosts that need cross-origin isolation (WebVM/CheerpX, JSLinux,
+      // v86) cannot render inside our iframe — the browser blocks
+      // SharedArrayBuffer without COOP+COEP and the page shows a broken
+      // file icon. Serve a friendly launcher card the user can click to
+      // open in a dedicated tab.
+      if (requiresExternalTab(src)) {
+        return { kind: 'web', src, title: label, embedType: 'external' };
+      }
       return { kind: 'web', src, title: label, embedType: 'iframe' };
     }
 

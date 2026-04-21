@@ -4,7 +4,7 @@ import { Suspense, useState, useRef, useEffect, useLayoutEffect, useMemo, useCal
 import { useNavigate } from 'react-router-dom'
 import * as THREE from 'three'
 import { useLipSync } from '../lib/lipSync'
-import { subscribeMonitor, handleShowOnMonitor } from '../lib/monitorStore'
+import { subscribeMonitor, handleShowOnMonitor, setMonitorGeoProvider } from '../lib/monitorStore'
 import { STATUS_COLORS, STATUS_PULSE_HZ } from '../lib/kelionStatus'
 import { useGeminiLive } from '../lib/geminiLive'
 import { useOpenAIRealtime } from '../lib/openaiRealtime'
@@ -494,6 +494,7 @@ function MonitorOverlay() {
   if (!m.src) return null
 
   const isImage = m.embedType === 'image'
+  const isExternal = m.embedType === 'external'
   const onClose = (e) => {
     e.stopPropagation()
     handleShowOnMonitor({ kind: 'clear' })
@@ -585,6 +586,51 @@ function MonitorOverlay() {
             referrerPolicy="no-referrer"
             style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', background: '#0d0b1d' }}
           />
+        ) : isExternal ? (
+          <div
+            style={{
+              width: '100%',
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 18,
+              padding: 24,
+              textAlign: 'center',
+              color: '#ede9fe',
+              background: 'radial-gradient(ellipse at center, #1a1230 0%, #0d0b1d 70%)',
+            }}
+          >
+            <div style={{ fontSize: 40, lineHeight: 1 }}>🖥️</div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: '#c4b5fd', maxWidth: 360 }}>
+              {m.title || 'External app'} needs its own tab
+            </div>
+            <div style={{ fontSize: 13, opacity: 0.75, maxWidth: 360, lineHeight: 1.5 }}>
+              This Linux-in-the-browser requires cross-origin isolation that the embedded
+              frame cannot provide. Open it in a new tab — files persist in your browser.
+            </div>
+            <a
+              href={m.src}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                appearance: 'none',
+                textDecoration: 'none',
+                border: '1px solid rgba(167, 139, 250, 0.55)',
+                background: 'rgba(124, 58, 237, 0.28)',
+                color: '#ede9fe',
+                padding: '10px 20px',
+                borderRadius: 8,
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: 'pointer',
+                letterSpacing: 0.2,
+              }}
+            >
+              Open {m.title || 'app'} in new tab ↗
+            </a>
+          </div>
         ) : (
           <iframe
             src={m.src}
@@ -792,6 +838,15 @@ export default function KelionStage() {
   // Alias to the names already used elsewhere in this file (clientGeo /
   // geoPermission / requestGeo).
   const { coords: clientGeo, permission: geoPermission, requestNow: requestGeo } = useClientGeo()
+  // Register a geo provider so monitorStore can fall back to the user's
+  // current coords when the model calls show_on_monitor({kind:'map'}) without
+  // a query (e.g. "arată-mi harta" / "show me a map" without a place name).
+  const clientGeoRef = useRef(null)
+  useEffect(() => { clientGeoRef.current = clientGeo }, [clientGeo])
+  useEffect(() => {
+    setMonitorGeoProvider(() => clientGeoRef.current)
+    return () => setMonitorGeoProvider(null)
+  }, [])
   const [voiceLevel, setVoiceLevel] = useState(0)
   const [transcriptOpen, setTranscriptOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
