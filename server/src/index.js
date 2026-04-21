@@ -22,6 +22,7 @@ const ttsRouter        = require('./routes/tts');
 const realtimeRouter   = require('./routes/realtime');
 const passkeyRouter    = require('./routes/passkey');
 const memoryRouter     = require('./routes/memory');
+const conversationsRouter = require('./routes/conversations');
 const toolsRouter      = require('./routes/tools');
 const pushRouter       = require('./routes/push');
 const creditsRouter    = require('./routes/credits');
@@ -292,6 +293,7 @@ app.use('/api/diag', diagRouter);
 // users table with orphan rows (Devin Review BUG pr-review-182448fc_0001).
 app.use('/api/auth/passkey', chatLimiter, passkeyRouter);
 app.use('/api/memory', requireAuth, memoryRouter);
+app.use('/api/conversations', requireAuth, conversationsRouter);
 
 // Stage 4 — M19 (browser use) + M20 (web search status) + M21 (MCP stubs).
 // Router is PUBLIC by design: Gemini Live tool-call flow has no login gate,
