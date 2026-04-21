@@ -21,15 +21,18 @@ process.env.GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'test-gemini';
 
 const express = require('express');
 const cookieParser = require('cookie-parser');
+const jwt = require('jsonwebtoken');
+const config = require('../src/config');
 
 // A tiny JSON-only test client — avoids pulling in supertest just for
 // three assertions.
-async function getJSON(app, path) {
+async function getJSON(app, path, { cookie } = {}) {
   return await new Promise((resolve, reject) => {
     const server = app.listen(0, () => {
       const port = server.address().port;
       const http = require('http');
-      http.get({ host: '127.0.0.1', port, path }, (res) => {
+      const headers = cookie ? { Cookie: cookie } : {};
+      http.get({ host: '127.0.0.1', port, path, headers }, (res) => {
         let buf = '';
         res.on('data', (c) => { buf += c; });
         res.on('end', () => {
@@ -148,5 +151,42 @@ describe('/api/realtime/openai-live-token', () => {
     expect(names).toContain('observe_user_emotion');
     expect(names).toContain('show_on_monitor');
     expect(body.setup.session.tool_choice).toBe('auto');
+  });
+
+  // Regression guard for the Devin-Review finding on PR #115:
+  // peekSignedInUser now returns `{ id: null, email, role }` for a JWT
+  // whose `sub` is not a numeric row id (stale pre-Postgres UUID cookie).
+  // Before the fix, the non-admin branch in /openai-live-token and
+  // /gemini-token silently skipped the credits check when `id` was null,
+  // so these users got unlimited free voice sessions. The route must now
+  // clear the cookie and return 401 to force a re-auth.
+  test('stale JWT (non-numeric sub in Postgres mode) → 401 reauth, not free session', async () => {
+    const prevDb = process.env.DATABASE_URL;
+    process.env.DATABASE_URL = process.env.DATABASE_URL || 'postgres://fake';
+    try {
+      const token = jwt.sign(
+        {
+          // UUID sub — simulates a cookie minted before the Postgres
+          // migration. `Number.parseInt(sub, 10)` yields NaN so
+          // peekSignedInUser returns `{ id: null, ... }`.
+          sub:   'c1b8a5e2-1234-4321-9876-abcdefabcdef',
+          email: 'not-an-admin@example.com',
+          name:  'Stale User',
+        },
+        config.jwt.secret,
+        { expiresIn: '1h' }
+      );
+      const { status, body } = await getJSON(
+        app,
+        '/api/realtime/openai-live-token?lang=en-US',
+        { cookie: `kelion.token=${token}` }
+      );
+      expect(status).toBe(401);
+      expect(body.action).toBe('reauth');
+      expect(body.error).toMatch(/sign in again|Session expired/i);
+    } finally {
+      if (prevDb === undefined) delete process.env.DATABASE_URL;
+      else process.env.DATABASE_URL = prevDb;
+    }
   });
 });
