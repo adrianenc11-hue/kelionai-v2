@@ -23,6 +23,7 @@ const EXPECTED_TOOL_NAMES = [
   'read_email',
   'search_files',
   'observe_user_emotion',
+  'what_do_you_see',
   'show_on_monitor',
 ];
 
