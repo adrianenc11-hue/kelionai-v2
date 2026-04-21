@@ -85,8 +85,8 @@ Language (strict — English is the default):
 5. Never mix two languages in a single utterance.
 
 Tools you can use (Stage 4):
-- deep_think(question, context?) — YOUR REASONING ENGINE. You are a fast conversational model; you are NOT optimized for heavy reasoning. Whenever the user asks something that needs real thinking, you MUST call deep_think and speak its answer. That includes: analysis, planning, multi-step explanations, structured comparisons, cause-and-effect, advice on non-trivial decisions, "how does X work" at more than a surface level, research questions, technical/legal/medical/financial depth, math that is not trivial, anything where a wrong answer would mislead the user. Do NOT answer these from your own head. For tiny talk, greetings, confirmations, time-of-day, or questions about the user that you already know from memory, do NOT call deep_think — answer directly. Pass the user's question in your own words as the question argument; optionally pass a short context string (1-3 sentences of recent dialogue) when useful. Narrate one short sentence before the call — natural, like a person thinking out loud ("let me think about that for a moment", or the equivalent in the user's current language) — then make the call. When the result arrives, speak it as your own answer in your own voice; do not say "the thinking engine said".
-- browse_web(task) — send an autonomous web agent to perform a task in a real browser (open a page, fill a form, extract info). Use it when you need to actually navigate / click / submit, not just reason about facts.
+- google_search — live web search grounded in Google results. Call this the moment you need anything time-sensitive (news, prices, weather, schedules, recent events, facts that change). Cite the source naturally in speech ("according to the BBC…") when it helps trust.
+- browse_web(task) — send an autonomous web agent to perform a task in a real browser (open a page, fill a form, extract info). Use it when search alone is not enough.
 - read_calendar(range), read_email(query), search_files(query) — look into the user's connected accounts when they ask about their own stuff.
 - observe_user_emotion(state, intensity, cue) — SILENT tool. Call it whenever you read a clear emotional shift on the user's face (when the camera is on) or in their voice. Never narrate this call, never tell the user you are doing it. The client uses it to subtly adapt the avatar's expression and the halo color. Fire it at most once every 4-5 seconds and only when you are genuinely confident.
 - show_on_monitor(kind, query) — display something on the presentation monitor behind you in the scene. Use whenever the user asks to "show me", "open", or "display" a map, weather, a page, or a concept (in any language). Pick the right kind: "map" for geographic locations, "weather" for forecasts, "video" for YouTube clips, "image" for photos, "wiki" for Wikipedia, "web" for arbitrary HTTPS URLs, or "clear" to blank the monitor. query is the search term (e.g. "Cluj-Napoca", "New York weather", "https://en.wikipedia.org/wiki/Paris"). Narrate briefly while the monitor loads ("let me put that up"). Call it again with a new query to swap the content.
@@ -369,32 +369,6 @@ router.get('/gemini-token', async (req, res) => {
       tools: [
         {
           functionDeclarations: [
-                  // Stage 7 — M29: deep-think router. Flash Live is a
-                  // voice-optimized conversational model, not a reasoning
-                  // engine. This tool hands off complex questions to
-                  // Gemini 3.1 Pro + Google Search grounding on a
-                  // SEPARATE generateContent call (see routes/tools.js
-                  // /deep-think). The Live session WebSocket is never
-                  // touched — Flash just narrates Pro's answer back to
-                  // the user in his own voice. No overlap, no streaming.
-                  {
-                    name: 'deep_think',
-                    description: "Your reasoning engine. Call this whenever the user asks anything that needs real thinking: analysis, planning, multi-step explanation, structured comparison, cause-and-effect, advice on non-trivial decisions, technical/legal/medical/financial depth, non-trivial math, research questions, anything fact-heavy or where a wrong answer would mislead. Do NOT call for greetings, small talk, time-of-day, or things you already know about the user from memory. Narrate a short 'let me think' sentence (in the user's current language) before calling.",
-                    parameters: {
-                      type: 'OBJECT',
-                      properties: {
-                        question: {
-                          type: 'STRING',
-                          description: "The user's question, rephrased in your own words if helpful. Self-contained — include everything the reasoning engine needs to answer.",
-                        },
-                        context: {
-                          type: 'STRING',
-                          description: 'Optional: 1-3 sentences of recent conversation context that would help the reasoning engine understand the question. Omit if not useful.',
-                        },
-                      },
-                      required: ['question'],
-                    },
-                  },
                   {
                     name: 'browse_web',
                     description: 'Run an autonomous web-browsing agent in a real browser. Use when the user asks Kelion to open a site, fill a form, extract info from a page behind JS, compare products, book/reserve, etc. Returns a short summary + optional URL.',

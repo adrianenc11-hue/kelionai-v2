@@ -31,19 +31,6 @@ function summarize(j, successKey = 'result') {
 
 export async function runTool(name, args) {
   switch (name) {
-    case 'deep_think': {
-      // Router: Flash Live hands heavy reasoning to Gemini 3.1 Pro via
-      // our /api/tools/deep-think endpoint (separate generateContent
-      // call, never touches the Live WebSocket). We return Pro's text
-      // answer and Flash narrates it. On failure we still return a
-      // plain-English string so Flash can explain it to the user
-      // instead of stalling the session.
-      const j = await postJSON('/api/tools/deep-think', {
-        question: args?.question,
-        context:  args?.context || '',
-      })
-      return summarize(j)
-    }
     case 'browse_web': {
       const j = await postJSON('/api/tools/browser/browse', {
         task: args?.task,
