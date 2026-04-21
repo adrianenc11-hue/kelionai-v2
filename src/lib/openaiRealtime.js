@@ -27,7 +27,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { runTool } from './kelionTools'
-import { setLatestCameraFrame, clearLatestCameraFrame } from './cameraFrameBuffer'
+import { setLatestCameraFrame, clearLatestCameraFrame, getLatestCameraFrame } from './cameraFrameBuffer'
+import { subscribeNarrationMode, getNarrationMode, setNarrationMode } from './narrationMode'
 
 // Public signature matches useGeminiLive exactly so swapping is a
 // one-line change in KelionStage.
@@ -80,6 +81,16 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
   const cameraVideoRef      = useRef(null)
   const cameraCanvasRef     = useRef(null)
   const cameraGrabTimerRef  = useRef(null)
+  // Narration-mode orchestration. Flags so the periodic tick knows
+  // when it's safe to speak (don't interrupt user, don't stack on top
+  // of an in-flight response). `lastNarrationHashRef` dedupes identical
+  // descriptions so Kelion doesn't repeat "a laptop on the desk" every
+  // 8 seconds when nothing's changed.
+  const narrationTimerRef   = useRef(null)
+  const narrationInflightRef = useRef(false)
+  const assistantSpeakingRef = useRef(false)
+  const userSpeakingRef      = useRef(false)
+  const lastNarrationTextRef = useRef('')
   const creditsIntervalRef = useRef(null)
   const creditsStartedRef  = useRef(false)
   const creditsStartFnRef  = useRef(null)
@@ -202,10 +213,12 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
         // OpenAI's server handles interrupt_response automatically when
         // we enable it in session.update; the remote track goes silent
         // on its own. We just reflect state so the HUD shows the mic.
+        userSpeakingRef.current = true
         setStatus('listening')
         return
       case 'input_audio_buffer.speech_stopped':
       case 'input_audio_buffer.committed':
+        userSpeakingRef.current = false
         return
 
       // User transcript (from whisper, async/approximate per OpenAI docs).
@@ -218,9 +231,13 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
         return
 
       // Assistant transcript of its own speech output.
+      case 'response.created':
+        assistantSpeakingRef.current = true
+        return
       case 'response.output_audio_transcript.delta':
       case 'response.audio_transcript.delta': // pre-GA alias, still seen in the wild
         if (event.delta) appendTurn('assistant', event.delta, false)
+        assistantSpeakingRef.current = true
         setStatus('speaking')
         return
       case 'response.output_audio_transcript.done':
@@ -273,7 +290,11 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
       }
 
       case 'response.done':
+        assistantSpeakingRef.current = false
         if (status !== 'error') setStatus('listening')
+        return
+      case 'response.cancelled':
+        assistantSpeakingRef.current = false
         return
 
       case 'error': {
@@ -556,6 +577,17 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
     }
     creditsStartedRef.current = false
     creditsStartFnRef.current = null
+    // Stopping the voice session also stops continuous narration — a
+    // narration tick only makes sense while the data channel is live.
+    try { setNarrationMode({ enabled: false }) } catch (_) { /* ignore */ }
+    if (narrationTimerRef.current) {
+      clearInterval(narrationTimerRef.current)
+      narrationTimerRef.current = null
+    }
+    narrationInflightRef.current = false
+    lastNarrationTextRef.current = ''
+    assistantSpeakingRef.current = false
+    userSpeakingRef.current = false
     pendingToolArgsRef.current.clear()
     pendingToolNameRef.current.clear()
     remoteStreamRef.current = null
@@ -581,6 +613,134 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
       try { cameraVideoRef.current.srcObject = null } catch (_) { /* ignore */ }
     }
     clearLatestCameraFrame()
+  }, [])
+
+  // Continuous narration mode — accessibility for users who can't see the
+  // screen. When enabled (voice-command-driven via `set_narration_mode`
+  // tool), the hook ticks every N seconds, pulls the latest frame from
+  // cameraFrameBuffer, asks Gemini Vision for a short description, and
+  // injects that description into the OpenAI session as a user-turn
+  // input_text followed by a response.create. The model then speaks the
+  // narration in natural language in the user's language. We skip ticks
+  // when:
+  //   - the data channel is not open (no session);
+  //   - the user is currently speaking (server VAD said so);
+  //   - a response is already in flight (assistant is speaking);
+  //   - no camera frame is available (camera off);
+  //   - the latest frame is the same as the one we already narrated
+  //     (dedup via vision description text).
+  // Narration state lives in src/lib/narrationMode.js so the
+  // `set_narration_mode` tool handler in src/lib/kelionTools.js can flip
+  // it without re-entering React state.
+  useEffect(() => {
+    let cancelled = false
+
+    const runTick = async () => {
+      const mode = getNarrationMode()
+      if (!mode.enabled) return
+      const dc = dcRef.current
+      if (!dc || dc.readyState !== 'open') return
+      if (userSpeakingRef.current || assistantSpeakingRef.current) return
+      if (narrationInflightRef.current) return
+
+      const frame = getLatestCameraFrame()
+      if (!frame?.dataUrl) return
+      // Stale-frame guard mirrors the one-shot tool handler. If the
+      // camera has been off for > 30s, don't speak a phantom scene.
+      if (Date.now() - (frame.capturedAt || 0) > 30_000) return
+
+      narrationInflightRef.current = true
+      try {
+        const r = await fetch('/api/realtime/vision', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            frame: frame.dataUrl,
+            focus: mode.focus || '',
+            mode: 'narration',
+          }),
+        })
+        if (cancelled) return
+        if (!r.ok) {
+          // Swallow transient errors silently — narration is a running
+          // background service, not a foreground request. Voice stays fine.
+          return
+        }
+        const body = await r.json().catch(() => null)
+        const description = (body?.description || '').trim()
+        if (!description) return
+        // Dedup: if the description is (roughly) what we just spoke,
+        // don't speak it again. Exact-match is plenty; the vision model
+        // almost always phrases a changed scene differently.
+        if (description === lastNarrationTextRef.current) return
+        lastNarrationTextRef.current = description
+
+        // One last race check before we send — speech states may have
+        // flipped while we were waiting on the vision API.
+        if (userSpeakingRef.current || assistantSpeakingRef.current) return
+        if (dc.readyState !== 'open') return
+
+        const prompt = mode.focus
+          ? `[Scene update, focus: ${mode.focus}] ${description}`
+          : `[Scene update] ${description}`
+
+        sendEvent(dc, {
+          type: 'conversation.item.create',
+          item: {
+            type: 'message',
+            role: 'user',
+            content: [{ type: 'input_text', text: prompt }],
+          },
+        })
+        sendEvent(dc, {
+          type: 'response.create',
+          response: {
+            instructions: "The user has continuous narration turned on for accessibility. Speak the scene update above as ONE short natural sentence in the user's language. Do not greet, do not preface, do not read brackets. If the scene has not meaningfully changed since the last narration, it is fine to stay silent (respond with an empty message) — do not repeat yourself.",
+          },
+        })
+      } catch (_) {
+        // Network blip, CORS flake, whatever — narration is best-effort.
+      } finally {
+        narrationInflightRef.current = false
+      }
+    }
+
+    const arm = () => {
+      if (narrationTimerRef.current) {
+        clearInterval(narrationTimerRef.current)
+        narrationTimerRef.current = null
+      }
+      const mode = getNarrationMode()
+      if (!mode.enabled) return
+      // Fire one shortly after enable so the first narration is prompt,
+      // then tick on the configured cadence.
+      setTimeout(runTick, 600)
+      narrationTimerRef.current = setInterval(runTick, Math.max(4000, mode.intervalMs))
+    }
+
+    arm()
+    const unsub = subscribeNarrationMode(() => {
+      if (cancelled) return
+      // Reset dedup so the first tick after re-enable always narrates.
+      lastNarrationTextRef.current = ''
+      arm()
+    })
+
+    return () => {
+      cancelled = true
+      if (narrationTimerRef.current) {
+        clearInterval(narrationTimerRef.current)
+        narrationTimerRef.current = null
+      }
+      unsub()
+    }
+  }, [sendEvent])
+
+  // Force-disable narration on unmount so a stale flag doesn't survive
+  // into the next mount of KelionStage.
+  useEffect(() => () => {
+    try { setNarrationMode({ enabled: false }) } catch (_) { /* ignore */ }
   }, [])
 
   // Passive camera grabber.

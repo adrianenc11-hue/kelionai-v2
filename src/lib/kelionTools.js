@@ -9,6 +9,7 @@
 import { setEmotion } from './emotionStore'
 import { handleShowOnMonitor } from './monitorStore'
 import { getLatestCameraFrame } from './cameraFrameBuffer'
+import { setNarrationMode } from './narrationMode'
 
 async function postJSON(url, body) {
   const r = await fetch(url, {
@@ -66,6 +67,29 @@ export async function runTool(name, args) {
       // monitorStore resolves (kind, query) → iframe/image URL and notifies
       // the React tree via subscribeMonitor. No backend round-trip needed.
       return handleShowOnMonitor({ kind: args?.kind, query: args?.query })
+    }
+    case 'set_narration_mode': {
+      // Accessibility mode. Flips a module-level flag that
+      // src/lib/openaiRealtime.js watches — when true it runs a periodic
+      // vision call and injects the description into the OpenAI session
+      // so Kelion speaks a short natural narration. Does NOT itself
+      // fetch the first frame; the transport's narration loop handles
+      // the cadence. We just confirm the transition back to the model
+      // so it can say something like "OK, I'll keep describing what
+      // I see" before the first tick fires.
+      const enabled = !!args?.enabled
+      const interval = Number(args?.interval_s)
+      const focus = typeof args?.focus === 'string' ? args.focus : ''
+      const next = setNarrationMode({
+        enabled,
+        interval_s: Number.isFinite(interval) ? interval : undefined,
+        focus: enabled ? focus : '',
+      })
+      if (next.enabled) {
+        const every = Math.round(next.intervalMs / 1000)
+        return `narration_on:${every}s${next.focus ? `:focus=${next.focus.slice(0, 80)}` : ''}`
+      }
+      return 'narration_off'
     }
     case 'what_do_you_see': {
       // Hybrid voice+vision: OpenAI handles speech, Gemini Vision handles

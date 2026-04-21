@@ -184,6 +184,16 @@ const KELION_TOOLS = [
     required: ['state', 'intensity'],
   },
   {
+    name: 'set_narration_mode',
+    description: "Turn continuous scene narration ON or OFF for the user. Call this IMMEDIATELY when the user says anything that indicates they want you to describe what you see without being asked each time — accessibility request (e.g. 'I'm blind', 'I can't see well', 'sunt nevazator', 'nu vad'), explicit narration request (e.g. 'narrate', 'narează', 'describe continuously', 'descrie tot ce vezi', 'keep telling me what you see', 'povesteste-mi', 'spune-mi ce vezi', 'tell me what's around me'), or a stop request (e.g. 'stop narrating', 'basta cu descrierile', 'taci din cameră', 'opreste narea'). When enabled=true, the app will periodically feed you short descriptions of the camera frame so you can speak them naturally to the user; when enabled=false, the app returns to ask-only vision. Announce the change briefly ('I'll keep describing what I see' / 'I'll stop narrating') and then say the FIRST description right away after enabling.",
+    properties: {
+      enabled:    { type: 'boolean', description: 'true = turn narration ON, false = turn narration OFF.' },
+      interval_s: { type: 'number',  description: 'Optional: how often to narrate, in seconds. Must be between 4 and 30 (default 8). Lower = more updates, higher = quieter.' },
+      focus:      { type: 'string',  description: "Optional: an anchor phrase from the user for the vision model to prioritise (e.g. 'watch the stove', 'tell me if the dog moves', 'read the text on the screen'). Leave blank for a general description." },
+    },
+    required: ['enabled'],
+  },
+  {
     name: 'what_do_you_see',
     description: "Describe what is currently visible in the user's camera. Call this ONLY when the user explicitly asks you to look (e.g. 'what do you see?', 'ce vezi?', 'can you see me?', 'describe what's in front of you', 'look at this'). The camera is kept silently on for this purpose — do NOT announce it, do NOT describe the camera unsolicited. When this tool is called the backend analyzes the current frame with Gemini Vision and returns a short description; integrate that description naturally into your spoken reply, do not read it verbatim.",
     properties: {
