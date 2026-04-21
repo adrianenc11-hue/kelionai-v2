@@ -7,6 +7,7 @@ import { useLipSync } from '../lib/lipSync'
 import { subscribeMonitor } from '../lib/monitorStore'
 import { STATUS_COLORS, STATUS_PULSE_HZ } from '../lib/kelionStatus'
 import { useGeminiLive } from '../lib/geminiLive'
+import { useOpenAIRealtime } from '../lib/openaiRealtime'
 import { useWakeWord } from '../lib/useWakeWord'
 import { useTrial } from '../lib/useTrial'
 import { useClientGeo } from '../lib/useClientGeo'
@@ -1384,6 +1385,50 @@ export default function KelionStage() {
     return () => { if (bubbleHideTimerRef.current) clearTimeout(bubbleHideTimerRef.current) }
   }, [chatMessages, chatBusy])
 
+  // Plan C — provider switch. Two stable transports are mounted in
+  // parallel (both hooks allocate refs/state only; neither opens a
+  // network connection until the user taps mic), and the HUD routes
+  // start/stop to whichever is currently selected. Default is the
+  // OpenAI Realtime GA transport — it does not depend on the Gemini
+  // Live preview keep-alive that Google closes at ~2 min on our key.
+  //
+  // Selection precedence (highest wins):
+  //   1. ?provider=openai | gemini query param (useful for A/B testing)
+  //   2. localStorage.kelion_live_provider (persisted user choice)
+  //   3. 'openai'                           (Plan C default)
+  const [liveProvider, setLiveProvider] = useState(() => {
+    try {
+      const q = new URL(window.location.href).searchParams.get('provider')
+      if (q === 'openai' || q === 'gemini') return q
+      const saved = window.localStorage.getItem('kelion_live_provider')
+      if (saved === 'openai' || saved === 'gemini') return saved
+    } catch (_) { /* no window in SSR / sandboxed iframes — fall through */ }
+    return 'openai'
+  })
+  useEffect(() => {
+    try { window.localStorage.setItem('kelion_live_provider', liveProvider) }
+    catch (_) { /* storage disabled — best-effort */ }
+  }, [liveProvider])
+
+  const geminiHook = useGeminiLive({
+    audioRef,
+    coords: clientGeo,
+    // Live HUD: every successful consume response carries the
+    // post-deduction balance. Pipe it straight into the top-right
+    // "Credits · N" chip so users see the credit tick down per minute
+    // without a page refresh. Admins get `null` (exempt) and the
+    // hook skips the update — chip stays on whatever /balance loaded.
+    onBalanceUpdate: (minutes) => setBalance(minutes),
+  })
+  const openaiHook = useOpenAIRealtime({
+    audioRef,
+    coords: clientGeo,
+    onBalanceUpdate: (minutes) => setBalance(minutes),
+  })
+  // Active transport — rest of the component destructures from this.
+  // Both hooks return the same shape (see lib/openaiRealtime.js
+  // "Public signature matches useGeminiLive exactly").
+  const liveHook = liveProvider === 'openai' ? openaiHook : geminiHook
   const {
     status,
     error,
@@ -1399,21 +1444,22 @@ export default function KelionStage() {
     stopCamera,
     startScreen,
     stopScreen,
-    // Voice-chat trial countdown returned by the Gemini Live token mint.
-    // We no longer drive the HUD off this — the HUD pulls from the
-    // shared /api/trial/status endpoint so the timer also ticks for
-    // text-chat-only guests who never touch the mic.
+    // Voice-chat trial countdown returned by the active transport's
+    // token mint. We no longer drive the HUD off this — the HUD
+    // pulls from the shared /api/trial/status endpoint so the timer
+    // also ticks for text-chat-only guests who never touch the mic.
     trial: voiceTrial,
-  } = useGeminiLive({
-    audioRef,
-    coords: clientGeo,
-    // Live HUD: every successful consume response carries the
-    // post-deduction balance. Pipe it straight into the top-right
-    // "Credits · N" chip so users see the credit tick down per minute
-    // without a page refresh. Admins get `null` (exempt) and the
-    // hook skips the update — chip stays on whatever /balance loaded.
-    onBalanceUpdate: (minutes) => setBalance(minutes),
-  })
+  } = liveHook
+  // Flip providers cleanly: stop whatever's live on the old provider
+  // before the next tap spins up the new one. No-op when the switched-
+  // away provider is idle.
+  const prevProviderRef = useRef(liveProvider)
+  useEffect(() => {
+    if (prevProviderRef.current === liveProvider) return
+    const outgoing = prevProviderRef.current === 'openai' ? openaiHook : geminiHook
+    try { outgoing.stop() } catch (_) { /* hooks unmount-safe */ }
+    prevProviderRef.current = liveProvider
+  }, [liveProvider, openaiHook, geminiHook])
 
   // Unified trial HUD source of truth. Applies to both voice AND text
   // chat via the shared 15-min/day IP window on the server. Collapses
@@ -2218,6 +2264,34 @@ export default function KelionStage() {
           display: 'flex', alignItems: 'center', gap: 8,
         }}
       >
+        {/* Plan C — voice-transport pill. Click cycles OpenAI ↔ Gemini.
+            Kept next to the Credits pill so Adrian (or any user) can flip
+            providers without opening DevTools if the active one
+            misbehaves on prod. Label is short ("GPT"/"Gem") so it doesn't
+            crowd the HUD; full name + hint live in the tooltip. */}
+        <button
+          onClick={() => setLiveProvider((p) => (p === 'openai' ? 'gemini' : 'openai'))}
+          style={{
+            height: 36, padding: '0 10px', borderRadius: 999,
+            background: liveProvider === 'openai'
+              ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(59, 130, 246, 0.2))'
+              : 'linear-gradient(135deg, rgba(167, 139, 250, 0.2), rgba(236, 72, 153, 0.18))',
+            backdropFilter: 'blur(12px)',
+            border: liveProvider === 'openai'
+              ? '1px solid rgba(16, 185, 129, 0.45)'
+              : '1px solid rgba(167, 139, 250, 0.45)',
+            color: '#ede9fe', fontSize: 11, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', gap: 6,
+            fontWeight: 600, letterSpacing: '0.03em',
+          }}
+          title={liveProvider === 'openai'
+            ? 'Voice: OpenAI Realtime (GA, stable). Click to switch to Gemini Live.'
+            : 'Voice: Gemini Live (preview). Click to switch to OpenAI Realtime.'}
+          aria-label={`Voice transport: ${liveProvider === 'openai' ? 'OpenAI Realtime' : 'Gemini Live'}. Click to switch.`}
+        >
+          <span style={{ fontSize: 13 }}>🎙️</span>
+          <span>{liveProvider === 'openai' ? 'GPT' : 'Gem'}</span>
+        </button>
         {/* Credits pill — hidden for admins (they have unlimited access and
             no billing; showing "0 min" confused Adrian in testing). For
             regular signed-in users we still show balance + open the Stripe

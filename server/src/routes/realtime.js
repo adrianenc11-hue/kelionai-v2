@@ -119,6 +119,125 @@ On your very first turn, greet the user warmly and briefly IN ENGLISH, and invit
 }
 
 // ──────────────────────────────────────────────────────────────────
+// Kelion tool catalog (provider-agnostic source of truth).
+//
+// We historically declared tools in the Gemini Live `functionDeclarations`
+// shape inline inside the gemini-token endpoint (uppercase types OBJECT /
+// STRING / INTEGER / NUMBER, nested under `{ functionDeclarations: [...] }`).
+// Plan C (OpenAI Realtime) needs the same tools in OpenAI's GA Realtime
+// shape (lowercase JSON-Schema types, each tool wrapped as
+// `{ type: 'function', name, description, parameters }`). Instead of keeping
+// two copies of the catalog (which drift), we declare it once here in a
+// neutral shape and ship two tiny adapters.
+//
+// Both adapters are pure functions — safe to call from /gemini-token and
+// /openai-live-token. If you add a new tool, add it to KELION_TOOLS only;
+// the adapters pick it up automatically.
+const KELION_TOOLS = [
+  {
+    name: 'browse_web',
+    description: 'Run an autonomous web-browsing agent in a real browser. Use when the user asks Kelion to open a site, fill a form, extract info from a page behind JS, compare products, book/reserve, etc. Returns a short summary + optional URL.',
+    properties: {
+      task:      { type: 'string',  description: 'Natural-language instruction for the web agent, e.g. "Find the cheapest round-trip Bucharest-Rome flight next weekend on skyscanner.com and tell me the airline and price."' },
+      start_url: { type: 'string',  description: 'Optional URL to start on. Leave empty to let the agent pick.' },
+    },
+    required: ['task'],
+  },
+  {
+    name: 'read_calendar',
+    description: "Look into the signed-in user's calendar. Use when the user asks about their schedule, upcoming events, availability.",
+    properties: {
+      range: { type: 'string', description: 'Natural-language range, e.g. "today", "this week", "next Monday 9am-noon".' },
+    },
+    required: ['range'],
+  },
+  {
+    name: 'read_email',
+    description: "Search the signed-in user's email. Use when they ask about a specific message, sender, or thread.",
+    properties: {
+      query: { type: 'string',  description: 'Free-text search (sender, subject, keyword).' },
+      limit: { type: 'integer', description: 'Max results (default 5).' },
+    },
+    required: ['query'],
+  },
+  {
+    name: 'search_files',
+    description: "Search the signed-in user's connected file storage (Drive, Dropbox, etc).",
+    properties: {
+      query: { type: 'string',  description: 'Free-text search.' },
+      limit: { type: 'integer', description: 'Max results (default 5).' },
+    },
+    required: ['query'],
+  },
+  {
+    name: 'observe_user_emotion',
+    description: "Record your read of the user's current emotional state based on their face (camera) and voice. Call this silently whenever you notice a clear shift (they smile, frown, look tired, sound stressed, etc.) — do NOT announce it to the user. Keep calls rare (at most every 4-5 seconds) and only when you are genuinely confident.",
+    properties: {
+      state: {
+        type: 'string',
+        enum: ['neutral','happy','sad','surprised','angry','tired','focused','confused','anxious'],
+        description: "Your best single-word read of the user's current state.",
+      },
+      intensity: { type: 'number', description: 'How strong the signal is, 0.0 (faint) to 1.0 (unmistakable).' },
+      cue:       { type: 'string', description: 'Short phrase naming the cue ("slight smile", "voice trembling", "furrowed brow"). 1-6 words.' },
+    },
+    required: ['state', 'intensity'],
+  },
+  {
+    name: 'show_on_monitor',
+    description: "Display something on the big presentation monitor in the scene behind you. Use whenever the user asks (in any language) to see / open / show / display a map, the weather, a video, an image, a Wikipedia / reference page, or any web page. Pick the right `kind` — the client resolves it to the best embed URL. Call again with a new query to swap the content on screen.",
+    properties: {
+      kind: {
+        type: 'string',
+        enum: ['map', 'weather', 'video', 'image', 'wiki', 'web', 'clear'],
+        description: "Type of content: 'map' = Google Maps for a place; 'weather' = forecast for a city; 'video' = YouTube clip or search; 'image' = photo search; 'wiki' = Wikipedia article; 'web' = arbitrary URL (must start with https://); 'clear' = blank the monitor.",
+      },
+      query: { type: 'string', description: "Search term or URL. Examples: 'Cluj-Napoca', 'New York', 'sunset mountains', 'Paris', 'https://en.wikipedia.org/wiki/Artificial_intelligence'. Required unless kind='clear'." },
+    },
+    required: ['kind'],
+  },
+];
+
+// Gemini v1alpha BidiGenerateContent — JSON schema with UPPERCASE types and
+// declarations grouped under a single `functionDeclarations` array.
+function buildKelionToolsGemini() {
+  const up = (t) => (t || 'string').toString().toUpperCase();
+  return [{
+    functionDeclarations: KELION_TOOLS.map(t => ({
+      name: t.name,
+      description: t.description,
+      parameters: {
+        type: 'OBJECT',
+        properties: Object.fromEntries(
+          Object.entries(t.properties).map(([k, v]) => {
+            const p = { type: up(v.type), description: v.description };
+            if (v.enum) p.enum = v.enum;
+            return [k, p];
+          })
+        ),
+        required: t.required,
+      },
+    })),
+  }];
+}
+
+// OpenAI Realtime GA — flat array of `{ type: 'function', name, description,
+// parameters }` entries. JSON-Schema with lowercase types per OpenAI docs:
+//   https://platform.openai.com/docs/guides/realtime-conversations#function-calling
+function buildKelionToolsOpenAI() {
+  return KELION_TOOLS.map(t => ({
+    type: 'function',
+    name: t.name,
+    description: t.description,
+    parameters: {
+      type: 'object',
+      properties: t.properties,
+      required: t.required,
+    },
+  }));
+}
+
+// ──────────────────────────────────────────────────────────────────
 // OpenAI Realtime (legacy, kept for compat)
 // ──────────────────────────────────────────────────────────────────
 router.get('/token', async (req, res) => {
@@ -368,130 +487,16 @@ router.get('/gemini-token', async (req, res) => {
       outputAudioTranscription: {},
       // Stage 4 — tools. functionDeclarations route tool calls back to
       // OUR backend via the client, which executes them and returns a
-      // tool_response.
+      // tool_response. The declarations themselves live in KELION_TOOLS
+      // above (single source of truth shared with the OpenAI endpoint);
+      // we only render them here in the Gemini-specific shape.
       //
       // NOTE: `{googleSearch: {}}` was removed earlier — it's a
       // project-scoped grounding feature that is rejected on ephemeral
       // token sessions with close code 1007. Web search is instead handled
       // by the `browse_web` function-declaration tool, which routes through
       // our own server (via `/api/tools/browse_web`).
-      tools: [
-        {
-          functionDeclarations: [
-                  {
-                    name: 'browse_web',
-                    description: 'Run an autonomous web-browsing agent in a real browser. Use when the user asks Kelion to open a site, fill a form, extract info from a page behind JS, compare products, book/reserve, etc. Returns a short summary + optional URL.',
-                    parameters: {
-                      type: 'OBJECT',
-                      properties: {
-                        task: {
-                          type: 'STRING',
-                          description: 'Natural-language instruction for the web agent, e.g. "Find the cheapest round-trip Bucharest-Rome flight next weekend on skyscanner.com and tell me the airline and price."',
-                        },
-                        start_url: {
-                          type: 'STRING',
-                          description: 'Optional URL to start on. Leave empty to let the agent pick.',
-                        },
-                      },
-                      required: ['task'],
-                    },
-                  },
-                  {
-                    name: 'read_calendar',
-                    description: "Look into the signed-in user's calendar. Use when the user asks about their schedule, upcoming events, availability.",
-                    parameters: {
-                      type: 'OBJECT',
-                      properties: {
-                        range: {
-                          type: 'STRING',
-                          description: 'Natural-language range, e.g. "today", "this week", "next Monday 9am-noon".',
-                        },
-                      },
-                      required: ['range'],
-                    },
-                  },
-                  {
-                    name: 'read_email',
-                    description: "Search the signed-in user's email. Use when they ask about a specific message, sender, or thread.",
-                    parameters: {
-                      type: 'OBJECT',
-                      properties: {
-                        query: {
-                          type: 'STRING',
-                          description: 'Free-text search (sender, subject, keyword).',
-                        },
-                        limit: { type: 'INTEGER', description: 'Max results (default 5).' },
-                      },
-                      required: ['query'],
-                    },
-                  },
-                  {
-                    name: 'search_files',
-                    description: "Search the signed-in user's connected file storage (Drive, Dropbox, etc).",
-                    parameters: {
-                      type: 'OBJECT',
-                      properties: {
-                        query: { type: 'STRING', description: 'Free-text search.' },
-                        limit: { type: 'INTEGER', description: 'Max results (default 5).' },
-                      },
-                      required: ['query'],
-                    },
-                  },
-                  // Stage 6 — M27: emotion mirroring. Fire-and-forget tool
-                  // — Kelion calls this whenever he reads a visible emotional
-                  // cue from the user's camera (smile, furrowed brow, etc.).
-                  // The client applies subtle avatar morphs + halo tint.
-                  // Kelion should NOT narrate that he's doing this.
-                  {
-                    name: 'observe_user_emotion',
-                    description: "Record your read of the user's current emotional state based on their face (camera) and voice. Call this silently whenever you notice a clear shift (they smile, frown, look tired, sound stressed, etc.) — do NOT announce it to the user. Keep calls rare (at most every 4-5 seconds) and only when you are genuinely confident.",
-                    parameters: {
-                      type: 'OBJECT',
-                      properties: {
-                        state: {
-                          type: 'STRING',
-                          enum: ['neutral','happy','sad','surprised','angry','tired','focused','confused','anxious'],
-                          description: 'Your best single-word read of the user\'s current state.',
-                        },
-                        intensity: {
-                          type: 'NUMBER',
-                          description: 'How strong the signal is, 0.0 (faint) to 1.0 (unmistakable).',
-                        },
-                        cue: {
-                          type: 'STRING',
-                          description: 'Short phrase naming the cue ("slight smile", "voice trembling", "furrowed brow"). 1-6 words.',
-                        },
-                      },
-                      required: ['state', 'intensity'],
-                    },
-                  },
-                  // Stage 7 — M28: avatar stage monitor. Kelion can project
-                  // content onto the big screen behind him in the 3D scene.
-                  // Use for maps, weather, reference pages, YouTube, images,
-                  // or arbitrary URLs the user asks him to "show me". The
-                  // client maps `kind` to the appropriate embed URL.
-                  {
-                    name: 'show_on_monitor',
-                    description: "Display something on the big presentation monitor in the scene behind you. Use whenever the user asks (in any language) to see / open / show / display a map, the weather, a video, an image, a Wikipedia / reference page, or any web page. Pick the right `kind` — the client resolves it to the best embed URL. Call again with a new query to swap the content on screen.",
-                    parameters: {
-                      type: 'OBJECT',
-                      properties: {
-                        kind: {
-                          type: 'STRING',
-                          enum: ['map', 'weather', 'video', 'image', 'wiki', 'web', 'clear'],
-                          description: "Type of content: 'map' = Google Maps for a place; 'weather' = forecast for a city; 'video' = YouTube clip or search; 'image' = photo search; 'wiki' = Wikipedia article; 'web' = arbitrary URL (must start with https://); 'clear' = blank the monitor.",
-                        },
-                        query: {
-                          type: 'STRING',
-                          description: "Search term or URL. Examples: 'Cluj-Napoca', 'New York', 'sunset mountains', 'Paris', 'https://en.wikipedia.org/wiki/Artificial_intelligence'. Required unless kind='clear'.",
-                        },
-                      },
-                      required: ['kind'],
-                    },
-                  },
-          ],
-        },
-      ],
+      tools: buildKelionToolsGemini(),
     };
 
     // Ephemeral tokens live under v1alpha only — v1beta/auth_tokens returns 404.
@@ -549,6 +554,219 @@ router.get('/gemini-token', async (req, res) => {
   }
 });
 
+// ──────────────────────────────────────────────────────────────────
+// OpenAI Realtime (GA) — Plan C transport for Kelion voice chat.
+//
+// Why this exists:
+//   Gemini Live preview was unstable for long (>2-min) sessions and hit
+//   hard per-project quotas on our key (close code 1011 "You exceeded your
+//   current quota"). Google's GA Live id we tried (#112) was rejected with
+//   1008 "models/...-live-001 is not found for API version v1main", so the
+//   only Gemini Live model that connects is the preview itself. To remove
+//   the Google-side dependency for voice we added OpenAI's GA Realtime API
+//   as a second provider the client can choose.
+//
+// Protocol: https://platform.openai.com/docs/guides/realtime-websocket
+// Ephemeral token endpoint (GA):
+//   POST https://api.openai.com/v1/realtime/client_secrets
+// Client WebSocket URL:
+//   wss://api.openai.com/v1/realtime?model=<model>
+// First client frame: `session.update` with the full Kelion persona,
+// tool catalog, and audio config. We stamp the persona and tools here
+// server-side so the browser bundle can't tamper with either.
+//
+// Gating matches /gemini-token: guest trial window, credits check for
+// signed-in non-admin, admin unlimited. Keeping two endpoints behind one
+// gate lets the client pick either provider without a second round-trip.
+router.get('/openai-live-token', async (req, res) => {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    return res.status(503).json({ error: 'OPENAI_API_KEY not configured' });
+  }
+
+  const adminUser = await peekSignedInUser(req);
+  const isAdmin   = await isAdminUser(adminUser);
+
+  // Mirror the gating block from /gemini-token. Kept inline rather than
+  // extracted to a helper so this PR is a pure addition with zero risk to
+  // the already-shipping gemini path.
+  const isGuest = !adminUser;
+  let trial = null;
+  if (isGuest && !isAdmin) {
+    const ip = ipGeo.clientIp(req) || req.ip || '';
+    const status = trialStatus(ip);
+    if (!status.allowed) {
+      const isLifetime = status.reason === 'lifetime_expired';
+      return res.status(429).json({
+        error: isLifetime
+          ? 'Your 7-day free trial has ended. Please create an account and buy credits to keep talking to Kelion.'
+          : 'Free trial for today is used up. Come back tomorrow or sign in to continue.',
+        trial: {
+          allowed: false,
+          reason:  status.reason || 'window_expired',
+          remainingMs: 0,
+          ...(status.nextWindowMs != null ? { nextWindowMs: status.nextWindowMs } : {}),
+        },
+      });
+    }
+    stampTrialIfFresh(ip, status);
+    trial = {
+      allowed:     true,
+      remainingMs: status.remainingMs,
+      windowMs:    TRIAL_WINDOW_MS,
+    };
+  } else if (adminUser && !isAdmin) {
+    try {
+      const balance = await getCreditsBalance(adminUser.id);
+      if (!Number.isFinite(balance) || balance <= 0) {
+        return res.status(402).json({
+          error: 'No credits left. Buy a package to keep talking to Kelion.',
+          balance_minutes: 0,
+          action: 'buy_credits',
+        });
+      }
+    } catch (err) {
+      console.warn('[realtime] credits-balance lookup failed', err && err.message);
+    }
+  }
+
+  try {
+    // Voice: OpenAI GA Realtime voices include `marin`, `cedar`, `alloy`,
+    // `ash`, `ballad`, `coral`, `echo`, `sage`, `shimmer`, `verse`. `marin`
+    // is the new GA-recommended neutral voice; operators can override via
+    // OPENAI_REALTIME_LIVE_VOICE. The old beta `ash` used by /token is
+    // kept for legacy.
+    const voice = process.env.OPENAI_REALTIME_LIVE_VOICE || 'marin';
+    // Model: `gpt-realtime` is the GA speech-to-speech model (August 2025
+    // release). The previous `gpt-4o-realtime-preview` is kept only for
+    // the legacy /token endpoint. Override via OPENAI_REALTIME_LIVE_MODEL.
+    const model = process.env.OPENAI_REALTIME_LIVE_MODEL || 'gpt-realtime';
+
+    // Per-user context: memory, geo, voice style, language. Same semantics
+    // as /gemini-token so the user gets identical behavior no matter which
+    // provider the client picks.
+    const user = adminUser;
+    let memoryItems = [];
+    if (user) {
+      try { memoryItems = await listMemoryItems(user.id, 60); }
+      catch (err) { console.warn('[realtime] memory load failed', err.message); }
+    }
+    const browserLang = (req.query.lang || 'en-US').toString().slice(0, 16);
+    const forcedLang  = (process.env.KELION_FORCE_LANG || browserLang).toString().slice(0, 16);
+    const styleFromCookie = req.cookies?.['kelion.voice_style'];
+    const styleFromQuery  = (req.query.style || '').toString();
+    const voiceStyle = resolveVoiceStyle(styleFromCookie || styleFromQuery);
+    const ipGeoData = await ipGeo.lookup(ipGeo.clientIp(req));
+    const clientLat = Number.parseFloat(req.query.lat);
+    const clientLon = Number.parseFloat(req.query.lon);
+    const clientAcc = Number.parseFloat(req.query.acc);
+    const geo = (Number.isFinite(clientLat) && Number.isFinite(clientLon))
+      ? {
+          ...(ipGeoData || {}),
+          latitude:  clientLat,
+          longitude: clientLon,
+          accuracy:  Number.isFinite(clientAcc) ? clientAcc : null,
+          source:    'client-gps',
+        }
+      : ipGeoData;
+
+    const instructions = buildKelionPersona({ user, memoryItems, voiceStyle, geo });
+
+    // Mint a GA ephemeral client_secret. Safe to ship to the browser — it
+    // is scoped to one Realtime session and auto-expires.
+    // Docs: https://platform.openai.com/docs/api-reference/realtime-sessions/create-realtime-client-secret
+    const sessionConfig = {
+      session: {
+        type:  'realtime',
+        model,
+        audio: {
+          output: { voice },
+        },
+      },
+    };
+
+    const r = await fetch('https://api.openai.com/v1/realtime/client_secrets', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type':  'application/json',
+      },
+      body: JSON.stringify(sessionConfig),
+    });
+
+    if (!r.ok) {
+      const err = await r.text();
+      console.error(
+        '[realtime] OpenAI ephemeral client_secret error:',
+        'status=' + r.status,
+        'model=' + model,
+        'voice=' + voice,
+        'body=' + err.slice(0, 2000),
+      );
+      return res.status(500).json({ error: 'Failed to create OpenAI live session' });
+    }
+
+    const data = await r.json();
+    // GA response shape is `{ value, expires_at, session }`. The beta was
+    // `{ client_secret: { value, expires_at } }`. We only rely on value
+    // here so both work, but we read from the GA-preferred shape first.
+    const tokenValue = data.value || data.client_secret?.value;
+    const expiresAt  = data.expires_at || data.client_secret?.expires_at || null;
+    if (!tokenValue) {
+      console.error('[realtime] OpenAI response missing ephemeral value:', JSON.stringify(data).slice(0, 500));
+      return res.status(500).json({ error: 'Failed to create OpenAI live session' });
+    }
+
+    // First frame the client should send on WS open. We ship the full
+    // persona + tools here (not in client_secrets) so we can re-render
+    // the persona per request (user memory, GPS, local time, voice style)
+    // without invalidating caches on OpenAI's side.
+    const firstFrame = {
+      type: 'session.update',
+      session: {
+        type:  'realtime',
+        model,
+        instructions,
+        audio: {
+          input: {
+            format: { type: 'audio/pcm', rate: 24000 },
+            turn_detection: {
+              type: 'server_vad',
+              create_response:     true,
+              interrupt_response:  true,
+            },
+            transcription: { model: 'whisper-1', language: forcedLang.split('-')[0] || 'en' },
+          },
+          output: {
+            voice,
+            format: { type: 'audio/pcm', rate: 24000 },
+          },
+        },
+        tools:       buildKelionToolsOpenAI(),
+        tool_choice: 'auto',
+      },
+    };
+
+    res.json({
+      token:       tokenValue,
+      expiresAt,
+      model,
+      voice,
+      provider:    'openai',
+      wsUrl:       `wss://api.openai.com/v1/realtime?model=${encodeURIComponent(model)}`,
+      signedIn:    !!user,
+      userName:    user?.name || null,
+      memoryCount: memoryItems.length,
+      voiceStyle:  voiceStyle.label,
+      setup:       firstFrame,
+      trial,
+    });
+  } catch (err) {
+    console.error('[realtime] OpenAI error:', err.message);
+    res.status(500).json({ error: 'Failed to create OpenAI live session' });
+  }
+});
+
 // Stage 6 — M26: lightweight cookie-backed voice style setter.
 // Persisted 90 days as httpOnly=false (so the client can read/clear too).
 router.post('/voice-style', (req, res) => {
@@ -565,4 +783,9 @@ router.post('/voice-style', (req, res) => {
 module.exports = router;
 module.exports.VOICE_STYLES = VOICE_STYLES;
 module.exports.resolveVoiceStyle = resolveVoiceStyle;
+// Exported for unit tests + for the forthcoming OpenAI Realtime client
+// transport so it can render the same tool catalog without re-declaring.
+module.exports.KELION_TOOLS          = KELION_TOOLS;
+module.exports.buildKelionToolsGemini = buildKelionToolsGemini;
+module.exports.buildKelionToolsOpenAI = buildKelionToolsOpenAI;
 module.exports.buildKelionPersona = buildKelionPersona;
