@@ -26,9 +26,54 @@ Language rules (strict — English is the default):
 Manners:
 - You are unfailingly polite and warm. Greet, thank, apologize when appropriate. Never condescending, never impatient. Calm, professional, empathetic.
 
+Honesty (HARD rule — no exceptions):
+- NEVER claim you did something you did not do. Do NOT say "I showed it on the screen", "I opened the map", "I displayed it", "ți-am afișat", "v-am arătat pe ecran", "am deschis harta", "I'll forward this to my team", "voi transmite echipei", or any equivalent invented action in any language.
+- If you cannot do what the user asked, say so plainly: "I can't do that" / "nu pot face asta" / "I don't know — let me search" / "nu știu". Then try a tool if one is available.
+- You have the show_on_monitor tool. When the user asks to see / open / display / show a map, the weather, a video, an image, a Wikipedia page, or any web page — CALL THE TOOL. Do not just talk about it. If the tool is unavailable in this context, say "I can't open that here" — never pretend you did.
+- Never invent a "team" you will forward feedback to. You are Kelion; there is no human team relaying messages in real time. If the user gives feedback, acknowledge it briefly and move on.
+
 Be concise and helpful.
 You have access to real-time information provided in the system context below.
 If the user asks about the time, date, or location — answer using the context provided.`;
+
+// Same show_on_monitor contract as the realtime (voice) path. Kept in sync
+// manually with server/src/routes/realtime.js KELION_TOOLS — the shape must
+// match because the client resolves the arguments identically for both
+// transports.
+const CHAT_TOOLS = [
+  {
+    type: 'function',
+    function: {
+      name: 'show_on_monitor',
+      description:
+        "Display something on the big presentation monitor beside Kelion. " +
+        "Use whenever the user asks (in any language) to see / open / show / " +
+        "display a map, the weather, a video, an image, a Wikipedia / reference " +
+        "page, or any web page. Pick the right `kind`. Call again with a new " +
+        "query to swap content.",
+      parameters: {
+        type: 'object',
+        properties: {
+          kind: {
+            type: 'string',
+            enum: ['map', 'weather', 'video', 'image', 'wiki', 'web', 'clear'],
+            description:
+              "'map' = Google Maps for a place; 'weather' = forecast for a " +
+              "city; 'video' = YouTube; 'image' = photo search; 'wiki' = " +
+              "Wikipedia; 'web' = arbitrary https:// URL (for a Linux shell, " +
+              "pass kind='web' with query='https://webvm.io'); 'clear' = blank.",
+          },
+          query: {
+            type: 'string',
+            description:
+              "Search term or URL. Required unless kind='clear'.",
+          },
+        },
+        required: ['kind'],
+      },
+    },
+  },
+];
 
 const MAX_MESSAGE_LENGTH = 4000;
 const MAX_MESSAGES_COUNT = 40;
@@ -168,16 +213,90 @@ router.post('/', async (req, res) => {
   res.setHeader('Connection', 'keep-alive');
   res.flushHeaders();
 
-  try {
+  // Stream a chat completion with tool-calling enabled. When the model emits
+  // a show_on_monitor tool_call, we forward it to the client as a
+  // `{"tool":...}` SSE frame (the client invokes handleShowOnMonitor) and
+  // then ask the model for a short confirmation reply. Two passes, but the
+  // user only sees one continuous stream: first the tool frame, then the
+  // final narration ("Here's Cluj-Napoca on the monitor.").
+  async function streamOnce(msgs) {
     const stream = await ai.chat.completions.create({
       model,
       stream: true,
-      messages: [{ role: 'system', content: systemPrompt }, ...sanitized],
+      tools: CHAT_TOOLS,
+      tool_choice: 'auto',
+      messages: msgs,
     });
-
+    let textSoFar = '';
+    const toolAcc = {}; // index -> { id, name, args }
+    let finishReason = null;
     for await (const chunk of stream) {
-      const content = chunk.choices[0]?.delta?.content;
-      if (content) res.write(`data: ${JSON.stringify({ content })}\n\n`);
+      const choice = chunk.choices && chunk.choices[0];
+      if (!choice) continue;
+      const delta = choice.delta || {};
+      if (delta.content) {
+        textSoFar += delta.content;
+        res.write(`data: ${JSON.stringify({ content: delta.content })}\n\n`);
+      }
+      if (Array.isArray(delta.tool_calls)) {
+        for (const tc of delta.tool_calls) {
+          const idx = typeof tc.index === 'number' ? tc.index : 0;
+          if (!toolAcc[idx]) toolAcc[idx] = { id: '', name: '', args: '' };
+          if (tc.id) toolAcc[idx].id = tc.id;
+          if (tc.function?.name) toolAcc[idx].name = tc.function.name;
+          if (tc.function?.arguments) toolAcc[idx].args += tc.function.arguments;
+        }
+      }
+      if (choice.finish_reason) finishReason = choice.finish_reason;
+    }
+    return { text: textSoFar, toolCalls: Object.values(toolAcc), finishReason };
+  }
+
+  try {
+    const firstMsgs = [{ role: 'system', content: systemPrompt }, ...sanitized];
+    const first = await streamOnce(firstMsgs);
+
+    if (first.toolCalls.length > 0 && first.finishReason === 'tool_calls') {
+      // Assemble the assistant tool-call turn and synthetic tool results so
+      // the second pass can produce the natural-language reply. Client-side
+      // tools succeed optimistically — if resolveMonitor fails we still get
+      // a sensible "Here's …" line rather than a stuck chat.
+      const toolCallsForHistory = first.toolCalls.map((t) => ({
+        id: t.id || `call_${Math.random().toString(36).slice(2)}`,
+        type: 'function',
+        function: { name: t.name, arguments: t.args || '{}' },
+      }));
+      const toolMessages = first.toolCalls.map((t) => {
+        let parsed = {};
+        try { parsed = JSON.parse(t.args || '{}'); } catch (_) { /* ignore */ }
+        if (t.name === 'show_on_monitor') {
+          // Emit the tool frame to the client — it runs handleShowOnMonitor
+          // and updates the overlay immediately, before the narration lands.
+          res.write(`data: ${JSON.stringify({ tool: t.name, arguments: parsed })}\n\n`);
+          return {
+            role: 'tool',
+            tool_call_id: toolCallsForHistory.find(c => c.function.name === t.name)?.id
+              || `call_${Math.random().toString(36).slice(2)}`,
+            content: JSON.stringify({ ok: true, shown: parsed }),
+          };
+        }
+        return {
+          role: 'tool',
+          tool_call_id: `call_${Math.random().toString(36).slice(2)}`,
+          content: JSON.stringify({ ok: false, error: 'unknown tool' }),
+        };
+      });
+
+      const secondMsgs = [
+        ...firstMsgs,
+        {
+          role: 'assistant',
+          content: first.text || '',
+          tool_calls: toolCallsForHistory,
+        },
+        ...toolMessages,
+      ];
+      await streamOnce(secondMsgs);
     }
     res.write('data: [DONE]\n\n');
   } catch (err) {

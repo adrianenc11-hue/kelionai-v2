@@ -1327,6 +1327,14 @@ export default function KelionStage() {
                 copy[copy.length - 1] = { role: 'assistant', content: assistant }
                 return copy
               })
+            } else if (obj.tool === 'show_on_monitor' && obj.arguments) {
+              // Server streamed a tool-call frame — the model decided to
+              // open something on the monitor. Invoke the same handler
+              // the voice path uses; a natural-language confirmation
+              // ("Here's Cluj-Napoca on the monitor.") streams next.
+              try { handleShowOnMonitor(obj.arguments) } catch (e) {
+                console.warn('[chat] show_on_monitor failed', e && e.message)
+              }
             } else if (obj.error) {
               throw new Error(obj.error)
             }
