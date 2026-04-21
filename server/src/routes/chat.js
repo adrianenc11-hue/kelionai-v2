@@ -6,6 +6,7 @@ const { getCreditsBalance, findById, listMemoryItems } = require('../db');
 const { isAdminEmail } = require('../middleware/subscription');
 const ipGeo = require('../services/ipGeo');
 const { trialStatus, stampTrialIfFresh } = require('../services/trialQuota');
+const { executeRealTool, pickForcedTool } = require('../services/realTools');
 
 const router = Router();
 
@@ -26,13 +27,28 @@ Language rules (strict — English is the default):
 Manners:
 - You are unfailingly polite and warm. Greet, thank, apologize when appropriate. Never condescending, never impatient. Calm, professional, empathetic.
 
+Response length (HARD default):
+- Default reply: 1–3 short sentences. Never more unless the user EXPLICITLY asks for depth ("explain in detail", "pe larg", "cu detalii", "step by step").
+- No long lists, no markdown headings, no "First,…, Second,…" unless the user asked for steps.
+- Answer, then stop. Do not pad. Do not repeat the question back.
+
+Stop-word rule (HARD, no exceptions):
+- If the user says any of: "stop", "hush", "quiet", "enough", "be quiet", "shut up", "taci", "gata", "destul", "oprește-te", "oprește", "lasă", "lasa", "tacere", "liniște" — reply with at most one short word ("Okay." / "Bine.") or nothing at all. Do not keep explaining. Do not add a polite closing.
+
 Honesty (HARD rule — no exceptions):
 - NEVER claim you did something you did not do. Do NOT say "I showed it on the screen", "I opened the map", "I displayed it", "ți-am afișat", "v-am arătat pe ecran", "am deschis harta", "I'll forward this to my team", "voi transmite echipei", or any equivalent invented action in any language.
-- If you cannot do what the user asked, say so plainly: "I can't do that" / "nu pot face asta" / "I don't know — let me search" / "nu știu". Then try a tool if one is available.
-- You have the show_on_monitor tool. When the user asks to see / open / display / show a map, the weather, a video, an image, a Wikipedia page, or any web page — CALL THE TOOL. Do not just talk about it. If the tool is unavailable in this context, say "I can't open that here" — never pretend you did.
+- If you cannot do what the user asked, say so plainly: "I can't do that" / "nu pot face asta" / "I don't know" / "nu știu". Then try a tool if one is available.
 - Never invent a "team" you will forward feedback to. You are Kelion; there is no human team relaying messages in real time. If the user gives feedback, acknowledge it briefly and move on.
 
-Be concise and helpful.
+Tools you MUST use (do not guess when a tool fits):
+- show_on_monitor(kind, query) — display a map, weather, video, image, Wikipedia, or web page on the monitor. Call it whenever the user says see / open / display / show (in any language).
+- calculate(expression) — DETERMINISTIC math. For any arithmetic, percentage, or algebraic expression beyond a trivial one-digit sum, CALL THIS TOOL. Do not do mental math on longer numbers.
+- get_weather(city or lat/lon, days) — REAL weather from Open-Meteo. For any question about weather, temperature, rain, wind, or a forecast — CALL THIS TOOL. Never guess weather.
+- web_search(query, limit) — live web search with URLs + snippets. For anything time-sensitive (news, prices, events, who-is, recent facts) — CALL THIS TOOL. Never invent a URL or a price.
+- translate(text, to, from) — real translation engine. For "how do you say X in Y", "translate this to Y", "tradu ..." — CALL THIS TOOL.
+
+HARD: if the user's question clearly needs one of these tools, you MUST call it. Saying "let me check" or "I'll look that up" without calling the tool counts as a lie. If no tool fits and you don't know, say "I don't know" honestly.
+
 You have access to real-time information provided in the system context below.
 If the user asks about the time, date, or location — answer using the context provided.`;
 
@@ -70,6 +86,84 @@ const CHAT_TOOLS = [
           },
         },
         required: ['kind'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'calculate',
+      description:
+        "Evaluate a math expression DETERMINISTICALLY (mathjs). Use this for " +
+        "any arithmetic, percentage, or algebraic expression beyond a trivial " +
+        "one-digit sum. Never do mental math on longer numbers.",
+      parameters: {
+        type: 'object',
+        properties: {
+          expression: {
+            type: 'string',
+            description:
+              "A mathjs expression, e.g. '127 * 38', 'sqrt(2) + log(10)', " +
+              "'12% of 340', '(100 - 35) / 2'.",
+          },
+        },
+        required: ['expression'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_weather',
+      description:
+        "Fetch real current weather + short forecast (Open-Meteo, free). Use " +
+        "for any question about weather, temperature, rain, wind, or a " +
+        "forecast. Never guess weather.",
+      parameters: {
+        type: 'object',
+        properties: {
+          city: { type: 'string', description: "City / place name (e.g. 'Cluj-Napoca'). Either city or lat+lon is required." },
+          lat:  { type: 'number', description: "Latitude in decimal degrees." },
+          lon:  { type: 'number', description: "Longitude in decimal degrees." },
+          days: { type: 'integer', description: "Forecast days (1-7). Default 1." },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'web_search',
+      description:
+        "Live web search (DuckDuckGo free; Serper when key available). Use " +
+        "for anything time-sensitive — news, prices, events, who-is, recent " +
+        "facts. Never invent a URL or a price.",
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: "Free-text search query." },
+          limit: { type: 'integer', description: "Max results (1-10, default 5)." },
+        },
+        required: ['query'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'translate',
+      description:
+        "Translate text between languages using a real engine (DeepL when " +
+        "key available, else LibreTranslate public).",
+      parameters: {
+        type: 'object',
+        properties: {
+          text: { type: 'string', description: "Source text, max 5000 chars." },
+          to:   { type: 'string', description: "Target ISO 639-1 code (en, ro, fr, de, es, it, pt, ru, zh, ja, ar, ...)." },
+          from: { type: 'string', description: "Source ISO code, or 'auto' to detect (default)." },
+        },
+        required: ['text', 'to'],
       },
     },
   },
@@ -239,14 +333,34 @@ router.post('/', async (req, res) => {
   // then ask the model for a short confirmation reply. Two passes, but the
   // user only sees one continuous stream: first the tool frame, then the
   // final narration ("Here's Cluj-Napoca on the monitor.").
-  async function streamOnce(msgs) {
-    const stream = await ai.chat.completions.create({
+  // Detect keyword-driven tool forcing from the most recent user message.
+  // When the user's question clearly calls for calculate / get_weather /
+  // web_search / translate, we set tool_choice to force the model to emit
+  // a function call instead of hallucinating a plain-text answer. Falls
+  // back to 'auto' otherwise so the model can still freely chat.
+  const lastUserText = (() => {
+    for (let i = sanitized.length - 1; i >= 0; i--) {
+      const m = sanitized[i];
+      if (m.role !== 'user') continue;
+      if (typeof m.content === 'string') return m.content;
+      if (Array.isArray(m.content)) {
+        const t = m.content.find((p) => p && p.type === 'text');
+        if (t && typeof t.text === 'string') return t.text;
+      }
+    }
+    return '';
+  })();
+  const forcedTool = pickForcedTool(lastUserText);
+
+  async function streamOnce(msgs, opts = {}) {
+    const body = {
       model,
       stream: true,
       tools: CHAT_TOOLS,
-      tool_choice: 'auto',
+      tool_choice: opts.toolChoice || 'auto',
       messages: msgs,
-    });
+    };
+    const stream = await ai.chat.completions.create(body);
     let textSoFar = '';
     const toolAcc = {}; // index -> { id, name, args }
     let finishReason = null;
@@ -274,38 +388,67 @@ router.post('/', async (req, res) => {
 
   try {
     const firstMsgs = [{ role: 'system', content: systemPrompt }, ...sanitized];
-    const first = await streamOnce(firstMsgs);
+    // If a keyword forces a specific tool, pass it on the first pass only —
+    // after the tool result lands, the model is free to answer in prose.
+    const firstOpts = forcedTool
+      ? { toolChoice: { type: 'function', function: { name: forcedTool } } }
+      : {};
+    const first = await streamOnce(firstMsgs, firstOpts);
 
     if (first.toolCalls.length > 0 && first.finishReason === 'tool_calls') {
       // Assemble the assistant tool-call turn and synthetic tool results so
       // the second pass can produce the natural-language reply. Client-side
-      // tools succeed optimistically — if resolveMonitor fails we still get
-      // a sensible "Here's …" line rather than a stuck chat.
+      // tools (show_on_monitor) succeed optimistically; server-side tools
+      // (calculate/get_weather/web_search/translate) actually run here and
+      // their JSON results are fed back so the model's next reply is
+      // grounded in real data — not guessed.
       const toolCallsForHistory = first.toolCalls.map((t) => ({
         id: t.id || `call_${Math.random().toString(36).slice(2)}`,
         type: 'function',
         function: { name: t.name, arguments: t.args || '{}' },
       }));
-      const toolMessages = first.toolCalls.map((t) => {
+      const toolMessages = [];
+      for (let i = 0; i < first.toolCalls.length; i++) {
+        const t = first.toolCalls[i];
+        const tool_call_id = toolCallsForHistory[i].id;
         let parsed = {};
         try { parsed = JSON.parse(t.args || '{}'); } catch (_) { /* ignore */ }
+
         if (t.name === 'show_on_monitor') {
           // Emit the tool frame to the client — it runs handleShowOnMonitor
           // and updates the overlay immediately, before the narration lands.
           res.write(`data: ${JSON.stringify({ tool: t.name, arguments: parsed })}\n\n`);
-          return {
+          toolMessages.push({
             role: 'tool',
-            tool_call_id: toolCallsForHistory.find(c => c.function.name === t.name)?.id
-              || `call_${Math.random().toString(36).slice(2)}`,
+            tool_call_id,
             content: JSON.stringify({ ok: true, shown: parsed }),
-          };
+          });
+          continue;
         }
-        return {
+
+        // Server-executed real tools. executeRealTool returns null for
+        // unrecognised names so we can distinguish "not handled here" from
+        // "tool ran and returned data".
+        const result = await executeRealTool(t.name, parsed);
+        if (result != null) {
+          // Let the client echo the tool call into the UI (shows a small
+          // "Kelion used calculate(...)" chip). The rendered result is
+          // whatever the model says in the second pass; we just announce.
+          res.write(`data: ${JSON.stringify({ tool: t.name, arguments: parsed, result })}\n\n`);
+          toolMessages.push({
+            role: 'tool',
+            tool_call_id,
+            content: JSON.stringify(result).slice(0, 8000),
+          });
+          continue;
+        }
+
+        toolMessages.push({
           role: 'tool',
-          tool_call_id: `call_${Math.random().toString(36).slice(2)}`,
+          tool_call_id,
           content: JSON.stringify({ ok: false, error: 'unknown tool' }),
-        };
-      });
+        });
+      }
 
       const secondMsgs = [
         ...firstMsgs,
@@ -316,7 +459,9 @@ router.post('/', async (req, res) => {
         },
         ...toolMessages,
       ];
-      await streamOnce(secondMsgs);
+      // Second pass lets the model freely produce a final natural-language
+      // reply given the real tool results. No forced tool_choice here.
+      await streamOnce(secondMsgs, { toolChoice: 'auto' });
     }
     res.write('data: [DONE]\n\n');
   } catch (err) {

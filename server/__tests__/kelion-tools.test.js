@@ -26,6 +26,12 @@ const EXPECTED_TOOL_NAMES = [
   'set_narration_mode',
   'what_do_you_see',
   'show_on_monitor',
+  // Real professional tools added in this PR — all executed server-side
+  // with deterministic/real APIs (see server/src/services/realTools.js).
+  'calculate',
+  'get_weather',
+  'web_search',
+  'translate',
 ];
 
 describe('Kelion tool catalog', () => {

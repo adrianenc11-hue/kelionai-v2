@@ -57,6 +57,12 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
   // remainingMs so the HUD can tick locally without a poll loop.
   const [trial, setTrial] = useState(null)
   const trialTimeoutRef = useRef(null)
+  // Timestamp (epoch ms) of the most recent VAD activity from either
+  // side. Used by the credits heartbeat below to send silent=true on
+  // /api/credits/consume when the session has been idle >30 s — the
+  // server then skips the deduction, preventing the idle drain Adrian
+  // reported (-1 min x 28 min at idle).
+  const lastActivityAtRef = useRef(Date.now())
   // Credits heartbeat (signed-in non-admin only). While a Gemini Live
   // session is open we POST /api/credits/consume every 60s to deduct
   // one minute from the user's balance. When the server reports
@@ -288,15 +294,18 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
       // Interruption — user spoke over Kelion
       if (sc.interrupted) {
         clearAudioQueue()
+        lastActivityAtRef.current = Date.now()
         setStatus('listening')
         return
       }
 
       if (sc.inputTranscription?.text) {
         appendTurn('user', sc.inputTranscription.text, false)
+        lastActivityAtRef.current = Date.now()
       }
       if (sc.outputTranscription?.text) {
         appendTurn('assistant', sc.outputTranscription.text, false)
+        lastActivityAtRef.current = Date.now()
       }
 
       const parts = sc.modelTurn?.parts || []
@@ -554,11 +563,16 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
         creditsStartedRef.current = false
         const consumeCredits = async () => {
           try {
+            // Silence-aware heartbeat — matches server /api/credits/consume.
+            // If no VAD activity in the last 30 s, send silent=true so the
+            // server skips the deduction. Prevents the idle-drain Adrian
+            // reported (-1 min x 28 min at idle).
+            const silent = (Date.now() - lastActivityAtRef.current) > 30_000
             const r = await fetch('/api/credits/consume', {
               method: 'POST',
               credentials: 'include',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ minutes: 1 }),
+              body: JSON.stringify({ minutes: 1, silent }),
             })
             if (r.status === 401) {
               // Guest (no JWT) — nothing to deduct, stop polling.
