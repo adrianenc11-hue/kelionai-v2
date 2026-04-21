@@ -87,7 +87,15 @@ module.exports = {
     // Keep this default in sync with server/src/routes/realtime.js — both
     // read GEMINI_LIVE_MODEL directly, so the fallbacks must match. See
     // that file for the current list of valid Google Live model names.
-    liveModel:    optional('GEMINI_LIVE_MODEL', 'gemini-3.1-flash-live-preview'),
+    //
+    // Default is the GA stable model `gemini-2.0-flash-live-001` — the
+    // preview `gemini-3.1-flash-live-preview` kept emitting 1007
+    // "setup must be the first message and only the first" about two
+    // minutes into a session (Adrian 2026-04-21: "Crapa dupa 2 min de
+    // funtionare 1007"). Preview models can change protocol without
+    // warning; the GA model has a locked wire format. Override via
+    // Railway env GEMINI_LIVE_MODEL when a newer stable model ships.
+    liveModel:    optional('GEMINI_LIVE_MODEL', 'gemini-2.0-flash-live-001'),
     ttsModel:     optional('GEMINI_TTS_MODEL', 'gemini-3.1-flash-tts-preview'),
     ttsVoiceKelion: optional('GEMINI_TTS_VOICE_KELION', 'Kore'),
   },

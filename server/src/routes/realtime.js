@@ -254,13 +254,17 @@ router.get('/gemini-token', async (req, res) => {
     // `Puck` (bright, playful) and `Fenrir` (gravelly). Feminine options
     // include `Kore`, `Aoede`, `Leda`.
     const voice = process.env.GEMINI_LIVE_VOICE_KELION || 'Charon';
-    // Default to the newest Gemini Live model documented by Google
-    // (https://ai.google.dev/gemini-api/docs/live-api/ephemeral-tokens —
-    // the official example uses this exact name). Override via Railway env
-    // GEMINI_LIVE_MODEL when a newer one is announced. Previous fallbacks
-    // tried include `gemini-live-2.5-flash-preview` which returns 404 from
-    // the v1alpha auth_tokens provisioning endpoint.
-    const model = process.env.GEMINI_LIVE_MODEL || 'gemini-3.1-flash-live-preview';
+    // Default to the GA stable Gemini Live model. The preview
+    // `gemini-3.1-flash-live-preview` kept emitting 1007 "setup must
+    // be the first message and only the first" about two minutes into
+    // a session (Adrian 2026-04-21: "Crapa dupa 2 min de funtionare
+    // 1007"). Preview models can change protocol without warning; GA
+    // models have a locked wire format. Override via Railway env
+    // GEMINI_LIVE_MODEL when a newer stable model ships.
+    // Docs: https://ai.google.dev/gemini-api/docs/live-api/ephemeral-tokens
+    // Previous fallback `gemini-live-2.5-flash-preview` returned 404
+    // from the v1alpha auth_tokens provisioning endpoint.
+    const model = process.env.GEMINI_LIVE_MODEL || 'gemini-2.0-flash-live-001';
     // Language resolution for Gemini Live. `speechConfig.languageCode`
     // controls BOTH the TTS output voice locale AND biases the STT
     // model for the input audio — so if we hard-code en-US a user who
