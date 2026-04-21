@@ -460,30 +460,6 @@ function useNYCSkylineTexture() {
   }, [])
 }
 
-// StageMonitorContent — the inner-screen decor of the 3D presentation
-// monitor. It always renders an idle grid/watermark; the actual iframe /
-// image payload now lives in the 2D <MonitorOverlay/> half-page panel
-// (see below). Keeping the 3D plane as scenic decor instead of a second
-// iframe avoids loading the same map/video twice (e.g. double YouTube
-// autoplay) and keeps the overlay as the single source of truth for
-// what Kelion is showing.
-function StageMonitorContent() {
-  return (
-    <>
-      {Array.from({ length: 6 }).map((_, i) => (
-        <mesh key={`mh-${i}`} position={[0, -0.75 + i * 0.3, 0.001]}>
-          <planeGeometry args={[2.9, 0.004]} />
-          <meshBasicMaterial color={'#1f1b3a'} toneMapped={false} opacity={0.4} transparent />
-        </mesh>
-      ))}
-      <mesh position={[0, 0, 0.002]}>
-        <circleGeometry args={[0.07, 32]} />
-        <meshBasicMaterial color={'#7c3aed'} toneMapped={false} opacity={0.55} transparent />
-      </mesh>
-    </>
-  )
-}
-
 // MonitorOverlay — half-page 2D panel that renders whatever `monitorStore`
 // currently holds. Anchored to the left 50vw of the viewport on desktop, or
 // as a bottom sheet (100vw × 55vh) on narrow screens so the avatar — which
@@ -661,48 +637,12 @@ function StudioDecor() {
         <meshBasicMaterial color={'#60a5fa'} toneMapped={false} />
       </mesh>
 
-      {/* Side wall slats were removed — Adrian found them distracting. The
-          left half of the stage now holds the presentation monitor; the
-          right half remains clean so the avatar is the focus. */}
-
-      {/* ───── Presentation monitor ─────
-          Positioned adjacent to the avatar as a presenter + screen pair.
-          Adrian: "monitor mai spre el" — moved closer to center (-1.1 from
-          -1.7) and slightly forward (-0.35 from -0.8) so the monitor reads
-          as the avatar's screen, not a separate fixture on the wall.
-          Adrian 2026-04-20: "muta monitorul un pic mai sus acopera chatul"
-          — raised Y from 0.35 → 0.95 so the bezel's bottom edge clears
-          the "Type to Kelion…" composer and any error banner sitting
-          above it at 1080p/desktop framing.
-          Adrian 2026-04-20 (follow-up): "monitorul un pic mai la dreapta
-          si mai jos sa fie incadrat la stanga si stanga sus" — after
-          the raise, the top-left corner of the bezel fell outside the
-          camera frustum at standard framing. Nudged X from -1.1 → -0.8
-          (closer to centre) and Y from 0.95 → 0.65 (lower) so the
-          top edge is visible and the left edge sits cleanly inside
-          the viewport.
-          When Gemini Live calls the `show_on_monitor` tool, <StageMonitor/>
-          is now rendered OUTSIDE the 3D canvas by <MonitorOverlay/> so the
-          screen is a full half-viewport DOM panel — the 3D plane here is
-          just decor (faint grid + purple dot). */}
-      <group position={[-0.8, 0.65, -0.35]} rotation={[0, Math.PI / 9, 0]}>
-        {/* Bezel / outer frame */}
-        <mesh position={[0, 0, -0.03]}>
-          <planeGeometry args={[3.2, 2.1]} />
-          <meshStandardMaterial color={'#0a0b14'} metalness={0.75} roughness={0.35} />
-        </mesh>
-        {/* Inner screen (idle state: dark purple with faint grid). */}
-        <mesh position={[0, 0, 0]}>
-          <planeGeometry args={[3.0, 1.9]} />
-          <meshBasicMaterial color={'#0d0b1d'} toneMapped={false} />
-        </mesh>
-        <StageMonitorContent />
-        {/* Stand leg */}
-        <mesh position={[0, -1.3, -0.02]}>
-          <planeGeometry args={[0.12, 0.7]} />
-          <meshStandardMaterial color={'#0a0b14'} metalness={0.8} roughness={0.3} />
-        </mesh>
-      </group>
+      {/* The in-scene 3D presentation monitor was removed so that the stage
+          stays clean when no content is loaded. All monitor payloads now
+          render exclusively in the half-page <MonitorOverlay/> (left 50vw
+          on desktop, bottom 55vh on mobile). An empty dark bezel sitting
+          next to the avatar at all times was confusing — users expected it
+          to be the promised half-page screen. */}
 
       {/* Reflective floor */}
       <mesh position={[0, -1.65, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
