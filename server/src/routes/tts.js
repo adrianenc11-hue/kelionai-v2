@@ -255,6 +255,38 @@ async function synthesizeGemini(text, lang) {
   return pcmToWav(Buffer.from(b64, 'base64'));
 }
 
+// OpenAI TTS — used to unify the text-chat voice with the voice transport.
+// When the user talks to Kelion via the OpenAI Realtime API (cedar, a deep
+// masculine voice), text-chat TTS via Gemini Charon / ElevenLabs sounds like
+// a *different person*. Adrian reported this directly: "cind sunt in chat e
+// o voce cu un timbru, cind ii cer o harta apare o alta voce". OpenAI TTS
+// doesn't expose the Realtime `cedar` voice, but `onyx` is the deep masculine
+// standalone voice — it's the closest timbre match. Operator can override
+// via OPENAI_TTS_VOICE / OPENAI_TTS_MODEL.
+async function synthesizeOpenAI(text, _lang) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  const voice  = process.env.OPENAI_TTS_VOICE || 'onyx';
+  const model  = process.env.OPENAI_TTS_MODEL || 'gpt-4o-mini-tts';
+  const r = await fetch('https://api.openai.com/v1/audio/speech', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type':  'application/json',
+    },
+    body: JSON.stringify({
+      model,
+      voice,
+      input: text,
+      response_format: 'mp3',
+    }),
+  });
+  if (!r.ok) {
+    const err = await r.text();
+    throw new Error(`OpenAI TTS error: ${r.status} ${err}`);
+  }
+  return Buffer.from(await r.arrayBuffer());
+}
+
 async function synthesizeElevenLabs(text, lang) {
   const apiKey  = process.env.ELEVENLABS_API_KEY;
   const voiceId = elevenLabsVoiceFor(lang);
@@ -339,33 +371,47 @@ router.post('/', async (req, res) => {
     }
   }
 
+  const hasOpenAI     = !!process.env.OPENAI_API_KEY;
   const hasGemini     = !!process.env.GEMINI_API_KEY;
   const hasElevenLabs = !!process.env.ELEVENLABS_API_KEY;
-  if (!hasGemini && !hasElevenLabs) {
-    return res.status(503).json({ error: 'TTS not configured. Set GEMINI_API_KEY or ELEVENLABS_API_KEY.' });
+  if (!hasOpenAI && !hasGemini && !hasElevenLabs) {
+    return res.status(503).json({ error: 'TTS not configured. Set OPENAI_API_KEY, GEMINI_API_KEY, or ELEVENLABS_API_KEY.' });
   }
 
-  // Adrian: "La chat scris […] aceeiasi voce ca la chat audio". Voice chat
-  // uses Gemini Live with the Charon prebuilt voice; text chat must match so
-  // Kelion sounds like the same person across modalities. Prefer Gemini
-  // Charon by default; only fall back to ElevenLabs if Gemini isn't
-  // configured, or if the operator explicitly opts into ElevenLabs with
-  // TTS_PROVIDER=elevenlabs.
+  // Adrian: "cind sunt in chat e o voce cu un timbru, cind ii cer o harta
+  // apare o alta voce" — text chat voice (Gemini Charon) and voice chat
+  // voice (OpenAI Realtime cedar) sound like different people. Default now
+  // to OpenAI TTS `onyx` (deep masculine, closest standalone match to cedar)
+  // so the same provider speaks in both modes. Operators opt out with
+  // TTS_PROVIDER=gemini or TTS_PROVIDER=elevenlabs.
   const providerOverride = (process.env.TTS_PROVIDER || '').toLowerCase();
-  const forceElevenLabs  = providerOverride === 'elevenlabs' || providerOverride === '11labs';
+  const forceOpenAI      = providerOverride === 'openai';
   const forceGemini      = providerOverride === 'gemini';
-  const useElevenLabs = forceElevenLabs
-    ? hasElevenLabs
-    : forceGemini
-      ? false
-      : !hasGemini && hasElevenLabs; // default: Gemini first, ElevenLabs only as fallback
+  const forceElevenLabs  = providerOverride === 'elevenlabs' || providerOverride === '11labs';
+  let chosen; // 'openai' | 'gemini' | 'elevenlabs'
+  if (forceOpenAI && hasOpenAI) chosen = 'openai';
+  else if (forceGemini && hasGemini) chosen = 'gemini';
+  else if (forceElevenLabs && hasElevenLabs) chosen = 'elevenlabs';
+  else if (hasOpenAI) chosen = 'openai';
+  else if (hasGemini) chosen = 'gemini';
+  else chosen = 'elevenlabs';
   // Frontend may send a language hint (e.g. `navigator.language`). Trust any
   // well-formed ISO 639-1 code the client supplies; otherwise auto-detect
   // from the reply text itself.
   const hint = typeof langHint === 'string' ? langHint.toLowerCase().slice(0, 2) : '';
   const lang = /^[a-z]{2}$/.test(hint) ? hint : detectLanguage(text);
   try {
-    if (useElevenLabs) {
+    if (chosen === 'openai') {
+      const mp3 = await synthesizeOpenAI(text, lang);
+      res.set({
+        'Content-Type': 'audio/mpeg',
+        'Content-Length': mp3.length,
+        'X-TTS-Provider': 'openai',
+        'X-TTS-Language': lang,
+      });
+      return res.send(mp3);
+    }
+    if (chosen === 'elevenlabs') {
       const mp3 = await synthesizeElevenLabs(text, lang);
       res.set({
         'Content-Type': 'audio/mpeg',
