@@ -1771,8 +1771,13 @@ export default function KelionStage() {
 
   // Auto-save new chat messages to the conversation history backend.
   // `savedUpToRef` tracks the prefix of `chatMessages` that has already
-  // been persisted so this effect only POSTs the delta. Empty assistant
-  // placeholders (streaming not yet started) are skipped.
+  // been persisted so this effect only POSTs the delta. An empty
+  // assistant placeholder (streaming not yet started) halts iteration
+  // without advancing the cursor past it — once streaming fills the
+  // same slot with content, a subsequent effect run picks it up and
+  // persists it. Without the break, the placeholder's slot would be
+  // marked "saved" and the final assistant reply would never reach
+  // localStorage / the server.
   useEffect(() => {
     const total = chatMessages.length
     const start = savedUpToRef.current
@@ -1782,15 +1787,17 @@ export default function KelionStage() {
     }
     let cancelled = false
     ;(async () => {
+      let savedUpTo = start
       for (let i = start; i < chatMessages.length; i++) {
         const m = chatMessages[i]
-        if (!m || !m.content || !String(m.content).trim()) continue
+        if (!m || !m.content || !String(m.content).trim()) break
         if (cancelled) return
         try {
           await appendConversationMessage({ role: m.role || 'user', content: m.content })
+          savedUpTo = i + 1
         } catch { /* swallow — next delta will retry via ensureActiveConversation */ }
       }
-      if (!cancelled) savedUpToRef.current = chatMessages.length
+      if (!cancelled) savedUpToRef.current = savedUpTo
     })()
     return () => { cancelled = true }
   }, [chatMessages])
@@ -1936,6 +1943,14 @@ export default function KelionStage() {
     setAuthState({ signedIn: false, user: null })
     setMemoryItems([])
     setMemoryOpen(false)
+    // Don't leak the previous user's server conversation into the
+    // now-signed-out guest session. Clear the active id, on-screen
+    // transcript, loaded history list, and the autosave cursor.
+    try { startNewConversation() } catch { /* ignore */ }
+    setChatMessages([])
+    setHistoryItems([])
+    setHistoryOpen(false)
+    savedUpToRef.current = 0
   }, [])
 
   const handleForgetAll = useCallback(async () => {
