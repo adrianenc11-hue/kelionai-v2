@@ -96,6 +96,16 @@ function writeActiveId(id) {
 
 let activeConversationId = readActiveId();
 
+// In-flight guard for ensureActiveConversation. The autosave effect in
+// KelionStage fires once per chatMessages change, and SSE streaming can
+// fire it many times a second. Without this, two back-to-back user turns
+// each trigger POST /api/conversations in parallel (neither has seen the
+// other's returned id yet), producing N threads for what should be one
+// conversation — the "fragmentation" Adrian saw in the admin list where
+// the same "What is the capital of France?" appeared as 3 separate rows
+// in 20 seconds, each missing memory of the previous turn.
+let pendingEnsure = null;
+
 // A guest id is prefixed `g-` in `guestNextId`; server ids are numeric.
 // Used to drop a stale active id when the auth mode changes between
 // sessions (e.g. signed-in user refreshes → app starts signed-out per
@@ -111,6 +121,7 @@ export function setActiveConversationId(id) {
 
 export function startNewConversation() {
   setActiveConversationId(null);
+  pendingEnsure = null;
 }
 
 // ─── ensureActiveConversation — lazily create on first message ───
@@ -129,37 +140,50 @@ export async function ensureActiveConversation(firstMessageHint) {
     if (mismatch) setActiveConversationId(null);
   }
   if (activeConversationId) return activeConversationId;
-  const title = guestDeriveTitle(firstMessageHint);
 
-  if (signedIn()) {
-    try {
-      const r = await fetch('/api/conversations', {
-        method: 'POST',
-        credentials: 'include',
-        headers: authHeaders(),
-        body: JSON.stringify({ title }),
-      });
-      if (r.ok) {
-        const data = await r.json();
-        const id = data?.conversation?.id;
-        if (id) {
-          setActiveConversationId(String(id));
-          return activeConversationId;
+  // Coalesce concurrent callers onto a single create. The autosave effect
+  // fires on every chatMessages change; two nearly-simultaneous user
+  // turns would otherwise each POST /api/conversations before either saw
+  // the returned id, producing duplicate threads (fragmentation).
+  if (pendingEnsure) return pendingEnsure;
+
+  pendingEnsure = (async () => {
+    const title = guestDeriveTitle(firstMessageHint);
+
+    if (signedIn()) {
+      try {
+        const r = await fetch('/api/conversations', {
+          method: 'POST',
+          credentials: 'include',
+          headers: authHeaders(),
+          body: JSON.stringify({ title }),
+        });
+        if (r.ok) {
+          const data = await r.json();
+          const id = data?.conversation?.id;
+          if (id) {
+            setActiveConversationId(String(id));
+            return activeConversationId;
+          }
         }
-      }
-    } catch { /* fall through to guest path */ }
-  }
+      } catch { /* fall through to guest path */ }
+    }
 
-  // Guest (or server create failed) — localStorage.
-  const now = new Date().toISOString();
-  const id  = guestNextId();
-  const store = readGuestStore();
-  store.conversations.unshift({
-    id, title, created_at: now, updated_at: now, messages: [],
+    // Guest (or server create failed) — localStorage.
+    const now = new Date().toISOString();
+    const id  = guestNextId();
+    const store = readGuestStore();
+    store.conversations.unshift({
+      id, title, created_at: now, updated_at: now, messages: [],
+    });
+    writeGuestStore(store);
+    setActiveConversationId(id);
+    return id;
+  })().finally(() => {
+    pendingEnsure = null;
   });
-  writeGuestStore(store);
-  setActiveConversationId(id);
-  return id;
+
+  return pendingEnsure;
 }
 
 // ─── appendMessage — save one turn to the active conversation ────
