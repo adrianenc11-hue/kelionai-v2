@@ -1771,13 +1771,27 @@ export default function KelionStage() {
 
   // Auto-save new chat messages to the conversation history backend.
   // `savedUpToRef` tracks the prefix of `chatMessages` that has already
-  // been persisted so this effect only POSTs the delta. An empty
-  // assistant placeholder (streaming not yet started) halts iteration
-  // without advancing the cursor past it — once streaming fills the
-  // same slot with content, a subsequent effect run picks it up and
-  // persists it. Without the break, the placeholder's slot would be
-  // marked "saved" and the final assistant reply would never reach
-  // localStorage / the server.
+  // been persisted so we only POST the delta.
+  //
+  // Two subtleties this effect MUST handle correctly, both of which
+  // the previous implementation got wrong (zero setItem calls on prod
+  // during streaming):
+  //
+  //   1. While `chatBusy` is true the last assistant message is a
+  //      half-streamed chunk (e.g. "Par" before "Paris"). Persisting
+  //      it now would save garbage and advance the cursor past the
+  //      final content — so we hold off on the tail until streaming
+  //      finishes (chatBusy flips back to false, which re-runs this
+  //      effect via the dep array).
+  //
+  //   2. SSE chunks fire many setChatMessages calls per second. Each
+  //      one triggers this effect and cancels the previous run's
+  //      closure. If we only advance `savedUpToRef` at the end of the
+  //      loop, rapid cancellations mean the ref never advances and
+  //      work repeats. We advance it incrementally, inside the loop,
+  //      the moment each message is actually persisted — cancellation
+  //      then just halts future iterations, it doesn't roll back
+  //      progress already made.
   useEffect(() => {
     const total = chatMessages.length
     const start = savedUpToRef.current
@@ -1787,20 +1801,22 @@ export default function KelionStage() {
     }
     let cancelled = false
     ;(async () => {
-      let savedUpTo = start
       for (let i = start; i < chatMessages.length; i++) {
+        if (cancelled) return
         const m = chatMessages[i]
         if (!m || !m.content || !String(m.content).trim()) break
-        if (cancelled) return
+        const isLast = i === chatMessages.length - 1
+        // Hold off on the still-streaming assistant tail — we'll pick
+        // it up once chatBusy flips back to false.
+        if (isLast && chatBusy && (m.role || 'user') === 'assistant') break
         try {
           await appendConversationMessage({ role: m.role || 'user', content: m.content })
-          savedUpTo = i + 1
-        } catch { /* swallow — next delta will retry via ensureActiveConversation */ }
+          if (!cancelled) savedUpToRef.current = i + 1
+        } catch { /* next change will retry from the unchanged cursor */ }
       }
-      if (!cancelled) savedUpToRef.current = savedUpTo
     })()
     return () => { cancelled = true }
-  }, [chatMessages])
+  }, [chatMessages, chatBusy])
 
   // Load history list whenever the panel opens.
   const refreshHistory = useCallback(async () => {
