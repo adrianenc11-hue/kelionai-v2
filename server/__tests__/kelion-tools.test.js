@@ -69,6 +69,12 @@ const EXPECTED_TOOL_NAMES = [
   // (clientGeoProvider, cameraControl) rather than the server.
   'get_my_location',
   'switch_camera',
+  // PR B — document readers + OCR (pdf-parse / mammoth / tesseract.js).
+  // Inputs accept either a public HTTPS URL or a base64 blob.
+  'read_pdf',
+  'read_docx',
+  'ocr_image',
+  'ocr_passport',
 ];
 
 describe('Kelion tool catalog', () => {
