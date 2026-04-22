@@ -504,6 +504,36 @@ const KELION_TOOLS = [
     },
     required: ['url'],
   },
+  // ── Document readers ────────────────────────────────────────────
+  {
+    name: 'read_pdf',
+    description: "Download an HTTPS-hosted PDF and extract its text. Use for 'read this PDF', 'what's in this document', when the user pastes or mentions a PDF URL. Returns page count, title/author metadata, and the extracted text (capped to ~6000 chars by default). The server enforces a 15 MB download cap.",
+    properties: {
+      url:       { type: 'string',  description: 'HTTPS URL of the PDF file. http:// is refused.' },
+      max_chars: { type: 'integer', description: 'Maximum characters of text to return (200-60000, default 6000).' },
+    },
+    required: ['url'],
+  },
+  {
+    name: 'read_docx',
+    description: "Download an HTTPS-hosted Word document (.docx) and extract its plain text. Use for 'read this Word file', 'summarise this DOCX'. Returns the raw text (capped to ~6000 chars by default). Only .docx is supported — legacy .doc will fail.",
+    properties: {
+      url:       { type: 'string',  description: 'HTTPS URL of the .docx file. http:// is refused.' },
+      max_chars: { type: 'integer', description: 'Maximum characters of text to return (200-60000, default 6000).' },
+    },
+    required: ['url'],
+  },
+  {
+    name: 'read_spreadsheet',
+    description: "Download an HTTPS-hosted spreadsheet (.xlsx, .xls, .csv, .ods) and return the first sheet (or a named sheet) as a CSV preview. Use for 'what's in this spreadsheet', 'show me the first 50 rows'. Also returns the list of available sheet names so the user can pick a different one on the next call.",
+    properties: {
+      url:       { type: 'string',  description: 'HTTPS URL of the spreadsheet. http:// is refused.' },
+      sheet:     { type: 'string',  description: 'Optional sheet name. Falls back to the first sheet if omitted or not found.' },
+      max_rows:  { type: 'integer', description: 'Maximum rows to include in the preview (1-500, default 50).' },
+      max_chars: { type: 'integer', description: 'Maximum characters of CSV text to return (200-60000, default 6000).' },
+    },
+    required: ['url'],
+  },
   // ── Knowledge ───────────────────────────────────────────────────
   {
     name: 'wikipedia_search',

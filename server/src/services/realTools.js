@@ -1063,6 +1063,134 @@ async function toolRssRead({ url, limit }) {
 }
 
 // ──────────────────────────────────────────────────────────────────
+// Document readers — read_pdf / read_docx / read_spreadsheet
+//
+// All three fetch a user-supplied URL and parse it on the server. They
+// share the same guardrails:
+//   • https only (the server never dereferences http:// for documents)
+//   • 15 MB cap on the downloaded buffer — pdf-parse / mammoth / xlsx
+//     all hold the whole document in memory while parsing, so this is
+//     both a memory bound and a poor-man's abuse check
+//   • 15 s fetch timeout via fetchWithTimeout
+//   • `max_chars` output truncation so the voice model doesn't choke on
+//     a 400-page PDF — default 6 KB, hard ceiling 60 KB
+//
+// These tools live alongside fetch_url / rss_read and get the same SSRF
+// guard once PR #138 lands (assertPublicHttpsUrl), but until then they
+// already refuse http:// explicitly.
+
+const MAX_DOC_BYTES = 15 * 1024 * 1024;
+
+async function fetchDocumentBuffer(url) {
+  const u = (url || '').toString().trim();
+  if (!/^https:\/\//i.test(u)) {
+    return { ok: false, error: 'url must start with https:// (http not allowed)' };
+  }
+  let r;
+  try {
+    r = await fetchWithTimeout(u, {
+      headers: { 'User-Agent': 'Kelion/1.0 (+https://kelionai.app)' },
+    }, 15000);
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+  if (!r.ok) return { ok: false, error: `fetch ${r.status}` };
+  const len = Number(r.headers.get('content-length') || 0);
+  if (len && len > MAX_DOC_BYTES) {
+    return { ok: false, error: `document too large (${len} bytes, max ${MAX_DOC_BYTES})` };
+  }
+  // Stream into an ArrayBuffer, rejecting if it exceeds the cap mid-flight.
+  // `fetch().arrayBuffer()` already allocates the whole body, so we
+  // double-check after the fact.
+  const ab = await r.arrayBuffer();
+  if (ab.byteLength > MAX_DOC_BYTES) {
+    return { ok: false, error: `document too large (${ab.byteLength} bytes, max ${MAX_DOC_BYTES})` };
+  }
+  return { ok: true, url: u, buffer: Buffer.from(ab), contentType: r.headers.get('content-type') || '' };
+}
+
+function truncateForVoice(text, maxChars) {
+  const cap = Math.max(200, Math.min(60000, Number.parseInt(maxChars, 10) || 6000));
+  const s = (text || '').replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+  return s.length > cap ? s.slice(0, cap) + '\n… [truncated]' : s;
+}
+
+async function toolReadPdf({ url, max_chars }) {
+  const f = await fetchDocumentBuffer(url);
+  if (!f.ok) return f;
+  try {
+    // pdf-parse exports differently across major versions; `.default`
+    // covers the 2.x shape and the call signature is the same in both.
+    const pdfParseMod = require('pdf-parse');
+    const pdfParse = pdfParseMod && pdfParseMod.default ? pdfParseMod.default : pdfParseMod;
+    const data = await pdfParse(f.buffer);
+    return {
+      ok: true,
+      url: f.url,
+      pages: data.numpages,
+      title: data.info?.Title || null,
+      author: data.info?.Author || null,
+      text: truncateForVoice(data.text, max_chars),
+      source: 'pdf-parse',
+    };
+  } catch (err) {
+    return { ok: false, error: `pdf parse failed: ${err && err.message ? err.message : String(err)}` };
+  }
+}
+
+async function toolReadDocx({ url, max_chars }) {
+  const f = await fetchDocumentBuffer(url);
+  if (!f.ok) return f;
+  try {
+    const mammoth = require('mammoth');
+    const { value } = await mammoth.extractRawText({ buffer: f.buffer });
+    return {
+      ok: true,
+      url: f.url,
+      text: truncateForVoice(value, max_chars),
+      source: 'mammoth',
+    };
+  } catch (err) {
+    return { ok: false, error: `docx parse failed: ${err && err.message ? err.message : String(err)}` };
+  }
+}
+
+async function toolReadSpreadsheet({ url, sheet, max_rows, max_chars }) {
+  const f = await fetchDocumentBuffer(url);
+  if (!f.ok) return f;
+  try {
+    const XLSX = require('xlsx');
+    const wb = XLSX.read(f.buffer, { type: 'buffer' });
+    const sheetName = sheet && wb.SheetNames.includes(String(sheet))
+      ? String(sheet)
+      : wb.SheetNames[0];
+    if (!sheetName) return { ok: false, error: 'spreadsheet has no sheets' };
+    const ws = wb.Sheets[sheetName];
+    const rowCap = Math.max(1, Math.min(500, Number.parseInt(max_rows, 10) || 50));
+    // sheet_to_json({ header: 1 }) returns a 2-D array of cell values,
+    // which converts cleanly to a CSV-style preview the voice model
+    // can speak without getting lost in JSON structure.
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false }).slice(0, rowCap);
+    const csv = rows.map((r) => r.map((c) => {
+      if (c == null) return '';
+      const s = String(c).replace(/"/g, '""');
+      return /[",\n]/.test(s) ? `"${s}"` : s;
+    }).join(',')).join('\n');
+    return {
+      ok: true,
+      url: f.url,
+      sheet: sheetName,
+      sheets: wb.SheetNames,
+      rows: rows.length,
+      preview: truncateForVoice(csv, max_chars),
+      source: 'xlsx',
+    };
+  } catch (err) {
+    return { ok: false, error: `spreadsheet parse failed: ${err && err.message ? err.message : String(err)}` };
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────
 // wikipedia_search — Wikipedia REST summary API
 
 async function toolWikipediaSearch({ query, lang }) {
@@ -1327,6 +1455,10 @@ async function executeRealTool(name, args) {
     case 'search_stackoverflow': return toolSearchStackoverflow(a);
     case 'fetch_url':         return toolFetchUrl(a);
     case 'rss_read':          return toolRssRead(a);
+    // ── document readers ──
+    case 'read_pdf':          return toolReadPdf(a);
+    case 'read_docx':         return toolReadDocx(a);
+    case 'read_spreadsheet':  return toolReadSpreadsheet(a);
     // ── knowledge ──
     case 'wikipedia_search':  return toolWikipediaSearch(a);
     case 'dictionary':        return toolDictionary(a);
@@ -1390,6 +1522,10 @@ module.exports = {
   toolSearchStackoverflow,
   toolFetchUrl,
   toolRssRead,
+  // document readers
+  toolReadPdf,
+  toolReadDocx,
+  toolReadSpreadsheet,
   // knowledge
   toolWikipediaSearch,
   toolDictionary,
