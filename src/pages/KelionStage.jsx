@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import * as THREE from 'three'
 import { useLipSync } from '../lib/lipSync'
 import { subscribeMonitor, handleShowOnMonitor, setMonitorGeoProvider } from '../lib/monitorStore'
+import { setClientGeoProvider } from '../lib/clientGeoProvider'
 import { STATUS_COLORS, STATUS_PULSE_HZ } from '../lib/kelionStatus'
 import { useGeminiLive } from '../lib/geminiLive'
 import { useOpenAIRealtime } from '../lib/openaiRealtime'
@@ -842,10 +843,29 @@ export default function KelionStage() {
   // current coords when the model calls show_on_monitor({kind:'map'}) without
   // a query (e.g. "arată-mi harta" / "show me a map" without a place name).
   const clientGeoRef = useRef(null)
+  const geoPermissionRef = useRef('unknown')
+  const requestGeoRef = useRef(null)
   useEffect(() => { clientGeoRef.current = clientGeo }, [clientGeo])
+  useEffect(() => { geoPermissionRef.current = geoPermission }, [geoPermission])
+  useEffect(() => { requestGeoRef.current = requestGeo }, [requestGeo])
   useEffect(() => {
     setMonitorGeoProvider(() => clientGeoRef.current)
     return () => setMonitorGeoProvider(null)
+  }, [])
+  // Also publish the geo state to clientGeoProvider so the voice-side
+  // `get_my_location` tool handler (in src/lib/kelionTools.js) can read
+  // coords / permission / request-on-gesture without reaching into the
+  // React tree. Tool handlers run outside React so they need a module-
+  // level registry just like monitorGeoProvider above.
+  useEffect(() => {
+    setClientGeoProvider({
+      getCoords:     () => clientGeoRef.current,
+      getPermission: () => geoPermissionRef.current,
+      requestNow:    () => {
+        if (typeof requestGeoRef.current === 'function') requestGeoRef.current()
+      },
+    })
+    return () => setClientGeoProvider(null)
   }, [])
   const [voiceLevel, setVoiceLevel] = useState(0)
   const [transcriptOpen, setTranscriptOpen] = useState(false)
