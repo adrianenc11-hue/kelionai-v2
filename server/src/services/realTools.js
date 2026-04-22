@@ -129,7 +129,19 @@ function isPrivateIPv6(ip) {
   if (lower.startsWith('fc') || lower.startsWith('fd')) return true;  // ULA
   if (lower.startsWith('fe80')) return true;                          // link-local
   if (lower.startsWith('::ffff:')) {
+    // Node's WHATWG URL parser normalises ::ffff:A.B.C.D to ::ffff:XXXX:XXXX
+    // (hex pair). Without the hex→dotted conversion below, isPrivateIPv4
+    // receives a non-dotted string, its `.split('.').length !== 4` guard
+    // trips, and every IPv4-mapped IPv6 host — including public ones like
+    // 8.8.8.8 — is treated as private.
     const v4 = lower.slice('::ffff:'.length);
+    const hexMatch = v4.match(/^([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+    if (hexMatch) {
+      const hi = Number.parseInt(hexMatch[1], 16);
+      const lo = Number.parseInt(hexMatch[2], 16);
+      const dotted = `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`;
+      return isPrivateIPv4(dotted);
+    }
     return isPrivateIPv4(v4);
   }
   return false;

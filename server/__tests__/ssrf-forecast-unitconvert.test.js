@@ -89,6 +89,26 @@ describe('SSRF guard on fetch_url', () => {
     const r = await realTools.toolFetchUrl({ url: 'https://[::1]/' });
     expect(r.ok).toBe(false);
   });
+
+  test('rejects IPv4-mapped IPv6 pointing at private range', async () => {
+    // Node's URL parser normalises ::ffff:127.0.0.1 to ::ffff:7f00:1.
+    // The guard must convert the hex pair back to a dotted quad and
+    // recognise 127.0.0.1 as private.
+    const r = await realTools.toolFetchUrl({ url: 'https://[::ffff:127.0.0.1]/' });
+    expect(r.ok).toBe(false);
+    expect(FETCH_CALLS).toHaveLength(0);
+  });
+
+  test('allows IPv4-mapped IPv6 pointing at a public address', async () => {
+    // Regression guard for the Devin Review finding: before the fix
+    // isPrivateIPv6 blanket-blocked every ::ffff:* host because
+    // isPrivateIPv4 was called with a hex pair instead of dotted quad.
+    const r = await realTools.toolFetchUrl({ url: 'https://[::ffff:8.8.8.8]/' });
+    // We don't care about the fetch outcome here (the stub returns ok),
+    // only that the SSRF guard didn't reject before the network call.
+    expect(r.ok).toBe(true);
+    expect(FETCH_CALLS.length).toBeGreaterThan(0);
+  });
 });
 
 describe('SSRF guard on rss_read', () => {
