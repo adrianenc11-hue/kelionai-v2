@@ -75,10 +75,25 @@ async function stripeRequest(path, { method = 'GET', form = null, idempotencyKey
   }
 }
 
-function fmtMinor(cents, currency) {
-  if (typeof cents !== 'number' || !Number.isFinite(cents)) return '—';
-  const sym = String(currency || '').toUpperCase();
-  return `${(cents / 100).toFixed(2)} ${sym}`;
+// Stripe's zero-decimal currencies store amounts directly in major
+// units, not in "cents". The full list is small and stable; if it ever
+// changes, Stripe documents it at
+// https://stripe.com/docs/currencies#zero-decimal. We include the
+// current set here so a Kelion account ever paid out in JPY/KRW/etc.
+// doesn't show numbers 100× too small.
+const ZERO_DECIMAL_CURRENCIES = new Set([
+  'bif', 'clp', 'djf', 'gnf', 'jpy', 'kmf', 'krw', 'mga',
+  'pyg', 'rwf', 'ugx', 'vnd', 'vuv', 'xaf', 'xof', 'xpf',
+]);
+
+function fmtMinor(amount, currency) {
+  if (typeof amount !== 'number' || !Number.isFinite(amount)) return '—';
+  const cur = String(currency || '').toLowerCase();
+  const sym = cur.toUpperCase();
+  if (ZERO_DECIMAL_CURRENCIES.has(cur)) {
+    return `${Math.round(amount)} ${sym}`;
+  }
+  return `${(amount / 100).toFixed(2)} ${sym}`;
 }
 
 /**

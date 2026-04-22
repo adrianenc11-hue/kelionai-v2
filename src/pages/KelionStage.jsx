@@ -1215,11 +1215,14 @@ export default function KelionStage() {
   const [payoutsError, setPayoutsError] = useState(null)
   const [payoutBusy, setPayoutBusy] = useState(false)
   const [payoutResult, setPayoutResult] = useState(null)
-  const openPayouts = useCallback(async () => {
-    setPayoutsOpen(true)
+  // `refreshPayoutsData` pulls a fresh snapshot without touching
+  // `payoutResult`; that way the "OK — 50.00 EUR · status in_transit"
+  // banner survives the refresh triggered right after a successful
+  // instant payout. `openPayouts` wraps it and additionally clears the
+  // previous result so opening the drawer from scratch feels clean.
+  const refreshPayoutsData = useCallback(async () => {
     setPayoutsLoading(true)
     setPayoutsError(null)
-    setPayoutResult(null)
     try {
       const r = await fetch('/api/admin/payouts?days=30', { credentials: 'include' })
       if (!r.ok) throw new Error(`HTTP ${r.status}`)
@@ -1230,6 +1233,11 @@ export default function KelionStage() {
       setPayoutsLoading(false)
     }
   }, [])
+  const openPayouts = useCallback(async () => {
+    setPayoutsOpen(true)
+    setPayoutResult(null)
+    await refreshPayoutsData()
+  }, [refreshPayoutsData])
   const triggerInstantPayout = useCallback(async () => {
     if (payoutBusy) return
     // A confirm() keeps this honest — an instant payout cannot be
@@ -1253,13 +1261,15 @@ export default function KelionStage() {
       }
       setPayoutResult({ ok: true, ...body })
       // Refresh the snapshot so the new payout shows up in recent list.
-      openPayouts()
+      // Must use `refreshPayoutsData` (not `openPayouts`) so the success
+      // banner we just set isn't immediately wiped.
+      refreshPayoutsData()
     } catch (err) {
       setPayoutResult({ ok: false, error: err.message || 'Instant payout failed' })
     } finally {
       setPayoutBusy(false)
     }
-  }, [payoutBusy, openPayouts])
+  }, [payoutBusy, refreshPayoutsData])
 
   const switchAdminTab = useCallback((tab) => {
     // Close non-target tabs first so only one panel is on screen at a
