@@ -24,9 +24,13 @@ CREATE TABLE IF NOT EXISTS users (
   passkey_credentials        TEXT DEFAULT '[]',
   current_webauthn_challenge TEXT,
   credits_balance_minutes    INTEGER NOT NULL DEFAULT 0,
+  preferred_language         TEXT,
   created_at                 TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   updated_at                 TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+-- F8: idempotent migration for older Supabase clusters that existed
+-- before the column was added to the CREATE TABLE above.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS preferred_language TEXT;
 CREATE INDEX IF NOT EXISTS idx_users_google_id     ON users(google_id);
 CREATE INDEX IF NOT EXISTS idx_users_email         ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_referral_code ON users(referral_code);
