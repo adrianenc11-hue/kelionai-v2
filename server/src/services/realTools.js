@@ -98,6 +98,84 @@ async function fetchWithTimeout(url, opts = {}, timeoutMs = 8000) {
 }
 
 // ──────────────────────────────────────────────────────────────────
+// SSRF guard — used by any tool that dereferences a user-supplied URL
+// (fetch_url, rss_read). The rule is: https only, and the hostname
+// must not resolve to a private / loopback / link-local / metadata
+// range. Without this guard an unauthenticated caller could POST
+// `{ url: 'http://169.254.169.254/latest/meta-data/' }` to
+// /api/tools/execute and exfiltrate cloud metadata.
+// Devin Review on PR #134 flagged this as the critical SSRF vector.
+const dns = require('node:dns').promises;
+const net = require('node:net');
+
+function isPrivateIPv4(ip) {
+  const parts = ip.split('.').map((n) => Number.parseInt(n, 10));
+  if (parts.length !== 4 || parts.some((p) => !Number.isFinite(p))) return true;
+  const [a, b] = parts;
+  if (a === 0) return true;                                   // 0.0.0.0/8
+  if (a === 10) return true;                                  // 10/8
+  if (a === 127) return true;                                 // loopback
+  if (a === 169 && b === 254) return true;                    // link-local + cloud metadata
+  if (a === 172 && b >= 16 && b <= 31) return true;           // 172.16/12
+  if (a === 192 && b === 168) return true;                    // 192.168/16
+  if (a === 100 && b >= 64 && b <= 127) return true;          // CGNAT 100.64/10
+  if (a >= 224) return true;                                  // multicast + reserved
+  return false;
+}
+
+function isPrivateIPv6(ip) {
+  const lower = ip.toLowerCase();
+  if (lower === '::1' || lower === '::') return true;
+  if (lower.startsWith('fc') || lower.startsWith('fd')) return true;  // ULA
+  if (lower.startsWith('fe80')) return true;                          // link-local
+  if (lower.startsWith('::ffff:')) {
+    const v4 = lower.slice('::ffff:'.length);
+    return isPrivateIPv4(v4);
+  }
+  return false;
+}
+
+async function assertPublicHttpsUrl(rawUrl) {
+  if (!/^https:\/\//i.test(rawUrl)) {
+    return { ok: false, error: 'url must start with https:// (http not allowed)' };
+  }
+  let parsed;
+  try { parsed = new URL(rawUrl); } catch { return { ok: false, error: 'invalid url' }; }
+  const host = (parsed.hostname || '').toLowerCase();
+  if (!host) return { ok: false, error: 'invalid host' };
+  // Block well-known internal names outright — some DNS setups return
+  // a public IP for "localhost" if the caller has a broken resolver.
+  if (
+    host === 'localhost'
+    || host.endsWith('.localhost')
+    || host.endsWith('.internal')
+    || host.endsWith('.local')
+    || host === 'metadata.google.internal'
+  ) {
+    return { ok: false, error: 'private host blocked' };
+  }
+  // If the URL already contains a literal IP, skip DNS and validate it
+  // directly. Strip IPv6 brackets that `URL` leaves on hostname.
+  const ipLiteral = host.startsWith('[') && host.endsWith(']') ? host.slice(1, -1) : host;
+  const family = net.isIP(ipLiteral);
+  if (family) {
+    if (family === 4 && isPrivateIPv4(ipLiteral)) return { ok: false, error: 'private IP blocked' };
+    if (family === 6 && isPrivateIPv6(ipLiteral)) return { ok: false, error: 'private IP blocked' };
+    return { ok: true };
+  }
+  try {
+    const addrs = await dns.lookup(host, { all: true, verbatim: true });
+    for (const a of addrs) {
+      if (a.family === 4 && isPrivateIPv4(a.address)) return { ok: false, error: 'resolved to private IP' };
+      if (a.family === 6 && isPrivateIPv6(a.address)) return { ok: false, error: 'resolved to private IP' };
+    }
+  } catch (err) {
+    return { ok: false, error: `dns lookup failed: ${err && err.message ? err.message : String(err)}` };
+  }
+  return { ok: true };
+}
+
+// ──────────────────────────────────────────────────────────────────
 // calculate
 
 function toolCalculate({ expression }) {
@@ -139,7 +217,7 @@ async function geocodeCity(city) {
   };
 }
 
-async function toolGetWeather({ city, lat, lon, days }) {
+async function toolGetWeather({ city, lat, lon, days, _maxDays }) {
   try {
     let place = null;
     let latitude = Number.parseFloat(lat);
@@ -150,7 +228,12 @@ async function toolGetWeather({ city, lat, lon, days }) {
       latitude = place.latitude;
       longitude = place.longitude;
     }
-    const n = Math.max(1, Math.min(7, Number.parseInt(days, 10) || 1));
+    // Default ceiling stays at 7 days to match the `get_weather` contract,
+    // but `toolGetForecast` can pass `_maxDays: 16` so that the forecast
+    // variant is not silently truncated to a week. Open-Meteo's free tier
+    // supports up to 16 forecast_days.
+    const ceiling = Math.max(1, Math.min(16, Number.parseInt(_maxDays, 10) || 7));
+    const n = Math.max(1, Math.min(ceiling, Number.parseInt(days, 10) || 1));
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}`
       + '&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,wind_speed_10m'
       + '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max'
@@ -351,7 +434,8 @@ async function toolTranslate({ text, to, from }) {
 
 async function toolGetForecast({ city, lat, lon, days }) {
   const n = Math.max(1, Math.min(16, Number.parseInt(days, 10) || 7));
-  return toolGetWeather({ city, lat, lon, days: Math.min(n, 7) });
+  // Pass the 16-day ceiling so toolGetWeather doesn't silently clamp to 7.
+  return toolGetWeather({ city, lat, lon, days: n, _maxDays: 16 });
 }
 
 // ──────────────────────────────────────────────────────────────────
@@ -859,6 +943,12 @@ const UNIT_CONVERSIONS = {
   l: 1, ml: 0.001, gal: 3.78541, qt: 0.946353, pt: 0.473176, cup: 0.236588, floz: 0.0295735,
   // time (to seconds)
   s: 1, min: 60, h: 3600, hr: 3600, day: 86400, wk: 604800,
+  // data size (to bytes). Decimal (kB=1000) + binary (KiB=1024) so either
+  // convention works. The KELION_TOOLS catalog advertises GB/MB as
+  // examples, so we need these here.
+  b: 1, byte: 1, bytes: 1,
+  kb: 1000, mb: 1000 * 1000, gb: 1000 ** 3, tb: 1000 ** 4, pb: 1000 ** 5,
+  kib: 1024, mib: 1024 ** 2, gib: 1024 ** 3, tib: 1024 ** 4, pib: 1024 ** 5,
 };
 const UNIT_CATEGORY = {
   m: 'length', km: 'length', cm: 'length', mm: 'length', mi: 'length', miles: 'length',
@@ -866,15 +956,27 @@ const UNIT_CATEGORY = {
   kg: 'mass', g: 'mass', mg: 'mass', t: 'mass', lb: 'mass', lbs: 'mass', oz: 'mass',
   l: 'volume', ml: 'volume', gal: 'volume', qt: 'volume', pt: 'volume', cup: 'volume', floz: 'volume',
   s: 'time', min: 'time', h: 'time', hr: 'time', day: 'time', wk: 'time',
+  b: 'data', byte: 'data', bytes: 'data',
+  kb: 'data', mb: 'data', gb: 'data', tb: 'data', pb: 'data',
+  kib: 'data', mib: 'data', gib: 'data', tib: 'data', pib: 'data',
 };
 
 function toolUnitConvert({ value, from, to }) {
   const v = Number.parseFloat(value);
   if (!Number.isFinite(v)) return { ok: false, error: 'missing/invalid value' };
-  const f = (from || '').toString().toLowerCase().trim();
-  const t = (to || '').toString().toLowerCase().trim();
-  // Temperature — non-linear, handled separately
-  const tempKey = (k) => ({ c: 'c', celsius: 'c', '°c': 'c', f: 'f', fahrenheit: 'f', '°f': 'f', k: 'k', kelvin: 'k' }[k]);
+  // Normalize: lowercase + strip degree symbol / trailing "deg" prefix so
+  // that `degF`, `°F`, `Deg c`, `Fahrenheit` all resolve to the same key.
+  const normalize = (raw) => (raw || '').toString().toLowerCase().replace(/[°\s]/g, '').trim();
+  const f = normalize(from);
+  const t = normalize(to);
+  // Temperature — non-linear, handled separately. Accept the full set of
+  // aliases we advertise in the KELION_TOOLS catalog (degC/degF/degK).
+  const TEMP_ALIASES = {
+    c: 'c', degc: 'c', celsius: 'c',
+    f: 'f', degf: 'f', fahrenheit: 'f',
+    k: 'k', degk: 'k', kelvin: 'k',
+  };
+  const tempKey = (k) => TEMP_ALIASES[k];
   const fT = tempKey(f);
   const tT = tempKey(t);
   if (fT && tT) {
@@ -1002,7 +1104,11 @@ async function toolSearchStackoverflow({ query, limit }) {
 
 async function toolFetchUrl({ url, max_chars }) {
   const u = (url || '').toString().trim();
-  if (!/^https?:\/\//i.test(u)) return { ok: false, error: 'url must start with http(s)://' };
+  // SSRF guard: https only + no private/loopback/metadata IPs. The old
+  // regex matched both http:// and https:// and there was no IP check,
+  // which let any caller hit 169.254.169.254 / 127.0.0.1 / internal RDS.
+  const guard = await assertPublicHttpsUrl(u);
+  if (!guard.ok) return guard;
   const cap = Math.max(200, Math.min(20000, Number.parseInt(max_chars, 10) || 4000));
   try {
     const r = await fetchWithTimeout(u, {
@@ -1035,7 +1141,8 @@ async function toolFetchUrl({ url, max_chars }) {
 
 async function toolRssRead({ url, limit }) {
   const u = (url || '').toString().trim();
-  if (!/^https?:\/\//i.test(u)) return { ok: false, error: 'url must start with http(s)://' };
+  const guard = await assertPublicHttpsUrl(u);
+  if (!guard.ok) return guard;
   const n = Math.max(1, Math.min(30, Number.parseInt(limit, 10) || 10));
   try {
     const r = await fetchWithTimeout(u, { headers: { 'User-Agent': 'Kelion/1.0 (RSS)' } });

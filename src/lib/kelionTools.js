@@ -70,7 +70,11 @@ function summarizeRealTool(name, j) {
     return `${loc}: ${c.temperature_2m}°C, wind ${c.wind_speed_10m} m/s, precipitation ${c.precipitation} mm.`
   }
   if (name === 'get_crypto_price' && j.prices) {
-    const parts = Object.entries(j.prices).map(([id, p]) => `${id} ${p.usd} USD`)
+    // `vs` echoes the requested fiat (usd/eur/ron/…). The server returns
+    // `{ bitcoin: { eur: 50000 } }`, so hardcoding `p.usd` gave
+    // "bitcoin undefined USD" for any non-USD query.
+    const vs = (j.vs || 'usd').toLowerCase()
+    const parts = Object.entries(j.prices).map(([id, p]) => `${id} ${p?.[vs]} ${vs.toUpperCase()}`)
     return parts.join('; ')
   }
   if (name === 'get_stock_price' && j.price !== undefined) {
