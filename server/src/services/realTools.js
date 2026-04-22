@@ -1357,6 +1357,206 @@ const EXPLAIN_CODE_SYSTEM = [
   'Call out non-obvious tricks, edge cases, and invariants. Do not rewrite the code.',
 ].join('\n');
 
+// ──────────────────────────────────────────────────────────────────
+// PR B — document + OCR tools. Backend-only; the LLM calls these via
+// function-calling and gets back structured text it can summarise or
+// translate. Inputs are either a public HTTPS URL (goes through the
+// same SSRF guard as fetch_url) or a base64-encoded file — that way
+// the chat UI can pass an uploaded blob directly without a temp-URL
+// round-trip.
+//
+//   read_pdf      → pdf-parse
+//   read_docx     → mammoth
+//   ocr_image     → tesseract.js
+//   ocr_passport  → tesseract.js + MRZ parser (TD3, ICAO 9303)
+
+function decodeBase64Source(base64) {
+  const raw = String(base64 || '').replace(/^data:[^,]+,/, '');
+  if (!raw) return { ok: false, error: 'missing base64' };
+  try {
+    const buf = Buffer.from(raw, 'base64');
+    if (!buf.length) return { ok: false, error: 'empty base64' };
+    return { ok: true, buffer: buf };
+  } catch (_) {
+    return { ok: false, error: 'invalid base64' };
+  }
+}
+
+async function fetchBufferWithGuard(url, maxBytes, timeoutMs) {
+  const guard = await assertPublicHttpsUrl(url);
+  if (!guard.ok) return guard;
+  try {
+    const r = await fetchWithTimeout(url, {
+      headers: { 'User-Agent': 'Kelion/1.0 (+https://kelionai.app)' },
+    }, timeoutMs);
+    if (!r.ok) return { ok: false, error: `fetch ${r.status}` };
+    const ab = await r.arrayBuffer();
+    if (ab.byteLength > maxBytes) {
+      return { ok: false, error: `file too large (${ab.byteLength} bytes, max ${maxBytes})` };
+    }
+    return {
+      ok: true,
+      buffer: Buffer.from(ab),
+      contentType: r.headers.get('content-type') || '',
+    };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+}
+
+async function loadDocBuffer({ url, base64 }, maxBytes, timeoutMs) {
+  if (base64) return decodeBase64Source(base64);
+  if (url) return fetchBufferWithGuard(String(url).trim(), maxBytes, timeoutMs);
+  return { ok: false, error: 'provide either url or base64' };
+}
+
+async function toolReadPdf({ url, base64, max_chars, max_pages }) {
+  const loaded = await loadDocBuffer({ url, base64 }, 25 * 1024 * 1024, 15000);
+  if (!loaded.ok) return loaded;
+  const cap = Math.max(500, Math.min(50000, Number.parseInt(max_chars, 10) || 8000));
+  const maxPages = Math.max(1, Math.min(200, Number.parseInt(max_pages, 10) || 50));
+  try {
+    const pdfParse = require('pdf-parse');
+    const data = await pdfParse(loaded.buffer, { max: maxPages });
+    const text = (data.text || '').replace(/\r/g, '').replace(/\n{3,}/g, '\n\n').trim();
+    const truncated = text.length > cap;
+    return {
+      ok: true,
+      pages: data.numpages || null,
+      info: data.info || null,
+      text: truncated ? text.slice(0, cap) + '… [truncated]' : text,
+      truncated,
+      chars: text.length,
+      bytes: loaded.buffer.length,
+    };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+}
+
+async function toolReadDocx({ url, base64, max_chars }) {
+  const loaded = await loadDocBuffer({ url, base64 }, 25 * 1024 * 1024, 15000);
+  if (!loaded.ok) return loaded;
+  const cap = Math.max(500, Math.min(50000, Number.parseInt(max_chars, 10) || 8000));
+  try {
+    const mammoth = require('mammoth');
+    const result = await mammoth.extractRawText({ buffer: loaded.buffer });
+    const text = (result.value || '').replace(/\r/g, '').replace(/\n{3,}/g, '\n\n').trim();
+    const truncated = text.length > cap;
+    return {
+      ok: true,
+      text: truncated ? text.slice(0, cap) + '… [truncated]' : text,
+      truncated,
+      chars: text.length,
+      bytes: loaded.buffer.length,
+      warnings: (result.messages || []).slice(0, 5).map((m) => m.message),
+    };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+}
+
+// Lazy-require tesseract.js — importing it eagerly pulls in language
+// training data worth ~8 MB that we do not want on hot-path requests
+// that never touch OCR. Tests mock this via jest.mock('tesseract.js').
+let _tesseractModule = null;
+async function getTesseract() {
+  if (!_tesseractModule) _tesseractModule = require('tesseract.js');
+  return _tesseractModule;
+}
+
+async function toolOcrImage({ url, base64, lang, max_chars }) {
+  const loaded = await loadDocBuffer({ url, base64 }, 20 * 1024 * 1024, 20000);
+  if (!loaded.ok) return loaded;
+  const cap = Math.max(200, Math.min(20000, Number.parseInt(max_chars, 10) || 4000));
+  // Accept only the leading run of [a-z+] after trim/lowercase so a value
+  // like "eng+ron!; DROP TABLE" collapses to "eng+ron" instead of the
+  // concatenation "eng+rondroptable".
+  const langMatch = String(lang || 'eng').toLowerCase().trim().match(/^[a-z+]+/);
+  const language = (langMatch ? langMatch[0] : '').slice(0, 32) || 'eng';
+  try {
+    const Tess = await getTesseract();
+    const worker = await Tess.createWorker(language);
+    try {
+      const { data } = await worker.recognize(loaded.buffer);
+      const text = (data && data.text ? data.text : '').trim();
+      const truncated = text.length > cap;
+      return {
+        ok: true,
+        text: truncated ? text.slice(0, cap) + '… [truncated]' : text,
+        truncated,
+        chars: text.length,
+        confidence: Number.isFinite(Number(data && data.confidence))
+          ? Number(data.confidence)
+          : null,
+        language,
+      };
+    } finally {
+      try { await worker.terminate(); } catch (_) { /* no-op */ }
+    }
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+}
+
+// MRZ date → ISO. Birth years ≥ 30 assume 19xx, < 30 assume 20xx; expiry
+// always projects forward into 20xx. Matches ICAO 9303 century rule for
+// passports issued before 2030 (no explicit century digit in MRZ).
+function mrzDate(s, future = false) {
+  if (!/^\d{6}$/.test(s)) return null;
+  const yy = Number(s.slice(0, 2));
+  const mm = s.slice(2, 4);
+  const dd = s.slice(4, 6);
+  const year = future ? 2000 + yy : (yy >= 30 ? 1900 + yy : 2000 + yy);
+  return `${year}-${mm}-${dd}`;
+}
+
+function parseMrz(lines) {
+  if (!Array.isArray(lines) || lines.length < 2) return null;
+  const td3 = lines.filter((l) => typeof l === 'string' && l.length === 44).slice(0, 2);
+  if (td3.length === 2) {
+    const l1 = td3[0];
+    const l2 = td3[1];
+    // MRZ name field: surname and given names are separated by exactly
+    // two `<`, individual name tokens are separated by a single `<`, and
+    // trailing `<` fill the field. Split on `<<` first so the surname
+    // boundary is preserved even after we collapse single `<` to spaces.
+    const nameField = l1.slice(5);
+    const [surnameRaw, givenRaw = ''] = nameField.split('<<');
+    const cleanName = (s) => s.replace(/</g, ' ').replace(/\s+/g, ' ').trim();
+    return {
+      format: 'TD3',
+      documentType:   l1.slice(0, 2).replace(/</g, ''),
+      issuingCountry: l1.slice(2, 5).replace(/</g, ''),
+      surname:        cleanName(surnameRaw),
+      givenNames:     cleanName(givenRaw),
+      passportNumber: l2.slice(0, 9).replace(/</g, ''),
+      nationality:    l2.slice(10, 13).replace(/</g, ''),
+      dateOfBirth:    mrzDate(l2.slice(13, 19)),
+      sex:            l2[20] === '<' ? null : l2[20],
+      dateOfExpiry:   mrzDate(l2.slice(21, 27), true),
+    };
+  }
+  return { format: 'unknown', lines };
+}
+
+async function toolOcrPassport({ url, base64 }) {
+  const ocr = await toolOcrImage({ url, base64, lang: 'eng', max_chars: 20000 });
+  if (!ocr.ok) return ocr;
+  const cleaned = (ocr.text || '')
+    .split(/\r?\n+/)
+    .map((l) => l.replace(/\s+/g, '').toUpperCase())
+    .filter(Boolean);
+  const mrzLines = cleaned.filter((l) => /^[A-Z0-9<]+$/.test(l) && (l.length === 30 || l.length === 36 || l.length === 44));
+  return {
+    ok: true,
+    text: ocr.text,
+    mrz: mrzLines,
+    fields: parseMrz(mrzLines),
+    confidence: ocr.confidence,
+  };
+}
+
 async function toolSolveProblem(args) {
   const description = String(args?.description || args?.problem || '').trim();
   if (!description) return { ok: false, error: 'missing problem description' };
@@ -1468,6 +1668,11 @@ async function executeRealTool(name, args) {
     case 'solve_problem':     return toolSolveProblem(a);
     case 'code_review':       return toolCodeReview(a);
     case 'explain_code':      return toolExplainCode(a);
+    // ── PR B — documents + OCR ──
+    case 'read_pdf':          return toolReadPdf(a);
+    case 'read_docx':         return toolReadDocx(a);
+    case 'ocr_image':         return toolOcrImage(a);
+    case 'ocr_passport':      return toolOcrPassport(a);
     default:                  return null; // signal "not handled here"
   }
 }
@@ -1487,6 +1692,9 @@ const REAL_TOOL_NAMES = [
   // Groq-powered (opt-in) — safe to advertise; executor returns
   // `{ ok:false, unavailable:true }` when GROQ_API_KEY is not set.
   'solve_problem', 'code_review', 'explain_code',
+  // PR B — documents + OCR (pdf-parse / mammoth / tesseract.js).
+  // Inputs accept either a public HTTPS URL or a base64 blob.
+  'read_pdf', 'read_docx', 'ocr_image', 'ocr_passport',
 ];
 
 module.exports = {
@@ -1531,4 +1739,10 @@ module.exports = {
   toolSolveProblem,
   toolCodeReview,
   toolExplainCode,
+  // PR B — documents + OCR
+  toolReadPdf,
+  toolReadDocx,
+  toolOcrImage,
+  toolOcrPassport,
+  parseMrz,
 };
