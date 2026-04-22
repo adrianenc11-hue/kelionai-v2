@@ -86,6 +86,9 @@ const EXPECTED_TOOL_NAMES = [
   // PR D — communications + automations + package info.
   'send_email', 'send_sms', 'create_calendar_ics', 'zapier_trigger',
   'github_repo_info', 'npm_package_info', 'pypi_package_info',
+  // F11 — AI image generation (OpenAI gpt-image-1). Graceful fallback when
+  // OPENAI_API_KEY is absent.
+  'generate_image',
 ];
 
 describe('Kelion tool catalog', () => {

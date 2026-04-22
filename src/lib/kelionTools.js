@@ -7,7 +7,7 @@
 // mutates the emotion store, which the avatar subscribes to.
 
 import { setEmotion } from './emotionStore'
-import { handleShowOnMonitor } from './monitorStore'
+import { handleShowOnMonitor, showImageOnMonitor } from './monitorStore'
 import { getLatestCameraFrame } from './cameraFrameBuffer'
 import { setNarrationMode } from './narrationMode'
 import {
@@ -56,6 +56,8 @@ const REAL_TOOL_NAMES = new Set([
   // Groq-powered (opt-in). The server returns a graceful "not configured"
   // message when GROQ_API_KEY is absent, so the voice UX never breaks.
   'solve_problem', 'code_review', 'explain_code',
+  // F11 — `generate_image` is handled specially in the runTool switch
+  // below so we can side-effect the monitor; it isn't in this set.
 ])
 
 // Compress a tool-result JSON into a short, speakable string for the voice
@@ -191,6 +193,37 @@ export async function runTool(name, args) {
       // monitorStore resolves (kind, query) → iframe/image URL and notifies
       // the React tree via subscribeMonitor. No backend round-trip needed.
       return handleShowOnMonitor({ kind: args?.kind, query: args?.query })
+    }
+    case 'generate_image': {
+      // F11 — OpenAI gpt-image-1. The server generates the PNG, caches it
+      // for 10 min, and returns a short-lived URL. We then push it onto
+      // the stage monitor so the avatar literally shows the new image
+      // inline (no second "show_on_monitor" turn needed — cuts one
+      // round-trip of latency the user would otherwise hear).
+      const j = await postJSON('/api/tools/execute', {
+        name: 'generate_image',
+        args: {
+          prompt: args?.prompt,
+          size: args?.size,
+        },
+      })
+      if (!j?.ok) {
+        // Preserve the upstream error so Kelion can explain ("the safety
+        // system rejected that prompt", "image service isn't configured
+        // yet", …). The caller already surfaces this verbatim to the
+        // voice model via the transport's tool-response frame.
+        return j?.error || 'Image generation failed.'
+      }
+      if (j.url) {
+        showImageOnMonitor({
+          src: j.url,
+          title: j.title || args?.prompt || 'Generated image',
+        })
+      }
+      // The voice model reads this short ack back to the user. Keeping
+      // it under ~80 chars avoids filler latency on the TTS pass.
+      const label = (j.title || args?.prompt || '').toString().slice(0, 80)
+      return label ? `Generated: ${label}` : 'Image generated and displayed.'
     }
     case 'set_narration_mode': {
       // Accessibility mode. Flips a module-level flag that

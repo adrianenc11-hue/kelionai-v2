@@ -753,6 +753,21 @@ const KELION_TOOLS = [
     },
     required: ['name'],
   },
+  {
+    // F11 — AI image generation. The tool executor returns a short-lived
+    // URL (served by /api/generated-images/:id) that the client pipes
+    // onto the avatar's stage monitor via `showImageOnMonitor`. Use only
+    // when the user explicitly asks to *create/generate* an image — for
+    // "show me a picture of Paris" prefer `show_on_monitor('image', …)`
+    // which hits LoremFlickr and is free.
+    name: 'generate_image',
+    description: "Generate an original image with OpenAI gpt-image-1 from a natural-language prompt. The result is shown on the avatar's stage monitor. Use only when the user explicitly asks to create/generate/design/draw/paint an image (phrases like 'generate me a picture of…', 'fă-mi o imagine cu…', 'draw…'). Costs ~$0.04 per call — don't use for mere look-up of existing images.",
+    properties: {
+      prompt: { type: 'string', description: "Detailed description of the image to create (max 4000 chars). Include style hints (photo-realistic, watercolour, line art) and composition cues when useful." },
+      size:   { type: 'string', description: "Canvas aspect. Defaults to `auto` (let the model pick).", enum: ['auto', '1024x1024', '1024x1536', '1536x1024'] },
+    },
+    required: ['prompt'],
+  },
 ];
 
 // Gemini v1alpha BidiGenerateContent — JSON schema with UPPERCASE types and
