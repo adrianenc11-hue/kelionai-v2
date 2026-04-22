@@ -129,6 +129,64 @@ async function probeOpenAI() {
   return card;
 }
 
+async function probeGroq() {
+  const apiKey = process.env.GROQ_API_KEY || '';
+  const card = {
+    id: 'groq',
+    name: 'Groq',
+    // Short, matches the other probes' tone. Groq currently only backs
+    // the opt-in code helpers (solve_problem / code_review / explain_code)
+    // — keep the subtitle focused so admins see at a glance what breaks
+    // when the key is missing.
+    subtitle: 'Free-tier LPU (coding tools)',
+    configured: Boolean(apiKey),
+    keyFingerprint: maskKey(apiKey),
+    balance: null,           // Groq doesn't expose remaining quota via API
+    balanceDisplay: 'Check in Groq console',
+    unit: null,
+    status: 'unknown',
+    message: null,
+    // Clicking the card opens the Groq keys page — same UX as the
+    // Gemini "topUpUrl" (which points to AI Studio keys, not a
+    // literal top-up). Groq is free but keys rotate, so this is
+    // where the admin re-issues one if the probe flips to error.
+    topUpUrl: 'https://console.groq.com/keys',
+    billingUrl: 'https://console.groq.com/settings/usage',
+  };
+  if (!apiKey) {
+    // `unconfigured` (not `error`) because Groq is an opt-in coding helper;
+    // an admin leaving the key unset is a valid choice, not a misconfiguration
+    // we should email-alert about every 6h. Admin UI still renders a visible
+    // "NOT SET" card (slate / muted styling — see KelionStage.jsx creditsCards
+    // badge map), distinct from the red `error` badge, so the admin sees the
+    // state at a glance without triggering the email alert in admin.js.
+    card.status = 'unconfigured';
+    card.message = 'GROQ_API_KEY not set — solve_problem / code_review / explain_code will return a graceful "not configured" response until you add the key in Railway.';
+    return card;
+  }
+  try {
+    // /openai/v1/models is the OpenAI-compatible alias exposed by Groq.
+    // Cheapest endpoint that validates the key without burning a request
+    // on a chat completion.
+    const r = await fetchWithTimeout('https://api.groq.com/openai/v1/models', {
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${apiKey}` },
+    });
+    if (r.ok) {
+      card.status = 'ok';
+      card.message = 'API key valid (free tier · 14.4k req/day)';
+    } else {
+      const body = await r.text().catch(() => '');
+      card.status = 'error';
+      card.message = `HTTP ${r.status}: ${body.slice(0, 200)}`;
+    }
+  } catch (err) {
+    card.status = 'error';
+    card.message = err && err.message ? err.message : 'network error';
+  }
+  return card;
+}
+
 async function probeElevenLabs() {
   const apiKey = process.env.ELEVENLABS_API_KEY || '';
   const card = {
@@ -265,14 +323,18 @@ async function probeRailway() {
  * order. Safe to call in parallel — each probe handles its own errors.
  */
 async function getAllCredits() {
-  const [gemini, openai, elevenlabs, stripe, railway] = await Promise.all([
+  // Order is display order in the admin grid. Groq sits next to the
+  // other AI providers so admins can eyeball "is every AI brain we
+  // call actually reachable" in a single glance.
+  const [gemini, openai, groq, elevenlabs, stripe, railway] = await Promise.all([
     probeGemini(),
     probeOpenAI(),
+    probeGroq(),
     probeElevenLabs(),
     probeStripe(),
     probeRailway(),
   ]);
-  return [gemini, openai, elevenlabs, stripe, railway];
+  return [gemini, openai, groq, elevenlabs, stripe, railway];
 }
 
 /**
@@ -452,6 +514,7 @@ module.exports = {
   getAllCredits,
   probeGemini,
   probeOpenAI,
+  probeGroq,
   probeElevenLabs,
   probeStripe,
   probeRailway,
