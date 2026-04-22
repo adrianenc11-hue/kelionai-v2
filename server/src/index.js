@@ -81,6 +81,15 @@ app.use(
         connectSrc: ["'self'", "https://api.openai.com", "wss://api.openai.com", "https://generativelanguage.googleapis.com", "wss://generativelanguage.googleapis.com", "https://raw.githack.com", "https://*.githubusercontent.com", "blob:", "https:", "wss:"],
         mediaSrc:   ["'self'", "blob:"],
         workerSrc:  ["'self'", "blob:"],
+        // Allow cross-origin iframes for the <MonitorOverlay/>: Google Maps
+        // embed, wttr.in, Wikipedia, YouTube, LoremFlickr and friends. Without
+        // an explicit frameSrc they fall back to defaultSrc 'self' and the
+        // browser renders a blank CSP-error frame (the "pagina alba cu err"
+        // bug). `https:` covers every HTTPS embed target we rely on.
+        frameSrc:   ["'self'", "https:", "data:", "blob:"],
+        // childSrc is a legacy alias some older UAs still check — mirror the
+        // same policy so Safari/iOS don't fall through to defaultSrc.
+        childSrc:   ["'self'", "https:", "data:", "blob:"],
       },
     },
     crossOriginEmbedderPolicy: false,
