@@ -1187,6 +1187,30 @@ export default function KelionStage() {
     }
   }, [])
 
+  // PR E1 — unified admin shell. Two new tab panels (Users, Payouts)
+  // replace the scattered overflow-menu entries; Business / AI / Visitors
+  // keep their existing open*() data fetchers but now share a tab bar at
+  // the top. switchAdminTab is the single entry point the top-bar
+  // "Admin · ∞" button and the tab bar both call — it closes whichever
+  // tab is currently visible and opens the target one, re-using the
+  // existing fetcher so the data is always fresh.
+  const [usersOpen, setUsersOpen] = useState(false)
+  const [payoutsOpen, setPayoutsOpen] = useState(false)
+  const switchAdminTab = useCallback((tab) => {
+    // Close non-target tabs first so only one panel is on screen at a
+    // time. Each open*() call on the target flips its own state to true.
+    if (tab !== 'business') setBusinessOpen(false)
+    if (tab !== 'ai')       setCreditsOpen(false)
+    if (tab !== 'visitors') setVisitorsOpen(false)
+    if (tab !== 'users')    setUsersOpen(false)
+    if (tab !== 'payouts')  setPayoutsOpen(false)
+    if (tab === 'business') { openBusiness() }
+    else if (tab === 'ai')       { openCredits() }
+    else if (tab === 'visitors') { openVisitors() }
+    else if (tab === 'users')    { setUsersOpen(true) }
+    else if (tab === 'payouts')  { setPayoutsOpen(true) }
+  }, [openBusiness, openCredits, openVisitors])
+
   // Stage 6 — emotion mirroring + voice style
   const emotion = useEmotion()
   const [voiceStyle, setVoiceStyleState] = useState(() => readVoiceStyleCookie())
@@ -2668,7 +2692,7 @@ export default function KelionStage() {
             metrics overlay, same as the overflow menu entry. */}
         {authState.signedIn && isAdmin && (
           <button
-            onClick={() => openBusiness()}
+            onClick={() => switchAdminTab('business')}
             style={{
               height: 36, padding: '0 12px', borderRadius: 999,
               background: 'linear-gradient(135deg, rgba(250, 204, 21, 0.18), rgba(167, 139, 250, 0.18))',
@@ -2678,8 +2702,8 @@ export default function KelionStage() {
               display: 'flex', alignItems: 'center', gap: 6,
               fontWeight: 600,
             }}
-            title="Admin — unlimited access"
-            aria-label="Admin — unlimited access"
+            title="Admin dashboard — Business, AI credits, Visitors, Users, Payouts"
+            aria-label="Open admin dashboard"
           >
             <span style={{ fontSize: 14 }}>🛡️</span>
             <span>Admin · ∞</span>
@@ -2852,26 +2876,15 @@ export default function KelionStage() {
                   Install Kelion on this device
                 </MenuItem>
               )}
-              {/* Admin-only — AI credits dashboard (one button per AI we
-                  spend on + Stripe revenue card + top-up links + email
-                  alerts to contact@kelionai.app). */}
+              {/* Admin-only — unified dashboard. One entry that opens the
+                  admin shell with tabs for Business, AI credits, Visitors,
+                  Users, and Payouts. Replaces the three separate menu
+                  entries that used to live here (2026-04-20 Adrian:
+                  "management de admin integrat intr-un singur buton"). */}
               {isAdmin && (
-                <>
-                  <MenuItem onClick={() => { openCredits(); setMenuOpen(false) }}>
-                    AI credits (admin)
-                  </MenuItem>
-                  <MenuItem onClick={() => { openBusiness(); setMenuOpen(false) }}>
-                    Business metrics (admin)
-                  </MenuItem>
-                  {/* Visitor analytics — Adrian 2026-04-20: "nu vad buton
-                      vizite reale cine a vizitat situl, ip tara restul
-                      datelor lor". One row per SPA page load with IP,
-                      country, user-agent, referer, and (if signed in)
-                      email. */}
-                  <MenuItem onClick={() => { openVisitors(); setMenuOpen(false) }}>
-                    Visitors (admin)
-                  </MenuItem>
-                </>
+                <MenuItem onClick={() => { switchAdminTab('business'); setMenuOpen(false) }}>
+                  Admin dashboard
+                </MenuItem>
               )}
               {/* Sign out moved to the top-right action bar. */}
             </>
@@ -3556,10 +3569,10 @@ export default function KelionStage() {
         >
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            marginBottom: 18,
+            marginBottom: 12,
           }}>
             <div style={{ fontSize: 11, opacity: 0.6, letterSpacing: '0.15em' }}>
-              BUSINESS — LAST 30 DAYS
+              ADMIN · BUSINESS — LAST 30 DAYS
             </div>
             <button
               onClick={() => setBusinessOpen(false)}
@@ -3570,6 +3583,7 @@ export default function KelionStage() {
               aria-label="Close"
             >✕</button>
           </div>
+          <AdminTabBar active="business" onSelect={switchAdminTab} />
 
           {businessLoading && (
             <div style={{ opacity: 0.55, fontSize: 14 }}>Crunching numbers…</div>
@@ -3680,10 +3694,10 @@ export default function KelionStage() {
         >
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            marginBottom: 18,
+            marginBottom: 12,
           }}>
             <div style={{ fontSize: 11, opacity: 0.6, letterSpacing: '0.15em' }}>
-              AI CREDITS — ADMIN
+              ADMIN · AI CREDITS
             </div>
             <button
               onClick={() => setCreditsOpen(false)}
@@ -3694,6 +3708,7 @@ export default function KelionStage() {
               aria-label="Close"
             >✕</button>
           </div>
+          <AdminTabBar active="ai" onSelect={switchAdminTab} />
 
           {creditsLoading && (
             <div style={{ opacity: 0.55, fontSize: 14 }}>Fetching provider balances…</div>
@@ -4163,10 +4178,10 @@ export default function KelionStage() {
         >
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            marginBottom: 14,
+            marginBottom: 12,
           }}>
             <div style={{ fontSize: 11, opacity: 0.6, letterSpacing: '0.15em' }}>
-              VISITORS — ADMIN
+              ADMIN · VISITORS
             </div>
             <button
               onClick={() => setVisitorsOpen(false)}
@@ -4177,6 +4192,7 @@ export default function KelionStage() {
               aria-label="Close"
             >✕</button>
           </div>
+          <AdminTabBar active="visitors" onSelect={switchAdminTab} />
 
           {/* Stats header — last 24h summary. */}
           {visitorsStats && (
@@ -4316,6 +4332,241 @@ export default function KelionStage() {
         </div>
       )}
 
+      {/* Admin — Users tab. Placeholder panel for now; the unified shell
+          gives the tab a permanent home so it doesn't drift around the
+          overflow menu, and a future PR will wire up /api/admin/users
+          (list, search by email, grant credits, ban, reset password,
+          view ledger). Adrian 2026-04-20: "Users list, search email,
+          grant credits, ban, reset password, view history". Marked
+          "nu acum" for the mutating actions — they land in PR E5. */}
+      {usersOpen && (
+        <div
+          onClick={() => setUsersOpen(false)}
+          style={{
+            position: 'absolute', inset: 0,
+            background: 'rgba(3, 4, 10, 0.35)',
+            zIndex: 25,
+          }}
+        />
+      )}
+      {usersOpen && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: 'absolute', top: 0, right: 0, bottom: 0,
+            width: 'min(560px, 98vw)',
+            background: 'rgba(10, 8, 20, 0.92)',
+            backdropFilter: 'blur(22px)',
+            borderLeft: '1px solid rgba(167, 139, 250, 0.2)',
+            padding: '70px 20px 24px 20px',
+            overflowY: 'auto',
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+            zIndex: 26,
+            color: '#ede9fe',
+          }}
+        >
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            marginBottom: 12,
+          }}>
+            <div style={{ fontSize: 11, opacity: 0.6, letterSpacing: '0.15em' }}>
+              ADMIN · USERS
+            </div>
+            <button
+              onClick={() => setUsersOpen(false)}
+              style={{
+                background: 'transparent', border: 'none', color: '#ede9fe',
+                fontSize: 20, cursor: 'pointer', opacity: 0.7,
+              }}
+              aria-label="Close"
+            >✕</button>
+          </div>
+          <AdminTabBar active="users" onSelect={switchAdminTab} />
+          <div style={{
+            padding: '18px 16px',
+            background: 'rgba(167, 139, 250, 0.06)',
+            border: '1px solid rgba(167, 139, 250, 0.2)',
+            borderRadius: 12,
+            fontSize: 14,
+            lineHeight: 1.55,
+          }}>
+            <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 15 }}>
+              User management — în construcție
+            </div>
+            <div style={{ opacity: 0.75, marginBottom: 10 }}>
+              Tab-ul este rezervat; panoul complet se activează în următorul
+              PR al seriei admin. Funcții planificate:
+            </div>
+            <ul style={{ paddingLeft: 18, margin: 0, opacity: 0.82 }}>
+              <li>Listă useri cu email, dată înregistrare, ultimă activitate.</li>
+              <li>Căutare după email sau ID.</li>
+              <li>Grant credits manual (pentru refund sau goodwill).</li>
+              <li>Resetare parolă (trimite email de reset).</li>
+              <li>Ban / unban (blochează login și API).</li>
+              <li>Istoric top-ups și consum per user.</li>
+            </ul>
+            <div style={{
+              marginTop: 14, padding: '10px 12px',
+              background: 'rgba(250, 204, 21, 0.08)',
+              border: '1px solid rgba(250, 204, 21, 0.25)',
+              borderRadius: 8,
+              fontSize: 12, opacity: 0.85,
+            }}>
+              Până atunci, /api/admin/credits/ledger din tab-ul Business
+              arată deja fiecare top-up și consum cu user-ul asociat.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin — Payouts tab. Shows where the owner's half of each
+          top-up ends up. Stripe already runs the automatic payout
+          schedule (set once in the Stripe Dashboard); this panel is a
+          read-only view into what Stripe is about to pay + a link to
+          the dashboard. Future iteration (PR E3) will add the 50/50
+          ledger split view and an on-demand "Instant payout" button.
+          Adrian 2026-04-20: "A pot da cardul unde sa se faca payouut?"
+          — answered via the "Set up payout destination" link, which
+          deep-links to Stripe's external-account settings. */}
+      {payoutsOpen && (
+        <div
+          onClick={() => setPayoutsOpen(false)}
+          style={{
+            position: 'absolute', inset: 0,
+            background: 'rgba(3, 4, 10, 0.35)',
+            zIndex: 25,
+          }}
+        />
+      )}
+      {payoutsOpen && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: 'absolute', top: 0, right: 0, bottom: 0,
+            width: 'min(560px, 98vw)',
+            background: 'rgba(10, 8, 20, 0.92)',
+            backdropFilter: 'blur(22px)',
+            borderLeft: '1px solid rgba(167, 139, 250, 0.2)',
+            padding: '70px 20px 24px 20px',
+            overflowY: 'auto',
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+            zIndex: 26,
+            color: '#ede9fe',
+          }}
+        >
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            marginBottom: 12,
+          }}>
+            <div style={{ fontSize: 11, opacity: 0.6, letterSpacing: '0.15em' }}>
+              ADMIN · PAYOUTS
+            </div>
+            <button
+              onClick={() => setPayoutsOpen(false)}
+              style={{
+                background: 'transparent', border: 'none', color: '#ede9fe',
+                fontSize: 20, cursor: 'pointer', opacity: 0.7,
+              }}
+              aria-label="Close"
+            >✕</button>
+          </div>
+          <AdminTabBar active="payouts" onSelect={switchAdminTab} />
+
+          <div style={{
+            padding: '14px 16px',
+            background: 'rgba(96, 165, 250, 0.06)',
+            border: '1px solid rgba(96, 165, 250, 0.25)',
+            borderRadius: 12,
+            fontSize: 13, lineHeight: 1.55,
+            marginBottom: 14,
+          }}>
+            <div style={{ fontWeight: 600, marginBottom: 6, fontSize: 14 }}>
+              Cum ajung banii la tine
+            </div>
+            <div style={{ opacity: 0.82 }}>
+              Stripe varsă automat soldul în contul/ cardul pe care l-ai
+              conectat ca "external account". Nu trebuie să inițiezi tu
+              nimic — odată configurat, fiecare top-up al unui user trece
+              prin: Stripe Checkout → Stripe balance → payout automat (zilnic
+              sau săptămânal, după setarea ta). Jumătate din fiecare top-up
+              e deja rezervată intern pentru costurile AI (OpenAI, Groq,
+              ElevenLabs), cealaltă jumătate e profitul net.
+            </div>
+          </div>
+
+          <a
+            href="https://dashboard.stripe.com/settings/payouts"
+            target="_blank" rel="noopener noreferrer"
+            style={{
+              display: 'block',
+              padding: '12px 14px',
+              marginBottom: 10,
+              background: 'rgba(167, 139, 250, 0.12)',
+              border: '1px solid rgba(167, 139, 250, 0.35)',
+              borderRadius: 12,
+              color: '#ede9fe',
+              textDecoration: 'none',
+              fontSize: 14,
+              fontWeight: 500,
+              cursor: 'pointer',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Setează destinația payout-urilor</span>
+              <span style={{ fontSize: 12, opacity: 0.6 }}>Stripe ↗</span>
+            </div>
+            <div style={{ fontSize: 11, opacity: 0.65, marginTop: 4 }}>
+              Adaugi un IBAN sau un card de debit o singură dată. Recomandat:
+              Visa/Mastercard Debit (Revolut, Wise, Starling) pentru plăți
+              instant în 30 min.
+            </div>
+          </a>
+
+          <a
+            href="https://dashboard.stripe.com/payouts"
+            target="_blank" rel="noopener noreferrer"
+            style={{
+              display: 'block',
+              padding: '12px 14px',
+              marginBottom: 10,
+              background: 'rgba(167, 139, 250, 0.06)',
+              border: '1px solid rgba(167, 139, 250, 0.15)',
+              borderRadius: 12,
+              color: '#ede9fe',
+              textDecoration: 'none',
+              fontSize: 14,
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Istoric payout-uri</span>
+              <span style={{ fontSize: 12, opacity: 0.6 }}>Stripe ↗</span>
+            </div>
+            <div style={{ fontSize: 11, opacity: 0.65, marginTop: 4 }}>
+              Fiecare plată către banca/cardul tău, cu data și suma.
+            </div>
+          </a>
+
+          <div style={{
+            marginTop: 14, padding: '12px 14px',
+            background: 'rgba(250, 204, 21, 0.06)',
+            border: '1px solid rgba(250, 204, 21, 0.25)',
+            borderRadius: 12,
+            fontSize: 12, lineHeight: 1.55,
+            opacity: 0.88,
+          }}>
+            <div style={{ fontWeight: 600, marginBottom: 4, fontSize: 13 }}>
+              Următorul PR din serie
+            </div>
+            <div>
+              Panoul va afișa direct aici: soldul disponibil pentru payout,
+              data următorului transfer automat, split-ul 50/50 (AI vs profit
+              net) pe ultimele 30 zile, și buton "Withdraw now" pentru plăți
+              instant pe card (taxa Stripe: ~1% + 0.25 EUR).
+            </div>
+          </div>
+        </div>
+      )}
+
       <style>{`
         @keyframes pulse {
           0%, 100% { opacity: 1; transform: scale(1); }
@@ -4357,6 +4608,66 @@ function TopBarIconButton({ children, onClick, disabled, active, title, ariaLabe
       }}
     >{children}</button>
   )
+}
+
+// Admin shell — single entry point behaves like a dashboard with tabs.
+// Each tab maps 1:1 to an existing modal drawer (Business / AI / Visitors)
+// or a new placeholder panel (Users / Payouts). The parent component owns
+// one open state per tab; this bar only issues `onSelect(key)` and lets
+// the parent do the routing so the existing open*() data-fetch helpers
+// are reused without duplication.
+//
+// 2026-04-20 Adrian: "gindeste o structura informationala de admin adevarata,
+// un management integrat intru-un singur buton acolo cu subutoane".
+const ADMIN_TABS = [
+  { key: 'business', label: 'Business', emoji: '💼' },
+  { key: 'ai',       label: 'AI',       emoji: '🧠' },
+  { key: 'visitors', label: 'Visitors', emoji: '👥' },
+  { key: 'users',    label: 'Users',    emoji: '🧑‍🤝‍🧑' },
+  { key: 'payouts',  label: 'Payouts',  emoji: '💸' },
+];
+
+function AdminTabBar({ active, onSelect }) {
+  return (
+    <div
+      style={{
+        display: 'flex', gap: 4, flexWrap: 'wrap',
+        marginBottom: 14, paddingBottom: 10,
+        borderBottom: '1px solid rgba(167, 139, 250, 0.15)',
+      }}
+    >
+      {ADMIN_TABS.map((t) => {
+        const isActive = t.key === active;
+        return (
+          <button
+            key={t.key}
+            onClick={() => onSelect(t.key)}
+            style={{
+              padding: '6px 11px',
+              fontSize: 12,
+              background: isActive
+                ? 'rgba(167, 139, 250, 0.25)'
+                : 'rgba(167, 139, 250, 0.06)',
+              border: isActive
+                ? '1px solid rgba(167, 139, 250, 0.55)'
+                : '1px solid rgba(167, 139, 250, 0.12)',
+              color: isActive ? '#fff' : 'rgba(237, 233, 254, 0.72)',
+              borderRadius: 999,
+              cursor: 'pointer',
+              fontWeight: isActive ? 600 : 400,
+              display: 'flex', alignItems: 'center', gap: 5,
+              transition: 'background 0.12s, border-color 0.12s',
+            }}
+            aria-pressed={isActive}
+            aria-label={`Admin tab: ${t.label}`}
+          >
+            <span aria-hidden="true">{t.emoji}</span>
+            <span>{t.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 function MenuItem({ children, onClick, disabled }) {
