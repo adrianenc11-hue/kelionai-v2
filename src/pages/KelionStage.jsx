@@ -1204,6 +1204,73 @@ export default function KelionStage() {
   // existing fetcher so the data is always fresh.
   const [usersOpen, setUsersOpen] = useState(false)
   const [payoutsOpen, setPayoutsOpen] = useState(false)
+
+  // PR E3 — Payouts drawer pulls a live snapshot from Stripe (balance,
+  // linked external account, next-payout schedule, last ~10 payouts)
+  // plus the 50/50 AI-vs-profit split over the last 30 days. The
+  // snapshot aggregator on the server never throws; partial failures
+  // land in `payoutsData.errors` and the UI renders whatever did load.
+  const [payoutsData, setPayoutsData] = useState(null)
+  const [payoutsLoading, setPayoutsLoading] = useState(false)
+  const [payoutsError, setPayoutsError] = useState(null)
+  const [payoutBusy, setPayoutBusy] = useState(false)
+  const [payoutResult, setPayoutResult] = useState(null)
+  // `refreshPayoutsData` pulls a fresh snapshot without touching
+  // `payoutResult`; that way the "OK — 50.00 EUR · status in_transit"
+  // banner survives the refresh triggered right after a successful
+  // instant payout. `openPayouts` wraps it and additionally clears the
+  // previous result so opening the drawer from scratch feels clean.
+  const refreshPayoutsData = useCallback(async () => {
+    setPayoutsLoading(true)
+    setPayoutsError(null)
+    try {
+      const r = await fetch('/api/admin/payouts?days=30', { credentials: 'include' })
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      setPayoutsData(await r.json())
+    } catch (err) {
+      setPayoutsError(err.message || 'Could not load payouts dashboard')
+    } finally {
+      setPayoutsLoading(false)
+    }
+  }, [])
+  const openPayouts = useCallback(async () => {
+    setPayoutsOpen(true)
+    setPayoutResult(null)
+    await refreshPayoutsData()
+  }, [refreshPayoutsData])
+  const triggerInstantPayout = useCallback(async () => {
+    if (payoutBusy) return
+    // A confirm() keeps this honest — an instant payout cannot be
+    // undone, and the Stripe fee (~1% + €0.25) is real money.
+    if (!window.confirm('Instant payout: transferă soldul disponibil pe cardul legat acum. Taxa Stripe ~1% + 0.25 EUR. Continuăm?')) {
+      return
+    }
+    setPayoutBusy(true)
+    setPayoutResult(null)
+    try {
+      const r = await fetch('/api/admin/payouts/instant', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        // Empty body → Stripe pays out the full instant-available balance.
+        body: JSON.stringify({}),
+      })
+      const body = await r.json().catch(() => ({}))
+      if (!r.ok) {
+        throw new Error((body && body.error) || `HTTP ${r.status}`)
+      }
+      setPayoutResult({ ok: true, ...body })
+      // Refresh the snapshot so the new payout shows up in recent list.
+      // Must use `refreshPayoutsData` (not `openPayouts`) so the success
+      // banner we just set isn't immediately wiped.
+      refreshPayoutsData()
+    } catch (err) {
+      setPayoutResult({ ok: false, error: err.message || 'Instant payout failed' })
+    } finally {
+      setPayoutBusy(false)
+    }
+  }, [payoutBusy, refreshPayoutsData])
+
   const switchAdminTab = useCallback((tab) => {
     // Close non-target tabs first so only one panel is on screen at a
     // time. Each open*() call on the target flips its own state to true.
@@ -1216,8 +1283,8 @@ export default function KelionStage() {
     else if (tab === 'ai')       { openCredits() }
     else if (tab === 'visitors') { openVisitors() }
     else if (tab === 'users')    { setUsersOpen(true) }
-    else if (tab === 'payouts')  { setPayoutsOpen(true) }
-  }, [openBusiness, openCredits, openVisitors])
+    else if (tab === 'payouts')  { openPayouts() }
+  }, [openBusiness, openCredits, openVisitors, openPayouts])
 
   // Stage 6 — emotion mirroring + voice style
   const emotion = useEmotion()
@@ -4643,24 +4710,14 @@ export default function KelionStage() {
             </div>
           </a>
 
-          <div style={{
-            marginTop: 14, padding: '12px 14px',
-            background: 'rgba(250, 204, 21, 0.06)',
-            border: '1px solid rgba(250, 204, 21, 0.25)',
-            borderRadius: 12,
-            fontSize: 12, lineHeight: 1.55,
-            opacity: 0.88,
-          }}>
-            <div style={{ fontWeight: 600, marginBottom: 4, fontSize: 13 }}>
-              Următorul PR din serie
-            </div>
-            <div>
-              Panoul va afișa direct aici: soldul disponibil pentru payout,
-              data următorului transfer automat, split-ul 50/50 (AI vs profit
-              net) pe ultimele 30 zile, și buton "Withdraw now" pentru plăți
-              instant pe card (taxa Stripe: ~1% + 0.25 EUR).
-            </div>
-          </div>
+          <PayoutsPanel
+            data={payoutsData}
+            loading={payoutsLoading}
+            error={payoutsError}
+            onInstantPayout={triggerInstantPayout}
+            busy={payoutBusy}
+            result={payoutResult}
+          />
         </div>
       )}
 
@@ -4765,6 +4822,205 @@ function AdminTabBar({ active, onSelect }) {
       })}
     </div>
   );
+}
+
+// PR E3 — Payouts panel. Live Stripe balance + destination + recent
+// payouts + 50/50 split over the last 30 days. The server aggregator
+// never throws; partial failures come back in `data.errors` and we
+// render whatever did load.
+function PayoutsPanel({ data, loading, error, onInstantPayout, busy, result }) {
+  if (loading && !data) {
+    return <div style={{ fontSize: 13, opacity: 0.7, padding: '14px 4px' }}>Se încarcă…</div>
+  }
+  if (error) {
+    return (
+      <div style={{
+        marginTop: 14, padding: '12px 14px',
+        background: 'rgba(248, 113, 113, 0.08)',
+        border: '1px solid rgba(248, 113, 113, 0.35)',
+        borderRadius: 12, fontSize: 13, lineHeight: 1.5,
+      }}>
+        <div style={{ fontWeight: 600, marginBottom: 4 }}>Nu pot încărca payout-urile</div>
+        <div style={{ opacity: 0.85 }}>{error}</div>
+      </div>
+    )
+  }
+  if (!data) return null
+  if (!data.configured) {
+    return (
+      <div style={{
+        marginTop: 14, padding: '12px 14px',
+        background: 'rgba(250, 204, 21, 0.08)',
+        border: '1px solid rgba(250, 204, 21, 0.35)',
+        borderRadius: 12, fontSize: 13, lineHeight: 1.55,
+      }}>
+        <div style={{ fontWeight: 600, marginBottom: 4 }}>Stripe nu e încă legat</div>
+        <div style={{ opacity: 0.85 }}>
+          Setează STRIPE_SECRET_KEY pe server ca să vezi soldul real aici.
+        </div>
+      </div>
+    )
+  }
+
+  const fmt = (bucket) => (bucket && bucket.display) || '—'
+  // `buildRevenueSplit` returns { window, fraction, revenue, allocation, ... };
+  // the earlier draft guessed the shape and the 50/50 card silently rendered
+  // three "—" values on prod. Pull the fields from their real paths.
+  const split = data.split || {}
+  const days = (split.window && split.window.days) || 30
+  const gross = split.revenue && split.revenue.grossDisplay
+  const reserved = split.allocation && split.allocation.display
+  const profit = split.allocation && split.allocation.ownerDisplay
+  const recent = Array.isArray(data.recentPayouts) ? data.recentPayouts : []
+  const destination = data.destination
+  const canInstant = Boolean(data.instantEligible) && (data.balance && data.balance.instantAvailable && data.balance.instantAvailable.amount > 0)
+
+  return (
+    <div>
+      {/* Live balance */}
+      <div style={{
+        marginTop: 4, padding: '14px 16px',
+        background: 'rgba(16, 185, 129, 0.08)',
+        border: '1px solid rgba(16, 185, 129, 0.25)',
+        borderRadius: 12, fontSize: 13, lineHeight: 1.55,
+      }}>
+        <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 14 }}>Sold Stripe</div>
+        <PayoutsRow label="Disponibil acum" value={fmt(data.balance && data.balance.available)} />
+        <PayoutsRow label="În tranzit (pending)" value={fmt(data.balance && data.balance.pending)} />
+        <PayoutsRow label="Eligibil pentru instant" value={fmt(data.balance && data.balance.instantAvailable)} />
+      </div>
+
+      {/* Destination + schedule */}
+      {destination && (
+        <div style={{
+          marginTop: 10, padding: '12px 14px',
+          background: 'rgba(96, 165, 250, 0.06)',
+          border: '1px solid rgba(96, 165, 250, 0.22)',
+          borderRadius: 12, fontSize: 13, lineHeight: 1.55,
+        }}>
+          <div style={{ fontWeight: 600, marginBottom: 6 }}>Destinație payout</div>
+          <PayoutsRow
+            label="Tip"
+            value={
+              destination.type === 'card'
+                ? `Card ${destination.brand || ''} •••• ${destination.last4 || '????'}`
+                : destination.type === 'bank_account'
+                  ? `IBAN •••• ${destination.last4 || '????'} (${destination.country || ''})`
+                  : destination.type || 'nesetat'
+            }
+          />
+          <PayoutsRow label="Program" value={formatSchedule(data.schedule)} />
+        </div>
+      )}
+
+      {/* 50/50 split */}
+      <div style={{
+        marginTop: 10, padding: '12px 14px',
+        background: 'rgba(167, 139, 250, 0.06)',
+        border: '1px solid rgba(167, 139, 250, 0.22)',
+        borderRadius: 12, fontSize: 13, lineHeight: 1.55,
+      }}>
+        <div style={{ fontWeight: 600, marginBottom: 6 }}>Split 50/50 · ultimele {days} zile</div>
+        <PayoutsRow label="Venit brut" value={gross || '—'} />
+        <PayoutsRow label="Rezervat pentru AI" value={reserved || '—'} />
+        <PayoutsRow label="Profit net (al tău)" value={profit || '—'} bold />
+      </div>
+
+      {/* Instant payout CTA */}
+      <button
+        onClick={onInstantPayout}
+        disabled={busy || !canInstant}
+        style={{
+          marginTop: 10, width: '100%',
+          padding: '12px 14px',
+          background: canInstant
+            ? 'linear-gradient(180deg, rgba(167, 139, 250, 0.32), rgba(139, 92, 246, 0.22))'
+            : 'rgba(167, 139, 250, 0.08)',
+          color: canInstant ? '#fff' : 'rgba(237, 233, 254, 0.5)',
+          border: '1px solid rgba(167, 139, 250, 0.35)',
+          borderRadius: 12,
+          fontSize: 14, fontWeight: 600,
+          cursor: canInstant && !busy ? 'pointer' : 'not-allowed',
+        }}
+      >
+        {busy ? 'Trimit…' : canInstant ? 'Instant payout pe card (~30 min, taxa ~1% + 0.25 EUR)' : 'Instant payout indisponibil (nimic eligibil acum)'}
+      </button>
+
+      {/* Result of the last trigger */}
+      {result && (
+        <div style={{
+          marginTop: 10, padding: '10px 14px',
+          background: result.ok ? 'rgba(16, 185, 129, 0.08)' : 'rgba(248, 113, 113, 0.08)',
+          border: result.ok ? '1px solid rgba(16, 185, 129, 0.35)' : '1px solid rgba(248, 113, 113, 0.35)',
+          borderRadius: 10, fontSize: 12, lineHeight: 1.5,
+        }}>
+          {result.ok
+            ? `OK — ${result.display} · status ${result.status}${result.arrivalDateMs ? ' · ETA ' + new Date(result.arrivalDateMs).toLocaleString() : ''}`
+            : `Eroare: ${result.error}`}
+        </div>
+      )}
+
+      {/* Recent payouts */}
+      {recent.length > 0 && (
+        <div style={{
+          marginTop: 10, padding: '12px 14px',
+          background: 'rgba(255, 255, 255, 0.03)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          borderRadius: 12, fontSize: 12, lineHeight: 1.5,
+        }}>
+          <div style={{ fontWeight: 600, marginBottom: 6, fontSize: 13 }}>Ultimele payout-uri</div>
+          {recent.slice(0, 10).map((p) => (
+            <div key={p.id} style={{
+              display: 'flex', justifyContent: 'space-between',
+              padding: '5px 0', borderTop: '1px solid rgba(255,255,255,0.04)',
+              gap: 8,
+            }}>
+              <span style={{ opacity: 0.72 }}>
+                {p.createdMs ? new Date(p.createdMs).toLocaleDateString() : '—'} · {p.method || 'standard'}
+              </span>
+              <span style={{ textAlign: 'right' }}>
+                {p.display || '—'} <span style={{ opacity: 0.55 }}>· {p.status}</span>
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Partial-failure hints (balance loaded but account failed, etc) */}
+      {Array.isArray(data.errors) && data.errors.length > 0 && (
+        <div style={{
+          marginTop: 10, padding: '10px 14px',
+          background: 'rgba(250, 204, 21, 0.06)',
+          border: '1px solid rgba(250, 204, 21, 0.2)',
+          borderRadius: 10, fontSize: 11, lineHeight: 1.5, opacity: 0.85,
+        }}>
+          <div style={{ fontWeight: 600, marginBottom: 3 }}>Avertismente Stripe</div>
+          {data.errors.map((e, i) => (
+            <div key={i} style={{ opacity: 0.8 }}>{e.source}: {e.message}</div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function PayoutsRow({ label, value, bold }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0' }}>
+      <span style={{ opacity: 0.7 }}>{label}</span>
+      <span style={{ fontWeight: bold ? 700 : 500 }}>{value}</span>
+    </div>
+  )
+}
+
+function formatSchedule(schedule) {
+  if (!schedule || !schedule.interval) return '—'
+  const { interval, delayDays, monthlyAnchor, weeklyAnchor } = schedule
+  if (interval === 'manual') return 'Manual (doar instant)'
+  if (interval === 'daily') return `Zilnic (T+${delayDays ?? '?'} zile)`
+  if (interval === 'weekly') return `Săptămânal${weeklyAnchor ? ' · ' + weeklyAnchor : ''}`
+  if (interval === 'monthly') return `Lunar${monthlyAnchor ? ' · ziua ' + monthlyAnchor : ''}`
+  return interval
 }
 
 // PR E2 — translate raw provider card state into human-friendly copy
