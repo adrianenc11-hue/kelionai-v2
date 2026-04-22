@@ -47,6 +47,9 @@ const REAL_TOOL_NAMES = new Set([
   'fetch_url', 'rss_read',
   'wikipedia_search', 'dictionary',
   'translate',
+  // Groq-powered (opt-in). The server returns a graceful "not configured"
+  // message when GROQ_API_KEY is absent, so the voice UX never breaks.
+  'solve_problem', 'code_review', 'explain_code',
 ])
 
 // Compress a tool-result JSON into a short, speakable string for the voice
@@ -97,6 +100,11 @@ function summarizeRealTool(name, j) {
   }
   if (name === 'translate' && j.translated) {
     return j.translated
+  }
+  if ((name === 'solve_problem' || name === 'code_review' || name === 'explain_code') && j.result) {
+    // Groq completions are already structured; keep them mostly intact but
+    // cap so we don't blow past the voice model's context on the read-back.
+    return String(j.result).slice(0, 4000)
   }
   // Generic fallback — stringify but cap so the model never chokes.
   try {
