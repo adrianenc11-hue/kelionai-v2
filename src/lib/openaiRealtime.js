@@ -327,8 +327,13 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
     }
   }, [appendTurn, runToolAndRespond, status])
 
-  const start = useCallback(async () => {
+  const start = useCallback(async (opts = {}) => {
     if (startInFlightRef.current) return
+    // F4 — auto-fallback from the other provider passes the accumulated
+    // session transcript so Kelion continues the conversation rather than
+    // re-greeting. We POST when we have a payload; a fresh session stays
+    // on GET so existing callers and tests keep working unchanged.
+    const priorTurns = Array.isArray(opts.priorTurns) ? opts.priorTurns : []
     // Tear down any residual peer connection before opening a new one.
     if (pcRef.current) {
       try { pcRef.current.close() } catch (_) { /* ignore */ }
@@ -358,10 +363,15 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
       const geoQuery = (coords && Number.isFinite(coords.lat) && Number.isFinite(coords.lon))
         ? `&lat=${coords.lat.toFixed(6)}&lon=${coords.lon.toFixed(6)}&acc=${Math.round(coords.accuracy || 0)}`
         : ''
-      const tokenRes = await fetch(
-        `/api/realtime/openai-live-token?lang=${encodeURIComponent(langHint)}${geoQuery}`,
-        { credentials: 'include' },
-      )
+      const tokenUrl = `/api/realtime/openai-live-token?lang=${encodeURIComponent(langHint)}${geoQuery}`
+      const tokenRes = priorTurns.length
+        ? await fetch(tokenUrl, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ priorTurns }),
+          })
+        : await fetch(tokenUrl, { credentials: 'include' })
       if (tokenRes.status === 429) {
         let body = null
         try { body = await tokenRes.json() } catch (_) { /* ignore */ }

@@ -402,7 +402,11 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
   }, [appendTurn, enqueueAudio, clearAudioQueue])
 
   // ───── Start full pipeline ─────
-  const start = useCallback(async () => {
+  const start = useCallback(async (opts = {}) => {
+    // F4 — on auto-fallback from OpenAI, KelionStage passes the current
+    // session transcript so Gemini continues rather than re-greeting.
+    // Fresh sessions call start() with no args and stay on GET.
+    const priorTurns = Array.isArray(opts.priorTurns) ? opts.priorTurns : []
     // Concurrent-call guard — see comment on `startInFlightRef`. Tap and
     // wake-word both call start() off stale closures; without this lock
     // two WebSockets open in parallel, wsRef gets clobbered, and the
@@ -446,7 +450,15 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
       const geoQuery = (coords && Number.isFinite(coords.lat) && Number.isFinite(coords.lon))
         ? `&lat=${coords.lat.toFixed(6)}&lon=${coords.lon.toFixed(6)}&acc=${Math.round(coords.accuracy || 0)}`
         : ''
-      const tokenRes = await fetch(`/api/realtime/gemini-token?lang=${encodeURIComponent(langHint)}${geoQuery}`, { credentials: 'include' })
+      const tokenUrl = `/api/realtime/gemini-token?lang=${encodeURIComponent(langHint)}${geoQuery}`
+      const tokenRes = priorTurns.length
+        ? await fetch(tokenUrl, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ priorTurns }),
+          })
+        : await fetch(tokenUrl, { credentials: 'include' })
       // Guest trial exhaustion — propagate a clean user-facing error so
       // the HUD can render "Sign in / buy credits" instead of a raw
       // "HTTP 429".
