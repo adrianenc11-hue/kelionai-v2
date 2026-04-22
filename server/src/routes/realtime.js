@@ -498,6 +498,41 @@ const KELION_TOOLS = [
     },
     required: ['word'],
   },
+
+  // ── Groq-powered coding helpers ─────────────────────────────────
+  // Opt-in: the server only reaches Groq when `GROQ_API_KEY` is set. When
+  // the key is missing the executor returns a graceful "not configured"
+  // message instead of failing — so we can safely advertise these tools
+  // in every transport without breaking the baseline voice/text flow.
+  {
+    name: 'solve_problem',
+    description: "Solve a coding or algorithmic problem using Groq's Qwen2.5-Coder (free tier). Use when the user asks to 'write code that...', 'implement an algorithm for...', 'solve this problem: ...', or any request that needs real code generation rather than a verbal answer. Returns a plan + implementation + complexity note.",
+    properties: {
+      description: { type: 'string', description: "Plain-language problem statement." },
+      language:    { type: 'string', description: "Target language (e.g. 'python', 'javascript', 'rust'). Optional — defaults to Python." },
+    },
+    required: ['description'],
+  },
+  {
+    name: 'code_review',
+    description: "Review code and flag bugs, performance issues, security risks, and style problems. Use when the user pastes code and asks 'review this', 'is this correct', 'what's wrong with this code', 'can this be improved'. Returns a structured review.",
+    properties: {
+      code:     { type: 'string', description: "The code to review." },
+      language: { type: 'string', description: "Programming language (optional — inferred if omitted)." },
+      focus:    { type: 'string', description: "Optional focus area: 'security', 'performance', 'style', or a custom concern." },
+    },
+    required: ['code'],
+  },
+  {
+    name: 'explain_code',
+    description: "Explain a code snippet step-by-step. Use when the user asks 'what does this code do', 'explain this', 'how does this work'. Returns a plain-language walkthrough tuned to the requested audience.",
+    properties: {
+      code:     { type: 'string', description: "The code to explain." },
+      language: { type: 'string', description: "Programming language (optional)." },
+      audience: { type: 'string', description: "Target audience, e.g. 'a beginner', 'a senior engineer'. Defaults to 'an intermediate developer'." },
+    },
+    required: ['code'],
+  },
 ];
 
 // Gemini v1alpha BidiGenerateContent — JSON schema with UPPERCASE types and

@@ -1307,6 +1307,100 @@ function pickForcedTool(lastUserMessage) {
 }
 
 // ──────────────────────────────────────────────────────────────────
+// Groq-powered code helpers — ADDITIVE ONLY.
+//
+// These tools route to Groq (Qwen2.5-Coder-32B / Llama 3.3 70B) when
+// `GROQ_API_KEY` is configured. They do NOT touch the chat flow: they
+// are reachable exclusively via the KELION_TOOLS function-call path so
+// the model can invoke them on demand. If the key is missing the helper
+// returns `{ ok:false, unavailable:true, error }` and the model verbalizes
+// a graceful "not configured" message. No fallback to Gemini/OpenAI — we
+// want the user (or admin) to know the feature is opt-in.
+
+const { groqChat } = require('./groq');
+
+const SOLVE_PROBLEM_SYSTEM = [
+  'You are an expert software engineer.',
+  'Given a problem description, produce:',
+  '  1. A brief plan (1-3 bullets).',
+  '  2. A self-contained code solution in the requested language (or Python if unspecified).',
+  '  3. A short correctness + complexity note.',
+  'Keep the answer focused. No chit-chat.',
+].join('\n');
+
+const CODE_REVIEW_SYSTEM = [
+  'You are a senior code reviewer.',
+  'Review the supplied code. Output:',
+  '  - Summary (1-2 sentences).',
+  '  - Issues found (bug, perf, security, style) — each with file/line hint if visible.',
+  '  - Concrete suggestions (code snippet when useful).',
+  'Be specific. Skip praise.',
+].join('\n');
+
+const EXPLAIN_CODE_SYSTEM = [
+  'You are a patient teacher.',
+  'Explain the supplied code step-by-step in plain language suited to the requested audience.',
+  'Call out non-obvious tricks, edge cases, and invariants. Do not rewrite the code.',
+].join('\n');
+
+async function toolSolveProblem(args) {
+  const description = String(args?.description || args?.problem || '').trim();
+  if (!description) return { ok: false, error: 'missing problem description' };
+  const language = String(args?.language || '').trim();
+  const prompt = language
+    ? `Problem:\n${description}\n\nImplement the solution in ${language}.`
+    : `Problem:\n${description}`;
+  const r = await groqChat([
+    { role: 'system', content: SOLVE_PROBLEM_SYSTEM },
+    { role: 'user', content: prompt },
+  ], { temperature: 0.2, maxTokens: 1800 });
+  if (!r.ok) return r;
+  return { ok: true, result: r.text, model: r.model };
+}
+
+async function toolCodeReview(args) {
+  const code = String(args?.code || '').trim();
+  if (!code) return { ok: false, error: 'missing code' };
+  const focus = String(args?.focus || '').trim();
+  const language = String(args?.language || '').trim();
+  const header = [
+    language ? `Language: ${language}` : null,
+    focus ? `Focus: ${focus}` : null,
+  ].filter(Boolean).join('\n');
+  const prompt = header
+    ? `${header}\n\nCode:\n\`\`\`\n${code}\n\`\`\``
+    : `Code:\n\`\`\`\n${code}\n\`\`\``;
+  const r = await groqChat([
+    { role: 'system', content: CODE_REVIEW_SYSTEM },
+    { role: 'user', content: prompt },
+  ], { temperature: 0.1, maxTokens: 1500 });
+  if (!r.ok) return r;
+  return { ok: true, result: r.text, model: r.model };
+}
+
+async function toolExplainCode(args) {
+  const code = String(args?.code || '').trim();
+  if (!code) return { ok: false, error: 'missing code' };
+  const audience = String(args?.audience || 'an intermediate developer').trim();
+  const language = String(args?.language || '').trim();
+  // Keep the metadata lines separate from the code fence with a blank
+  // line so the model sees the same visual structure as toolCodeReview.
+  // We can't put '' inside filter(Boolean) because filter(Boolean) drops
+  // empty strings, so assemble the header and the code block separately.
+  const header = [
+    language ? `Language: ${language}` : null,
+    `Audience: ${audience}`,
+  ].filter(Boolean).join('\n');
+  const prompt = `${header}\n\nCode:\n\`\`\`\n${code}\n\`\`\``;
+  const r = await groqChat([
+    { role: 'system', content: EXPLAIN_CODE_SYSTEM },
+    { role: 'user', content: prompt },
+  ], { temperature: 0.2, maxTokens: 1500 });
+  if (!r.ok) return r;
+  return { ok: true, result: r.text, model: r.model };
+}
+
+// ──────────────────────────────────────────────────────────────────
 // Dispatch
 
 async function executeRealTool(name, args) {
@@ -1356,6 +1450,10 @@ async function executeRealTool(name, args) {
     case 'dictionary':        return toolDictionary(a);
     // ── translation ──
     case 'translate':         return toolTranslate(a);
+    // ── groq-powered coding (opt-in via GROQ_API_KEY) ──
+    case 'solve_problem':     return toolSolveProblem(a);
+    case 'code_review':       return toolCodeReview(a);
+    case 'explain_code':      return toolExplainCode(a);
     default:                  return null; // signal "not handled here"
   }
 }
@@ -1372,6 +1470,9 @@ const REAL_TOOL_NAMES = [
   'fetch_url', 'rss_read',
   'wikipedia_search', 'dictionary',
   'translate',
+  // Groq-powered (opt-in) — safe to advertise; executor returns
+  // `{ ok:false, unavailable:true }` when GROQ_API_KEY is not set.
+  'solve_problem', 'code_review', 'explain_code',
 ];
 
 module.exports = {
@@ -1412,4 +1513,8 @@ module.exports = {
   toolDictionary,
   // translation
   toolTranslate,
+  // groq-powered
+  toolSolveProblem,
+  toolCodeReview,
+  toolExplainCode,
 };
