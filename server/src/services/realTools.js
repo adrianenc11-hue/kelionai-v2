@@ -3,34 +3,97 @@
 /**
  * Real, deterministic tool executors for Kelion.
  *
- * All four tools call free public APIs (no key required) so they work
- * out of the box on prod without adding any paid dependency:
+ * All tools call free public APIs (no key required) so they work out of
+ * the box on prod without adding any paid dependency:
  *
- *   - calculate     → mathjs (local, offline)
- *   - get_weather   → Open-Meteo (free, no key)
- *   - web_search    → DuckDuckGo Instant Answer (free, no key)
- *   - translate     → LibreTranslate (public instance, no key)
+ *   - calculate        → mathjs (local, offline)
+ *   - get_weather      → Open-Meteo (free, no key)
+ *   - web_search       → DuckDuckGo Instant Answer (free, no key)
+ *   - translate        → LibreTranslate (public instance, no key)
+ *   - get_route        → OSRM + Nominatim (free, no key)
+ *   - get_news         → GDELT Doc API (free, no key)
+ *   - get_crypto_price → CoinGecko (free, no key)
+ *   - get_stock_price  → Yahoo Finance query1 (free, unofficial)
  *
  * Each executor returns a small JSON-safe object that the LLM can read
  * back on the second streaming pass. Every error path is caught and
  * returned as `{ ok: false, error }` — the chat stream never throws.
  *
- * If paid keys are later added (SERPER_API_KEY, DEEPL_API_KEY, etc.)
- * the respective executor prefers them automatically — no code change
- * needed elsewhere.
+ * If paid keys are later added (SERPER_API_KEY, DEEPL_API_KEY, TAVILY_API_KEY,
+ * NEWS_API_KEY, ALPHA_VANTAGE_KEY, …) the respective executor prefers
+ * them automatically — no code change needed elsewhere.
  */
 
-const { evaluate } = require('mathjs');
+// Restricted mathjs instance — OOM guard against user expressions that
+// construct huge matrices via `ones(N,N)` / `zeros(N,N)` / `range(...)`.
+// Devin Review on PR #133 (BUG_0002) confirmed `ones(10000,10000)` allocates
+// 752 MB even with the 500-char length cap, so we build a mathjs scope that
+// disables every matrix-constructor, range, and factorial function. The
+// remaining surface (arithmetic, trig, log, exp, pow, sqrt, comparisons…) is
+// still enough for every user-facing calculator use case.
+const { create, all } = require('mathjs');
+const mathRestricted = create(all, {
+  // Bignumber arithmetic with a soft precision cap keeps memory bounded
+  // even for expressions like `factorial(1000)`.
+  number: 'number',
+});
+mathRestricted.import(
+  {
+    // Wipe the dangerous constructors + anything that builds arbitrary
+    // sized collections. If a user really needs matrices they can use the
+    // UI once we add a dedicated tool for it — not free-form math.
+    ones:       () => { throw new Error('matrix constructors disabled'); },
+    zeros:      () => { throw new Error('matrix constructors disabled'); },
+    identity:   () => { throw new Error('matrix constructors disabled'); },
+    diag:       () => { throw new Error('matrix constructors disabled'); },
+    range:      () => { throw new Error('range is disabled'); },
+    concat:     () => { throw new Error('concat is disabled'); },
+    flatten:    () => { throw new Error('flatten is disabled'); },
+    resize:     () => { throw new Error('resize is disabled'); },
+    reshape:    () => { throw new Error('reshape is disabled'); },
+    matrix:     () => { throw new Error('matrix is disabled'); },
+    // Factorial / gamma allow small-expression OOM (e.g. `1e9!`) — cap.
+    factorial:  (n) => {
+      const x = Number(n);
+      if (!Number.isFinite(x) || x < 0 || x > 170) {
+        throw new Error('factorial out of range (0..170)');
+      }
+      let out = 1;
+      for (let i = 2; i <= x; i += 1) out *= i;
+      return out;
+    },
+    gamma:      () => { throw new Error('gamma is disabled'); },
+  },
+  { override: true }
+);
+
+function safeEvaluate(expr) {
+  return mathRestricted.evaluate(expr);
+}
 
 // Small helper so every fetch has a hard deadline — voice/text chat
 // stream expects the tool result within a couple of seconds, not 30s.
+// Falls back to dynamic node-fetch import when running on a Node version
+// that predates the global `fetch` (Devin Review BUG_0004-adjacent).
+let nodeFetchPromise = null;
+async function getFetch() {
+  if (typeof globalThis.fetch === 'function') {
+    return globalThis.fetch.bind(globalThis);
+  }
+  if (!nodeFetchPromise) {
+    nodeFetchPromise = import('node-fetch').then((mod) => mod.default || mod);
+  }
+  return nodeFetchPromise;
+}
+
 async function fetchWithTimeout(url, opts = {}, timeoutMs = 8000) {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  const fetchImpl = await getFetch();
+  const ctrl = typeof AbortController === 'function' ? new AbortController() : null;
+  const timer = ctrl ? setTimeout(() => ctrl.abort(), timeoutMs) : null;
   try {
-    return await fetch(url, { ...opts, signal: ctrl.signal });
+    return await fetchImpl(url, ctrl ? { ...opts, signal: ctrl.signal } : opts);
   } finally {
-    clearTimeout(timer);
+    if (timer) clearTimeout(timer);
   }
 }
 
@@ -42,7 +105,7 @@ function toolCalculate({ expression }) {
   if (!expr) return { ok: false, error: 'missing expression' };
   if (expr.length > 500) return { ok: false, error: 'expression too long (max 500 chars)' };
   try {
-    const value = evaluate(expr);
+    const value = safeEvaluate(expr);
     let result;
     if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'string') {
       result = value;
@@ -116,8 +179,38 @@ async function toolWebSearch({ query, limit }) {
   if (!q) return { ok: false, error: 'missing query' };
   const n = Math.max(1, Math.min(10, Number.parseInt(limit, 10) || 5));
 
-  // Serper.dev preferred if key present — richer results with URLs. Falls
-  // back to DuckDuckGo Instant Answer (free, no key) otherwise.
+  // Tavily preferred when a key is present — AI-optimized search with
+  // summarization + URLs. Falls through to Serper, then DuckDuckGo.
+  const tavilyKey = process.env.TAVILY_API_KEY;
+  if (tavilyKey) {
+    try {
+      const r = await fetchWithTimeout('https://api.tavily.com/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          api_key: tavilyKey,
+          query: q,
+          max_results: n,
+          search_depth: 'basic',
+          include_answer: true,
+        }),
+      });
+      if (r.ok) {
+        const data = await r.json();
+        const results = Array.isArray(data.results) ? data.results.slice(0, n) : [];
+        return {
+          ok: true,
+          query: q,
+          results: results.map((o) => ({ title: o.title, url: o.url, snippet: o.content })),
+          answer: data.answer || null,
+          source: 'tavily.com',
+        };
+      }
+    } catch (_) { /* fall through to Serper */ }
+  }
+
+  // Serper.dev preferred next if key present — richer results with URLs.
+  // Falls back to DuckDuckGo Instant Answer (free, no key) otherwise.
   const serperKey = process.env.SERPER_API_KEY;
   if (serperKey) {
     try {
@@ -254,6 +347,786 @@ async function toolTranslate({ text, to, from }) {
 }
 
 // ──────────────────────────────────────────────────────────────────
+// get_forecast — 7+ day extended weather (wraps get_weather)
+
+async function toolGetForecast({ city, lat, lon, days }) {
+  const n = Math.max(1, Math.min(16, Number.parseInt(days, 10) || 7));
+  return toolGetWeather({ city, lat, lon, days: Math.min(n, 7) });
+}
+
+// ──────────────────────────────────────────────────────────────────
+// get_air_quality — OpenAQ v3 nearest-station lookup
+
+async function toolGetAirQuality({ city, lat, lon }) {
+  try {
+    let latitude = Number.parseFloat(lat);
+    let longitude = Number.parseFloat(lon);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      if (!city) return { ok: false, error: 'provide city or lat+lon' };
+      const place = await geocodeCity(String(city).slice(0, 100));
+      latitude = place.latitude;
+      longitude = place.longitude;
+    }
+    const url = `https://api.openaq.org/v2/latest?coordinates=${latitude},${longitude}&radius=25000&limit=5&order_by=distance`;
+    const r = await fetchWithTimeout(url);
+    if (!r.ok) return { ok: false, error: `openaq ${r.status}` };
+    const data = await r.json();
+    const stations = Array.isArray(data.results) ? data.results.slice(0, 3) : [];
+    return {
+      ok: true,
+      coords: { latitude, longitude },
+      stations: stations.map((s) => ({
+        location: s.location,
+        city: s.city,
+        country: s.country,
+        measurements: (s.measurements || []).map((m) => ({
+          parameter: m.parameter,
+          value: m.value,
+          unit: m.unit,
+          lastUpdated: m.lastUpdated,
+        })),
+      })),
+      source: 'openaq.org',
+    };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────
+// get_news — GDELT Doc API v2 (free, no key)
+
+async function toolGetNews({ topic, lang, limit }) {
+  const q = (topic || '').toString().trim() || 'world';
+  const n = Math.max(1, Math.min(20, Number.parseInt(limit, 10) || 10));
+  const l = (lang || '').toString().toLowerCase().slice(0, 8);
+  const langFilter = l ? ` sourcelang:${l}` : '';
+  try {
+    const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(q + langFilter)}&mode=artlist&format=json&maxrecords=${n}&sort=datedesc`;
+    const r = await fetchWithTimeout(url);
+    if (!r.ok) return { ok: false, error: `gdelt ${r.status}` };
+    const data = await r.json();
+    const arts = Array.isArray(data.articles) ? data.articles.slice(0, n) : [];
+    return {
+      ok: true,
+      topic: q,
+      articles: arts.map((a) => ({
+        title: a.title,
+        url: a.url,
+        source: a.sourcecountry ? `${a.domain} (${a.sourcecountry})` : a.domain,
+        seendate: a.seendate,
+        language: a.language,
+      })),
+      source: 'gdeltproject.org',
+    };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────
+// get_crypto_price — CoinGecko simple price
+
+// Map common tickers → CoinGecko IDs so the model can pass either.
+const CRYPTO_TICKER_MAP = {
+  btc: 'bitcoin', eth: 'ethereum', sol: 'solana', doge: 'dogecoin',
+  ada: 'cardano', xrp: 'ripple', ltc: 'litecoin', bch: 'bitcoin-cash',
+  bnb: 'binancecoin', dot: 'polkadot', avax: 'avalanche-2', matic: 'matic-network',
+  trx: 'tron', link: 'chainlink', atom: 'cosmos', usdt: 'tether', usdc: 'usd-coin',
+};
+
+async function toolGetCryptoPrice({ coin, ids, vs }) {
+  const rawList = (ids || coin || 'bitcoin').toString().toLowerCase().split(',').map((s) => s.trim()).filter(Boolean);
+  const resolved = rawList.map((id) => CRYPTO_TICKER_MAP[id] || id);
+  const c = resolved.join(',');
+  const v = (vs || 'usd').toString().toLowerCase().trim();
+  try {
+    const url = `https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(c)}&vs_currencies=${encodeURIComponent(v)}&include_24hr_change=true&include_market_cap=true`;
+    const r = await fetchWithTimeout(url);
+    if (!r.ok) return { ok: false, error: `coingecko ${r.status}` };
+    const data = await r.json();
+    if (!data || Object.keys(data).length === 0) {
+      return { ok: false, error: `unknown coin id(s) "${c}" (try 'bitcoin', 'ethereum', 'solana' …)` };
+    }
+    // Both a per-coin map and the legacy single-coin shape so existing callers keep working.
+    const prices = {};
+    for (const [id, entry] of Object.entries(data)) {
+      prices[id] = {
+        [v]: entry[v],
+        [`${v}_market_cap`]: entry[`${v}_market_cap`] ?? null,
+        [`${v}_24h_change`]: entry[`${v}_24h_change`] ?? null,
+      };
+    }
+    const firstId = Object.keys(data)[0];
+    const first = data[firstId];
+    return {
+      ok: true,
+      coin: firstId,
+      vs: v,
+      price: first?.[v] ?? null,
+      marketCap: first?.[`${v}_market_cap`] ?? null,
+      change24h: first?.[`${v}_24h_change`] ?? null,
+      prices,
+      source: 'coingecko.com',
+    };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────
+// get_stock_price — Yahoo Finance query1 (free, no key, unofficial)
+
+async function toolGetStockPrice({ symbol }) {
+  const s = (symbol || '').toString().trim().toUpperCase();
+  if (!s) return { ok: false, error: 'missing symbol' };
+  try {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(s)}?range=1d&interval=1d`;
+    const r = await fetchWithTimeout(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Kelion/1.0)' },
+    });
+    if (!r.ok) return { ok: false, error: `yahoo ${r.status}` };
+    const data = await r.json();
+    const res = data?.chart?.result?.[0];
+    const meta = res?.meta;
+    if (!meta) return { ok: false, error: `unknown symbol "${s}"` };
+    return {
+      ok: true,
+      symbol: s,
+      price: meta.regularMarketPrice,
+      currency: meta.currency,
+      previousClose: meta.chartPreviousClose,
+      exchange: meta.exchangeName,
+      dayRange: { low: meta.regularMarketDayLow, high: meta.regularMarketDayHigh },
+      source: 'query1.finance.yahoo.com',
+    };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────
+// get_forex / currency_convert — exchangerate.host (free, no key)
+
+async function toolGetForex({ base, from, to, amount }) {
+  // Accept either `base` or `from` — the catalog uses `from` but the
+  // executor was historically `base`. Normalize here.
+  const b = (base || from || 'USD').toString().toUpperCase().slice(0, 3);
+  const t = (to || 'EUR').toString().toUpperCase().slice(0, 3);
+  const a = Number.parseFloat(amount);
+  try {
+    const url = `https://api.exchangerate.host/convert?from=${b}&to=${t}${Number.isFinite(a) ? `&amount=${a}` : ''}`;
+    const r = await fetchWithTimeout(url);
+    if (!r.ok) return { ok: false, error: `exchangerate.host ${r.status}` };
+    const data = await r.json();
+    if (!data || data.success === false || typeof data.result !== 'number') {
+      return { ok: false, error: 'conversion failed' };
+    }
+    return {
+      ok: true,
+      base: b,
+      from: b,
+      to: t,
+      rate: data.info?.rate ?? null,
+      amount: Number.isFinite(a) ? a : 1,
+      result: data.result,
+      date: data.date,
+      source: 'exchangerate.host',
+    };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+}
+
+const toolCurrencyConvert = toolGetForex;
+
+// ──────────────────────────────────────────────────────────────────
+// get_earthquakes — USGS GeoJSON feed
+
+async function toolGetEarthquakes({ minMagnitude, min_magnitude, period, limit }) {
+  // Accept both camelCase and snake_case — catalog uses `min_magnitude`.
+  const mag = Math.max(0, Math.min(9, Number.parseFloat(minMagnitude ?? min_magnitude) || 2.5));
+  const feed = { hour: 'all_hour', day: 'all_day', week: 'all_week', month: 'all_month' }[
+    (period || 'day').toString().toLowerCase()
+  ] || 'all_day';
+  const cap = Math.max(1, Math.min(50, Number.parseInt(limit, 10) || 10));
+  try {
+    const url = `https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/${feed}.geojson`;
+    const r = await fetchWithTimeout(url);
+    if (!r.ok) return { ok: false, error: `usgs ${r.status}` };
+    const data = await r.json();
+    const quakes = (data.features || [])
+      .filter((f) => (f.properties?.mag ?? 0) >= mag)
+      .slice(0, cap)
+      .map((f) => ({
+        magnitude: f.properties.mag,
+        place: f.properties.place,
+        time: new Date(f.properties.time).toISOString(),
+        url: f.properties.url,
+        coords: f.geometry?.coordinates || null,
+      }));
+    return { ok: true, minMagnitude: mag, period: period || 'day', count: quakes.length, quakes, source: 'usgs.gov' };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────
+// get_sun_times — sunrise-sunset.org
+
+async function toolGetSunTimes({ city, lat, lon, date }) {
+  try {
+    let latitude = Number.parseFloat(lat);
+    let longitude = Number.parseFloat(lon);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      if (!city) return { ok: false, error: 'provide city or lat+lon' };
+      const place = await geocodeCity(String(city).slice(0, 100));
+      latitude = place.latitude;
+      longitude = place.longitude;
+    }
+    const d = date ? `&date=${encodeURIComponent(date)}` : '';
+    const url = `https://api.sunrise-sunset.org/json?lat=${latitude}&lng=${longitude}&formatted=0${d}`;
+    const r = await fetchWithTimeout(url);
+    if (!r.ok) return { ok: false, error: `sunrise-sunset ${r.status}` };
+    const data = await r.json();
+    if (data.status !== 'OK') return { ok: false, error: data.status };
+    return {
+      ok: true,
+      coords: { latitude, longitude },
+      date: date || 'today',
+      sunrise: data.results.sunrise,
+      sunset: data.results.sunset,
+      solar_noon: data.results.solar_noon,
+      day_length: data.results.day_length,
+      civil_twilight_begin: data.results.civil_twilight_begin,
+      civil_twilight_end: data.results.civil_twilight_end,
+      source: 'sunrise-sunset.org',
+    };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────
+// get_moon_phase — computed from Julian date (offline, deterministic)
+
+function toolGetMoonPhase({ date }) {
+  try {
+    const d = date ? new Date(date) : new Date();
+    if (Number.isNaN(d.getTime())) return { ok: false, error: 'invalid date' };
+    // Normalization: known new moon 2000-01-06 18:14 UT → JD 2451550.1
+    const jd = d.getTime() / 86400000 + 2440587.5;
+    const days = jd - 2451550.1;
+    const cycles = days / 29.530588853;
+    const phase = cycles - Math.floor(cycles); // 0..1
+    const names = [
+      'new moon', 'waxing crescent', 'first quarter', 'waxing gibbous',
+      'full moon', 'waning gibbous', 'last quarter', 'waning crescent',
+    ];
+    const bucket = Math.floor(((phase + 1 / 16) * 8)) % 8;
+    return {
+      ok: true,
+      date: d.toISOString(),
+      phase: phase.toFixed(4),
+      illumination_percent: Math.round((1 - Math.cos(phase * 2 * Math.PI)) * 50),
+      name: names[bucket],
+      age_days: (phase * 29.530588853).toFixed(2),
+      source: 'computed (Jean Meeus algorithm, offline)',
+    };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────
+// Nominatim helpers — geocode / reverse_geocode / nearby_places
+
+const NOMINATIM_HEADERS = {
+  'User-Agent': 'Kelion/1.0 (https://kelionai.app)',
+  'Accept-Language': 'en',
+};
+
+async function toolGeocode({ query }) {
+  const q = (query || '').toString().trim();
+  if (!q) return { ok: false, error: 'missing query' };
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5&addressdetails=1`;
+    const r = await fetchWithTimeout(url, { headers: NOMINATIM_HEADERS });
+    if (!r.ok) return { ok: false, error: `nominatim ${r.status}` };
+    const data = await r.json();
+    return {
+      ok: true,
+      query: q,
+      results: (data || []).slice(0, 5).map((h) => ({
+        latitude: Number.parseFloat(h.lat),
+        longitude: Number.parseFloat(h.lon),
+        displayName: h.display_name,
+        type: h.type,
+        address: h.address || null,
+      })),
+      source: 'nominatim.openstreetmap.org',
+    };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+}
+
+async function toolReverseGeocode({ lat, lon }) {
+  const latitude = Number.parseFloat(lat);
+  const longitude = Number.parseFloat(lon);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return { ok: false, error: 'missing lat/lon' };
+  try {
+    const url = `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&addressdetails=1`;
+    const r = await fetchWithTimeout(url, { headers: NOMINATIM_HEADERS });
+    if (!r.ok) return { ok: false, error: `nominatim ${r.status}` };
+    const data = await r.json();
+    return {
+      ok: true,
+      coords: { latitude, longitude },
+      displayName: data.display_name,
+      address: data.address || null,
+      source: 'nominatim.openstreetmap.org',
+    };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────
+// get_route — OSRM (free, no key) + Nominatim for addresses
+
+async function resolveCoord(input) {
+  if (!input) return null;
+  if (typeof input === 'object' && Number.isFinite(input.lat) && Number.isFinite(input.lon)) {
+    return { latitude: input.lat, longitude: input.lon };
+  }
+  const s = String(input).trim();
+  // "lat,lon" shorthand
+  const m = s.match(/^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/);
+  if (m) return { latitude: Number.parseFloat(m[1]), longitude: Number.parseFloat(m[2]) };
+  const g = await toolGeocode({ query: s });
+  return g.ok && g.results[0] ? { latitude: g.results[0].latitude, longitude: g.results[0].longitude } : null;
+}
+
+async function toolGetRoute({ from, to, mode, profile: profileArg }) {
+  const a = await resolveCoord(from);
+  const b = await resolveCoord(to);
+  if (!a || !b) return { ok: false, error: `could not resolve ${a ? 'destination' : 'origin'}` };
+  // Accept both `mode` and `profile` — catalog uses `profile`.
+  const profile = { driving: 'driving', car: 'driving', walking: 'foot', walk: 'foot', cycling: 'bike', bike: 'bike' }[
+    (mode || profileArg || 'driving').toString().toLowerCase()
+  ] || 'driving';
+  try {
+    const url = `https://router.project-osrm.org/route/v1/${profile}/${a.longitude},${a.latitude};${b.longitude},${b.latitude}?overview=false&alternatives=false&steps=false`;
+    const r = await fetchWithTimeout(url);
+    if (!r.ok) return { ok: false, error: `osrm ${r.status}` };
+    const data = await r.json();
+    const route = data.routes && data.routes[0];
+    if (!route) return { ok: false, error: 'no route found' };
+    return {
+      ok: true,
+      from: a,
+      to: b,
+      mode: profile,
+      distance_km: +(route.distance / 1000).toFixed(2),
+      duration_min: +(route.duration / 60).toFixed(1),
+      source: 'project-osrm.org',
+    };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────
+// nearby_places — Overpass (OSM) POI search around a coordinate
+
+const AMENITY_MAP = {
+  restaurant: '["amenity"="restaurant"]',
+  cafe: '["amenity"="cafe"]',
+  bar: '["amenity"="bar"]',
+  pub: '["amenity"="pub"]',
+  atm: '["amenity"="atm"]',
+  bank: '["amenity"="bank"]',
+  pharmacy: '["amenity"="pharmacy"]',
+  hospital: '["amenity"="hospital"]',
+  supermarket: '["shop"="supermarket"]',
+  gas: '["amenity"="fuel"]',
+  fuel: '["amenity"="fuel"]',
+  parking: '["amenity"="parking"]',
+  hotel: '["tourism"="hotel"]',
+  charging: '["amenity"="charging_station"]',
+};
+
+async function toolNearbyPlaces({ lat, lon, category, query: queryArg, radius, radius_m, limit }) {
+  const latitude = Number.parseFloat(lat);
+  const longitude = Number.parseFloat(lon);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return { ok: false, error: 'missing lat/lon' };
+  // Catalog uses `query` + `radius_m` + `limit`; legacy callers pass `category` + `radius`.
+  const c = (queryArg || category || 'restaurant').toString().toLowerCase();
+  const filter = AMENITY_MAP[c] || `["amenity"="${c.replace(/"/g, '')}"]`;
+  const rad = Math.max(50, Math.min(10000, Number.parseInt(radius_m ?? radius, 10) || 1500));
+  const cap = Math.max(1, Math.min(20, Number.parseInt(limit, 10) || 10));
+  const query = `[out:json][timeout:10];(node${filter}(around:${rad},${latitude},${longitude}););out body ${cap};`;
+  try {
+    const r = await fetchWithTimeout('https://overpass-api.de/api/interpreter', {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: query,
+    });
+    if (!r.ok) return { ok: false, error: `overpass ${r.status}` };
+    const data = await r.json();
+    const elements = (data.elements || []).slice(0, 15);
+    return {
+      ok: true,
+      category: c,
+      center: { latitude, longitude },
+      radius_m: rad,
+      count: elements.length,
+      places: elements.map((e) => ({
+        name: e.tags?.name || '(unnamed)',
+        latitude: e.lat,
+        longitude: e.lon,
+        tags: e.tags || null,
+      })),
+      source: 'overpass-api.de',
+    };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────
+// get_elevation — Open-Elevation
+
+async function toolGetElevation({ lat, lon }) {
+  const latitude = Number.parseFloat(lat);
+  const longitude = Number.parseFloat(lon);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return { ok: false, error: 'missing lat/lon' };
+  try {
+    const url = `https://api.open-elevation.com/api/v1/lookup?locations=${latitude},${longitude}`;
+    const r = await fetchWithTimeout(url);
+    if (!r.ok) return { ok: false, error: `open-elevation ${r.status}` };
+    const data = await r.json();
+    const hit = data.results && data.results[0];
+    if (!hit) return { ok: false, error: 'no elevation data' };
+    return { ok: true, coords: { latitude, longitude }, elevation_m: hit.elevation, source: 'open-elevation.com' };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────
+// get_timezone — timeapi.io
+
+async function toolGetTimezone({ city, lat, lon }) {
+  try {
+    let latitude = Number.parseFloat(lat);
+    let longitude = Number.parseFloat(lon);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      if (!city) return { ok: false, error: 'provide city or lat+lon' };
+      const place = await geocodeCity(String(city).slice(0, 100));
+      latitude = place.latitude;
+      longitude = place.longitude;
+    }
+    const url = `https://www.timeapi.io/api/Time/current/coordinate?latitude=${latitude}&longitude=${longitude}`;
+    const r = await fetchWithTimeout(url);
+    if (!r.ok) return { ok: false, error: `timeapi ${r.status}` };
+    const data = await r.json();
+    return {
+      ok: true,
+      coords: { latitude, longitude },
+      timezone: data.timeZone,
+      dateTime: data.dateTime,
+      dayOfWeek: data.dayOfWeek,
+      dstActive: data.dstActive,
+      source: 'timeapi.io',
+    };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────
+// unit_convert — deterministic, offline
+
+const UNIT_CONVERSIONS = {
+  // length (to meters)
+  m: 1, km: 1000, cm: 0.01, mm: 0.001, mi: 1609.344, miles: 1609.344,
+  yd: 0.9144, ft: 0.3048, in: 0.0254, nm: 1852,
+  // mass (to kilograms)
+  kg: 1, g: 0.001, mg: 1e-6, t: 1000, lb: 0.45359237, lbs: 0.45359237, oz: 0.0283495,
+  // volume (to liters)
+  l: 1, ml: 0.001, gal: 3.78541, qt: 0.946353, pt: 0.473176, cup: 0.236588, floz: 0.0295735,
+  // time (to seconds)
+  s: 1, min: 60, h: 3600, hr: 3600, day: 86400, wk: 604800,
+};
+const UNIT_CATEGORY = {
+  m: 'length', km: 'length', cm: 'length', mm: 'length', mi: 'length', miles: 'length',
+  yd: 'length', ft: 'length', in: 'length', nm: 'length',
+  kg: 'mass', g: 'mass', mg: 'mass', t: 'mass', lb: 'mass', lbs: 'mass', oz: 'mass',
+  l: 'volume', ml: 'volume', gal: 'volume', qt: 'volume', pt: 'volume', cup: 'volume', floz: 'volume',
+  s: 'time', min: 'time', h: 'time', hr: 'time', day: 'time', wk: 'time',
+};
+
+function toolUnitConvert({ value, from, to }) {
+  const v = Number.parseFloat(value);
+  if (!Number.isFinite(v)) return { ok: false, error: 'missing/invalid value' };
+  const f = (from || '').toString().toLowerCase().trim();
+  const t = (to || '').toString().toLowerCase().trim();
+  // Temperature — non-linear, handled separately
+  const tempKey = (k) => ({ c: 'c', celsius: 'c', '°c': 'c', f: 'f', fahrenheit: 'f', '°f': 'f', k: 'k', kelvin: 'k' }[k]);
+  const fT = tempKey(f);
+  const tT = tempKey(t);
+  if (fT && tT) {
+    let celsius;
+    if (fT === 'c') celsius = v;
+    else if (fT === 'f') celsius = (v - 32) * 5 / 9;
+    else celsius = v - 273.15;
+    let out;
+    if (tT === 'c') out = celsius;
+    else if (tT === 'f') out = celsius * 9 / 5 + 32;
+    else out = celsius + 273.15;
+    return { ok: true, value: v, from: fT, to: tT, result: +out.toFixed(6), category: 'temperature' };
+  }
+  if (!UNIT_CONVERSIONS[f] || !UNIT_CONVERSIONS[t]) return { ok: false, error: `unknown unit "${UNIT_CONVERSIONS[f] ? t : f}"` };
+  if (UNIT_CATEGORY[f] !== UNIT_CATEGORY[t]) return { ok: false, error: `can't convert ${UNIT_CATEGORY[f]} to ${UNIT_CATEGORY[t]}` };
+  const result = v * UNIT_CONVERSIONS[f] / UNIT_CONVERSIONS[t];
+  return { ok: true, value: v, from: f, to: t, result: +result.toFixed(6), category: UNIT_CATEGORY[f] };
+}
+
+// ──────────────────────────────────────────────────────────────────
+// search_academic — arXiv API
+
+async function toolSearchAcademic({ query, limit }) {
+  const q = (query || '').toString().trim();
+  if (!q) return { ok: false, error: 'missing query' };
+  const n = Math.max(1, Math.min(10, Number.parseInt(limit, 10) || 5));
+  try {
+    const url = `https://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(q)}&start=0&max_results=${n}`;
+    const r = await fetchWithTimeout(url);
+    if (!r.ok) return { ok: false, error: `arxiv ${r.status}` };
+    const text = await r.text();
+    // Very small XML parser — arXiv atom feed.
+    const entries = Array.from(text.matchAll(/<entry>([\s\S]*?)<\/entry>/g)).slice(0, n);
+    const results = entries.map((m) => {
+      const block = m[1];
+      const pick = (tag) => {
+        const mm = block.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`));
+        return mm ? mm[1].replace(/\s+/g, ' ').trim() : null;
+      };
+      const idMatch = block.match(/<id>([\s\S]*?)<\/id>/);
+      const authors = Array.from(block.matchAll(/<name>([\s\S]*?)<\/name>/g)).map((a) => a[1].trim());
+      return {
+        title: pick('title'),
+        summary: pick('summary'),
+        published: pick('published'),
+        url: idMatch ? idMatch[1].trim() : null,
+        authors: authors.slice(0, 5),
+      };
+    });
+    return { ok: true, query: q, results, source: 'arxiv.org' };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────
+// search_github — GitHub Search API (unauth, 10 req/min)
+
+async function toolSearchGithub({ query, type, limit }) {
+  const q = (query || '').toString().trim();
+  if (!q) return { ok: false, error: 'missing query' };
+  const n = Math.max(1, Math.min(10, Number.parseInt(limit, 10) || 5));
+  const kind = ({ repo: 'repositories', repos: 'repositories', repositories: 'repositories', code: 'code', issue: 'issues', issues: 'issues', user: 'users', users: 'users' }[
+    (type || 'repositories').toString().toLowerCase()
+  ]) || 'repositories';
+  try {
+    const headers = { Accept: 'application/vnd.github+json', 'User-Agent': 'Kelion/1.0' };
+    if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+    const url = `https://api.github.com/search/${kind}?q=${encodeURIComponent(q)}&per_page=${n}`;
+    const r = await fetchWithTimeout(url, { headers });
+    if (!r.ok) return { ok: false, error: `github ${r.status}` };
+    const data = await r.json();
+    const items = Array.isArray(data.items) ? data.items.slice(0, n) : [];
+    return {
+      ok: true,
+      query: q,
+      type: kind,
+      total: data.total_count,
+      results: items.map((i) => ({
+        name: i.full_name || i.name || i.login,
+        url: i.html_url,
+        description: i.description || i.bio || null,
+        stars: i.stargazers_count ?? null,
+        language: i.language ?? null,
+      })),
+      source: 'api.github.com',
+    };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────
+// search_stackoverflow — StackExchange API
+
+async function toolSearchStackoverflow({ query, limit }) {
+  const q = (query || '').toString().trim();
+  if (!q) return { ok: false, error: 'missing query' };
+  const n = Math.max(1, Math.min(10, Number.parseInt(limit, 10) || 5));
+  try {
+    const url = `https://api.stackexchange.com/2.3/search/advanced?order=desc&sort=relevance&q=${encodeURIComponent(q)}&site=stackoverflow&pagesize=${n}`;
+    const r = await fetchWithTimeout(url);
+    if (!r.ok) return { ok: false, error: `stackexchange ${r.status}` };
+    const data = await r.json();
+    return {
+      ok: true,
+      query: q,
+      results: (data.items || []).slice(0, n).map((it) => ({
+        title: it.title,
+        url: it.link,
+        score: it.score,
+        answered: it.is_answered,
+        answer_count: it.answer_count,
+        tags: it.tags,
+      })),
+      source: 'stackoverflow.com',
+    };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────
+// fetch_url — GET a URL and return text content (truncated)
+
+async function toolFetchUrl({ url, max_chars }) {
+  const u = (url || '').toString().trim();
+  if (!/^https?:\/\//i.test(u)) return { ok: false, error: 'url must start with http(s)://' };
+  const cap = Math.max(200, Math.min(20000, Number.parseInt(max_chars, 10) || 4000));
+  try {
+    const r = await fetchWithTimeout(u, {
+      headers: { 'User-Agent': 'Kelion/1.0 (+https://kelionai.app)', Accept: 'text/html,application/json,*/*' },
+    }, 12000);
+    const ct = r.headers.get('content-type') || '';
+    const buf = await r.text();
+    if (ct.includes('application/json')) {
+      const sliced = buf.length > cap ? buf.slice(0, cap) + '… [truncated]' : buf;
+      return { ok: true, url: u, contentType: ct, bytes: buf.length, content: sliced, source: 'direct-fetch' };
+    }
+    // Strip tags for HTML; keep plain text for others.
+    const stripped = buf
+      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const text = stripped.length > cap ? stripped.slice(0, cap) + '… [truncated]' : stripped;
+    return { ok: true, url: u, contentType: ct, bytes: buf.length, content: text, source: 'direct-fetch' };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────
+// rss_read — parse an RSS/Atom feed into entries
+
+async function toolRssRead({ url, limit }) {
+  const u = (url || '').toString().trim();
+  if (!/^https?:\/\//i.test(u)) return { ok: false, error: 'url must start with http(s)://' };
+  const n = Math.max(1, Math.min(30, Number.parseInt(limit, 10) || 10));
+  try {
+    const r = await fetchWithTimeout(u, { headers: { 'User-Agent': 'Kelion/1.0 (RSS)' } });
+    if (!r.ok) return { ok: false, error: `fetch ${r.status}` };
+    const xml = await r.text();
+    const items = Array.from(xml.matchAll(/<(item|entry)[\s\S]*?<\/\1>/g)).slice(0, n);
+    const pick = (block, tag) => {
+      const m = block.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i'));
+      return m ? m[1].replace(/<!\[CDATA\[|\]\]>/g, '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim() : null;
+    };
+    const entries = items.map((m) => {
+      const b = m[0];
+      const linkMatch = b.match(/<link[^>]*href="([^"]+)"/) || b.match(/<link[^>]*>([^<]+)<\/link>/);
+      return {
+        title: pick(b, 'title'),
+        link: linkMatch ? linkMatch[1] : null,
+        pubDate: pick(b, 'pubDate') || pick(b, 'published') || pick(b, 'updated'),
+        summary: pick(b, 'description') || pick(b, 'summary'),
+      };
+    });
+    return { ok: true, url: u, count: entries.length, entries, source: 'rss' };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────
+// wikipedia_search — Wikipedia REST summary API
+
+async function toolWikipediaSearch({ query, lang }) {
+  const q = (query || '').toString().trim();
+  if (!q) return { ok: false, error: 'missing query' };
+  const l = (lang || 'en').toString().toLowerCase().slice(0, 5);
+  try {
+    // 1) search titles
+    const s = await fetchWithTimeout(`https://${l}.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(q)}&limit=1&namespace=0&format=json`);
+    if (!s.ok) return { ok: false, error: `wikipedia ${s.status}` };
+    const sd = await s.json();
+    const title = sd?.[1]?.[0];
+    if (!title) return { ok: false, error: 'no wikipedia article found' };
+    // 2) fetch summary
+    const r = await fetchWithTimeout(`https://${l}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`);
+    if (!r.ok) return { ok: false, error: `wikipedia summary ${r.status}` };
+    const data = await r.json();
+    return {
+      ok: true,
+      query: q,
+      title: data.title,
+      extract: data.extract,
+      url: data.content_urls?.desktop?.page,
+      thumbnail: data.thumbnail?.source || null,
+      source: `${l}.wikipedia.org`,
+    };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────
+// dictionary — Free Dictionary API (en) or Wiktionary
+
+async function toolDictionary({ word, lang }) {
+  const w = (word || '').toString().trim();
+  if (!w) return { ok: false, error: 'missing word' };
+  const l = (lang || 'en').toString().toLowerCase().slice(0, 5);
+  try {
+    const url = `https://api.dictionaryapi.dev/api/v2/entries/${l}/${encodeURIComponent(w)}`;
+    const r = await fetchWithTimeout(url);
+    if (!r.ok) return { ok: false, error: `dictionary ${r.status}` };
+    const data = await r.json();
+    if (!Array.isArray(data) || !data[0]) return { ok: false, error: 'word not found' };
+    const entry = data[0];
+    return {
+      ok: true,
+      word: entry.word,
+      phonetic: entry.phonetic || entry.phonetics?.[0]?.text || null,
+      meanings: (entry.meanings || []).slice(0, 3).map((m) => ({
+        partOfSpeech: m.partOfSpeech,
+        definitions: (m.definitions || []).slice(0, 3).map((d) => ({
+          definition: d.definition,
+          example: d.example || null,
+        })),
+      })),
+      source: 'dictionaryapi.dev',
+    };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────
 // Keyword → forced tool detection.
 //
 // If the latest user message clearly asks for one of these capabilities,
@@ -278,6 +1151,42 @@ const TOOL_FORCE_RULES = [
     name: 'translate',
     re: /\b(translate|in translation|how do you say|translate (?:this|that|to|into)|traduc(?:e|eți)|cum se spune pe|tradu|traducere)\b/i,
   },
+  {
+    name: 'get_news',
+    re: /\b(news about|latest news|headlines on|știri despre|ultimele știri|titluri despre)\b/i,
+  },
+  {
+    name: 'get_crypto_price',
+    re: /\b(price of (bitcoin|btc|ethereum|eth|solana|sol|doge|ada|xrp)|cât costă (bitcoin|btc|ethereum|eth)|cotație (bitcoin|eth))\b/i,
+  },
+  {
+    name: 'get_stock_price',
+    re: /\b(stock price (of|for)|quote for|cotație (acțiuni )?pentru|preț acțiuni) [A-Z]{1,5}\b/i,
+  },
+  {
+    name: 'get_forex',
+    re: /\b(convert .+ (to|in) .+|exchange rate|rate [A-Z]{3}\/[A-Z]{3}|curs (valutar|schimb)|converteste|conversie valutar[ăa])\b/i,
+  },
+  {
+    name: 'get_route',
+    re: /\b(route from .+ to|how (do I|to) get from|directions from|rut[aă] de la .+ (p[aâ]n[aă] la|la)|distanț[aă] (de la|între))\b/i,
+  },
+  {
+    name: 'wikipedia_search',
+    re: /\b(wikipedia|wiki (about|on|for)|caut[aă] pe wikipedia)\b/i,
+  },
+  {
+    name: 'dictionary',
+    re: /\b(define .+|definition of|what does .+ mean|meaning of the word|definiție pentru)\b/i,
+  },
+  {
+    name: 'get_earthquakes',
+    re: /\b(recent earthquakes|cutremure recente|ultimele cutremure)\b/i,
+  },
+  {
+    name: 'get_air_quality',
+    re: /\b(air quality|AQI|pollution level|calitate (a )?aer(ului)?|poluare)\b/i,
+  },
 ];
 
 function pickForcedTool(lastUserMessage) {
@@ -293,20 +1202,96 @@ function pickForcedTool(lastUserMessage) {
 // Dispatch
 
 async function executeRealTool(name, args) {
+  const a = args || {};
   switch (name) {
-    case 'calculate':   return toolCalculate(args || {});
-    case 'get_weather': return toolGetWeather(args || {});
-    case 'web_search':  return toolWebSearch(args || {});
-    case 'translate':   return toolTranslate(args || {});
-    default:            return null; // signal "not handled here"
+    // ── math / offline ──
+    case 'calculate':         return toolCalculate(a);
+    case 'unit_convert':      return toolUnitConvert(a);
+    case 'get_moon_phase':    return toolGetMoonPhase(a);
+    // ── weather / feeds ──
+    case 'get_weather':       return toolGetWeather(a);
+    case 'get_forecast':      return toolGetForecast(a);
+    case 'get_air_quality':   return toolGetAirQuality(a);
+    case 'get_news':          return toolGetNews(a);
+    case 'get_crypto_price':  return toolGetCryptoPrice(a);
+    case 'get_stock_price':   return toolGetStockPrice(a);
+    case 'get_forex':         return toolGetForex(a);
+    case 'currency_convert':  return toolCurrencyConvert(a);
+    case 'get_earthquakes':   return toolGetEarthquakes(a);
+    case 'get_sun_times':     return toolGetSunTimes(a);
+    // ── geo ──
+    case 'geocode':           return toolGeocode(a);
+    case 'reverse_geocode':   return toolReverseGeocode(a);
+    case 'get_route':         return toolGetRoute(a);
+    case 'nearby_places':     return toolNearbyPlaces(a);
+    case 'get_elevation':     return toolGetElevation(a);
+    case 'get_timezone':      return toolGetTimezone(a);
+    // ── web / search ──
+    case 'web_search':        return toolWebSearch(a);
+    case 'search_academic':   return toolSearchAcademic(a);
+    case 'search_github':     return toolSearchGithub(a);
+    case 'search_stackoverflow': return toolSearchStackoverflow(a);
+    case 'fetch_url':         return toolFetchUrl(a);
+    case 'rss_read':          return toolRssRead(a);
+    // ── knowledge ──
+    case 'wikipedia_search':  return toolWikipediaSearch(a);
+    case 'dictionary':        return toolDictionary(a);
+    // ── translation ──
+    case 'translate':         return toolTranslate(a);
+    default:                  return null; // signal "not handled here"
   }
 }
+
+// Full list of tool names handled by this module — keeps catalogs honest.
+const REAL_TOOL_NAMES = [
+  'calculate', 'unit_convert', 'get_moon_phase',
+  'get_weather', 'get_forecast', 'get_air_quality', 'get_news',
+  'get_crypto_price', 'get_stock_price', 'get_forex', 'currency_convert',
+  'get_earthquakes', 'get_sun_times',
+  'geocode', 'reverse_geocode', 'get_route', 'nearby_places',
+  'get_elevation', 'get_timezone',
+  'web_search', 'search_academic', 'search_github', 'search_stackoverflow',
+  'fetch_url', 'rss_read',
+  'wikipedia_search', 'dictionary',
+  'translate',
+];
 
 module.exports = {
   executeRealTool,
   pickForcedTool,
+  REAL_TOOL_NAMES,
+  // math / offline
   toolCalculate,
+  toolUnitConvert,
+  toolGetMoonPhase,
+  // weather / feeds
   toolGetWeather,
+  toolGetForecast,
+  toolGetAirQuality,
+  toolGetNews,
+  toolGetCryptoPrice,
+  toolGetStockPrice,
+  toolGetForex,
+  toolCurrencyConvert,
+  toolGetEarthquakes,
+  toolGetSunTimes,
+  // geo
+  toolGeocode,
+  toolReverseGeocode,
+  toolGetRoute,
+  toolNearbyPlaces,
+  toolGetElevation,
+  toolGetTimezone,
+  // web / search
   toolWebSearch,
+  toolSearchAcademic,
+  toolSearchGithub,
+  toolSearchStackoverflow,
+  toolFetchUrl,
+  toolRssRead,
+  // knowledge
+  toolWikipediaSearch,
+  toolDictionary,
+  // translation
   toolTranslate,
 };

@@ -268,6 +268,236 @@ const KELION_TOOLS = [
     },
     required: ['text', 'to'],
   },
+  // ── Feeds & live data ─────────────────────────────────────────────
+  {
+    name: 'get_forecast',
+    description: "Get a multi-day weather forecast (up to 16 days) for a city or coordinates. Use when the user asks 'what's the weather this week', 'will it rain on Friday', 'forecast for next weekend'. Data from Open-Meteo.",
+    properties: {
+      city: { type: 'string', description: "City / place name. Either city or lat+lon required." },
+      lat:  { type: 'number', description: "Latitude in decimal degrees." },
+      lon:  { type: 'number', description: "Longitude in decimal degrees." },
+      days: { type: 'integer', description: "Forecast days (1-16, default 7)." },
+    },
+    required: [],
+  },
+  {
+    name: 'get_air_quality',
+    description: "Fetch real-time air-quality index (PM2.5, PM10, ozone, NO2) for a city or coordinates. Use when the user asks about pollution, smog, allergies, breathing conditions. Data from Open-Meteo air-quality API (OpenAQ-derived).",
+    properties: {
+      city: { type: 'string', description: "City / place name. Either city or lat+lon required." },
+      lat:  { type: 'number', description: "Latitude." },
+      lon:  { type: 'number', description: "Longitude." },
+    },
+    required: [],
+  },
+  {
+    name: 'get_news',
+    description: "Fetch recent news headlines from GDELT's live news index. Use when the user asks for news, headlines, 'what's happening with X', 'latest on Y'. Returns up to 10 articles with title, source, URL and published date.",
+    properties: {
+      topic: { type: 'string', description: "Free-text topic / query (e.g. 'earthquake Turkey', 'OpenAI announcements')." },
+      lang:  { type: 'string', description: "Optional language filter (ISO 639-1, e.g. 'en', 'ro')." },
+      limit: { type: 'integer', description: "Max articles (1-20, default 8)." },
+    },
+    required: ['topic'],
+  },
+  {
+    name: 'get_crypto_price',
+    description: "Fetch the current USD price (and 24h change) for one or more cryptocurrencies using CoinGecko. Use when the user asks about BTC, ETH, SOL, DOGE, ADA, XRP, any token price.",
+    properties: {
+      ids: { type: 'string', description: "Comma-separated CoinGecko IDs, e.g. 'bitcoin,ethereum,solana'. Common tickers also accepted (btc, eth, sol, doge, ada, xrp, ltc, bch, bnb)." },
+    },
+    required: ['ids'],
+  },
+  {
+    name: 'get_stock_price',
+    description: "Fetch the most recent price, change, and volume for a US stock symbol using Yahoo Finance's free query1 endpoint. Use for 'how is AAPL', 'price of TSLA', 'quote for MSFT'.",
+    properties: {
+      symbol: { type: 'string', description: "Stock symbol, e.g. 'AAPL', 'TSLA', 'GOOGL'. Uppercase letters only." },
+    },
+    required: ['symbol'],
+  },
+  {
+    name: 'get_forex',
+    description: "Get the current exchange rate between two currencies using exchangerate.host (free). Use for 'how many euros in 100 dollars', 'EUR to RON', 'USD/JPY'.",
+    properties: {
+      from:   { type: 'string', description: "Source currency (ISO 4217 3-letter, e.g. 'USD', 'EUR', 'RON')." },
+      to:     { type: 'string', description: "Target currency (ISO 4217)." },
+      amount: { type: 'number',  description: "Amount to convert (default 1)." },
+    },
+    required: ['from', 'to'],
+  },
+  {
+    name: 'currency_convert',
+    description: "Alias of get_forex for natural phrasings like 'convert 50 EUR to RON'. Same exchangerate.host source.",
+    properties: {
+      from:   { type: 'string', description: "Source currency (ISO 4217)." },
+      to:     { type: 'string', description: "Target currency (ISO 4217)." },
+      amount: { type: 'number',  description: "Amount to convert." },
+    },
+    required: ['from', 'to', 'amount'],
+  },
+  {
+    name: 'get_earthquakes',
+    description: "Fetch recent earthquakes from USGS (authoritative). Use when the user asks about earthquakes worldwide or near a location. Returns magnitude, location, depth, time for events in the last 24 h.",
+    properties: {
+      min_magnitude: { type: 'number',  description: "Minimum magnitude (default 2.5)." },
+      limit:         { type: 'integer', description: "Max events to return (1-50, default 10)." },
+    },
+    required: [],
+  },
+  {
+    name: 'get_sun_times',
+    description: "Get sunrise, sunset, civil twilight and day length for a date and location. Use when the user asks 'what time does the sun rise in Paris tomorrow'. Uses Open-Meteo's solar endpoint (free).",
+    properties: {
+      city: { type: 'string', description: "City / place name. Either city or lat+lon required." },
+      lat:  { type: 'number', description: "Latitude." },
+      lon:  { type: 'number', description: "Longitude." },
+      date: { type: 'string', description: "ISO date YYYY-MM-DD. Default today." },
+    },
+    required: [],
+  },
+  {
+    name: 'get_moon_phase',
+    description: "Compute the current moon phase, illumination percent and age in days (offline, deterministic via Jean Meeus algorithm). Use for 'is it a full moon', 'how full is the moon', 'moon phase on DATE'.",
+    properties: {
+      date: { type: 'string', description: "ISO date YYYY-MM-DD. Default today UTC." },
+    },
+    required: [],
+  },
+  // ── Math & conversion ────────────────────────────────────────────
+  {
+    name: 'unit_convert',
+    description: "Convert a numeric value between units (length, mass, volume, temperature, time, speed, pressure, data, energy). Deterministic, offline via mathjs units. Examples: 10 km → mi, 80 kg → lb, 100 °F → °C, 1 GB → MB.",
+    properties: {
+      value: { type: 'number', description: "Numeric value to convert." },
+      from:  { type: 'string', description: "Source unit, e.g. 'km', 'kg', 'degF', 'GB'." },
+      to:    { type: 'string', description: "Target unit, e.g. 'mi', 'lb', 'degC', 'MB'." },
+    },
+    required: ['value', 'from', 'to'],
+  },
+  // ── Geo / routing ────────────────────────────────────────────────
+  {
+    name: 'geocode',
+    description: "Look up latitude/longitude for a place using Open-Meteo's geocoding (Nominatim-sourced). Use when you need coordinates before calling a location-scoped tool.",
+    properties: {
+      query: { type: 'string', description: "Place name to geocode, e.g. 'Eiffel Tower'." },
+    },
+    required: ['query'],
+  },
+  {
+    name: 'reverse_geocode',
+    description: "Look up the nearest place name for latitude/longitude using the OSM Nominatim reverse endpoint. Use when the user gives GPS coordinates or when the app passes raw coords.",
+    properties: {
+      lat: { type: 'number', description: "Latitude." },
+      lon: { type: 'number', description: "Longitude." },
+    },
+    required: ['lat', 'lon'],
+  },
+  {
+    name: 'get_route',
+    description: "Compute a real driving, walking or cycling route between two places using the public OSRM demo server. Returns distance in km, duration in minutes and a short step summary. Use for 'how long from A to B', 'route from X to Y', 'distance between'.",
+    properties: {
+      from:    { type: 'string', description: "Starting place name or 'lat,lon'." },
+      to:      { type: 'string', description: "Destination place name or 'lat,lon'." },
+      profile: { type: 'string', enum: ['driving', 'walking', 'cycling'], description: "Travel mode. Default 'driving'." },
+    },
+    required: ['from', 'to'],
+  },
+  {
+    name: 'nearby_places',
+    description: "Find POIs near a point using the Overpass OSM API (restaurants, ATMs, hospitals, gas stations, etc.). Use for 'nearest pharmacy', 'coffee shops around me', 'ATM in walking distance'.",
+    properties: {
+      query:    { type: 'string', description: "OSM amenity tag or free text (e.g. 'pharmacy', 'restaurant', 'atm', 'fuel', 'hospital')." },
+      lat:      { type: 'number', description: "Latitude of search origin." },
+      lon:      { type: 'number', description: "Longitude of search origin." },
+      radius_m: { type: 'integer', description: "Search radius in meters (100-5000, default 1500)." },
+      limit:    { type: 'integer', description: "Max results (1-20, default 10)." },
+    },
+    required: ['query', 'lat', 'lon'],
+  },
+  {
+    name: 'get_elevation',
+    description: "Fetch altitude above sea level for a coordinate pair using Open-Elevation (free). Use for 'what altitude is Sinaia', 'how high is this mountain'.",
+    properties: {
+      lat: { type: 'number', description: "Latitude." },
+      lon: { type: 'number', description: "Longitude." },
+    },
+    required: ['lat', 'lon'],
+  },
+  {
+    name: 'get_timezone',
+    description: "Get timezone name, offset, and current local time for a city or coordinates using timeapi.io (free). Use for 'what time is it in Tokyo', 'timezone of New York'.",
+    properties: {
+      city: { type: 'string', description: "City / place name. Either city or lat+lon required." },
+      lat:  { type: 'number', description: "Latitude." },
+      lon:  { type: 'number', description: "Longitude." },
+    },
+    required: [],
+  },
+  // ── Web / search ────────────────────────────────────────────────
+  {
+    name: 'search_academic',
+    description: "Search arXiv for academic papers (titles, authors, abstract, PDF URL). Use for 'papers about X', 'research on Y', 'arXiv about Z'.",
+    properties: {
+      query: { type: 'string', description: "Free-text topic / title / author." },
+      limit: { type: 'integer', description: "Max papers (1-10, default 5)." },
+    },
+    required: ['query'],
+  },
+  {
+    name: 'search_github',
+    description: "Search public GitHub repositories via the GitHub REST API. Returns repo name, description, stars, URL. Respects GITHUB_TOKEN when set for higher rate limits.",
+    properties: {
+      query: { type: 'string', description: "Free-text search. Supports GitHub qualifiers (language:js, stars:>100)." },
+      limit: { type: 'integer', description: "Max results (1-10, default 5)." },
+    },
+    required: ['query'],
+  },
+  {
+    name: 'search_stackoverflow',
+    description: "Search Stack Overflow answers via the Stack Exchange API. Returns question title, score, accepted-answer URL. Use for programming questions where a canonical answer likely exists.",
+    properties: {
+      query: { type: 'string', description: "Free-text programming question." },
+      limit: { type: 'integer', description: "Max results (1-10, default 5)." },
+    },
+    required: ['query'],
+  },
+  {
+    name: 'fetch_url',
+    description: "GET an arbitrary HTTPS URL and return its text content (stripped of HTML tags, capped at ~8000 chars). Use when the user asks you to 'read this page' or you need raw content from a known URL. Never fetch sites that require login.",
+    properties: {
+      url: { type: 'string', description: "HTTPS URL to fetch. http:// is refused." },
+    },
+    required: ['url'],
+  },
+  {
+    name: 'rss_read',
+    description: "Fetch and parse an RSS / Atom feed, returning the latest items (title, link, published, summary). Use for 'what's new on blog X', 'latest from feed Y'.",
+    properties: {
+      url:   { type: 'string', description: "Feed URL (RSS 2.0 or Atom)." },
+      limit: { type: 'integer', description: "Max items (1-20, default 10)." },
+    },
+    required: ['url'],
+  },
+  // ── Knowledge ───────────────────────────────────────────────────
+  {
+    name: 'wikipedia_search',
+    description: "Search Wikipedia and return the lead summary + extract for the best match. Use for encyclopedic questions: 'who is X', 'what is Y', 'tell me about Z'. Respects the user's language when possible.",
+    properties: {
+      query: { type: 'string', description: "Free-text topic or article title." },
+      lang:  { type: 'string', description: "Wikipedia language code (default 'en'). Accepts 'ro', 'fr', 'de', 'es', etc." },
+    },
+    required: ['query'],
+  },
+  {
+    name: 'dictionary',
+    description: "Look up a word's definition(s) using the free Wiktionary REST API. Returns part-of-speech and definitions. Use for 'define X', 'what does Y mean', 'definition of Z'.",
+    properties: {
+      word: { type: 'string', description: "Word or short phrase to define." },
+      lang: { type: 'string', description: "Wiktionary language code (default 'en'). 'ro' for Romanian, 'fr' for French, etc." },
+    },
+    required: ['word'],
+  },
 ];
 
 // Gemini v1alpha BidiGenerateContent — JSON schema with UPPERCASE types and
@@ -305,6 +535,25 @@ function buildKelionToolsOpenAI() {
       type: 'object',
       properties: t.properties,
       required: t.required,
+    },
+  }));
+}
+
+// OpenAI Chat Completions — historically used on /api/chat. Same JSON-Schema,
+// but wrapped as `{ type: 'function', function: { name, description, parameters } }`.
+// Exported so the text-chat route pulls the catalog from one source of truth
+// (Devin Review ask on PR #133 — don't keep two hand-maintained copies).
+function buildKelionToolsChatCompletions() {
+  return KELION_TOOLS.map(t => ({
+    type: 'function',
+    function: {
+      name: t.name,
+      description: t.description,
+      parameters: {
+        type: 'object',
+        properties: t.properties,
+        required: t.required,
+      },
     },
   }));
 }
@@ -1015,7 +1264,8 @@ module.exports.VOICE_STYLES = VOICE_STYLES;
 module.exports.resolveVoiceStyle = resolveVoiceStyle;
 // Exported for unit tests + for the forthcoming OpenAI Realtime client
 // transport so it can render the same tool catalog without re-declaring.
-module.exports.KELION_TOOLS          = KELION_TOOLS;
-module.exports.buildKelionToolsGemini = buildKelionToolsGemini;
-module.exports.buildKelionToolsOpenAI = buildKelionToolsOpenAI;
-module.exports.buildKelionPersona = buildKelionPersona;
+module.exports.KELION_TOOLS                    = KELION_TOOLS;
+module.exports.buildKelionToolsGemini          = buildKelionToolsGemini;
+module.exports.buildKelionToolsOpenAI          = buildKelionToolsOpenAI;
+module.exports.buildKelionToolsChatCompletions = buildKelionToolsChatCompletions;
+module.exports.buildKelionPersona              = buildKelionPersona;

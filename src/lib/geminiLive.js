@@ -418,6 +418,11 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
     startInFlightRef.current = true
     setError(null)
     setStatus('requesting')
+    // Reset silence-idle timestamp on every new session — otherwise a stale
+    // value from component mount (or a previous session) makes the first
+    // heartbeat wrongly mark the session silent and skip a billable minute.
+    // Devin Review BUG_0003 on PR #133.
+    lastActivityAtRef.current = Date.now()
     try {
       // 1. Request mic
       const stream = await navigator.mediaDevices.getUserMedia({
