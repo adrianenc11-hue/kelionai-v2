@@ -166,6 +166,22 @@ describe('send_sms', () => {
     expect(params.get('To')).toBe('+14155550123');
     expect(params.get('Body')).toBe('hi');
   });
+
+  test('strips spaces / dashes / parens from to+from before hitting Twilio', async () => {
+    process.env.TWILIO_ACCOUNT_SID = 'AC123';
+    process.env.TWILIO_AUTH_TOKEN = 'secret';
+    process.env.TWILIO_FROM = '+1 (415) 555-0100';
+    let captured = null;
+    globalThis.fetch = async (url, init) => {
+      captured = { url, init };
+      return { ok: true, status: 201, json: async () => ({ sid: 'SM99', status: 'queued' }) };
+    };
+    const r = await toolSendSms({ to: '+1 (415) 555-0123', message: 'hi' });
+    expect(r.ok).toBe(true);
+    const params = new URLSearchParams(captured.init.body);
+    expect(params.get('From')).toBe('+14155550100');
+    expect(params.get('To')).toBe('+14155550123');
+  });
 });
 
 // ───────────────────────── create_calendar_ics ────────────────────
@@ -203,6 +219,19 @@ describe('create_calendar_ics', () => {
     });
     expect(r.ok).toBe(true);
     expect(r.ics).toMatch(/SUMMARY:Pay\\; eat\\, sleep\\nrepeat/);
+  });
+
+  test('wraps attendee CN in DQUOTEs when it contains RFC 5545 specials', () => {
+    const r = toolCreateCalendarIcs({
+      title: 'x',
+      start: '2026-05-01T09:00:00Z',
+      attendees: [{ name: 'Doe; John, CEO', email: 'jd@example.com' }],
+    });
+    expect(r.ok).toBe(true);
+    // Must NOT backslash-escape the parameter value (that's for property values).
+    expect(r.ics).not.toMatch(/CN=Doe\\;/);
+    // Must quote the value because it contains ';' and ','.
+    expect(r.ics).toMatch(/ATTENDEE;CN="Doe; John, CEO";RSVP=TRUE:mailto:jd@example\.com/);
   });
 
   test('drops invalid attendee emails but keeps valid ones', () => {
@@ -379,6 +408,9 @@ describe('npm_package_info', () => {
     expect(r.description).toMatch(/React/);
     expect(r.license).toBe('MIT');
     expect(r.weeklyDownloads).toBe(25000000);
+    // Regression: `modified` was previously always null because the code read
+    // j.modified instead of j.time.modified.
+    expect(r.modified).toBe('2026-04-01T00:00:00Z');
   });
 
   test('handles scoped packages', async () => {

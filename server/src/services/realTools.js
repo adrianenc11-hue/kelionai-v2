@@ -1912,24 +1912,31 @@ async function toolSendEmail(args) {
   }
 }
 
+function normalizeE164(s) {
+  return typeof s === 'string' ? s.replace(/[\s\-()]/g, '').trim() : '';
+}
 function e164ish(s) {
-  return typeof s === 'string' && /^\+?[1-9]\d{6,14}$/.test(s.replace(/[\s\-()]/g, ''));
+  return typeof s === 'string' && /^\+?[1-9]\d{6,14}$/.test(normalizeE164(s));
 }
 
 async function toolSendSms(args) {
   const sid   = process.env.TWILIO_ACCOUNT_SID;
   const token = process.env.TWILIO_AUTH_TOKEN;
-  const from  = (args?.from || process.env.TWILIO_FROM || '').toString().trim();
+  const fromRaw = (args?.from || process.env.TWILIO_FROM || '').toString().trim();
   if (!sid || !token) {
     return needConfig('SMS sending is not configured. Set TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN (https://www.twilio.com/console) to enable send_sms.');
   }
-  if (!from) {
+  if (!fromRaw) {
     return needConfig('No Twilio sender number. Set TWILIO_FROM (E.164, e.g. +14155550123) or pass `from`.');
   }
-  if (!e164ish(from)) return { ok: false, error: 'invalid "from" number (must be E.164, e.g. +14155550123)' };
-  const rawTo = String(args?.to || '').trim();
-  if (!rawTo) return { ok: false, error: 'missing recipient (to)' };
-  if (!e164ish(rawTo)) return { ok: false, error: 'invalid "to" number (must be E.164)' };
+  if (!e164ish(fromRaw)) return { ok: false, error: 'invalid "from" number (must be E.164, e.g. +14155550123)' };
+  const toRaw = String(args?.to || '').trim();
+  if (!toRaw) return { ok: false, error: 'missing recipient (to)' };
+  if (!e164ish(toRaw)) return { ok: false, error: 'invalid "to" number (must be E.164)' };
+  // Strip formatting chars before handing to Twilio — the API rejects numbers
+  // containing whitespace / dashes / parens even though our validator accepts them.
+  const from = normalizeE164(fromRaw);
+  const rawTo = normalizeE164(toRaw);
   const message = String(args?.message || args?.body || '').trim();
   if (!message) return { ok: false, error: 'missing message' };
   if (message.length > 1600) return { ok: false, error: 'message too long (max 1600 chars — 10 SMS segments)' };
@@ -1983,6 +1990,14 @@ function icsEscape(s) {
     .replace(/\n/g, '\\n')
     .replace(/,/g, '\\,')
     .replace(/;/g, '\\;');
+}
+
+// RFC 5545 §3.2 — parameter values cannot use backslash escapes. When the value
+// contains CONTROL / ":" / ";" / "," it must be wrapped in DQUOTEs. DQUOTE
+// itself cannot appear inside a parameter value at all (stripped).
+function icsParamValue(s) {
+  const clean = String(s || '').replace(/[\r\n]/g, ' ').replace(/"/g, '');
+  return /[,;:]/.test(clean) ? `"${clean}"` : clean;
 }
 
 function icsFmtDate(iso) {
@@ -2042,7 +2057,10 @@ function toolCreateCalendarIcs(args) {
   if (description) lines.push(`DESCRIPTION:${icsEscape(description)}`);
   if (location)    lines.push(`LOCATION:${icsEscape(location)}`);
   for (const at of validAttendees) {
-    const cn = at.name ? `CN=${icsEscape(at.name)};` : '';
+    // RFC 5545 §3.2: parameter values containing CONTROL / ":" / ";" / "," must be
+    // wrapped in DQUOTEs; DQUOTE itself cannot appear inside a parameter value, so
+    // we strip it. Backslash escaping (\, \;) applies only to property VALUES.
+    const cn = at.name ? `CN=${icsParamValue(at.name)};` : '';
     lines.push(`ATTENDEE;${cn}RSVP=TRUE:mailto:${at.email}`);
   }
   lines.push('END:VEVENT', 'END:VCALENDAR', '');
@@ -2188,7 +2206,7 @@ async function toolNpmPackageInfo(args) {
       repository:  pkg && pkg.repository ? (pkg.repository.url || pkg.repository) : null,
       keywords:    Array.isArray(pkg && pkg.keywords) ? pkg.keywords.slice(0, 20) : [],
       weeklyDownloads: weekly,
-      modified:    j.time && j.modified ? j.time.modified : null,
+      modified:    j.time && j.time.modified ? j.time.modified : null,
       versions:    Array.isArray(Object.keys(j.versions || {}))
         ? Object.keys(j.versions || {}).slice(-10)
         : [],
