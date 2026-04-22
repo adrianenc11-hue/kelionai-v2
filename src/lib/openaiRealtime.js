@@ -513,6 +513,20 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
       pc.addEventListener('connectionstatechange', () => {
         const st = pc.connectionState
         if (st === 'failed' || st === 'disconnected' || st === 'closed') {
+          // Always tear down the credits heartbeat when the peer
+          // connection goes down. Without this, the 60s interval kept
+          // ticking after the pc died and fired stray
+          // /api/credits/consume calls on tab wake — audit 2026-04-22
+          // saw a -1 credit ledger entry 7 h after the session actually
+          // ended. stop() handles the idle/error path; this handler is
+          // the only one for abnormal closes where stop() is never
+          // called by the UI.
+          if (creditsIntervalRef.current) {
+            clearInterval(creditsIntervalRef.current)
+            creditsIntervalRef.current = null
+          }
+          creditsStartedRef.current = false
+          creditsStartFnRef.current = null
           if (statusRef.current === 'idle' || statusRef.current === 'error') return
           const neverOpened = statusRef.current === 'connecting' || statusRef.current === 'requesting'
           // 'failed' is a hard peer-connection error (ICE failure, TURN

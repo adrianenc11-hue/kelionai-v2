@@ -657,6 +657,19 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
         // status / abnormal, 1008 = policy (wrong endpoint / bad token),
         // 1007 = protocol (double setup), 1011 = server / quota.
         console.warn('[geminiLive] ws close', { code: e?.code, reason: e?.reason, wasClean: e?.wasClean })
+        // Always tear down the credits heartbeat on socket close. Without
+        // this guard the 60s interval kept ticking after the ws died and
+        // fired a stray /api/credits/consume on tab wake hours later —
+        // audit 2026-04-22 saw a -1 credit ledger entry 7 h after the
+        // session actually ended. stop() handles the idle/error path;
+        // this handler is the only one for abnormal closes where stop()
+        // is never called by the UI.
+        if (creditsIntervalRef.current) {
+          clearInterval(creditsIntervalRef.current)
+          creditsIntervalRef.current = null
+        }
+        creditsStartedRef.current = false
+        creditsStartFnRef.current = null
         if (statusRef.current === 'idle') return
         if (statusRef.current === 'error') return
         // If we never reached 'listening' (i.e. the session died before
