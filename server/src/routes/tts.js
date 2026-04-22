@@ -123,9 +123,12 @@ function elevenLabsVoiceFor(lang) {
 //      European languages. Covers ~25 languages confidently.
 //   3. Fallback to English.
 //
-// ElevenLabs (eleven_multilingual_v2) accepts any ISO 639-1 `language_code`
-// and speaks the text natively; operators can additionally pick a true
-// native-speaker voice per language via ELEVENLABS_VOICE_<LANG> env vars.
+// ElevenLabs Turbo v2.5 / Flash v2.5 accept an ISO 639-1 `language_code`
+// to enforce output language. Older models (`eleven_multilingual_v2`,
+// `eleven_monolingual_v1`, etc.) reject that field with HTTP 400 —
+// `synthesizeElevenLabs` strips it when those models are configured.
+// Operators can additionally pick a true native-speaker voice per
+// language via ELEVENLABS_VOICE_<LANG> env vars.
 // Gemini TTS accepts BCP-47 codes (en-US, ro-RO, …).
 function detectLanguage(text) {
   const raw = String(text || '');
@@ -288,21 +291,33 @@ async function synthesizeOpenAI(text, _lang) {
   return Buffer.from(await r.arrayBuffer());
 }
 
+// ElevenLabs only accepts `language_code` on Turbo v2.5 / Flash v2.5.
+// Sending it on `eleven_multilingual_v2` triggers HTTP 400 and every TTS
+// request fails — that was the "avatar can't speak any language"
+// regression. Default to Turbo v2.5 (32 languages, lower latency); any
+// other model gets the request without `language_code` so it still
+// works. Known-incompatible models are listed in
+// `ELEVENLABS_NO_LANGCODE_MODELS` so new ElevenLabs releases stay
+// opt-in (fail-safe) rather than silently dropping the hint.
+const ELEVENLABS_NO_LANGCODE_MODELS = new Set([
+  'eleven_multilingual_v2',
+  'eleven_multilingual_v1',
+  'eleven_monolingual_v1',
+  'eleven_english_sts_v2',
+]);
+
 async function synthesizeElevenLabs(text, lang, voiceOverride) {
   const apiKey  = process.env.ELEVENLABS_API_KEY;
   const voiceId = voiceOverride || elevenLabsVoiceFor(lang);
-  // eleven_multilingual_v2 auto-detects language natively and speaks with a
-  // native accent (Adam sounds native in Romanian, English, Italian, etc).
-  // We pass `language_code` only as an explicit hint — the provider accepts
-  // ISO 639-1 codes (e.g. "ro", "en", "it") and uses them to disambiguate
-  // short inputs.
+  const modelId = process.env.ELEVENLABS_TTS_MODEL || 'eleven_turbo_v2_5';
+  const supportsLangCode = !ELEVENLABS_NO_LANGCODE_MODELS.has(modelId);
   const r = await fetch(`${ELEVENLABS_URL}/${voiceId}`, {
     method: 'POST',
     headers: { 'xi-api-key': apiKey, 'Content-Type': 'application/json', 'Accept': 'audio/mpeg' },
     body: JSON.stringify({
       text,
-      model_id: 'eleven_multilingual_v2',
-      ...(lang ? { language_code: lang } : {}),
+      model_id: modelId,
+      ...(lang && supportsLangCode ? { language_code: lang } : {}),
       voice_settings: { stability: 0.5, similarity_boost: 0.75 },
     }),
   });
