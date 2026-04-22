@@ -64,6 +64,11 @@ const EXPECTED_TOOL_NAMES = [
   'solve_problem',
   'code_review',
   'explain_code',
+  // PR #139 — mobile GPS + camera switch. Both tools are client-handled
+  // (src/lib/kelionTools.js) and reach into module-level registries
+  // (clientGeoProvider, cameraControl) rather than the server.
+  'get_my_location',
+  'switch_camera',
 ];
 
 describe('Kelion tool catalog', () => {
