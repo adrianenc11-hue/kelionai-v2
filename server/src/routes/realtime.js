@@ -558,6 +558,48 @@ const KELION_TOOLS = [
     },
     required: ['code'],
   },
+  // ── PR B — documents + OCR ────────────────────────────────────────
+  {
+    name: 'read_pdf',
+    description: "Extract plain text from a PDF. Use when the user pastes a PDF link, attaches a PDF, or asks 'read this PDF', 'ce scrie în PDF', 'summarize this report'. Either `url` (public HTTPS) or `base64` must be provided.",
+    properties: {
+      url:       { type: 'string',  description: "Public HTTPS URL of the PDF. Ignored when base64 is set." },
+      base64:    { type: 'string',  description: "Base64 payload of the PDF (data: prefix accepted)." },
+      max_chars: { type: 'integer', description: "Cap on returned text length (500-50000, default 8000)." },
+      max_pages: { type: 'integer', description: "Hard cap on pages parsed (1-200, default 50). Large docs are truncated." },
+    },
+    required: [],
+  },
+  {
+    name: 'read_docx',
+    description: "Extract plain text from a Microsoft Word .docx file. Use when the user attaches or links a .docx (contracts, CVs, reports). Either `url` or `base64` must be provided.",
+    properties: {
+      url:       { type: 'string',  description: "Public HTTPS URL of the .docx. Ignored when base64 is set." },
+      base64:    { type: 'string',  description: "Base64 payload of the .docx." },
+      max_chars: { type: 'integer', description: "Cap on returned text length (500-50000, default 8000)." },
+    },
+    required: [],
+  },
+  {
+    name: 'ocr_image',
+    description: "Run OCR on an image (JPG/PNG/WebP) and return the recognised text. Use when the user sends a photo of a receipt, whiteboard, screenshot, handwritten note, or any picture with text. Supports multi-language via `lang` (e.g. 'eng', 'ron', 'eng+ron').",
+    properties: {
+      url:       { type: 'string',  description: "Public HTTPS URL of the image. Ignored when base64 is set." },
+      base64:    { type: 'string',  description: "Base64 payload of the image (data: prefix accepted)." },
+      lang:      { type: 'string',  description: "Tesseract language code (default 'eng'). Combine with '+' for multi-script, e.g. 'eng+ron'." },
+      max_chars: { type: 'integer', description: "Cap on returned text length (200-20000, default 4000)." },
+    },
+    required: [],
+  },
+  {
+    name: 'ocr_passport',
+    description: "OCR a passport photo and parse the MRZ (Machine Readable Zone). Returns structured fields: document type, issuing country, surname, given names, passport number, nationality, date of birth, sex, date of expiry. Use only when the user explicitly asks to read/extract passport data. Never log or store the raw MRZ.",
+    properties: {
+      url:    { type: 'string', description: "Public HTTPS URL of the passport photo. Ignored when base64 is set." },
+      base64: { type: 'string', description: "Base64 payload of the passport photo." },
+    },
+    required: [],
+  },
 ];
 
 // Gemini v1alpha BidiGenerateContent — JSON schema with UPPERCASE types and
