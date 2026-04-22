@@ -188,21 +188,30 @@ router.get('/revenue-split', async (req, res) => {
  * without needing the Stripe Dashboard tab open.
  */
 router.get('/payouts', async (req, res) => {
+  const days = Math.min(365, Math.max(1, Number(req.query.days) || 30));
+  // Always try to return *something* — if Stripe is healthy but the DB
+  // (summary / split) errors, the admin still needs to see balance and
+  // recent payouts. `getPayoutSnapshot()` itself never throws; it writes
+  // partial failures into `snapshot.errors[]`.
+  let snapshot;
   try {
-    const days = Math.min(365, Math.max(1, Number(req.query.days) || 30));
-    const [snapshot, summary] = await Promise.all([
-      payoutsService.getPayoutSnapshot(),
-      getCreditRevenueSummary(days),
-    ]);
-    const split = await buildRevenueSplit(summary, { days });
-    res.json({
-      ...snapshot,
-      split, // 50/50 revenue split over the same window
-    });
+    snapshot = await payoutsService.getPayoutSnapshot();
   } catch (err) {
-    console.error('[admin/payouts] Error:', err && err.message);
-    res.status(500).json({ error: 'Failed to load payouts dashboard' });
+    console.error('[admin/payouts] snapshot error:', err && err.message);
+    return res.status(500).json({ error: 'Failed to load payouts dashboard' });
   }
+  let split = null;
+  try {
+    const summary = await getCreditRevenueSummary(days);
+    split = await buildRevenueSplit(summary, { days });
+  } catch (err) {
+    console.warn('[admin/payouts] split error (non-fatal):', err && err.message);
+    snapshot.errors = [...(snapshot.errors || []), { source: 'split', message: err.message || 'split failed' }];
+  }
+  res.json({
+    ...snapshot,
+    split, // 50/50 revenue split over the same window (null if DB failed)
+  });
 });
 
 /**

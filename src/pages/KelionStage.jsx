@@ -4863,11 +4863,14 @@ function PayoutsPanel({ data, loading, error, onInstantPayout, busy, result }) {
   }
 
   const fmt = (bucket) => (bucket && bucket.display) || '—'
+  // `buildRevenueSplit` returns { window, fraction, revenue, allocation, ... };
+  // the earlier draft guessed the shape and the 50/50 card silently rendered
+  // three "—" values on prod. Pull the fields from their real paths.
   const split = data.split || {}
-  const days = (split && split.days) || 30
-  const gross = split.gross && split.gross.display
-  const reserved = split.aiAllocation && split.aiAllocation.display
-  const profit = split.platformShare && split.platformShare.display
+  const days = (split.window && split.window.days) || 30
+  const gross = split.revenue && split.revenue.grossDisplay
+  const reserved = split.allocation && split.allocation.display
+  const profit = split.allocation && split.allocation.ownerDisplay
   const recent = Array.isArray(data.recentPayouts) ? data.recentPayouts : []
   const destination = data.destination
   const canInstant = Boolean(data.instantEligible) && (data.balance && data.balance.instantAvailable && data.balance.instantAvailable.amount > 0)

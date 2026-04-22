@@ -123,6 +123,7 @@ async function getPayoutSnapshot() {
     configured: Boolean(key),
     balance: null,
     destination: null,
+    schedule: null,
     recentPayouts: [],
     instantEligible: false,
     errors: [],
