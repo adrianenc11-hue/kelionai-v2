@@ -128,6 +128,8 @@ function isPrivateIPv6(ip) {
   if (lower === '::1' || lower === '::') return true;
   if (lower.startsWith('fc') || lower.startsWith('fd')) return true;  // ULA
   if (/^fe[89ab]/i.test(lower)) return true;                          // link-local fe80::/10 (fe80-febf)
+  if (/^fe[cdef]/i.test(lower)) return true;                          // deprecated site-local fec0::/10
+  if (lower.startsWith('ff')) return true;                            // multicast ff00::/8 (defense-in-depth; HTTP is TCP-only)
   if (lower.startsWith('::ffff:')) {
     // Node's WHATWG URL parser normalises ::ffff:A.B.C.D to ::ffff:XXXX:XXXX
     // (hex pair). Without the hex→dotted conversion below, isPrivateIPv4

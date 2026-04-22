@@ -112,6 +112,18 @@ describe('SSRF guard on fetch_url', () => {
     expect(FETCH_CALLS).toHaveLength(0);
   });
 
+  test('rejects IPv6 multicast ff00::/8 and deprecated site-local fec0::/10 (defense-in-depth)', async () => {
+    // Not reachable via HTTP in practice (multicast is UDP-only, site-local
+    // is deprecated), but blocking them closes the classification gap so
+    // the SSRF guard has explicit coverage of every non-global IPv6 range.
+    for (const host of ['ff02::1', 'ff05::1:3', 'fec0::1', 'fedf::1']) {
+      const r = await realTools.toolFetchUrl({ url: `https://[${host}]/` });
+      expect(r.ok).toBe(false);
+      expect(String(r.error)).toMatch(/private IP/);
+    }
+    expect(FETCH_CALLS).toHaveLength(0);
+  });
+
   test('allows IPv4-mapped IPv6 pointing at a public address', async () => {
     // Regression guard for the Devin Review finding: before the fix
     // isPrivateIPv6 blanket-blocked every ::ffff:* host because
