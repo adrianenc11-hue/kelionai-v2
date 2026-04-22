@@ -29,6 +29,7 @@ const state = {
 // these hosts as an external "Open in new tab" card instead of a broken
 // iframe. The host list is a small allowlist updated as we learn.
 const EXTERNAL_ONLY_HOSTS = new Set([
+  // Require cross-origin isolation (SAB)
   'webvm.io',
   'www.webvm.io',
   'copy.sh',
@@ -36,9 +37,51 @@ const EXTERNAL_ONLY_HOSTS = new Set([
   'bellard.org',
   'www.bellard.org',
 ]);
+
+// F10 — Hosts that send `X-Frame-Options: DENY` (or a strict
+// `Content-Security-Policy: frame-ancestors`) and therefore render
+// as an empty gray box inside our monitor iframe (user screenshot
+// 2026-04-22 showed google.com as a broken icon). Matched by suffix
+// so `mail.google.com`, `accounts.google.com`, etc. all qualify.
+// The renderer already handles `embedType: 'external'` — the user
+// sees a friendly "open in new tab" card instead of a dead frame.
+const NON_EMBEDDABLE_HOST_SUFFIXES = [
+  'google.com',
+  'google.co.uk',
+  'youtube.com',   // main site (our /embed/... path still works separately)
+  'facebook.com',
+  'instagram.com',
+  'twitter.com',
+  'x.com',
+  'linkedin.com',
+  'amazon.com',
+  'amazon.co.uk',
+  'reddit.com',
+  'netflix.com',
+  'github.com',
+  'gitlab.com',
+  'paypal.com',
+  'stripe.com',
+  'dropbox.com',
+  'apple.com',
+  'microsoft.com',
+  'office.com',
+  'live.com',
+];
+function isNonEmbeddableHost(host) {
+  const h = (host || '').toLowerCase();
+  return NON_EMBEDDABLE_HOST_SUFFIXES.some(
+    (sfx) => h === sfx || h.endsWith('.' + sfx),
+  );
+}
+
 function requiresExternalTab(url) {
-  try { return EXTERNAL_ONLY_HOSTS.has(new URL(url).hostname.toLowerCase()); }
-  catch { return false; }
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    if (EXTERNAL_ONLY_HOSTS.has(host)) return true;
+    if (isNonEmbeddableHost(host)) return true;
+    return false;
+  } catch { return false; }
 }
 
 // Fallback geolocation provider — lets the React tree register the
@@ -126,6 +169,44 @@ function setState(patch) {
   notify();
 }
 
+// F10 — Async YouTube search upgrade. Called fire-and-forget from the
+// sync resolveMonitor('video', query) branch. When the server has
+// YOUTUBE_API_KEY set, `/api/youtube/search` returns a videoId that's
+// guaranteed embeddable; we then swap the external search card for a
+// real inline /embed/<id> iframe so the avatar plays the video for
+// real. We track the most recent query so a fast double-call ("show me
+// jazz" → "show me rock") doesn't let a late reply from the earlier
+// query overwrite the latest state. Silent on 404 (key not set) — the
+// external card stays.
+let lastYouTubeQuery = 0;
+async function queueYouTubeUpgrade(query) {
+  if (typeof window === 'undefined' || !window.fetch) return;
+  const q = (query || '').toString().trim();
+  if (!q) return;
+  const token = ++lastYouTubeQuery;
+  try {
+    const url = `/api/youtube/search?q=${encodeURIComponent(q)}`;
+    const r = await fetch(url, { credentials: 'same-origin' });
+    if (token !== lastYouTubeQuery) return; // superseded by a newer call
+    if (r.status === 404) return;            // key not configured
+    if (r.status === 204) return;            // no embeddable results
+    if (!r.ok) return;
+    const data = await r.json();
+    if (!data || !data.videoId) return;
+    if (token !== lastYouTubeQuery) return;
+    if (state.kind !== 'video') return;      // user opened something else
+    setState({
+      kind: 'video',
+      src: `https://www.youtube.com/embed/${data.videoId}?autoplay=1&mute=0`,
+      title: data.title ? `Video — ${data.title}` : `Video`,
+      embedType: 'iframe',
+    });
+  } catch {
+    /* Network hiccup / AbortError — external card stays, user still gets
+       a playable fallback. Not worth surfacing an error. */
+  }
+}
+
 function safeUrl(u) {
   if (!u || typeof u !== 'string') return null;
   const s = u.trim();
@@ -201,13 +282,19 @@ function resolveMonitor(kind, query) {
           embedType: 'iframe',
         };
       }
-      // Fallback: YouTube deprecated `listType=search&list=…` years ago and
-      // embedding that URL now returns "Error 153 — player configuration
-      // error" (the empty-screen failure the user kept seeing for queries
-      // like "country music playlist"). Render a search card that opens a
-      // new YouTube results tab instead — the user sees real, playable
-      // results and picks one rather than staring at a broken iframe.
+      // Free-text query fallback. YouTube deprecated the
+      // `embed?listType=search&list=…` API years ago — that URL now
+      // returns player Error 153. We render an external search card
+      // synchronously so the user always gets something clickable, and
+      // in parallel kick off `/api/youtube/search` which (when
+      // YOUTUBE_API_KEY is set) upgrades the state in-place to a real
+      // inline `/embed/<videoId>` iframe so the avatar genuinely plays
+      // the video on its stage monitor instead of showing a link.
       const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`;
+      // Fire-and-forget upgrade — safe inside `getMonitorState` because
+      // setState() publishes to listeners via notify() and the UI
+      // re-renders with the inline iframe the moment the server replies.
+      queueYouTubeUpgrade(q);
       return { kind: 'video', src: url, title: `Video — ${q}`, embedType: 'external' };
     }
 

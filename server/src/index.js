@@ -27,6 +27,7 @@ const toolsRouter      = require('./routes/tools');
 const pushRouter       = require('./routes/push');
 const creditsRouter    = require('./routes/credits');
 const diagRouter       = require('./routes/diag');
+const youtubeRouter    = require('./routes/youtube');
 const proactive        = require('./services/proactive');
 const { bootstrapAdmin } = require('./services/adminBootstrap');
 
@@ -308,6 +309,14 @@ app.use('/api/conversations', requireAuth, conversationsRouter);
 // Router is PUBLIC by design: Gemini Live tool-call flow has no login gate,
 // and MCP endpoints self-check for a signed-in user inside the handler.
 app.use('/api/tools', chatLimiter, toolsRouter);
+
+// F10 — YouTube Data API v3 search wrapper. Public (no auth) so the
+// stage monitor can resolve `show_on_monitor('video', query)` into an
+// embeddable video id inline. Rate-limited under chatLimiter like the
+// other public monitor helpers. Gracefully 404s when YOUTUBE_API_KEY
+// is not configured; the client then falls back to the external
+// search card shipped in PR #160.
+app.use('/api/youtube', chatLimiter, youtubeRouter);
 
 // Stage 5 — M23 push + M24/M25 proactive scheduler. Requires passkey auth,
 // except /public-key which the browser needs to fetch BEFORE authenticating.
