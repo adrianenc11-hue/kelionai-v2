@@ -134,6 +134,40 @@ describe('buildKelionToolsGemini', () => {
       'neutral','happy','sad','surprised','angry','tired','focused','confused','anxious',
     ]);
   });
+
+  // Gemini BidiGenerateContent rejects the whole setup frame with
+  // "missing field" if any ARRAY property omits `items`, and closes the
+  // socket with code 1007 before setupComplete. Guard the adapter so new
+  // array-typed parameters can't regress voice for everyone on Gemini.
+  test('every ARRAY property carries an items schema', () => {
+    const walk = (schema, path) => {
+      if (!schema || typeof schema !== 'object') return;
+      if (schema.type === 'ARRAY') {
+        expect(schema.items).toBeDefined();
+        expect(schema.items.type).toMatch(/^(STRING|INTEGER|NUMBER|BOOLEAN|ARRAY|OBJECT)$/);
+        walk(schema.items, `${path}.items`);
+      }
+      if (schema.type === 'OBJECT') {
+        for (const [k, sub] of Object.entries(schema.properties || {})) {
+          walk(sub, `${path}.${k}`);
+        }
+      }
+    };
+    for (const fn of rendered[0].functionDeclarations) {
+      walk(fn.parameters, fn.name);
+    }
+  });
+
+  test('create_calendar_ics attendees is an array of {email, name?}', () => {
+    const fn = rendered[0].functionDeclarations.find((f) => f.name === 'create_calendar_ics');
+    const attendees = fn.parameters.properties.attendees;
+    expect(attendees.type).toBe('ARRAY');
+    expect(attendees.items).toBeDefined();
+    expect(attendees.items.type).toBe('OBJECT');
+    expect(attendees.items.properties).toHaveProperty('email');
+    expect(attendees.items.properties).toHaveProperty('name');
+    expect(attendees.items.required).toEqual(['email']);
+  });
 });
 
 describe('buildKelionToolsOpenAI', () => {
