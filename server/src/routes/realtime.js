@@ -558,6 +558,157 @@ const KELION_TOOLS = [
     },
     required: ['code'],
   },
+  // ── PR B — documents + OCR ────────────────────────────────────────
+  {
+    name: 'read_pdf',
+    description: "Extract plain text from a PDF. Use when the user pastes a PDF link, attaches a PDF, or asks 'read this PDF', 'ce scrie în PDF', 'summarize this report'. Either `url` (public HTTPS) or `base64` must be provided.",
+    properties: {
+      url:       { type: 'string',  description: "Public HTTPS URL of the PDF. Ignored when base64 is set." },
+      base64:    { type: 'string',  description: "Base64 payload of the PDF (data: prefix accepted)." },
+      max_chars: { type: 'integer', description: "Cap on returned text length (500-50000, default 8000)." },
+      max_pages: { type: 'integer', description: "Hard cap on pages parsed (1-200, default 50). Large docs are truncated." },
+    },
+    required: [],
+  },
+  {
+    name: 'read_docx',
+    description: "Extract plain text from a Microsoft Word .docx file. Use when the user attaches or links a .docx (contracts, CVs, reports). Either `url` or `base64` must be provided.",
+    properties: {
+      url:       { type: 'string',  description: "Public HTTPS URL of the .docx. Ignored when base64 is set." },
+      base64:    { type: 'string',  description: "Base64 payload of the .docx." },
+      max_chars: { type: 'integer', description: "Cap on returned text length (500-50000, default 8000)." },
+    },
+    required: [],
+  },
+  {
+    name: 'ocr_image',
+    description: "Run OCR on an image (JPG/PNG/WebP) and return the recognised text. Use when the user sends a photo of a receipt, whiteboard, screenshot, handwritten note, or any picture with text. Supports multi-language via `lang` (e.g. 'eng', 'ron', 'eng+ron').",
+    properties: {
+      url:       { type: 'string',  description: "Public HTTPS URL of the image. Ignored when base64 is set." },
+      base64:    { type: 'string',  description: "Base64 payload of the image (data: prefix accepted)." },
+      lang:      { type: 'string',  description: "Tesseract language code (default 'eng'). Combine with '+' for multi-script, e.g. 'eng+ron'." },
+      max_chars: { type: 'integer', description: "Cap on returned text length (200-20000, default 4000)." },
+    },
+    required: [],
+  },
+  {
+    name: 'ocr_passport',
+    description: "OCR a passport photo and parse the MRZ (Machine Readable Zone). Returns structured fields: document type, issuing country, surname, given names, passport number, nationality, date of birth, sex, date of expiry. Use only when the user explicitly asks to read/extract passport data. Never log or store the raw MRZ.",
+    properties: {
+      url:    { type: 'string', description: "Public HTTPS URL of the passport photo. Ignored when base64 is set." },
+      base64: { type: 'string', description: "Base64 payload of the passport photo." },
+    },
+    required: [],
+  },
+  {
+    name: 'run_regex',
+    description: "Test a JavaScript regular expression against an input string. mode=test returns a boolean, mode=match returns the matches (up to 100) with capture groups, mode=replace returns the replaced string. Useful when the user is debugging a regex or asks 'does this pattern match'.",
+    properties: {
+      pattern:     { type: 'string', description: 'Regex pattern (max 500 chars).' },
+      input:       { type: 'string', description: 'Input string to test against (max 50 000 chars).' },
+      flags:       { type: 'string', description: "Regex flags. Any subset of g,i,m,s,u,y. Defaults to 'g'." },
+      mode:        { type: 'string', description: 'One of test | match | replace.', enum: ['test', 'match', 'replace'] },
+      replacement: { type: 'string', description: "Replacement string for mode=replace. Supports $1, $2… backrefs." },
+    },
+    required: ['pattern', 'input'],
+  },
+  {
+    name: 'run_code',
+    description: "Execute a short Python or JavaScript snippet inside a disposable e2b sandbox and return stdout / stderr / result. Strict limits: code ≤ 20 KB, wall-clock ≤ 15 s. Prefer this when the user explicitly asks to run, try, execute, or verify a piece of code. Do not use for networked API calls — prefer the dedicated tools for those.",
+    properties: {
+      language: { type: 'string', description: "Language of the snippet.", enum: ['python', 'javascript'] },
+      code:     { type: 'string', description: "Source code to execute (max 20 000 chars)." },
+      timeout:  { type: 'number', description: "Optional wall-clock limit in ms (1000..30000, default 15000)." },
+    },
+    required: ['language', 'code'],
+  },
+  {
+    name: 'get_my_credits',
+    description: "Return the currently signed-in user's voice-minute balance. Use when the user asks 'how many minutes do I have left', 'ce credit am', etc. Does not reveal personal data beyond the balance.",
+    properties: {},
+    required: [],
+  },
+  {
+    name: 'get_my_usage',
+    description: "Return a short summary of the signed-in user's recent credit activity: total minutes consumed and topped up over the last 20 ledger rows, plus the 10 most recent entries (kind, delta, amount, note, timestamp). Use when the user asks 'what did I spend', 'when did I top up', etc.",
+    properties: {},
+    required: [],
+  },
+  {
+    name: 'get_my_profile',
+    description: "Return the signed-in user's id, display name, email, credits balance (minutes) and account creation date. Use only when the user explicitly asks 'what's on my profile' or 'who am I signed in as'.",
+    properties: {},
+    required: [],
+  },
+  {
+    name: 'send_email',
+    description: "Send a transactional email via Resend (requires RESEND_API_KEY + a verified domain address in RESEND_FROM). Use when the user explicitly asks to email someone; do not send on your own initiative. Returns the provider message id on success.",
+    properties: {
+      to:       { type: 'string', description: "Recipient email address (or an array of addresses)." },
+      subject:  { type: 'string', description: "Email subject line (max 300 chars)." },
+      text:     { type: 'string', description: "Plain-text body (optional if html is provided)." },
+      html:     { type: 'string', description: "HTML body (optional if text is provided)." },
+      from:     { type: 'string', description: "Override sender address. Defaults to RESEND_FROM." },
+      reply_to: { type: 'string', description: "Optional reply-to address." },
+    },
+    required: ['to', 'subject'],
+  },
+  {
+    name: 'send_sms',
+    description: "Send an SMS via Twilio (requires TWILIO_ACCOUNT_SID + TWILIO_AUTH_TOKEN + TWILIO_FROM). The number must be in E.164 format, e.g. +14155550123. Use only when the user explicitly asks to send an SMS.",
+    properties: {
+      to:      { type: 'string', description: "Recipient phone number in E.164 format (e.g. +14155550123)." },
+      message: { type: 'string', description: "SMS body (max 1600 chars — ~10 segments)." },
+      from:    { type: 'string', description: "Override sender number. Defaults to TWILIO_FROM." },
+    },
+    required: ['to', 'message'],
+  },
+  {
+    name: 'create_calendar_ics',
+    description: "Generate a valid .ics calendar invite (RFC 5545). Returns the ics text and a data: URL the caller can surface as a downloadable 'add to calendar' link. Does not deliver the invite — pair with send_email if the user wants it emailed.",
+    properties: {
+      title:       { type: 'string', description: "Event title (max 200 chars)." },
+      start:       { type: 'string', description: "Event start in ISO 8601 (UTC or with offset)." },
+      end:         { type: 'string', description: "Event end in ISO 8601. Defaults to start + 1 hour if omitted." },
+      location:    { type: 'string', description: "Optional location (max 200 chars)." },
+      description: { type: 'string', description: "Optional description / agenda (max 2000 chars)." },
+      attendees:   { type: 'array',  description: "Optional list of { name?, email } objects (max 50)." },
+    },
+    required: ['title', 'start'],
+  },
+  {
+    name: 'zapier_trigger',
+    description: "POST a JSON payload to a Zapier Catch Hook webhook so a Zap can automate the rest (Slack message, Sheets row, Gmail draft, etc). The URL is restricted to https://hooks.zapier.com/hooks/catch/… so the tool cannot be repurposed as a general webhook sink.",
+    properties: {
+      webhook_url: { type: 'string', description: "The Zapier Catch Hook URL from the Zap setup screen." },
+      payload:     { type: 'object', description: "JSON object sent as the request body (max 100 KB serialised)." },
+    },
+    required: ['webhook_url'],
+  },
+  {
+    name: 'github_repo_info',
+    description: "Return public metadata for a GitHub repository: description, stars, forks, open issues, language, license, default branch, topics. Use when the user asks 'what does this repo do', 'how popular is it', 'when was it updated last'. No authentication required (GITHUB_TOKEN, if set, just raises the unauth rate limit).",
+    properties: {
+      repo: { type: 'string', description: "Repo slug in the form `owner/name` (e.g. `facebook/react`). A full github.com URL also works." },
+    },
+    required: ['repo'],
+  },
+  {
+    name: 'npm_package_info',
+    description: "Return metadata for a public npm package: latest version, description, homepage, license, last modified date, last 10 versions, and weekly downloads when the downloads API is reachable. Use for 'what version is …', 'is this package maintained', 'how popular is …'.",
+    properties: {
+      name: { type: 'string', description: "Package name (scoped or unscoped, e.g. `react` or `@scope/pkg`)." },
+    },
+    required: ['name'],
+  },
+  {
+    name: 'pypi_package_info',
+    description: "Return metadata for a public PyPI package: latest version, summary, homepage, author, license, Python requirement, yanked flag, last 10 releases. Use for 'what version is …', 'who maintains …', 'is this yanked'.",
+    properties: {
+      name: { type: 'string', description: "PyPI package name (e.g. `requests`)." },
+    },
+    required: ['name'],
+  },
 ];
 
 // Gemini v1alpha BidiGenerateContent — JSON schema with UPPERCASE types and

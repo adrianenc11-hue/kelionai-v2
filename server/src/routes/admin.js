@@ -20,6 +20,8 @@ const { getAllCredits, probeStripe, buildRevenueSplit } = require('../services/a
 const { sendEmailAlert } = require('../services/emailAlerts');
 const { bootstrapAdmin } = require('../services/adminBootstrap');
 const autoTopup = require('../services/autoTopup');
+const payoutsService = require('../services/payouts');
+const { getVisitorAnalytics } = require('../services/visitorAnalytics');
 
 const router = Router();
 
@@ -178,6 +180,80 @@ router.get('/revenue-split', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/admin/payouts
+ * Payout dashboard data: Stripe balance (available / pending / instant-
+ * available), the linked external account, the automatic payout
+ * schedule, the last ~10 payouts, and the 50/50 split snapshot pulled
+ * straight from buildRevenueSplit. The admin UI renders all of this
+ * without needing the Stripe Dashboard tab open.
+ */
+router.get('/payouts', async (req, res) => {
+  const days = Math.min(365, Math.max(1, Number(req.query.days) || 30));
+  // Always try to return *something* — if Stripe is healthy but the DB
+  // (summary / split) errors, the admin still needs to see balance and
+  // recent payouts. `getPayoutSnapshot()` itself never throws; it writes
+  // partial failures into `snapshot.errors[]`.
+  let snapshot;
+  try {
+    snapshot = await payoutsService.getPayoutSnapshot();
+  } catch (err) {
+    console.error('[admin/payouts] snapshot error:', err && err.message);
+    return res.status(500).json({ error: 'Failed to load payouts dashboard' });
+  }
+  let split = null;
+  try {
+    const summary = await getCreditRevenueSummary(days);
+    split = await buildRevenueSplit(summary, { days });
+  } catch (err) {
+    console.warn('[admin/payouts] split error (non-fatal):', err && err.message);
+    snapshot.errors = [...(snapshot.errors || []), { source: 'split', message: err.message || 'split failed' }];
+  }
+  res.json({
+    ...snapshot,
+    split, // 50/50 revenue split over the same window (null if DB failed)
+  });
+});
+
+/**
+ * POST /api/admin/payouts/instant
+ * Fires an on-demand Stripe instant payout. Body: { amountCents?,
+ * currency?, description? }. When amount is omitted Stripe pays out
+ * the full instant-available balance. Stripe's own error messages are
+ * forwarded verbatim so the admin can triage (e.g. "external account
+ * does not support instant payouts" when IBAN is the only destination).
+ */
+router.post('/payouts/instant', async (req, res) => {
+  try {
+    const { amountCents, currency, description } = req.body || {};
+    const parsedAmount = Number(amountCents);
+    const out = await payoutsService.triggerInstantPayout({
+      amountCents: Number.isFinite(parsedAmount) && parsedAmount > 0 ? parsedAmount : undefined,
+      currency: typeof currency === 'string' ? currency : undefined,
+      description: typeof description === 'string' ? description : undefined,
+    });
+    const adminEmail = (req.user && req.user.email) || 'unknown';
+    sendEmailAlert({
+      subject: `[Kelion] Instant payout triggered (${out.display})`,
+      text: [
+        `Admin ${adminEmail} fired an instant payout.`,
+        `Amount: ${out.display}`,
+        `Stripe payout id: ${out.id} (status: ${out.status})`,
+        out.arrivalDateMs ? `Arrival: ${new Date(out.arrivalDateMs).toISOString()}` : '',
+        'Dashboard: https://dashboard.stripe.com/payouts',
+      ].filter(Boolean).join('\n'),
+    }).catch((err) => console.warn('[admin/payouts/instant] alert failed:', err && err.message));
+    res.json(out);
+  } catch (err) {
+    console.error('[admin/payouts/instant] Error:', err && err.message);
+    const status = Number.isFinite(err && err.status) ? err.status : 500;
+    res.status(status >= 400 && status < 600 ? status : 500).json({
+      error: err && err.message || 'Failed to trigger instant payout',
+      stripe: err && err.stripe,
+    });
+  }
+});
+
 router.get('/credits', async (req, res) => {
   try {
     const cards = await getAllCredits();
@@ -277,6 +353,24 @@ router.get('/visitors', async (req, res) => {
   } catch (err) {
     console.error('[admin/visitors] Error:', err && err.message);
     res.status(500).json({ error: 'Failed to fetch visitors' });
+  }
+});
+
+/**
+ * GET /api/admin/visitors/analytics?days=30
+ * Richer aggregate over the visitor_events table + credit ledger —
+ * replaces the rudimentary top-5 country tally on the Visitors tab
+ * with a proper breakdown (country list, device mix, 30-day chart,
+ * login→topup→usage funnel). Read-only, admin-only.
+ */
+router.get('/visitors/analytics', async (req, res) => {
+  try {
+    const days = Math.min(365, Math.max(1, Number(req.query.days) || 30));
+    const data = await getVisitorAnalytics({ days });
+    res.json(data);
+  } catch (err) {
+    console.error('[admin/visitors/analytics] Error:', err && err.message);
+    res.status(500).json({ error: 'Failed to fetch visitor analytics' });
   }
 });
 

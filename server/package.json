@@ -16,12 +16,15 @@
     "express-rate-limit": "^7.1.0",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.0",
+    "mammoth": "^1.12.0",
     "mathjs": "^15.2.0",
     "node-fetch": "^3.0.0",
     "openai": "^4.0.0",
+    "pdf-parse": "^1.1.4",
     "pg": "^8.20.0",
     "sqlite": "^5.1.1",
     "sqlite3": "^5.1.6",
+    "tesseract.js": "^5.1.1",
     "web-push": "^3.6.7"
   },
   "devDependencies": {
@@ -33,5 +36,8 @@
       "/node_modules/",
       "__tests__/helpers/"
     ]
+  },
+  "optionalDependencies": {
+    "@e2b/code-interpreter": "^1.5.1"
   }
 }

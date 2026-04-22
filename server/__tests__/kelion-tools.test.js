@@ -69,6 +69,23 @@ const EXPECTED_TOOL_NAMES = [
   // (clientGeoProvider, cameraControl) rather than the server.
   'get_my_location',
   'switch_camera',
+  // PR B — document readers + OCR (pdf-parse / mammoth / tesseract.js).
+  // Inputs accept either a public HTTPS URL or a base64 blob.
+  'read_pdf',
+  'read_docx',
+  'ocr_image',
+  'ocr_passport',
+  // PR C — regex tester + sandboxed code runner + user-intern tools.
+  // run_code needs E2B_API_KEY; get_my_* need a signed-in user passed
+  // through ctx. All degrade gracefully when the requirement is absent.
+  'run_regex',
+  'run_code',
+  'get_my_credits',
+  'get_my_usage',
+  'get_my_profile',
+  // PR D — communications + automations + package info.
+  'send_email', 'send_sms', 'create_calendar_ics', 'zapier_trigger',
+  'github_repo_info', 'npm_package_info', 'pypi_package_info',
 ];
 
 describe('Kelion tool catalog', () => {
