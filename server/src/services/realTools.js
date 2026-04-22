@@ -1405,7 +1405,20 @@ async function fetchBufferWithGuard(url, maxBytes, timeoutMs) {
 }
 
 async function loadDocBuffer({ url, base64 }, maxBytes, timeoutMs) {
-  if (base64) return decodeBase64Source(base64);
+  if (base64) {
+    const decoded = decodeBase64Source(base64);
+    // Defense in depth: the URL path already enforces maxBytes in
+    // fetchBufferWithGuard, but base64 inputs skip that guard. Without
+    // this check a caller bypassing the 1 MB Express body cap (e.g. a
+    // future WebSocket route) could hand us an unbounded buffer.
+    if (decoded.ok && decoded.buffer.length > maxBytes) {
+      return {
+        ok: false,
+        error: `file too large (${decoded.buffer.length} bytes, max ${maxBytes})`,
+      };
+    }
+    return decoded;
+  }
   if (url) return fetchBufferWithGuard(String(url).trim(), maxBytes, timeoutMs);
   return { ok: false, error: 'provide either url or base64' };
 }

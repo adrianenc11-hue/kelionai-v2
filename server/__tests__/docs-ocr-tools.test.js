@@ -92,6 +92,17 @@ describe('docs + OCR tools — PR B', () => {
     expect(r.text.endsWith('… [truncated]')).toBe(true);
   });
 
+  test('toolReadPdf rejects oversized base64 payloads (defense-in-depth)', async () => {
+    // Build a 26 MB base64 blob — above the 25 MB cap the tool enforces.
+    // The Devin-review finding was that the base64 path bypassed the
+    // maxBytes check; this locks in the regression so it cannot come
+    // back silently.
+    const oversize = Buffer.alloc(26 * 1024 * 1024, 0x25).toString('base64');
+    const r = await toolReadPdf({ base64: oversize });
+    expect(r.ok).toBe(false);
+    expect(String(r.error)).toMatch(/too large/i);
+  });
+
   test('toolReadDocx reads a docx buffer (via mocked mammoth)', async () => {
     const r = await toolReadDocx({ base64: fakeDocxBuffer().toString('base64') });
     expect(r.ok).toBe(true);
