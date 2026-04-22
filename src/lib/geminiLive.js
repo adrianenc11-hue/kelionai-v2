@@ -7,6 +7,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { runTool } from './kelionTools'
+import { setCameraController, setCurrentFacingMode } from './cameraControl'
 
 const SAMPLE_RATE_IN = 16000   // Gemini Live expects 16kHz PCM16 mic
 const SAMPLE_RATE_OUT = 24000  // Gemini Live returns 24kHz PCM16 audio
@@ -818,11 +819,30 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
     }
   }, [])
 
-  const startCamera = useCallback(async () => {
+  const cameraFacingRef = useRef('user')
+  const startCamera = useCallback(async (opts = {}) => {
     setVisionError(null)
+    // If a side was explicitly requested (e.g. by the `switch_camera`
+    // tool) we tear down the existing stream first so the new call to
+    // getUserMedia can open the opposite lens. Without the teardown
+    // mobile browsers keep the current track live and silently ignore
+    // the new constraint.
+    const nextFacing = (opts.facingMode === 'user' || opts.facingMode === 'environment')
+      ? opts.facingMode
+      : cameraFacingRef.current
+    if (opts.facingMode && cameraStreamRef.current && nextFacing !== cameraFacingRef.current) {
+      try {
+        stopFrameSender('camera')
+        cameraStreamRef.current.getTracks().forEach((t) => t.stop())
+      } catch (_) { /* ignore */ }
+      cameraStreamRef.current = null
+      setCameraStream(null)
+    }
     if (cameraStreamRef.current) return
+    cameraFacingRef.current = nextFacing
+    setCurrentFacingMode(nextFacing)
     // Ladder of progressively looser constraints. The first rung is what
-    // we actually want (front-camera 640×480); the fallbacks exist
+    // we actually want (requested camera at 640×480); the fallbacks exist
     // because Chromium on Windows/Edge throws NotReadableError with
     // the unhelpful message "Could not start video source" when the
     // *constraint set* is incompatible with the specific camera
@@ -832,7 +852,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
     // `facingMode: 'user'` explicitly is a known offender on
     // external webcams. Dropping constraints almost always recovers.
     const constraintLadder = [
-      { video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }, audio: false },
+      { video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: nextFacing }, audio: false },
       { video: { width: { ideal: 640 }, height: { ideal: 480 } }, audio: false },
       { video: true, audio: false },
     ]
@@ -865,6 +885,11 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
       friendly = 'Camera is in use by another app (Teams, Zoom, OBS…). Close it and try again.'
     }
     setVisionError(friendly)
+    // Propagate so the cameraControl.restart() wrapper used by the
+    // switch_camera tool sees the failure. Without the rethrow the
+    // tool returned ok:true on every call because the ladder caught
+    // every getUserMedia rejection without re-signalling it upward.
+    throw (lastError instanceof Error) ? lastError : new Error(friendly)
   }, [startFrameSender])
 
   const stopCamera = useCallback(() => {
@@ -986,6 +1011,19 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
   }, [stopFrameSender])
 
   useEffect(() => () => { stop() }, [stop])
+
+  // Register the camera controller so the `switch_camera` tool handler
+  // in kelionTools.js can flip front/back without reaching into this
+  // hook directly. Keeps the coupling one-way: the tool dispatches via
+  // cameraControl.js and whichever voice transport is mounted picks up
+  // the restart call.
+  useEffect(() => {
+    setCameraController({
+      restart: (opts) => startCamera(opts),
+      getFacingMode: () => cameraFacingRef.current || 'user',
+    })
+    return () => setCameraController(null)
+  }, [startCamera])
 
   return {
     status, error, start, stop, turns, userLevel,

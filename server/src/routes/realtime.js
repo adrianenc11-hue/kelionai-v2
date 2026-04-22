@@ -104,6 +104,8 @@ Tools you can use (Stage 4):
 - get_weather(city or lat/lon, days) — REAL weather + forecast from Open-Meteo. Whenever the user asks about weather, temperature, rain, wind, or a forecast — call this tool. Never invent the weather.
 - web_search(query, limit) — live web search with URLs and snippets. Whenever the user asks about anything time-sensitive (news, prices, events, who-is) — call this tool. Never invent a URL, price, or fact.
 - translate(text, to, from) — real translation engine (DeepL when available, otherwise LibreTranslate). Whenever the user asks you to translate a phrase to another language — call this tool.
+- get_my_location(include_address?) — REAL user coordinates from the device. Whenever the user asks "where am I?", "what's my location?", "ce orașe sunt aproape de mine?", or anything that depends on their current position — call this tool FIRST, then use the returned coords with get_weather / get_route / nearby_places. Never guess the city from IP, never say "I don't know where you are" without calling this first.
+- switch_camera(side) — flip the phone camera between front ('user' / selfie) and back ('environment' / rear). Call this whenever the user says "flip the camera", "show me the other side", "use the back camera", "schimbă camera", "arată-mi camera din spate". The camera must already be on; if it isn't, ask the user to tap the camera button first. Pass side='front' or side='back'; when the user just says "flip" / "switch" pass the opposite of the current side.
 
 HARD rule for all tools above: if the user question clearly needs one of them, YOU MUST call it. Saying "I'll check that for you" or "let me see" without calling the tool counts as a lie. If no tool fits, say honestly "I don't know" — never guess.
 
@@ -229,6 +231,29 @@ const KELION_TOOLS = [
       query: { type: 'string', description: "Search term or URL. Examples: 'Cluj-Napoca', 'New York', 'sunset mountains', 'Paris', 'https://en.wikipedia.org/wiki/Artificial_intelligence'. For a Linux shell / terminal, pass kind='web' with query='https://webvm.io' (a Debian-in-browser that works without install). Required unless kind='clear'." },
     },
     required: ['kind'],
+  },
+  {
+    name: 'get_my_location',
+    description: "Read the user's current geographic coordinates from their device (real GPS on mobile, OS-fused location on desktop). Call this whenever the user asks 'where am I?', 'what's my location?', 'ce orașe sunt aproape?', or any question that depends on their physical position (nearest pharmacy, my weather, restaurants around me). Prefer this over guessing from IP. If the user has not granted location permission the tool returns a speakable hint telling you to ask the user to allow location access — relay that to the user and do not claim you know their position.",
+    properties: {
+      include_address: {
+        type: 'boolean',
+        description: "If true (default), also include a reverse-geocoded place name (e.g. 'Cluj-Napoca, Romania') alongside the coordinates. Set false to skip the reverse-geocode network call when you only need raw lat/lon for another tool.",
+      },
+    },
+    required: [],
+  },
+  {
+    name: 'switch_camera',
+    description: "Flip the device camera between the front ('user' / selfie) and back ('environment' / rear) camera. Call this whenever the user says 'flip the camera', 'show me the other side', 'use the back camera', 'schimbă camera', 'arată-mi camera din spate'. The camera must already be on — if not, the tool returns an error asking the user to tap the camera button first. On desktops with a single webcam the browser may ignore the constraint; the tool reports the resulting facingMode so you can tell the user if the switch didn't actually take effect.",
+    properties: {
+      side: {
+        type: 'string',
+        enum: ['front', 'back'],
+        description: "Which camera to activate. 'front' = selfie / user-facing. 'back' = rear / environment-facing. If the user just says 'flip' or 'switch' without specifying, omit this property and the client will toggle to the opposite of the current side.",
+      },
+    },
+    required: [],
   },
   {
     name: 'calculate',

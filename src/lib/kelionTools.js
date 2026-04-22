@@ -10,6 +10,12 @@ import { setEmotion } from './emotionStore'
 import { handleShowOnMonitor } from './monitorStore'
 import { getLatestCameraFrame } from './cameraFrameBuffer'
 import { setNarrationMode } from './narrationMode'
+import {
+  readClientCoords,
+  readClientGeoPermission,
+  tryRequestClientGeo,
+} from './clientGeoProvider'
+import { requestCameraSwitch, getCurrentFacingMode } from './cameraControl'
 
 async function postJSON(url, body) {
   const r = await fetch(url, {
@@ -252,6 +258,73 @@ export async function runTool(name, args) {
       } catch (err) {
         return "The vision link dropped just now. I can try again if the user asks."
       }
+    }
+    case 'get_my_location': {
+      // Client-side GPS — on mobile this hits real GPS, on desktop the OS
+      // WiFi-fused location. KelionStage registered a provider via
+      // `setClientGeoProvider` on mount. If permission is already granted
+      // we return coords synchronously; if the user hasn't granted yet we
+      // fire `requestNow()` (iOS needs a user gesture, so the first call
+      // from KelionStage's onClick handler primes this path — by the
+      // time the model invokes the tool the prompt either ran or is
+      // about to) and return a speakable hint so Kelion can ask the user
+      // to allow location.
+      const permission = readClientGeoPermission()
+      let coords = readClientCoords()
+      if (!coords && permission !== 'denied') {
+        tryRequestClientGeo()
+        // Short wait so a freshly-granted prompt can land before we
+        // answer. Keeps the voice turn snappy — we never block longer
+        // than 1.5s here; the watchPosition subscription will update
+        // future calls.
+        const deadline = Date.now() + 1500
+        while (!coords && Date.now() < deadline) {
+          // eslint-disable-next-line no-await-in-loop
+          await new Promise((r) => setTimeout(r, 150))
+          coords = readClientCoords()
+        }
+      }
+      if (!coords) {
+        if (permission === 'denied') {
+          return 'Location permission is blocked. Tell the user to enable it in their browser settings.'
+        }
+        return 'Location not available yet. Ask the user to tap the screen and allow location access.'
+      }
+      const parts = [
+        `lat ${coords.lat.toFixed(5)}`,
+        `lon ${coords.lon.toFixed(5)}`,
+      ]
+      if (coords.accuracy != null) parts.push(`±${Math.round(coords.accuracy)} m`)
+      if (args?.include_address !== false) {
+        // Best-effort reverse geocode via the shared real-tool executor
+        // so Kelion can say "Cluj-Napoca, Romania" instead of raw
+        // coordinates. If it fails we still return the numeric answer.
+        try {
+          const j = await postJSON('/api/tools/execute', {
+            name: 'reverse_geocode',
+            args: { lat: coords.lat, lon: coords.lon },
+          })
+          // Server reverse_geocode returns `displayName` (camelCase) — the snake_case
+          // `display_name` check was left over from the raw Nominatim shape and never fired.
+          const place = j?.displayName || j?.display_name || j?.address?.city || j?.address?.town || j?.address?.village
+          if (place) parts.unshift(String(place))
+        } catch { /* ignore — numeric answer is fine */ }
+      }
+      return parts.join(', ')
+    }
+    case 'switch_camera': {
+      // Flip front / back camera on mobile. The voice model invokes this
+      // when the user says "flip the camera" / "show me what's behind you"
+      // / "schimbă camera". cameraControl.js restarts the active transport's
+      // getUserMedia stream with the new facingMode. On laptops / single-
+      // camera devices the browser may ignore the constraint and keep the
+      // same stream — we surface that so Kelion doesn't claim success.
+      const current = getCurrentFacingMode()
+      const side = args?.side
+        || (current === 'user' ? 'back' : 'front')
+      const res = await requestCameraSwitch(side)
+      if (!res.ok) return res.error || 'Camera switch failed.'
+      return `ok:facingMode=${res.facingMode}`
     }
     default:
       // Real-API tools (calculate, get_weather, web_search, …) are proxied

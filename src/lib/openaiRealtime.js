@@ -29,6 +29,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { runTool } from './kelionTools'
 import { setLatestCameraFrame, clearLatestCameraFrame, getLatestCameraFrame } from './cameraFrameBuffer'
 import { subscribeNarrationMode, getNarrationMode, setNarrationMode } from './narrationMode'
+import { setCameraController, setCurrentFacingMode } from './cameraControl'
 
 // Public signature matches useGeminiLive exactly so swapping is a
 // one-line change in KelionStage.
@@ -81,6 +82,11 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
   const cameraVideoRef      = useRef(null)
   const cameraCanvasRef     = useRef(null)
   const cameraGrabTimerRef  = useRef(null)
+  // Current `facingMode` requested for the next/running getUserMedia.
+  // Switched by the `switch_camera` tool through cameraControl.js — see
+  // the registerController effect at the bottom of this hook. Defaults
+  // to the selfie camera to match the pre-mobile-GPS behaviour.
+  const cameraFacingRef     = useRef('user')
   // Narration-mode orchestration. Flags so the periodic tick knows
   // when it's safe to speak (don't interrupt user, don't stack on top
   // of an in-flight response). `lastNarrationHashRef` dedupes identical
@@ -782,19 +788,38 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
   // still is plenty and keeps CPU / memory near zero while the user is
   // just talking. MediaStream stays in cameraVideoRef so we return it
   // to KelionStage (for preview thumbnails) without re-requesting.
-  const startCamera = useCallback(async () => {
+  const startCamera = useCallback(async (opts = {}) => {
     try {
       if (!navigator.mediaDevices?.getUserMedia) {
         setVisionError('Camera not available in this browser.')
         return
       }
+      // Resolve the requested side. `switch_camera` passes
+      // `{ facingMode: 'environment' }`; the on-stage camera button calls
+      // with no args so we keep whichever side was last active (default
+      // 'user' on first open).
+      if (opts.facingMode === 'user' || opts.facingMode === 'environment') {
+        cameraFacingRef.current = opts.facingMode
+      }
+      const facingMode = cameraFacingRef.current || 'user'
+      setCurrentFacingMode(facingMode)
       // Stop any prior capture first so start→stop→start is idempotent.
       if (cameraGrabTimerRef.current) {
         clearInterval(cameraGrabTimerRef.current)
         cameraGrabTimerRef.current = null
       }
+      // Tear down any existing MediaStream before requesting a new one —
+      // otherwise the browser can keep the previous track alive, and on
+      // mobile that blocks the switch to the other camera ('device in
+      // use'). We drop tracks synchronously; the new stream starts fresh.
+      setCameraStream((prev) => {
+        if (prev) {
+          try { prev.getTracks().forEach((t) => t.stop()) } catch (_) { /* ignore */ }
+        }
+        return null
+      })
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
+        video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode },
         audio: false,
       })
       setCameraStream(stream)
@@ -843,7 +868,13 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
       cameraGrabTimerRef.current = setInterval(grab, 1000)
     } catch (err) {
       console.warn('[openaiRealtime] startCamera failed', err && err.message)
-      setVisionError(err?.message || 'Unable to open the camera.')
+      const msg = err?.message || 'Unable to open the camera.'
+      setVisionError(msg)
+      // Propagate so the cameraControl.restart() wrapper used by the
+      // switch_camera tool sees the failure. Without the rethrow the
+      // tool returned ok:true on every call because the outer try block
+      // swallowed getUserMedia rejections.
+      throw (err instanceof Error) ? err : new Error(msg)
     }
   }, [])
 
@@ -876,6 +907,18 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
     setScreenStream(null)
     setVisionError(null)
   }, [])
+
+  // Register the camera controller so the `switch_camera` tool handler
+  // in kelionTools.js can flip front/back without reaching into this
+  // hook directly. We re-register whenever startCamera's identity
+  // changes (useCallback stable deps → once per mount in practice).
+  useEffect(() => {
+    setCameraController({
+      restart: (opts) => startCamera(opts),
+      getFacingMode: () => cameraFacingRef.current || 'user',
+    })
+    return () => setCameraController(null)
+  }, [startCamera])
 
   return {
     status, error, start, stop, turns, userLevel,
