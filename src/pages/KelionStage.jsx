@@ -15,6 +15,7 @@ import { useClientGeo } from '../lib/useClientGeo'
 import { TUNING, isTuningEnabled } from '../lib/tuning'
 import TuningPanel from '../components/TuningPanel'
 import SignInModal from '../components/SignInModal'
+import VoiceCloneModal from '../components/VoiceCloneModal'
 import {
   supportsPasskey,
   registerPasskey,
@@ -1455,6 +1456,7 @@ export default function KelionStage() {
   // Signed-in users get server persistence via /api/conversations; guests
   // fall back to localStorage. See src/lib/conversationStore.js.
   const [historyOpen, setHistoryOpen] = useState(false)
+  const [voiceCloneOpen, setVoiceCloneOpen] = useState(false)
   const [historyItems, setHistoryItems] = useState([])
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyError, setHistoryError] = useState(null)
@@ -3117,6 +3119,12 @@ export default function KelionStage() {
               <MenuItem onClick={() => { openMemory(); setMenuOpen(false) }}>
                 What do you know about me?
               </MenuItem>
+              {/* Consensual voice clone — opens the multi-step modal
+                  (consent + record + manage). Signed-in only; the
+                  backend route is gated by requireAuth. */}
+              <MenuItem onClick={() => { setVoiceCloneOpen(true); setMenuOpen(false) }}>
+                Clone my voice
+              </MenuItem>
               {/* Stage 5 — proactive pings */}
               {pushState.supported && (
                 pushState.enabled ? (
@@ -3355,6 +3363,13 @@ export default function KelionStage() {
             console.warn('[passkey auth]', err && err.message)
           }
         }}
+      />
+
+      <VoiceCloneModal
+        open={voiceCloneOpen}
+        onClose={() => setVoiceCloneOpen(false)}
+        userEmail={authState.user && authState.user.email}
+        userName={authState.user && (authState.user.name || authState.user.displayName)}
       />
 
       {/* Stage 3 — "Remember me" soft prompt */}
