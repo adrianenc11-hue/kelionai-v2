@@ -4,7 +4,7 @@ import { Suspense, useState, useRef, useEffect, useLayoutEffect, useMemo, useCal
 import { useNavigate } from 'react-router-dom'
 import * as THREE from 'three'
 import { useLipSync } from '../lib/lipSync'
-import { subscribeMonitor, handleShowOnMonitor, setMonitorGeoProvider } from '../lib/monitorStore'
+import { subscribeMonitor, handleShowOnMonitor, setMonitorGeoProvider, EXTERNAL_ONLY_HOSTS } from '../lib/monitorStore'
 import { setClientGeoProvider } from '../lib/clientGeoProvider'
 import { STATUS_COLORS, STATUS_PULSE_HZ } from '../lib/kelionStatus'
 import { useGeminiLive } from '../lib/geminiLive'
@@ -477,11 +477,17 @@ function useNYCSkylineTexture() {
 // rendered the WebVM-specific "This Linux-in-the-browser requires
 // cross-origin isolation" message — users saw that line on a Mr. Bean
 // YouTube card and (rightly) asked what it had to do with anything.
-// Four distinct cases:
+// Three distinct cases:
 //   - kind='video'                      → YouTube/search card
 //   - WebVM / CheerpX / JSLinux hosts   → cross-origin-isolation card
-//   - kind='web' | everything else that  → generic "site blocks embed"
-//     hits `embedType: 'external'`         card
+//   - kind='web' | everything else that → generic "site blocks embed"
+//     hits `embedType: 'external'`        card
+// NB: the video branch is currently YouTube-specific because
+// monitorStore.js is the only path that generates
+// `kind:'video' + embedType:'external'` and it always builds a YouTube
+// search URL. If another video provider is ever added we should
+// generalize the copy here — leaving it explicit for now so the user
+// sees an accurate reason rather than a vague one.
 export function externalCardCopy(m) {
   const title = (m && m.title) || 'External app'
   const src = (m && m.src) || ''
@@ -504,12 +510,10 @@ export function externalCardCopy(m) {
   // WebVM / CheerpX / JSLinux / v86 — these *legitimately* need cross-
   // origin isolation and we cannot render them in-app. Keep the specific
   // explanation so the user knows this is a browser-platform limit.
-  const WEBVM_HOSTS = [
-    'webvm.io', 'www.webvm.io',
-    'copy.sh', 'www.copy.sh',
-    'bellard.org', 'www.bellard.org',
-  ]
-  if (WEBVM_HOSTS.includes(host)) {
+  // Host list comes from monitorStore.EXTERNAL_ONLY_HOSTS so routing
+  // (which hosts get `embedType:'external'`) and display (which hosts
+  // get this cross-origin card copy) stay in sync automatically.
+  if (EXTERNAL_ONLY_HOSTS.has(host)) {
     return {
       icon: '🖥️',
       headline: `${title} needs its own tab`,
