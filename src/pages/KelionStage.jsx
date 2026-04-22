@@ -1169,7 +1169,10 @@ export default function KelionStage() {
   // Global ESC handler — closes any open overlay / drawer so the user is
   // never stuck with a side panel they cannot dismiss. Also closes the ⋯
   // menu. The Buy-credits modal has its own backdrop so it also closes
-  // on click-outside; this just adds keyboard parity.
+  // on click-outside; this just adds keyboard parity. Covers every
+  // admin-shell drawer (Business / AI / Visitors / Users / Payouts) so
+  // the new tabs from PR #141 share the same keyboard affordance as
+  // the older ones.
   useEffect(() => {
     const onKey = (e) => {
       if (e.key !== 'Escape') return
@@ -1178,6 +1181,9 @@ export default function KelionStage() {
       setMemoryOpen(false)
       setCreditsOpen(false)
       setBusinessOpen(false)
+      setVisitorsOpen(false)
+      setUsersOpen(false)
+      setPayoutsOpen(false)
       setBuyOpen(false)
       setRememberPromptOpen(false)
     }
@@ -1295,6 +1301,8 @@ export default function KelionStage() {
     else if (tab === 'users')    { setUsersOpen(true) }
     else if (tab === 'payouts')  { openPayouts() }
   }, [openBusiness, openCredits, openVisitors, openPayouts])
+
+
 
   // Stage 6 — emotion mirroring + voice style
   const emotion = useEmotion()

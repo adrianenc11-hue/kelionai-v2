@@ -48,6 +48,14 @@ const DEFAULT_THRESHOLD = 0.2;
 const DEFAULT_AMOUNT_EUR = 20;
 const DEFAULT_CURRENCY = 'eur';
 const DEFAULT_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+// Hard ceiling for Stripe calls. Slightly more generous than the 8s
+// default used by `fetchWithTimeout` in aiCredits.js / realTools.js
+// because PaymentIntents creation involves card-network round-trips
+// (3DS, issuer risk checks) that read-only probes don't. A hanging
+// Stripe request without this would keep the fire-and-forget promise
+// alive forever, never reach `_lastRun.set()`, and every admin refresh
+// would stack another orphaned request.
+const STRIPE_FETCH_TIMEOUT_MS = 10_000;
 
 function readConfig() {
   const thresholdRaw = Number(process.env.AUTO_TOPUP_THRESHOLD);
@@ -147,11 +155,29 @@ async function chargeStripe({ stripeKey, customerId, paymentMethodId, amountCent
   };
   if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey;
 
-  const r = await fetch('https://api.stripe.com/v1/payment_intents', {
-    method: 'POST',
-    headers,
-    body: form.toString(),
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), STRIPE_FETCH_TIMEOUT_MS);
+  let r;
+  try {
+    r = await fetch('https://api.stripe.com/v1/payment_intents', {
+      method: 'POST',
+      headers,
+      body: form.toString(),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    // AbortError surfaces as a normal failure so `_lastRun` still gets
+    // set by the caller and the cooldown kicks in — otherwise a hung
+    // Stripe endpoint would let every admin refresh fire a new charge.
+    if (err && err.name === 'AbortError') {
+      const timeoutErr = new Error(`Stripe request timed out after ${STRIPE_FETCH_TIMEOUT_MS}ms`);
+      timeoutErr.code = 'stripe-timeout';
+      throw timeoutErr;
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
   const body = await r.json().catch(() => ({}));
   if (!r.ok) {
     const msg = (body && body.error && body.error.message) || `HTTP ${r.status}`;
