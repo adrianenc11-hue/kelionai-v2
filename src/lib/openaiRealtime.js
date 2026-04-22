@@ -868,7 +868,13 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
       cameraGrabTimerRef.current = setInterval(grab, 1000)
     } catch (err) {
       console.warn('[openaiRealtime] startCamera failed', err && err.message)
-      setVisionError(err?.message || 'Unable to open the camera.')
+      const msg = err?.message || 'Unable to open the camera.'
+      setVisionError(msg)
+      // Propagate so the cameraControl.restart() wrapper used by the
+      // switch_camera tool sees the failure. Without the rethrow the
+      // tool returned ok:true on every call because the outer try block
+      // swallowed getUserMedia rejections.
+      throw (err instanceof Error) ? err : new Error(msg)
     }
   }, [])
 

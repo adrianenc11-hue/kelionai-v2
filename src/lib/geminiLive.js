@@ -885,6 +885,11 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
       friendly = 'Camera is in use by another app (Teams, Zoom, OBS…). Close it and try again.'
     }
     setVisionError(friendly)
+    // Propagate so the cameraControl.restart() wrapper used by the
+    // switch_camera tool sees the failure. Without the rethrow the
+    // tool returned ok:true on every call because the ladder caught
+    // every getUserMedia rejection without re-signalling it upward.
+    throw (lastError instanceof Error) ? lastError : new Error(friendly)
   }, [startFrameSender])
 
   const stopCamera = useCallback(() => {
