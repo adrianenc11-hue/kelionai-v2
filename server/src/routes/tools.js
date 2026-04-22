@@ -10,6 +10,7 @@
 const { Router } = require('express');
 const jwt = require('jsonwebtoken');
 const config = require('../config');
+const { executeRealTool, REAL_TOOL_NAMES } = require('../services/realTools');
 
 const router = Router();
 
@@ -200,6 +201,35 @@ router.post('/mcp/files', async (req, res) => {
   }
   if (!process.env.MCP_ENABLED) return res.status(200).json(mcpUnavailable('your files'));
   return res.status(200).json({ ok: false, error: 'MCP files not configured yet.' });
+});
+
+// ─── Real-tool proxy (shared server-side executor) ────────────────
+// Voice sessions (Gemini Live + OpenAI Realtime) emit tool calls on the
+// client; src/lib/kelionTools.js runTool() proxies unknown names here so
+// they run inside our trust boundary with the same executor the text
+// chat route already uses. Rate-limited per IP to stop a runaway session
+// from burning free-tier quotas on Open-Meteo / Nominatim / etc.
+router.post('/execute', async (req, res) => {
+  const ip = req.ip || 'anon';
+  if (!rateOk(`real:${ip}`, 120, 60_000)) {
+    return res.status(429).json({ ok: false, error: 'Slow down — too many tool calls in the last minute.' });
+  }
+  const name = typeof req.body?.name === 'string' ? req.body.name : '';
+  const args = req.body?.args && typeof req.body.args === 'object' ? req.body.args : {};
+  if (!name) return res.status(400).json({ ok: false, error: 'missing tool name' });
+  if (!REAL_TOOL_NAMES.includes(name)) {
+    return res.status(200).json({ ok: false, unavailable: true, error: `Tool "${name}" is not available on this build.` });
+  }
+  try {
+    const result = await executeRealTool(name, args);
+    if (result == null) {
+      return res.status(200).json({ ok: false, unavailable: true, error: `Tool "${name}" has no executor.` });
+    }
+    return res.status(200).json(result);
+  } catch (err) {
+    console.error('[tools/execute]', name, err?.message);
+    return res.status(200).json({ ok: false, error: 'Tool execution failed.' });
+  }
 });
 
 // Introspection — which tools are actually usable on this instance.

@@ -31,6 +31,86 @@ function summarize(j, successKey = 'result') {
   return 'Tool returned no result.'
 }
 
+// Real tools executed server-side via /api/tools/execute. These are the
+// deterministic-API tools (mathjs, Open-Meteo, CoinGecko, OSRM, Wikipedia,
+// Wiktionary, …) — the voice transports surface them so the model can ground
+// answers instead of guessing. The server has the authoritative REAL_TOOL_NAMES
+// list; this mirror just avoids a round-trip for names we know are unsupported.
+const REAL_TOOL_NAMES = new Set([
+  'calculate', 'unit_convert', 'get_moon_phase',
+  'get_weather', 'get_forecast', 'get_air_quality', 'get_news',
+  'get_crypto_price', 'get_stock_price', 'get_forex', 'currency_convert',
+  'get_earthquakes', 'get_sun_times',
+  'geocode', 'reverse_geocode', 'get_route', 'nearby_places',
+  'get_elevation', 'get_timezone',
+  'web_search', 'search_academic', 'search_github', 'search_stackoverflow',
+  'fetch_url', 'rss_read',
+  'wikipedia_search', 'dictionary',
+  'translate',
+])
+
+// Compress a tool-result JSON into a short, speakable string for the voice
+// model. We keep the payload compact because the model will read this back
+// in its next turn and any filler chars cost latency/tokens.
+function summarizeRealTool(name, j) {
+  if (!j || typeof j !== 'object') return 'Tool returned no result.'
+  if (j.ok === false) {
+    return j.error ? `Tool failed: ${j.error}` : 'Tool failed.'
+  }
+  // Known shapes — hand-tuned so the model gets the most useful bit first.
+  if (name === 'calculate' && j.result !== undefined) {
+    return `${j.expression} = ${j.result}`
+  }
+  if (name === 'unit_convert' && j.result !== undefined) {
+    return `${j.value} ${j.from} = ${j.result} ${j.to}`
+  }
+  if (name === 'get_weather' && j.current) {
+    const loc = j.location?.name || ''
+    const c = j.current
+    return `${loc}: ${c.temperature_2m}°C, wind ${c.wind_speed_10m} m/s, precipitation ${c.precipitation} mm.`
+  }
+  if (name === 'get_crypto_price' && j.prices) {
+    const parts = Object.entries(j.prices).map(([id, p]) => `${id} ${p.usd} USD`)
+    return parts.join('; ')
+  }
+  if (name === 'get_stock_price' && j.price !== undefined) {
+    const chg = (j.price != null && j.previousClose != null)
+      ? (((j.price - j.previousClose) / j.previousClose) * 100).toFixed(2)
+      : null
+    return `${j.symbol}: ${j.price} ${j.currency || ''}${chg != null ? ` (${chg}% vs prev close)` : ''}`
+  }
+  if (name === 'wikipedia_search' && j.extract) {
+    return String(j.extract).slice(0, 900)
+  }
+  if (name === 'dictionary' && Array.isArray(j.meanings) && j.meanings.length) {
+    const parts = []
+    for (const m of j.meanings.slice(0, 3)) {
+      for (const d of (m.definitions || []).slice(0, 2)) {
+        parts.push(`(${m.partOfSpeech}) ${d.definition}`)
+      }
+    }
+    return parts.join(' — ') || 'No definition found.'
+  }
+  if ((name === 'web_search' || name === 'search_academic' || name === 'search_github' || name === 'search_stackoverflow') && Array.isArray(j.results)) {
+    const top = j.results.slice(0, 5).map((r, i) => `${i + 1}. ${r.title} — ${r.url}`).join('\n')
+    return top || 'No results.'
+  }
+  if (name === 'translate' && j.translated) {
+    return j.translated
+  }
+  // Generic fallback — stringify but cap so the model never chokes.
+  try {
+    return JSON.stringify(j).slice(0, 2000)
+  } catch {
+    return 'Tool returned an unserializable result.'
+  }
+}
+
+async function runRealToolRemote(name, args) {
+  const j = await postJSON('/api/tools/execute', { name, args: args || {} })
+  return summarizeRealTool(name, j)
+}
+
 export async function runTool(name, args) {
   switch (name) {
     case 'browse_web': {
@@ -136,6 +216,16 @@ export async function runTool(name, args) {
       }
     }
     default:
+      // Real-API tools (calculate, get_weather, web_search, …) are proxied
+      // to the server — the executor is shared with text chat so the model
+      // gets the exact same JSON shape on both transports.
+      if (REAL_TOOL_NAMES.has(name)) {
+        try {
+          return await runRealToolRemote(name, args)
+        } catch (err) {
+          return `Tool "${name}" failed: ${err?.message || err}`
+        }
+      }
       return `Tool "${name}" is not implemented on this build.`
   }
 }

@@ -331,6 +331,10 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
     startInFlightRef.current = true
     setError(null)
     setStatus('requesting')
+    // Reset silence-idle timestamp on every new session — otherwise a stale
+    // value from mount or a previous session makes the first heartbeat
+    // wrongly silent-skip. Devin Review BUG_0003 on PR #133.
+    lastActivityAtRef.current = Date.now()
 
     try {
       // 1. Mic

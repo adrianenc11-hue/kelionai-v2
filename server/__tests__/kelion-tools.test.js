@@ -26,12 +26,38 @@ const EXPECTED_TOOL_NAMES = [
   'set_narration_mode',
   'what_do_you_see',
   'show_on_monitor',
-  // Real professional tools added in this PR — all executed server-side
-  // with deterministic/real APIs (see server/src/services/realTools.js).
+  // Real professional tools — all executed server-side with
+  // deterministic/real APIs (see server/src/services/realTools.js).
+  // PR #133 seed: calculate, get_weather, web_search, translate.
   'calculate',
   'get_weather',
   'web_search',
   'translate',
+  // PR A expansion — 24 additional real-API tools (all free, no key).
+  'get_forecast',
+  'get_air_quality',
+  'get_news',
+  'get_crypto_price',
+  'get_stock_price',
+  'get_forex',
+  'currency_convert',
+  'get_earthquakes',
+  'get_sun_times',
+  'get_moon_phase',
+  'unit_convert',
+  'geocode',
+  'reverse_geocode',
+  'get_route',
+  'nearby_places',
+  'get_elevation',
+  'get_timezone',
+  'search_academic',
+  'search_github',
+  'search_stackoverflow',
+  'fetch_url',
+  'rss_read',
+  'wikipedia_search',
+  'dictionary',
 ];
 
 describe('Kelion tool catalog', () => {

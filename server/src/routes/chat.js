@@ -7,6 +7,7 @@ const { isAdminEmail } = require('../middleware/subscription');
 const ipGeo = require('../services/ipGeo');
 const { trialStatus, stampTrialIfFresh } = require('../services/trialQuota');
 const { executeRealTool, pickForcedTool } = require('../services/realTools');
+const { buildKelionToolsChatCompletions } = require('./realtime');
 
 const router = Router();
 
@@ -52,122 +53,11 @@ HARD: if the user's question clearly needs one of these tools, you MUST call it.
 You have access to real-time information provided in the system context below.
 If the user asks about the time, date, or location — answer using the context provided.`;
 
-// Same show_on_monitor contract as the realtime (voice) path. Kept in sync
-// manually with server/src/routes/realtime.js KELION_TOOLS — the shape must
-// match because the client resolves the arguments identically for both
-// transports.
-const CHAT_TOOLS = [
-  {
-    type: 'function',
-    function: {
-      name: 'show_on_monitor',
-      description:
-        "Display something on the big presentation monitor beside Kelion. " +
-        "Use whenever the user asks (in any language) to see / open / show / " +
-        "display a map, the weather, a video, an image, a Wikipedia / reference " +
-        "page, or any web page. Pick the right `kind`. Call again with a new " +
-        "query to swap content.",
-      parameters: {
-        type: 'object',
-        properties: {
-          kind: {
-            type: 'string',
-            enum: ['map', 'weather', 'video', 'image', 'wiki', 'web', 'clear'],
-            description:
-              "'map' = Google Maps for a place; 'weather' = forecast for a " +
-              "city; 'video' = YouTube; 'image' = photo search; 'wiki' = " +
-              "Wikipedia; 'web' = arbitrary https:// URL (for a Linux shell, " +
-              "pass kind='web' with query='https://webvm.io'); 'clear' = blank.",
-          },
-          query: {
-            type: 'string',
-            description:
-              "Search term or URL. Required unless kind='clear'.",
-          },
-        },
-        required: ['kind'],
-      },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'calculate',
-      description:
-        "Evaluate a math expression DETERMINISTICALLY (mathjs). Use this for " +
-        "any arithmetic, percentage, or algebraic expression beyond a trivial " +
-        "one-digit sum. Never do mental math on longer numbers.",
-      parameters: {
-        type: 'object',
-        properties: {
-          expression: {
-            type: 'string',
-            description:
-              "A mathjs expression, e.g. '127 * 38', 'sqrt(2) + log(10)', " +
-              "'12% of 340', '(100 - 35) / 2'.",
-          },
-        },
-        required: ['expression'],
-      },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'get_weather',
-      description:
-        "Fetch real current weather + short forecast (Open-Meteo, free). Use " +
-        "for any question about weather, temperature, rain, wind, or a " +
-        "forecast. Never guess weather.",
-      parameters: {
-        type: 'object',
-        properties: {
-          city: { type: 'string', description: "City / place name (e.g. 'Cluj-Napoca'). Either city or lat+lon is required." },
-          lat:  { type: 'number', description: "Latitude in decimal degrees." },
-          lon:  { type: 'number', description: "Longitude in decimal degrees." },
-          days: { type: 'integer', description: "Forecast days (1-7). Default 1." },
-        },
-        required: [],
-      },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'web_search',
-      description:
-        "Live web search (DuckDuckGo free; Serper when key available). Use " +
-        "for anything time-sensitive — news, prices, events, who-is, recent " +
-        "facts. Never invent a URL or a price.",
-      parameters: {
-        type: 'object',
-        properties: {
-          query: { type: 'string', description: "Free-text search query." },
-          limit: { type: 'integer', description: "Max results (1-10, default 5)." },
-        },
-        required: ['query'],
-      },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'translate',
-      description:
-        "Translate text between languages using a real engine (DeepL when " +
-        "key available, else LibreTranslate public).",
-      parameters: {
-        type: 'object',
-        properties: {
-          text: { type: 'string', description: "Source text, max 5000 chars." },
-          to:   { type: 'string', description: "Target ISO 639-1 code (en, ro, fr, de, es, it, pt, ru, zh, ja, ar, ...)." },
-          from: { type: 'string', description: "Source ISO code, or 'auto' to detect (default)." },
-        },
-        required: ['text', 'to'],
-      },
-    },
-  },
-];
+// Single source of truth for the tool catalog: realtime.js owns KELION_TOOLS
+// and the adapter below converts it to OpenAI Chat Completions shape. Kept in
+// realtime.js because the voice transports also consume it — keeping it in
+// one place (Devin Review ask on PR #133) avoids drift between text/voice.
+const CHAT_TOOLS = buildKelionToolsChatCompletions();
 
 const MAX_MESSAGE_LENGTH = 4000;
 const MAX_MESSAGES_COUNT = 40;
@@ -395,7 +285,12 @@ router.post('/', async (req, res) => {
       : {};
     const first = await streamOnce(firstMsgs, firstOpts);
 
-    if (first.toolCalls.length > 0 && first.finishReason === 'tool_calls') {
+    // Per OpenAI API (documented 2024-08-06): when `tool_choice` is set to a
+    // specific function, `finish_reason` comes back as `'stop'` not
+    // `'tool_calls'`. Devin Review BUG_0001 on PR #133 flagged this as the
+    // reason the forced-tool path was silently dropping tool calls — accept
+    // either terminator so both the auto and the forced paths work.
+    if (first.toolCalls.length > 0 && (first.finishReason === 'tool_calls' || first.finishReason === 'stop')) {
       // Assemble the assistant tool-call turn and synthetic tool results so
       // the second pass can produce the natural-language reply. Client-side
       // tools (show_on_monitor) succeed optimistically; server-side tools
