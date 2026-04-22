@@ -48,8 +48,10 @@ const DEFAULT_THRESHOLD = 0.2;
 const DEFAULT_AMOUNT_EUR = 20;
 const DEFAULT_CURRENCY = 'eur';
 const DEFAULT_COOLDOWN_MS = 24 * 60 * 60 * 1000;
-// Hard ceiling for Stripe calls. Matches `fetchWithTimeout` used
-// everywhere else in the server (aiCredits.js, realTools.js). A hanging
+// Hard ceiling for Stripe calls. Slightly more generous than the 8s
+// default used by `fetchWithTimeout` in aiCredits.js / realTools.js
+// because PaymentIntents creation involves card-network round-trips
+// (3DS, issuer risk checks) that read-only probes don't. A hanging
 // Stripe request without this would keep the fire-and-forget promise
 // alive forever, never reach `_lastRun.set()`, and every admin refresh
 // would stack another orphaned request.
