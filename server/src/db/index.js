@@ -100,6 +100,19 @@ async function initDb() {
   if (!cols.find(c => c.name === 'current_webauthn_challenge')) {
     await db.exec("ALTER TABLE users ADD COLUMN current_webauthn_challenge TEXT");
   }
+  // PR E5 — admin user management. `banned=1` blocks API + chat for
+  // the offender; `requireAuth` / `optionalAuth` check this flag with
+  // an in-process cache so a ban takes effect within ~60s without
+  // paying a DB round-trip on every authed request.
+  if (!cols.find(c => c.name === 'banned')) {
+    await db.exec('ALTER TABLE users ADD COLUMN banned INTEGER NOT NULL DEFAULT 0');
+  }
+  if (!cols.find(c => c.name === 'banned_reason')) {
+    await db.exec('ALTER TABLE users ADD COLUMN banned_reason TEXT');
+  }
+  if (!cols.find(c => c.name === 'banned_at')) {
+    await db.exec('ALTER TABLE users ADD COLUMN banned_at DATETIME');
+  }
 
   // Create index for faster lookups
   await db.exec('CREATE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id)');

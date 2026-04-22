@@ -3,6 +3,7 @@
 const jwt = require('jsonwebtoken');
 const config = require('../config');
 const { getUserByGoogleId, findById, findByEmail, getUserByEmail } = require('../db');
+const { resolveBanStatus } = require('../services/banCache');
 
 /**
  * Middleware pentru verificarea autentificării.
@@ -162,6 +163,18 @@ async function requireAuth(req, res, next) {
           name: decoded.name,
           role: decoded.role || 'user',
         };
+        // PR E5 — banned users get a 403 from every authed route. The
+        // ban bit is resolved through an in-process 60s cache so this
+        // stays cheap on the hot path.
+        try {
+          const ban = await resolveBanStatus(effectiveSub);
+          if (ban.banned) {
+            return res.status(403).json({
+              error: 'Cont suspendat',
+              reason: ban.reason || null,
+            });
+          }
+        } catch (_) { /* fail open */ }
         return next();
       } catch (err) {
         if (err.name === 'TokenExpiredError') {

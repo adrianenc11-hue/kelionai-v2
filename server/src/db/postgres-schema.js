@@ -24,6 +24,9 @@ CREATE TABLE IF NOT EXISTS users (
   passkey_credentials        TEXT DEFAULT '[]',
   current_webauthn_challenge TEXT,
   credits_balance_minutes    INTEGER NOT NULL DEFAULT 0,
+  banned                     INTEGER NOT NULL DEFAULT 0,
+  banned_reason              TEXT,
+  banned_at                  TIMESTAMPTZ,
   created_at                 TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   updated_at                 TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
