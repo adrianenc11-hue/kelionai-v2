@@ -536,17 +536,25 @@ export function externalCardCopy(m) {
 // sits on the right half of the stage — always stays visible and can keep
 // talking / listening while the content is on screen. Hidden entirely when
 // there is nothing to display.
+// Below this viewport width we flip the overlay to a bottom-sheet
+// layout. Previously this was 900px which flipped plenty of desktop
+// windows (split-screen, devtools docked) into the mobile layout
+// and the sheet could end up behind the chat composer. 640px keeps
+// the side-by-side layout on every realistic desktop workflow and
+// only drops to the bottom sheet on narrow phones / tablets.
+const MONITOR_NARROW_BREAKPOINT = 640
+
 function MonitorOverlay() {
   const [m, setM] = useState({ kind: null, src: null, title: null, embedType: 'iframe', updatedAt: 0 })
   const [isNarrow, setIsNarrow] = useState(() => (
-    typeof window !== 'undefined' && window.innerWidth < 900
+    typeof window !== 'undefined' && window.innerWidth < MONITOR_NARROW_BREAKPOINT
   ))
 
   useEffect(() => subscribeMonitor((s) => setM({ ...s })), [])
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined
-    const onResize = () => setIsNarrow(window.innerWidth < 900)
+    const onResize = () => setIsNarrow(window.innerWidth < MONITOR_NARROW_BREAKPOINT)
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
   }, [])
@@ -2746,7 +2754,33 @@ export default function KelionStage() {
           // this event, so both paths work.
           onPaste={(e) => {
             try {
-              const text = (e.clipboardData || window.clipboardData)?.getData('text')
+              const cd = e.clipboardData || window.clipboardData
+              if (!cd) return
+
+              // Image paste: if the clipboard carries a binary image
+              // (screenshot, copied-from-browser image, drag-and-drop
+              // preview), convert the first one into a File and wire it
+              // through the same attachment pipeline as the paperclip.
+              // This fires before the text branch so a screenshot never
+              // gets silently dropped.
+              const items = cd.items ? Array.from(cd.items) : []
+              const imgItem = items.find((it) => it && it.kind === 'file' && typeof it.type === 'string' && it.type.startsWith('image/'))
+              if (imgItem) {
+                const blob = imgItem.getAsFile()
+                if (blob) {
+                  e.preventDefault()
+                  const ext = (blob.type.split('/')[1] || 'png').split(';')[0]
+                  const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+                  const named = (typeof File !== 'undefined')
+                    ? new File([blob], `pasted-${stamp}.${ext}`, { type: blob.type })
+                    : blob
+                  setAttachedFile(named)
+                  if (fileInputRef.current) { try { fileInputRef.current.value = '' } catch (_) {} }
+                  return
+                }
+              }
+
+              const text = cd.getData ? cd.getData('text') : ''
               if (text == null || text === '') return
               e.preventDefault()
               const el = e.currentTarget
