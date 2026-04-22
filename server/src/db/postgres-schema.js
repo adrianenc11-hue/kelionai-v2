@@ -31,6 +31,14 @@ CREATE TABLE IF NOT EXISTS users (
 -- F8: idempotent migration for older Supabase clusters that existed
 -- before the column was added to the CREATE TABLE above.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS preferred_language TEXT;
+
+-- Voice clone — opt-in ElevenLabs Instant Voice Cloning (see
+-- server/src/db/index.js for the SQLite counterpart and the full
+-- GDPR / BIPA consent rationale).
+ALTER TABLE users ADD COLUMN IF NOT EXISTS cloned_voice_id              TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS cloned_voice_consent_at      TIMESTAMPTZ;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS cloned_voice_consent_version TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS cloned_voice_enabled         INTEGER NOT NULL DEFAULT 0;
 CREATE INDEX IF NOT EXISTS idx_users_google_id     ON users(google_id);
 CREATE INDEX IF NOT EXISTS idx_users_email         ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_referral_code ON users(referral_code);
@@ -119,6 +127,19 @@ CREATE TABLE IF NOT EXISTS conversation_messages (
   created_at      TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_conv_messages_conv ON conversation_messages(conversation_id, id);
+
+CREATE TABLE IF NOT EXISTS voice_clone_events (
+  id              BIGSERIAL PRIMARY KEY,
+  user_id         BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  action          TEXT NOT NULL,
+  voice_id        TEXT,
+  consent_version TEXT,
+  ip              TEXT,
+  user_agent      TEXT,
+  note            TEXT,
+  created_at      TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_voice_clone_events_user ON voice_clone_events(user_id, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS visitor_events (
   id          BIGSERIAL PRIMARY KEY,

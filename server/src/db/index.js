@@ -111,6 +111,28 @@ async function initDb() {
     await db.exec('ALTER TABLE users ADD COLUMN preferred_language TEXT');
   }
 
+  // Voice clone — opt-in ElevenLabs Instant Voice Cloning. The user
+  // records ~60s in the browser, explicitly consents, and we upload the
+  // sample to ElevenLabs which returns a voice_id. That id is stored
+  // here and used by /api/tts instead of the default library voice when
+  // `cloned_voice_enabled = 1`. Consent is timestamped so we can prove
+  // it during GDPR / BIPA audits; `cloned_voice_consent_version` pins
+  // the exact ToS/privacy text the user agreed to (bumped every time
+  // the copy changes). Deleting the clone NULLs the first three
+  // columns but keeps `voice_clone_events` audit rows intact.
+  if (!cols.find(c => c.name === 'cloned_voice_id')) {
+    await db.exec('ALTER TABLE users ADD COLUMN cloned_voice_id TEXT');
+  }
+  if (!cols.find(c => c.name === 'cloned_voice_consent_at')) {
+    await db.exec('ALTER TABLE users ADD COLUMN cloned_voice_consent_at DATETIME');
+  }
+  if (!cols.find(c => c.name === 'cloned_voice_consent_version')) {
+    await db.exec('ALTER TABLE users ADD COLUMN cloned_voice_consent_version TEXT');
+  }
+  if (!cols.find(c => c.name === 'cloned_voice_enabled')) {
+    await db.exec('ALTER TABLE users ADD COLUMN cloned_voice_enabled INTEGER NOT NULL DEFAULT 0');
+  }
+
   // Create index for faster lookups
   await db.exec('CREATE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id)');
   await db.exec('CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)');
@@ -260,6 +282,26 @@ async function initDb() {
   `);
   await db.exec('CREATE INDEX IF NOT EXISTS idx_conv_messages_conv ON conversation_messages(conversation_id, id)');
 
+  // Voice clone audit log. One row per create / delete / enable / disable
+  // / synthesize event so we can prove when the user consented, prove the
+  // voice was deleted on request, and triage any claim of unauthorised
+  // use. Never pruned automatically — admins can archive manually.
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS voice_clone_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      action TEXT NOT NULL,
+      voice_id TEXT,
+      consent_version TEXT,
+      ip TEXT,
+      user_agent TEXT,
+      note TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+  await db.exec('CREATE INDEX IF NOT EXISTS idx_voice_clone_events_user ON voice_clone_events(user_id, created_at DESC)');
+
   return db;
 }
 
@@ -302,6 +344,97 @@ async function deleteMemoryItem(userId, id) {
 async function clearMemoryForUser(userId) {
   const r = await db.run('DELETE FROM memory_items WHERE user_id = ?', [userId]);
   return r.changes;
+}
+
+// ─── Voice clone helpers ──────────────────────────────────────────
+// Thin wrappers around the `users` voice-clone columns plus the
+// `voice_clone_events` audit log. The ElevenLabs call itself lives in
+// `services/voiceClone.js` — this file only owns the DB side.
+
+async function setClonedVoice(userId, voiceId, consentVersion) {
+  if (!userId || !voiceId) return null;
+  await db.run(
+    `UPDATE users
+       SET cloned_voice_id = ?,
+           cloned_voice_consent_at = CURRENT_TIMESTAMP,
+           cloned_voice_consent_version = ?,
+           cloned_voice_enabled = 1,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+    [voiceId, consentVersion || null, userId]
+  );
+  return getClonedVoice(userId);
+}
+
+async function clearClonedVoice(userId) {
+  if (!userId) return null;
+  await db.run(
+    `UPDATE users
+       SET cloned_voice_id = NULL,
+           cloned_voice_consent_at = NULL,
+           cloned_voice_consent_version = NULL,
+           cloned_voice_enabled = 0,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+    [userId]
+  );
+  return true;
+}
+
+async function setClonedVoiceEnabled(userId, enabled) {
+  if (!userId) return null;
+  await db.run(
+    `UPDATE users SET cloned_voice_enabled = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+    [enabled ? 1 : 0, userId]
+  );
+  return getClonedVoice(userId);
+}
+
+async function getClonedVoice(userId) {
+  if (!userId) return null;
+  const row = await db.get(
+    `SELECT cloned_voice_id           AS voiceId,
+            cloned_voice_consent_at   AS consentAt,
+            cloned_voice_consent_version AS consentVersion,
+            cloned_voice_enabled      AS enabled
+       FROM users WHERE id = ?`,
+    [userId]
+  );
+  if (!row) return null;
+  return {
+    voiceId: row.voiceId || null,
+    consentAt: row.consentAt || null,
+    consentVersion: row.consentVersion || null,
+    enabled: Boolean(row.enabled) && Boolean(row.voiceId),
+  };
+}
+
+async function logVoiceCloneEvent({ userId, action, voiceId, consentVersion, ip, userAgent, note }) {
+  if (!userId || !action) return null;
+  const r = await db.run(
+    `INSERT INTO voice_clone_events
+       (user_id, action, voice_id, consent_version, ip, user_agent, note)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [
+      userId,
+      String(action).slice(0, 40),
+      voiceId || null,
+      consentVersion || null,
+      ip ? String(ip).slice(0, 64) : null,
+      userAgent ? String(userAgent).slice(0, 400) : null,
+      note ? String(note).slice(0, 500) : null,
+    ]
+  );
+  return { id: r.lastID };
+}
+
+async function listVoiceCloneEvents(userId, limit = 50) {
+  if (!userId) return [];
+  return db.all(
+    `SELECT id, action, voice_id, consent_version, ip, user_agent, note, created_at
+       FROM voice_clone_events WHERE user_id = ? ORDER BY id DESC LIMIT ?`,
+    [userId, limit]
+  );
 }
 
 // F8 — preferred language helpers.
@@ -946,6 +1079,13 @@ module.exports = {
   // F8 — preferred language
   setPreferredLanguage,
   getPreferredLanguage,
+  // Voice clone
+  setClonedVoice,
+  clearClonedVoice,
+  setClonedVoiceEnabled,
+  getClonedVoice,
+  logVoiceCloneEvent,
+  listVoiceCloneEvents,
   // Conversation history
   createConversation,
   appendConversationMessage,

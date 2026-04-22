@@ -28,6 +28,7 @@ const pushRouter       = require('./routes/push');
 const creditsRouter    = require('./routes/credits');
 const diagRouter       = require('./routes/diag');
 const youtubeRouter    = require('./routes/youtube');
+const voiceCloneRouter = require('./routes/voiceClone');
 const proactive        = require('./services/proactive');
 const { bootstrapAdmin } = require('./services/adminBootstrap');
 
@@ -127,7 +128,13 @@ const chatLimiter = (process.env.NODE_ENV === 'test') ? (req, res, next) => next
 // stray ?retry=1 from Stripe wouldn't bypass the guard.
 app.use((req, res, next) => {
   if (req.path === '/api/credits/webhook') return next();
-  return express.json({ limit: '1mb' })(req, res, next);
+  // Voice-clone POST carries a base64-encoded audio sample up to ~10 MB
+  // (MediaRecorder blob → base64 is ~33% overhead). Raise the JSON cap
+  // only on that path so every other endpoint keeps the tight 1 MB
+  // defence-in-depth limit.
+  const isVoiceClone =
+    req.path === '/api/voice/clone' && req.method === 'POST';
+  return express.json({ limit: isVoiceClone ? '15mb' : '1mb' })(req, res, next);
 });
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
@@ -324,6 +331,7 @@ app.get('/api/push/public-key', (_req, res) => {
   res.json({ publicKey: pushRouter.getVapidPublicKey() });
 });
 app.use('/api/push', requireAuth, pushRouter);
+app.use('/api/voice/clone', requireAuth, voiceCloneRouter);
 
 if (process.env.NODE_ENV !== 'test' && process.env.PROACTIVE_DISABLED !== '1') {
   try { proactive.start(require('./routes/push').getWebPush()); }
