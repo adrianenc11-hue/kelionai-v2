@@ -425,16 +425,23 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
     // session transcript so Gemini continues rather than re-greeting.
     // Fresh sessions call start() with no args and stay on GET.
     const priorTurns = Array.isArray(opts.priorTurns) ? opts.priorTurns : []
-    // F5 — stash the handoff flag BEFORE opening the socket so the
-    // setupComplete handler sees it. Fresh sessions reset it to false so
-    // the kickstart greeting keeps firing as before.
-    handoffSessionRef.current = priorTurns.length > 0
     // Concurrent-call guard — see comment on `startInFlightRef`. Tap and
     // wake-word both call start() off stale closures; without this lock
     // two WebSockets open in parallel, wsRef gets clobbered, and the
     // orphaned ws's setupComplete handler fires clientContent on the
     // live ws BEFORE its own setup ack arrives → 1007.
+    //
+    // F6 — the guard MUST run before we touch `handoffSessionRef`.
+    // Otherwise a rejected concurrent start() (a tap firing while a
+    // handoff is still in-flight) would clobber the flag for the
+    // session that is actually opening the socket. Reject-first,
+    // mutate-after.
     if (startInFlightRef.current) return
+    // F5 — stash the handoff flag AFTER the concurrent guard so only
+    // the winning call writes it. The setupComplete handler reads it
+    // on the next microtask; fresh sessions explicitly reset to false
+    // so the kickstart greeting keeps firing as before.
+    handoffSessionRef.current = priorTurns.length > 0
     // If a previous ws is still live (or in CONNECTING), tear it down
     // before opening a new one — otherwise the old handlers keep firing
     // against `wsRef.current` after we reassign it below.
