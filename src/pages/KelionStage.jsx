@@ -4035,12 +4035,16 @@ export default function KelionStage() {
           </div>
 
           {!creditsLoading && creditsCards.map((c) => {
-            const badge = {
+            const badge = ({
               ok: { bg: 'rgba(34, 197, 94, 0.12)', border: 'rgba(34, 197, 94, 0.55)', text: '#bbf7d0', label: 'OK' },
               low: { bg: 'rgba(245, 158, 11, 0.12)', border: 'rgba(245, 158, 11, 0.55)', text: '#fde68a', label: 'LOW' },
               error: { bg: 'rgba(239, 68, 68, 0.12)', border: 'rgba(239, 68, 68, 0.55)', text: '#fecaca', label: 'ERROR' },
+              // `unconfigured` = opt-in provider (Groq) intentionally left unset.
+              // Muted slate styling (not red) so the admin sees the state
+              // at-a-glance without thinking something is broken.
+              unconfigured: { bg: 'rgba(148, 163, 184, 0.12)', border: 'rgba(148, 163, 184, 0.5)', text: '#e2e8f0', label: 'NOT SET' },
               unknown: { bg: 'rgba(148, 163, 184, 0.1)', border: 'rgba(148, 163, 184, 0.4)', text: '#cbd5e1', label: '—' },
-            }[c.status || 'unknown']
+            })[c.status] || { bg: 'rgba(148, 163, 184, 0.1)', border: 'rgba(148, 163, 184, 0.4)', text: '#cbd5e1', label: '—' }
             return (
               <a
                 key={c.id}
