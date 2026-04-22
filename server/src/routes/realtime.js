@@ -705,7 +705,18 @@ const KELION_TOOLS = [
       end:         { type: 'string', description: "Event end in ISO 8601. Defaults to start + 1 hour if omitted." },
       location:    { type: 'string', description: "Optional location (max 200 chars)." },
       description: { type: 'string', description: "Optional description / agenda (max 2000 chars)." },
-      attendees:   { type: 'array',  description: "Optional list of { name?, email } objects (max 50)." },
+      attendees:   {
+        type: 'array',
+        description: "Optional list of { name?, email } objects (max 50).",
+        items: {
+          type: 'object',
+          properties: {
+            email: { type: 'string', description: "Attendee email address (required)." },
+            name:  { type: 'string', description: "Attendee display name (optional, max 100 chars)." },
+          },
+          required: ['email'],
+        },
+      },
     },
     required: ['title', 'start'],
   },
@@ -745,9 +756,28 @@ const KELION_TOOLS = [
 ];
 
 // Gemini v1alpha BidiGenerateContent — JSON schema with UPPERCASE types and
-// declarations grouped under a single `functionDeclarations` array.
-function buildKelionToolsGemini() {
+// declarations grouped under a single `functionDeclarations` array. Gemini
+// rejects the setup frame outright if any ARRAY property is missing `items`
+// or any OBJECT property drops `properties`, so the converter walks the
+// schema recursively and carries those fields through.
+function toGeminiSchema(v) {
   const up = (t) => (t || 'string').toString().toUpperCase();
+  const type = up(v.type);
+  const out = { type };
+  if (v.description) out.description = v.description;
+  if (v.enum) out.enum = v.enum;
+  if (type === 'ARRAY') {
+    out.items = v.items ? toGeminiSchema(v.items) : { type: 'STRING' };
+  }
+  if (type === 'OBJECT') {
+    out.properties = Object.fromEntries(
+      Object.entries(v.properties || {}).map(([k, sub]) => [k, toGeminiSchema(sub)])
+    );
+    if (Array.isArray(v.required) && v.required.length) out.required = v.required;
+  }
+  return out;
+}
+function buildKelionToolsGemini() {
   return [{
     functionDeclarations: KELION_TOOLS.map(t => ({
       name: t.name,
@@ -755,11 +785,7 @@ function buildKelionToolsGemini() {
       parameters: {
         type: 'OBJECT',
         properties: Object.fromEntries(
-          Object.entries(t.properties).map(([k, v]) => {
-            const p = { type: up(v.type), description: v.description };
-            if (v.enum) p.enum = v.enum;
-            return [k, p];
-          })
+          Object.entries(t.properties).map(([k, v]) => [k, toGeminiSchema(v)])
         ),
         required: t.required,
       },
