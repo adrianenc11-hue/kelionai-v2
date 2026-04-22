@@ -379,12 +379,21 @@ router.post('/', async (req, res) => {
     return res.status(503).json({ error: 'TTS not configured. Set OPENAI_API_KEY, GEMINI_API_KEY, or ELEVENLABS_API_KEY.' });
   }
 
-  // Adrian: "cind sunt in chat e o voce cu un timbru, cind ii cer o harta
-  // apare o alta voce" — text chat voice (Gemini Charon) and voice chat
-  // voice (OpenAI Realtime cedar) sound like different people. Default now
-  // to OpenAI TTS `onyx` (deep masculine, closest standalone match to cedar)
-  // so the same provider speaks in both modes. Operators opt out with
-  // TTS_PROVIDER=gemini or TTS_PROVIDER=elevenlabs.
+  // Provider priority — ElevenLabs wins when its key is configured.
+  // Adrian's explicit ask: "vreau o singura voce auzita de user, indiferent
+  // de ce AI este in spate". OpenAI Realtime (`ash`) and Gemini Live
+  // (`Charon`) are voice-to-voice APIs whose timbre is fixed by the
+  // provider — we cannot reroute THAT audio through ElevenLabs without
+  // rearchitecting the realtime path. But every TEXT-chat reply goes
+  // through this HTTP endpoint, so picking ElevenLabs here with the same
+  // voice id used across modes gives the user a consistent timbre for the
+  // non-realtime surface (text chat, map card narration, reads, etc).
+  //
+  // Priority when TTS_PROVIDER is unset:
+  //   1. ElevenLabs (if key set)  — one voice across every text reply
+  //   2. OpenAI                   — matches Realtime `ash` fallback
+  //   3. Gemini                   — last-resort fallback
+  // Operators override via TTS_PROVIDER=openai|gemini|elevenlabs|11labs.
   const providerOverride = (process.env.TTS_PROVIDER || '').toLowerCase();
   const forceOpenAI      = providerOverride === 'openai';
   const forceGemini      = providerOverride === 'gemini';
@@ -393,9 +402,9 @@ router.post('/', async (req, res) => {
   if (forceOpenAI && hasOpenAI) chosen = 'openai';
   else if (forceGemini && hasGemini) chosen = 'gemini';
   else if (forceElevenLabs && hasElevenLabs) chosen = 'elevenlabs';
+  else if (hasElevenLabs) chosen = 'elevenlabs';
   else if (hasOpenAI) chosen = 'openai';
-  else if (hasGemini) chosen = 'gemini';
-  else chosen = 'elevenlabs';
+  else chosen = 'gemini';
   // Frontend may send a language hint (e.g. `navigator.language`). Trust any
   // well-formed ISO 639-1 code the client supplies; otherwise auto-detect
   // from the reply text itself.
