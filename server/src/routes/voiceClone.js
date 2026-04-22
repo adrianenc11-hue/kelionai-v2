@@ -232,7 +232,13 @@ router.patch('/', async (req, res) => {
   if (typeof body.enabled !== 'boolean') {
     return res.status(400).json({ error: '`enabled` (boolean) is required.' });
   }
-  const current = await getClonedVoice(userId);
+  let current;
+  try {
+    current = await getClonedVoice(userId);
+  } catch (err) {
+    console.error('[voice/clone PATCH] failed to load state', err && err.message);
+    return res.status(500).json({ error: 'Failed to load voice clone state.' });
+  }
   if (!current || !current.voiceId) {
     return res.status(404).json({ error: 'No cloned voice to toggle. Create one first.' });
   }

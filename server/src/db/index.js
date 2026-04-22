@@ -969,6 +969,10 @@ async function mergeUsers(sourceId, targetId) {
     'credit_transactions',
     'conversations',
     'visitor_events',
+    // Biometric-consent audit rows — merging must preserve the trail
+    // (ON DELETE CASCADE would otherwise wipe them when the source row
+    // is removed at the end of this transaction).
+    'voice_clone_events',
   ];
   // Referral rows carry two FK columns (`owner_id`, `used_by`) — move
   // both independently. `used_by` can be null (unredeemed code) so
@@ -1006,6 +1010,19 @@ async function mergeUsers(sourceId, targetId) {
     }
     if (!tgt.referral_code && src.referral_code) {
       fillIfEmpty.referral_code = src.referral_code;
+    }
+    // Voice-clone state: if the target has no clone but the source
+    // does, carry it (plus consent metadata + enabled flag) so we
+    // don't orphan the voice_id on the ElevenLabs side after merge.
+    if (!tgt.cloned_voice_id && src.cloned_voice_id) {
+      fillIfEmpty.cloned_voice_id = src.cloned_voice_id;
+      if (src.cloned_voice_consent_at) {
+        fillIfEmpty.cloned_voice_consent_at = src.cloned_voice_consent_at;
+      }
+      if (src.cloned_voice_consent_version) {
+        fillIfEmpty.cloned_voice_consent_version = src.cloned_voice_consent_version;
+      }
+      fillIfEmpty.cloned_voice_enabled = Number(src.cloned_voice_enabled || 0);
     }
     // credits_balance_minutes lives on users: sum instead of picking.
     const srcBalance = Number(src.credits_balance_minutes || 0);
