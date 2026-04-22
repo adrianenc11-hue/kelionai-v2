@@ -146,6 +146,27 @@ router.post('/consume', requireAuth, async (req, res) => {
       return res.json({ balance_minutes: null, deducted: 0, exempt: true });
     }
 
+    // Silence-aware heartbeat (anti idle-drain).
+    //
+    // Adrian 2026-04-20: "mănâncă credit la greu" — the client ticked
+    // /consume every 60 s even when nobody spoke, so a voice session
+    // left open on a desk silently drained a paid top-up (-1 minute for
+    // 28 minutes at idle in the audit).
+    //
+    // The voice hooks now pass `silent: true` when VAD has not detected
+    // user speech for >30 s. Accept the flag, refresh balance so the
+    // HUD stays truthful, but do NOT deduct or touch the cooldown. The
+    // very next non-silent tick charges normally.
+    const silent = !!(req.body && req.body.silent === true);
+    if (silent) {
+      const bal = await getCreditsBalance(req.user.id).catch(() => null);
+      return res.json({
+        balance_minutes: typeof bal === 'number' ? bal : null,
+        deducted: 0,
+        silent: true,
+      });
+    }
+
     const now = Date.now();
     const last = lastConsumeByUser.get(req.user.id) || 0;
     if (now - last < CONSUME_COOLDOWN_MS) {

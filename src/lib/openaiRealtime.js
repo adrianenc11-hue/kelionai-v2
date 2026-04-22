@@ -90,6 +90,11 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
   const narrationInflightRef = useRef(false)
   const assistantSpeakingRef = useRef(false)
   const userSpeakingRef      = useRef(false)
+  // Timestamp (epoch ms) of the most recent VAD activity from either
+  // side. The credits heartbeat uses it to decide when the session has
+  // been silent long enough (>30 s) to skip a deduction — see the
+  // `consumeCredits` loop and /api/credits/consume silent branch.
+  const lastActivityAtRef    = useRef(Date.now())
   const lastNarrationTextRef = useRef('')
   const creditsIntervalRef = useRef(null)
   const creditsStartedRef  = useRef(false)
@@ -214,11 +219,13 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
         // we enable it in session.update; the remote track goes silent
         // on its own. We just reflect state so the HUD shows the mic.
         userSpeakingRef.current = true
+        lastActivityAtRef.current = Date.now()
         setStatus('listening')
         return
       case 'input_audio_buffer.speech_stopped':
       case 'input_audio_buffer.committed':
         userSpeakingRef.current = false
+        lastActivityAtRef.current = Date.now()
         return
 
       // User transcript (from whisper, async/approximate per OpenAI docs).
@@ -233,11 +240,13 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
       // Assistant transcript of its own speech output.
       case 'response.created':
         assistantSpeakingRef.current = true
+        lastActivityAtRef.current = Date.now()
         return
       case 'response.output_audio_transcript.delta':
       case 'response.audio_transcript.delta': // pre-GA alias, still seen in the wild
         if (event.delta) appendTurn('assistant', event.delta, false)
         assistantSpeakingRef.current = true
+        lastActivityAtRef.current = Date.now()
         setStatus('speaking')
         return
       case 'response.output_audio_transcript.done':
@@ -427,11 +436,17 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
         creditsStartedRef.current = false
         const consumeCredits = async () => {
           try {
+            // Silence-aware heartbeat — matches server /api/credits/consume.
+            // If no VAD activity in the last 30 s (neither user nor
+            // assistant spoke), send silent=true so the server skips the
+            // deduction. Prevents the idle-drain Adrian reported
+            // (-1 min x 28 min at idle).
+            const silent = (Date.now() - lastActivityAtRef.current) > 30_000
             const r = await fetch('/api/credits/consume', {
               method: 'POST',
               credentials: 'include',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ minutes: 1 }),
+              body: JSON.stringify({ minutes: 1, silent }),
             })
             if (r.status === 401) {
               clearInterval(creditsIntervalRef.current)
