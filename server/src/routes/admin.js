@@ -19,6 +19,7 @@ const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { getAllCredits, probeStripe, buildRevenueSplit } = require('../services/aiCredits');
 const { sendEmailAlert } = require('../services/emailAlerts');
 const { bootstrapAdmin } = require('../services/adminBootstrap');
+const autoTopup = require('../services/autoTopup');
 
 const router = Router();
 
@@ -206,10 +207,38 @@ router.get('/credits', async (req, res) => {
       });
     }
 
-    res.json({ cards, ts: new Date().toISOString() });
+    // Fire-and-forget auto-topup pass. Only providers with a numeric
+    // balance/limit ratio below the configured threshold (default 20%)
+    // will actually charge the owner's saved Stripe card; everything
+    // else is a no-op. Errors never bubble up to the admin response.
+    autoTopup.checkAndTrigger(cards).catch((err) => {
+      console.warn('[admin/credits] auto-topup check failed:', err && err.message);
+    });
+
+    res.json({
+      cards,
+      autoTopup: autoTopup.getStatus(),
+      ts: new Date().toISOString(),
+    });
   } catch (err) {
     console.error('[admin/credits] Error:', err && err.message);
     res.status(500).json({ error: 'Failed to fetch AI credits' });
+  }
+});
+
+/**
+ * GET /api/admin/auto-topup
+ * Surfaces the owner-facing auto-topup configuration + in-memory
+ * history (last attempt per provider: timestamp, success/error,
+ * PaymentIntent id). Used by the admin UI to render the "Auto-topup:
+ * X% threshold · Y EUR from saved card · last run …" info strip.
+ */
+router.get('/auto-topup', async (req, res) => {
+  try {
+    res.json(autoTopup.getStatus());
+  } catch (err) {
+    console.error('[admin/auto-topup] Error:', err && err.message);
+    res.status(500).json({ error: 'Failed to load auto-topup status' });
   }
 });
 
