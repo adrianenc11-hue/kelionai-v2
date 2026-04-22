@@ -640,6 +640,75 @@ const KELION_TOOLS = [
     properties: {},
     required: [],
   },
+  {
+    name: 'send_email',
+    description: "Send a transactional email via Resend (requires RESEND_API_KEY + a verified domain address in RESEND_FROM). Use when the user explicitly asks to email someone; do not send on your own initiative. Returns the provider message id on success.",
+    properties: {
+      to:       { type: 'string', description: "Recipient email address (or an array of addresses)." },
+      subject:  { type: 'string', description: "Email subject line (max 300 chars)." },
+      text:     { type: 'string', description: "Plain-text body (optional if html is provided)." },
+      html:     { type: 'string', description: "HTML body (optional if text is provided)." },
+      from:     { type: 'string', description: "Override sender address. Defaults to RESEND_FROM." },
+      reply_to: { type: 'string', description: "Optional reply-to address." },
+    },
+    required: ['to', 'subject'],
+  },
+  {
+    name: 'send_sms',
+    description: "Send an SMS via Twilio (requires TWILIO_ACCOUNT_SID + TWILIO_AUTH_TOKEN + TWILIO_FROM). The number must be in E.164 format, e.g. +14155550123. Use only when the user explicitly asks to send an SMS.",
+    properties: {
+      to:      { type: 'string', description: "Recipient phone number in E.164 format (e.g. +14155550123)." },
+      message: { type: 'string', description: "SMS body (max 1600 chars — ~10 segments)." },
+      from:    { type: 'string', description: "Override sender number. Defaults to TWILIO_FROM." },
+    },
+    required: ['to', 'message'],
+  },
+  {
+    name: 'create_calendar_ics',
+    description: "Generate a valid .ics calendar invite (RFC 5545). Returns the ics text and a data: URL the caller can surface as a downloadable 'add to calendar' link. Does not deliver the invite — pair with send_email if the user wants it emailed.",
+    properties: {
+      title:       { type: 'string', description: "Event title (max 200 chars)." },
+      start:       { type: 'string', description: "Event start in ISO 8601 (UTC or with offset)." },
+      end:         { type: 'string', description: "Event end in ISO 8601. Defaults to start + 1 hour if omitted." },
+      location:    { type: 'string', description: "Optional location (max 200 chars)." },
+      description: { type: 'string', description: "Optional description / agenda (max 2000 chars)." },
+      attendees:   { type: 'array',  description: "Optional list of { name?, email } objects (max 50)." },
+    },
+    required: ['title', 'start'],
+  },
+  {
+    name: 'zapier_trigger',
+    description: "POST a JSON payload to a Zapier Catch Hook webhook so a Zap can automate the rest (Slack message, Sheets row, Gmail draft, etc). The URL is restricted to https://hooks.zapier.com/hooks/catch/… so the tool cannot be repurposed as a general webhook sink.",
+    properties: {
+      webhook_url: { type: 'string', description: "The Zapier Catch Hook URL from the Zap setup screen." },
+      payload:     { type: 'object', description: "JSON object sent as the request body (max 100 KB serialised)." },
+    },
+    required: ['webhook_url'],
+  },
+  {
+    name: 'github_repo_info',
+    description: "Return public metadata for a GitHub repository: description, stars, forks, open issues, language, license, default branch, topics. Use when the user asks 'what does this repo do', 'how popular is it', 'when was it updated last'. No authentication required (GITHUB_TOKEN, if set, just raises the unauth rate limit).",
+    properties: {
+      repo: { type: 'string', description: "Repo slug in the form `owner/name` (e.g. `facebook/react`). A full github.com URL also works." },
+    },
+    required: ['repo'],
+  },
+  {
+    name: 'npm_package_info',
+    description: "Return metadata for a public npm package: latest version, description, homepage, license, last modified date, last 10 versions, and weekly downloads when the downloads API is reachable. Use for 'what version is …', 'is this package maintained', 'how popular is …'.",
+    properties: {
+      name: { type: 'string', description: "Package name (scoped or unscoped, e.g. `react` or `@scope/pkg`)." },
+    },
+    required: ['name'],
+  },
+  {
+    name: 'pypi_package_info',
+    description: "Return metadata for a public PyPI package: latest version, summary, homepage, author, license, Python requirement, yanked flag, last 10 releases. Use for 'what version is …', 'who maintains …', 'is this yanked'.",
+    properties: {
+      name: { type: 'string', description: "PyPI package name (e.g. `requests`)." },
+    },
+    required: ['name'],
+  },
 ];
 
 // Gemini v1alpha BidiGenerateContent — JSON schema with UPPERCASE types and
