@@ -14,6 +14,8 @@ const {
   getCreditsBalance,
   listRecentVisitors,
   getVisitorStats,
+  findDuplicateUsers,
+  mergeUsers,
 } = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { getAllCredits, probeStripe, buildRevenueSplit } = require('../services/aiCredits');
@@ -399,6 +401,60 @@ router.get('/users', async (req, res) => {
   } catch (err) {
     console.error('[admin/users] Error:', err.message);
     res.status(500).json({ error: 'Failed to get users' });
+  }
+});
+
+/**
+ * GET /api/admin/users/duplicates
+ *
+ * F3 — Adrian 2026-04-22: audit found adrianenc11@gmail.com sitting as
+ * two separate user rows (id=5 from Google sign-in, id=6 from local
+ * signup). Surface every email that has more than one row so the
+ * admin UI can prompt the operator to merge them.
+ */
+router.get('/users/duplicates', async (_req, res) => {
+  try {
+    const groups = await findDuplicateUsers();
+    res.json({ groups, total: groups.length });
+  } catch (err) {
+    console.error('[admin/users/duplicates] Error:', err.message);
+    res.status(500).json({ error: 'Failed to list duplicate users' });
+  }
+});
+
+/**
+ * POST /api/admin/users/merge
+ *
+ * F3 — merge `sourceId` into `targetId`. All FK'd rows (conversations,
+ * credits ledger, memory, push subs, proactive log, referrals,
+ * visitor events) move to the target, credits_balance_minutes is
+ * summed, and the source row is deleted. Source and target must share
+ * the same (case-insensitive) email — we refuse a cross-account merge.
+ */
+router.post('/users/merge', async (req, res) => {
+  try {
+    const rawSource = req.body && req.body.sourceId;
+    const rawTarget = req.body && req.body.targetId;
+    if (rawSource == null || rawTarget == null) {
+      return res.status(400).json({ error: 'sourceId and targetId are required' });
+    }
+    // Preserve non-numeric IDs for stores that don't use BIGINT (future
+    // UUID migration, mocked DBs in tests). Numbers still get through.
+    const sourceId = typeof rawSource === 'string' && /^\d+$/.test(rawSource)
+      ? Number.parseInt(rawSource, 10)
+      : rawSource;
+    const targetId = typeof rawTarget === 'string' && /^\d+$/.test(rawTarget)
+      ? Number.parseInt(rawTarget, 10)
+      : rawTarget;
+    const result = await mergeUsers(sourceId, targetId);
+    res.json(result);
+  } catch (err) {
+    const msg = err && err.message ? err.message : String(err);
+    console.error('[admin/users/merge] Error:', msg);
+    // Client errors (bad IDs, different emails) get 400 so the UI
+    // can surface the message; genuine server crashes stay 500.
+    const is4xx = /not found|must differ|required|different email/i.test(msg);
+    res.status(is4xx ? 400 : 500).json({ error: msg || 'Failed to merge users' });
   }
 });
 

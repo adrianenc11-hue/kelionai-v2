@@ -726,6 +726,145 @@ async function getVisitorStats({ windowHours = 24 } = {}) {
   }
 }
 
+// ─── User de-duplication helpers ──────────────────────────────────
+// Adrian 2026-04-22: audit found adrianenc11@gmail.com sitting as two
+// separate rows (id=5 from a Google sign-in, id=6 from a later local
+// sign-up with the same email). The admin panel needs a way to list
+// those and merge them into a single canonical user so credits and
+// conversation history don't stay split.
+async function findDuplicateUsers() {
+  // Lower-cased email match is the right key — GSI / passwords / etc.
+  // each create a row, but a human only owns one address. SQLite and
+  // Postgres both understand LOWER().
+  try {
+    const rows = await db.all(
+      `SELECT LOWER(email) AS email_key, COUNT(*) AS n
+       FROM users
+       WHERE email IS NOT NULL AND email <> ''
+       GROUP BY LOWER(email)
+       HAVING COUNT(*) > 1
+       ORDER BY n DESC`
+    );
+    if (!Array.isArray(rows) || rows.length === 0) return [];
+    const groups = [];
+    for (const r of rows) {
+      const peers = await db.all(
+        'SELECT * FROM users WHERE LOWER(email) = ? ORDER BY created_at ASC, id ASC',
+        [r.email_key]
+      );
+      groups.push({
+        email: r.email_key,
+        count: Number(r.n) || peers.length,
+        users: peers.map(sanitizeUser),
+      });
+    }
+    return groups;
+  } catch (err) {
+    console.warn('[db] findDuplicateUsers failed:', err && err.message);
+    return [];
+  }
+}
+
+// Move every FK'd row from sourceId to targetId, then remove the
+// source user row. Runs inside a single SQLite transaction so a
+// partial failure rolls everything back. Returns a structured
+// summary of how many rows moved per table so the admin UI can
+// show the result without a second round-trip.
+async function mergeUsers(sourceId, targetId) {
+  if (!sourceId || !targetId) throw new Error('sourceId and targetId are required');
+  if (String(sourceId) === String(targetId)) throw new Error('source and target must differ');
+  const src = await getUserById(sourceId);
+  const tgt = await getUserById(targetId);
+  if (!src) throw new Error(`source user ${sourceId} not found`);
+  if (!tgt) throw new Error(`target user ${targetId} not found`);
+  // Guard — only allow merging rows that belong to the same human.
+  // Checking the lowercased email here means Google-linked + local
+  // signup rows can still collapse, but two completely different
+  // emails cannot be force-merged through this path.
+  if (String(src.email || '').toLowerCase() !== String(tgt.email || '').toLowerCase()) {
+    throw new Error('refusing to merge users with different email addresses');
+  }
+  const counts = {};
+  // Tables that carry `user_id` FK → plain UPDATE move.
+  const userIdTables = [
+    'memory_items',
+    'push_subscriptions',
+    'proactive_log',
+    'credit_transactions',
+    'conversations',
+    'visitor_events',
+  ];
+  // Referral rows carry two FK columns (`owner_id`, `used_by`) — move
+  // both independently. `used_by` can be null (unredeemed code) so
+  // the update is safe on both columns.
+  await db.exec('BEGIN');
+  try {
+    for (const t of userIdTables) {
+      const r = await db.run(`UPDATE ${t} SET user_id = ? WHERE user_id = ?`, [targetId, sourceId]);
+      counts[t] = Number((r && (r.changes || r.rowCount)) || 0);
+    }
+    const refOwner = await db.run(
+      'UPDATE referrals SET owner_id = ? WHERE owner_id = ?',
+      [targetId, sourceId]
+    );
+    const refUsed = await db.run(
+      'UPDATE referrals SET used_by = ? WHERE used_by = ?',
+      [targetId, sourceId]
+    );
+    counts.referrals_owner = Number((refOwner && (refOwner.changes || refOwner.rowCount)) || 0);
+    counts.referrals_used_by = Number((refUsed && (refUsed.changes || refUsed.rowCount)) || 0);
+    // Merge the users row itself: keep the target, but copy over
+    // whichever useful fields only the source had. This matters when
+    // the source row is the Google-linked one and the target is a
+    // later local signup (or vice versa) — we don't want to lose
+    // `google_id` or `stripe_customer_id` just because the target
+    // was created without them.
+    const fillIfEmpty = {};
+    if (!tgt.google_id && src.google_id) fillIfEmpty.google_id = src.google_id;
+    if (!tgt.picture && src.picture) fillIfEmpty.picture = src.picture;
+    if (!tgt.stripe_customer_id && src.stripe_customer_id) {
+      fillIfEmpty.stripe_customer_id = src.stripe_customer_id;
+    }
+    if (!tgt.password_hash && src.password_hash) {
+      fillIfEmpty.password_hash = src.password_hash;
+    }
+    if (!tgt.referral_code && src.referral_code) {
+      fillIfEmpty.referral_code = src.referral_code;
+    }
+    // credits_balance_minutes lives on users: sum instead of picking.
+    const srcBalance = Number(src.credits_balance_minutes || 0);
+    if (srcBalance > 0) {
+      const tgtBalance = Number(tgt.credits_balance_minutes || 0);
+      fillIfEmpty.credits_balance_minutes = tgtBalance + srcBalance;
+    }
+    if (Object.keys(fillIfEmpty).length > 0) {
+      const fields = Object.keys(fillIfEmpty).map(k => `${k} = ?`).join(', ');
+      const values = Object.values(fillIfEmpty);
+      await db.run(
+        `UPDATE users SET ${fields}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        [...values, targetId]
+      );
+    }
+    // Finally drop the source user. `conversation_messages` does not
+    // have a direct `user_id` column — it cascades via
+    // `conversation_id → conversations.user_id` which we've already
+    // repointed — so the DELETE below only removes the row itself.
+    const del = await db.run('DELETE FROM users WHERE id = ?', [sourceId]);
+    counts.users_deleted = Number((del && (del.changes || del.rowCount)) || 0);
+    await db.exec('COMMIT');
+  } catch (err) {
+    try { await db.exec('ROLLBACK'); } catch (_) { /* ignore */ }
+    throw err;
+  }
+  return {
+    sourceId,
+    targetId,
+    email: tgt.email,
+    moved: counts,
+    target: sanitizeUser(await getUserById(targetId)),
+  };
+}
+
 module.exports = {
   initDb,
   getDb,
@@ -738,6 +877,9 @@ module.exports = {
   incrementUsage,
   getAllUsers,
   deleteUser,
+  // F3 — admin user de-duplication
+  findDuplicateUsers,
+  mergeUsers,
   insertUser,
   findByEmail,
   findById,

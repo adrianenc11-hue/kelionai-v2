@@ -1221,6 +1221,70 @@ export default function KelionStage() {
   const [usersOpen, setUsersOpen] = useState(false)
   const [payoutsOpen, setPayoutsOpen] = useState(false)
 
+  // F3 — Adrian 2026-04-22: audit found adrianenc11@gmail.com split across
+  // two user rows (id=5 Google + id=6 local signup) and the admin panel
+  // had no way to collapse them. `dupGroups` holds whatever
+  // /api/admin/users/duplicates returned; the card in the Users drawer
+  // renders one row per group with a "Merge" button per peer. We keep
+  // the group list lazy — it only loads on demand when the Users tab
+  // is opened, and re-loads after each successful merge.
+  const [dupGroups, setDupGroups] = useState([])
+  const [dupLoading, setDupLoading] = useState(false)
+  const [dupError, setDupError] = useState(null)
+  const [dupBusyKey, setDupBusyKey] = useState(null)
+  const [dupResult, setDupResult] = useState(null)
+  const refreshDuplicateUsers = useCallback(async () => {
+    setDupLoading(true)
+    setDupError(null)
+    try {
+      const h = { Accept: 'application/json' }
+      if (authTokenRef.current) h['Authorization'] = `Bearer ${authTokenRef.current}`
+      const r = await fetch('/api/admin/users/duplicates', { credentials: 'include', headers: h })
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      const j = await r.json().catch(() => null)
+      setDupGroups(Array.isArray(j && j.groups) ? j.groups : [])
+    } catch (err) {
+      setDupError(err && err.message ? err.message : 'Nu am putut încărca conturile duplicate')
+    } finally {
+      setDupLoading(false)
+    }
+  }, [])
+  const mergeDuplicateUsers = useCallback(async (sourceId, targetId, email) => {
+    if (sourceId == null || targetId == null) return
+    const confirmMsg =
+      `Merge user ${sourceId} → ${targetId} (${email})?\n\n` +
+      'Toate conversațiile, creditele și istoricul sursei se vor muta pe țintă.\n' +
+      'Sursa va fi ștearsă. Acțiune ireversibilă.'
+    if (typeof window !== 'undefined' && !window.confirm(confirmMsg)) return
+    const key = `${sourceId}->${targetId}`
+    setDupBusyKey(key)
+    setDupResult(null)
+    try {
+      const h = { 'Content-Type': 'application/json' }
+      if (authTokenRef.current) h['Authorization'] = `Bearer ${authTokenRef.current}`
+      const r = await fetch('/api/admin/users/merge', {
+        method: 'POST',
+        credentials: 'include',
+        headers: h,
+        body: JSON.stringify({ sourceId, targetId }),
+      })
+      const j = await r.json().catch(() => null)
+      if (!r.ok) throw new Error((j && j.error) || `HTTP ${r.status}`)
+      setDupResult({ ok: true, sourceId, targetId, email, moved: (j && j.moved) || {} })
+      await refreshDuplicateUsers()
+    } catch (err) {
+      setDupResult({
+        ok: false,
+        sourceId,
+        targetId,
+        email,
+        error: err && err.message ? err.message : 'Merge eșuat',
+      })
+    } finally {
+      setDupBusyKey(null)
+    }
+  }, [refreshDuplicateUsers])
+
   // PR E3 — Payouts drawer pulls a live snapshot from Stripe (balance,
   // linked external account, next-payout schedule, last ~10 payouts)
   // plus the 50/50 AI-vs-profit split over the last 30 days. The
@@ -1298,9 +1362,9 @@ export default function KelionStage() {
     if (tab === 'business') { openBusiness() }
     else if (tab === 'ai')       { openCredits() }
     else if (tab === 'visitors') { openVisitors() }
-    else if (tab === 'users')    { setUsersOpen(true) }
+    else if (tab === 'users')    { setUsersOpen(true); refreshDuplicateUsers() }
     else if (tab === 'payouts')  { openPayouts() }
-  }, [openBusiness, openCredits, openVisitors, openPayouts])
+  }, [openBusiness, openCredits, openVisitors, openPayouts, refreshDuplicateUsers])
 
 
 
@@ -4547,6 +4611,181 @@ export default function KelionStage() {
             >✕</button>
           </div>
           <AdminTabBar active="users" onSelect={switchAdminTab} />
+
+          {/* F3 — Duplicate accounts card. Lists every email that has
+              more than one user row and offers a "Merge" button per
+              peer. Merging moves conversations, credits, memory, etc.
+              from the chosen source row into the target and deletes
+              the source. The API refuses a merge across different
+              emails; the UI also asks for confirmation before firing
+              since the action is irreversible. */}
+          <div style={{
+            padding: '16px',
+            background: 'rgba(250, 204, 21, 0.05)',
+            border: '1px solid rgba(250, 204, 21, 0.2)',
+            borderRadius: 12,
+            fontSize: 14,
+            lineHeight: 1.5,
+            marginBottom: 14,
+          }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              marginBottom: 10,
+            }}>
+              <div style={{ fontWeight: 600, fontSize: 15 }}>
+                Conturi duplicate
+              </div>
+              <button
+                onClick={refreshDuplicateUsers}
+                disabled={dupLoading}
+                style={{
+                  padding: '5px 10px',
+                  background: 'rgba(250, 204, 21, 0.12)',
+                  border: '1px solid rgba(250, 204, 21, 0.3)',
+                  borderRadius: 6,
+                  color: '#fef3c7',
+                  fontSize: 11,
+                  cursor: dupLoading ? 'wait' : 'pointer',
+                  opacity: dupLoading ? 0.6 : 1,
+                }}
+              >
+                {dupLoading ? 'Se verifică…' : 'Reîncarcă'}
+              </button>
+            </div>
+            {dupError && (
+              <div style={{
+                padding: '8px 10px', marginBottom: 8,
+                background: 'rgba(239, 68, 68, 0.1)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                borderRadius: 6, fontSize: 12, color: '#fecaca',
+              }}>
+                {dupError}
+              </div>
+            )}
+            {dupResult && (
+              <div style={{
+                padding: '8px 10px', marginBottom: 8,
+                background: dupResult.ok
+                  ? 'rgba(34, 197, 94, 0.1)'
+                  : 'rgba(239, 68, 68, 0.1)',
+                border: `1px solid ${dupResult.ok
+                  ? 'rgba(34, 197, 94, 0.3)'
+                  : 'rgba(239, 68, 68, 0.3)'}`,
+                borderRadius: 6, fontSize: 12,
+                color: dupResult.ok ? '#bbf7d0' : '#fecaca',
+              }}>
+                {dupResult.ok ? (
+                  <>
+                    Merge reușit: user {dupResult.sourceId} → {dupResult.targetId}
+                    {dupResult.email ? ` (${dupResult.email})` : ''}.
+                    {Object.keys(dupResult.moved).length > 0 && (
+                      <> Mutate: {Object.entries(dupResult.moved)
+                        .filter(([, n]) => n > 0)
+                        .map(([k, n]) => `${k}=${n}`)
+                        .join(', ') || '—'}.</>
+                    )}
+                  </>
+                ) : (
+                  <>Merge eșuat ({dupResult.sourceId} → {dupResult.targetId}): {dupResult.error}</>
+                )}
+              </div>
+            )}
+            {!dupLoading && !dupError && dupGroups.length === 0 && (
+              <div style={{ opacity: 0.75, fontSize: 13 }}>
+                Niciun email nu are conturi multiple — totul e curat.
+              </div>
+            )}
+            {dupGroups.map((g) => {
+              const canonical = (g.users && g.users[0]) || null
+              return (
+                <div
+                  key={g.email}
+                  style={{
+                    padding: '10px 12px',
+                    marginBottom: 10,
+                    background: 'rgba(10, 8, 20, 0.35)',
+                    border: '1px solid rgba(167, 139, 250, 0.2)',
+                    borderRadius: 8,
+                  }}
+                >
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+                    {g.email}
+                    <span style={{ opacity: 0.55, fontWeight: 400, marginLeft: 6 }}>
+                      · {g.count} conturi
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 8 }}>
+                    Păstrăm contul cel mai vechi (primul din listă) ca țintă.
+                    Butonul "Merge → {canonical ? `#${canonical.id}` : '…'}"
+                    mută totul de pe peer pe el și șterge peer-ul.
+                  </div>
+                  {(g.users || []).map((u, idx) => {
+                    const isCanonical = canonical && u.id === canonical.id
+                    const key = `${u.id}->${canonical && canonical.id}`
+                    const busy = dupBusyKey === key
+                    return (
+                      <div
+                        key={u.id}
+                        style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                          padding: '6px 8px', marginBottom: 4,
+                          background: isCanonical
+                            ? 'rgba(34, 197, 94, 0.06)'
+                            : 'rgba(255, 255, 255, 0.02)',
+                          border: `1px solid ${isCanonical
+                            ? 'rgba(34, 197, 94, 0.25)'
+                            : 'rgba(167, 139, 250, 0.12)'}`,
+                          borderRadius: 6,
+                          fontSize: 12,
+                        }}
+                      >
+                        <div style={{ minWidth: 0, flex: 1, marginRight: 8 }}>
+                          <div style={{ fontWeight: 600, marginBottom: 2 }}>
+                            #{u.id} {u.name ? `· ${u.name}` : ''}
+                            {isCanonical && (
+                              <span style={{
+                                marginLeft: 6, fontSize: 10, fontWeight: 400,
+                                color: '#bbf7d0',
+                              }}>
+                                ← țintă (se păstrează)
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ opacity: 0.6, fontSize: 11 }}>
+                            {u.google_id ? 'Google · ' : ''}
+                            {u.password_hash ? 'parolă · ' : ''}
+                            {u.stripe_customer_id ? 'Stripe · ' : ''}
+                            creat {u.created_at ? new Date(u.created_at).toLocaleDateString() : '?'}
+                          </div>
+                        </div>
+                        {!isCanonical && canonical && (
+                          <button
+                            onClick={() => mergeDuplicateUsers(u.id, canonical.id, g.email)}
+                            disabled={busy}
+                            style={{
+                              padding: '5px 10px',
+                              background: busy
+                                ? 'rgba(167, 139, 250, 0.1)'
+                                : 'rgba(167, 139, 250, 0.18)',
+                              border: '1px solid rgba(167, 139, 250, 0.45)',
+                              borderRadius: 6,
+                              color: '#ede9fe',
+                              fontSize: 11,
+                              cursor: busy ? 'wait' : 'pointer',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {busy ? 'Merge…' : `Merge → #${canonical.id}`}
+                          </button>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })}
+          </div>
+
           <div style={{
             padding: '18px 16px',
             background: 'rgba(167, 139, 250, 0.06)',
