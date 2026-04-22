@@ -102,15 +102,26 @@ function selectEligible(cards) {
     if (!c || c.kind === 'revenue' || c.status === 'unconfigured') continue;
     if (c.id !== 'elevenlabs') continue;
     if (typeof c.balance !== 'number') continue;
-    // Card sets `balance` = chars remaining. We need the original limit
-    // from balanceDisplay ("X,XXX / Y,YYY chars"). Parse best-effort.
-    const m = typeof c.balanceDisplay === 'string'
-      ? c.balanceDisplay.replace(/,/g, '').match(/(\d+)\s*\/\s*(\d+)/)
+    // Prefer the structured `balanceLimit` field set by the ElevenLabs
+    // probe. `balanceDisplay` is locale-formatted (toLocaleString) and
+    // not safe to parse — e.g. de-DE turns 10000 into "10.000", and the
+    // old regex would have extracted 10 instead of 10000. Keep the
+    // display parser only as a fallback for older shapes.
+    let limit = typeof c.balanceLimit === 'number' && Number.isFinite(c.balanceLimit) && c.balanceLimit > 0
+      ? c.balanceLimit
       : null;
-    if (!m) continue;
-    const remaining = Number(m[1]);
-    const limit = Number(m[2]);
-    if (!Number.isFinite(limit) || limit <= 0) continue;
+    if (limit === null && typeof c.balanceDisplay === 'string') {
+      // Delete every non-digit, non-slash character so locale grouping
+      // separators (comma, period, thin space, narrow no-break space,
+      // etc.) can't corrupt the ratio.
+      const m = c.balanceDisplay.replace(/[^\d/]/g, '').match(/^(\d+)\/(\d+)/);
+      if (m) {
+        const parsed = Number(m[2]);
+        if (Number.isFinite(parsed) && parsed > 0) limit = parsed;
+      }
+    }
+    if (limit === null) continue;
+    const remaining = c.balance;
     const ratio = remaining / limit;
     out.push({ card: c, remaining, limit, ratio });
   }

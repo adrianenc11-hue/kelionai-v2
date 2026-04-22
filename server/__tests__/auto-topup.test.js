@@ -64,6 +64,7 @@ describe('autoTopup service (PR E2)', () => {
       kind: undefined,
       status: 'low',
       balance: card.remaining,
+      balanceLimit: card.limit,
       balanceDisplay: `${card.remaining.toLocaleString()} / ${card.limit.toLocaleString()} chars`,
       ...card.overrides,
     };
@@ -182,6 +183,48 @@ describe('autoTopup service (PR E2)', () => {
     ]);
     expect(out.triggered).toHaveLength(0);
     expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  test('locale-formatted balanceDisplay (de-DE, fr-FR) still extracts correct limit via balanceLimit', async () => {
+    process.env.STRIPE_SECRET_KEY = 'sk_test_dummy';
+    process.env.OWNER_STRIPE_CUSTOMER_ID = 'cus_X';
+    process.env.OWNER_STRIPE_PAYMENT_METHOD_ID = 'pm_Y';
+    process.env.AUTO_TOPUP_THRESHOLD = '0.2';
+    const svc = load();
+    // de-DE: "500 / 10.000 chars" — period grouping separator would have
+    // been parsed as "limit=10" by the old regex, making ratio=50 and
+    // silently skipping the charge. With structured balanceLimit=10000
+    // we get the correct ratio=0.05 and trigger the charge.
+    const out = await svc.checkAndTrigger([{
+      id: 'elevenlabs',
+      name: 'ElevenLabs',
+      status: 'low',
+      balance: 500,
+      balanceLimit: 10000,
+      balanceDisplay: '500 / 10.000 chars',
+    }]);
+    expect(out.triggered).toHaveLength(1);
+    expect(out.triggered[0].limit).toBe(10000);
+    expect(out.triggered[0].ratio).toBeCloseTo(0.05);
+  });
+
+  test('fallback: balanceDisplay-only cards strip any non-digit separator (forward-compat)', async () => {
+    process.env.STRIPE_SECRET_KEY = 'sk_test_dummy';
+    process.env.OWNER_STRIPE_CUSTOMER_ID = 'cus_X';
+    process.env.OWNER_STRIPE_PAYMENT_METHOD_ID = 'pm_Y';
+    process.env.AUTO_TOPUP_THRESHOLD = '0.2';
+    const svc = load();
+    // No balanceLimit — exercise the fallback parser. A narrow no-break
+    // space (U+202F) is how fr-FR formats large numbers.
+    const out = await svc.checkAndTrigger([{
+      id: 'elevenlabs',
+      name: 'ElevenLabs',
+      status: 'low',
+      balance: 500,
+      balanceDisplay: '500 / 10\u202F000 chars',
+    }]);
+    expect(out.triggered).toHaveLength(1);
+    expect(out.triggered[0].limit).toBe(10000);
   });
 
   test('getStatus mirrors config + history', async () => {

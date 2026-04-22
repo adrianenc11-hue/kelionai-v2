@@ -196,6 +196,7 @@ async function probeElevenLabs() {
     configured: Boolean(apiKey),
     keyFingerprint: maskKey(apiKey),
     balance: null,
+    balanceLimit: null,
     balanceDisplay: '—',
     unit: 'chars',
     status: 'unknown',
@@ -219,6 +220,7 @@ async function probeElevenLabs() {
       const limit = Number(j.character_limit || 0);
       const remaining = Math.max(0, limit - used);
       card.balance = remaining;
+      card.balanceLimit = limit > 0 ? limit : null;
       card.balanceDisplay = limit > 0
         ? `${remaining.toLocaleString()} / ${limit.toLocaleString()} chars`
         : 'unlimited';
