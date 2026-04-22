@@ -176,8 +176,9 @@ function resolveMonitor(kind, query) {
 
     case 'video': {
       if (!q) return null;
-      // If the user gave a full YouTube URL, extract the id; otherwise use
-      // YouTube's "search results embed" which auto-plays the best match.
+      // If the user gave a full YouTube URL, extract the id and embed it.
+      // Many uploaders disable embedding; nothing we can do about individual
+      // refusals, but this path still works for the vast majority of videos.
       const ytMatch = q.match(/(?:v=|youtu\.be\/|shorts\/)([A-Za-z0-9_-]{6,})/);
       if (ytMatch) {
         const id = ytMatch[1];
@@ -188,9 +189,26 @@ function resolveMonitor(kind, query) {
           embedType: 'iframe',
         };
       }
-      // Fallback: YouTube query embed (plays first result).
-      const src = `https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(q)}`;
-      return { kind: 'video', src, title: `Video — ${q}`, embedType: 'iframe' };
+      // If a YouTube playlist id is present (`list=PLxxxx`), embed the
+      // playlist directly — that embed still works (unlike listType=search).
+      const plMatch = q.match(/[?&]list=([A-Za-z0-9_-]{10,})/);
+      if (plMatch) {
+        const listId = plMatch[1];
+        return {
+          kind: 'video',
+          src: `https://www.youtube.com/embed/videoseries?list=${encodeURIComponent(listId)}&autoplay=1`,
+          title: `Playlist`,
+          embedType: 'iframe',
+        };
+      }
+      // Fallback: YouTube deprecated `listType=search&list=…` years ago and
+      // embedding that URL now returns "Error 153 — player configuration
+      // error" (the empty-screen failure the user kept seeing for queries
+      // like "country music playlist"). Render a search card that opens a
+      // new YouTube results tab instead — the user sees real, playable
+      // results and picks one rather than staring at a broken iframe.
+      const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`;
+      return { kind: 'video', src: url, title: `Video — ${q}`, embedType: 'external' };
     }
 
     case 'image': {
