@@ -909,6 +909,11 @@ export default function KelionStage() {
   const [creditsCards, setCreditsCards] = useState([])
   const [creditsLoading, setCreditsLoading] = useState(false)
   const [creditsError, setCreditsError] = useState(null)
+  // PR E2 — auto-topup configuration snapshot returned alongside the
+  // provider cards (threshold, amount, last-run history). Drives the
+  // info strip at the top of the AI tab so the admin can see at a
+  // glance whether auto-refill is armed and when it last fired.
+  const [autoTopupStatus, setAutoTopupStatus] = useState(null)
   // Revenue-split snapshot (50/50 by default between AI provider spend
   // and owner net). Loaded from /api/admin/revenue-split in parallel
   // with the raw provider cards so the overlay can show both without
@@ -1001,7 +1006,10 @@ export default function KelionStage() {
     setLedgerLoading(true)
     const cardsPromise = fetch('/api/admin/credits', { credentials: 'include' })
       .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
-      .then((j) => setCreditsCards(Array.isArray(j.cards) ? j.cards : []))
+      .then((j) => {
+        setCreditsCards(Array.isArray(j.cards) ? j.cards : [])
+        setAutoTopupStatus(j.autoTopup || null)
+      })
       .catch((err) => setCreditsError(err.message || 'Could not load AI credits'))
       .finally(() => setCreditsLoading(false))
     const splitPromise = fetch('/api/admin/revenue-split?days=30', { credentials: 'include' })
@@ -4076,6 +4084,71 @@ export default function KelionStage() {
             })()}
           </div>
 
+          {/* PR E2 — auto-topup info strip. Shows the admin at a glance
+              whether the saved card is wired, what threshold triggers
+              a refill, and when we last ran. Sits above the provider
+              cards so the friendly copy on each card is consistent
+              with the refill policy. */}
+          {!creditsLoading && autoTopupStatus && (() => {
+            const s = autoTopupStatus
+            const armed = s.configured && s.enabled
+            const tone = armed
+              ? { bg: 'rgba(34, 197, 94, 0.08)', border: 'rgba(34, 197, 94, 0.35)', text: '#bbf7d0' }
+              : { bg: 'rgba(245, 158, 11, 0.08)', border: 'rgba(245, 158, 11, 0.35)', text: '#fde68a' }
+            const thresholdPct = Math.round((s.threshold || 0.2) * 100)
+            const lastRunLabel = (() => {
+              const hist = s.history || {}
+              const entries = Object.entries(hist)
+              if (entries.length === 0) return null
+              const latest = entries.reduce((a, b) => ((a[1]?.ts || 0) > (b[1]?.ts || 0) ? a : b))
+              const [id, e] = latest
+              if (!e || !e.ts) return null
+              const when = new Date(e.ts).toLocaleString()
+              if (e.status === 'ok') {
+                return `Ultima reîncărcare: ${id} · ${e.amountEur} ${String(e.currency || 'eur').toUpperCase()} · ${when}`
+              }
+              return `Ultima încercare: ${id} · eșuată (${e.error || 'eroare necunoscută'}) · ${when}`
+            })()
+            return (
+              <div style={{
+                marginBottom: 14, padding: '12px 14px',
+                borderRadius: 12,
+                background: tone.bg,
+                border: `1px solid ${tone.border}`,
+                color: tone.text,
+                fontSize: 13, lineHeight: 1.5,
+              }}>
+                <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                  {armed
+                    ? `Auto-topup armat — sub ${thresholdPct}% cardul tău Stripe e taxat cu ${s.amountEur} ${String(s.currency || 'eur').toUpperCase()}.`
+                    : 'Auto-topup inactiv — leagă un card salvat în Stripe ca să activezi.'}
+                </div>
+                <div style={{ fontSize: 12, opacity: 0.85 }}>
+                  {armed
+                    ? `Verificăm la fiecare deschidere a panoului. Cooldown ${s.cooldownHours || 24}h ca să nu se încarce de două ori. Primim email de confirmare sau eroare.`
+                    : 'Setează OWNER_STRIPE_CUSTOMER_ID + OWNER_STRIPE_PAYMENT_METHOD_ID în Railway, apoi refresh. Cardul îl salvezi o dată în Stripe.'}
+                </div>
+                {lastRunLabel && (
+                  <div style={{ fontSize: 11, opacity: 0.75, marginTop: 6 }}>
+                    {lastRunLabel}
+                  </div>
+                )}
+                {!armed && (
+                  <a
+                    href={s.setupUrl || 'https://dashboard.stripe.com/customers'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: 'inline-block', marginTop: 8,
+                      fontSize: 12, color: '#fde68a',
+                      textDecoration: 'underline',
+                    }}
+                  >Deschide Stripe — Customers →</a>
+                )}
+              </div>
+            )
+          })()}
+
           {!creditsLoading && creditsCards.map((c) => {
             const badge = ({
               ok: { bg: 'rgba(34, 197, 94, 0.12)', border: 'rgba(34, 197, 94, 0.55)', text: '#bbf7d0', label: 'OK' },
@@ -4087,6 +4160,14 @@ export default function KelionStage() {
               unconfigured: { bg: 'rgba(148, 163, 184, 0.12)', border: 'rgba(148, 163, 184, 0.5)', text: '#e2e8f0', label: 'NOT SET' },
               unknown: { bg: 'rgba(148, 163, 184, 0.1)', border: 'rgba(148, 163, 184, 0.4)', text: '#cbd5e1', label: '—' },
             })[c.status] || { bg: 'rgba(148, 163, 184, 0.1)', border: 'rgba(148, 163, 184, 0.4)', text: '#cbd5e1', label: '—' }
+            // PR E2 — friendly headline sits above the raw balance so
+            // admins scanning the grid read "credit suficient" /
+            // "credit aproape terminat" / "cheie lipsă" instead of
+            // parsing `123,456 / 500,000 chars` every time.
+            const friendly = friendlyCreditStatus(c)
+            const headlineColor = ({
+              ok: '#bbf7d0', warn: '#fde68a', error: '#fecaca', muted: '#e2e8f0',
+            })[friendly.tone] || '#ede9fe'
             return (
               <a
                 key={c.id}
@@ -4118,14 +4199,30 @@ export default function KelionStage() {
                     background: badge.bg, color: badge.text, border: `1px solid ${badge.border}`,
                   }}>{badge.label}</span>
                 </div>
-                {c.subtitle && (
-                  <div style={{ fontSize: 12, opacity: 0.55, marginBottom: 8 }}>{c.subtitle}</div>
-                )}
-                <div style={{ fontSize: 14, marginBottom: 4 }}>
-                  {c.balanceDisplay || '—'}
+                <div style={{
+                  fontSize: 14, fontWeight: 600,
+                  color: headlineColor, marginBottom: friendly.sub ? 2 : 6,
+                }}>
+                  {friendly.headline}
                 </div>
-                {c.message && (
-                  <div style={{ fontSize: 11, opacity: 0.6, marginTop: 4 }}>
+                {friendly.sub && (
+                  <div style={{ fontSize: 11, opacity: 0.7, marginBottom: 6 }}>
+                    {friendly.sub}
+                  </div>
+                )}
+                {c.subtitle && (
+                  <div style={{ fontSize: 11, opacity: 0.5, marginBottom: 6 }}>{c.subtitle}</div>
+                )}
+                {/* Raw numbers kept small so the admin can cross-check
+                    against the provider dashboard without drowning the
+                    friendly headline. */}
+                {c.balanceDisplay && c.balanceDisplay !== '—' && (
+                  <div style={{ fontSize: 11, opacity: 0.6 }}>
+                    {c.balanceDisplay}
+                  </div>
+                )}
+                {c.message && c.status !== 'ok' && (
+                  <div style={{ fontSize: 10, opacity: 0.55, marginTop: 4 }}>
                     {c.message}
                   </div>
                 )}
@@ -4668,6 +4765,51 @@ function AdminTabBar({ active, onSelect }) {
       })}
     </div>
   );
+}
+
+// PR E2 — translate raw provider card state into human-friendly copy
+// the admin actually wants to read ("credit suficient ✓" / "credit
+// scăzut — reîncarcă aici →" / "cheie lipsă"). The technical message
+// and balance string stay as a small secondary line for when the admin
+// needs to debug, but the big headline is always in plain Romanian.
+//
+// Adrian 2026-04-20: "poti schimba stilul de comunicare, la ai ex
+// credit suficient, atentie la ai .. x.. trebuie credit".
+function friendlyCreditStatus(card) {
+  if (!card) return { headline: '—', tone: 'muted', sub: null };
+  const isRevenue = card.kind === 'revenue';
+  switch (card.status) {
+    case 'ok':
+      return {
+        headline: isRevenue ? 'Venit — în cont' : 'Credit suficient ✓',
+        tone: 'ok',
+        sub: isRevenue ? 'Banii așteaptă payout-ul automat.' : null,
+      };
+    case 'low':
+      return {
+        headline: 'Credit aproape terminat — reîncarcă aici →',
+        tone: 'warn',
+        sub: 'Atingi cardul ca să deschizi pagina de top-up a providerului.',
+      };
+    case 'error':
+      return {
+        headline: 'Problemă cu cheia — deschide providerul →',
+        tone: 'error',
+        sub: 'Cheia nu răspunde; verifică-o sau rotește-o din dashboard-ul providerului.',
+      };
+    case 'unconfigured':
+      return {
+        headline: 'Opțional — nesetat',
+        tone: 'muted',
+        sub: 'Providerul nu-i obligatoriu; adaugă cheia dacă vrei să-l activezi.',
+      };
+    default:
+      return {
+        headline: card.balanceDisplay || 'Stare necunoscută',
+        tone: 'muted',
+        sub: null,
+      };
+  }
 }
 
 function MenuItem({ children, onClick, disabled }) {
