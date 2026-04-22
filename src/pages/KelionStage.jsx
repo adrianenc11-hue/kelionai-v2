@@ -1818,6 +1818,10 @@ export default function KelionStage() {
   // cross-cutting refactor of both transport libs and out of scope.
   const autoFallbackTriedRef = useRef(false)
   const pendingFallbackRef = useRef(false)
+  // F4 — snapshot of the outgoing provider's transcript at the moment we
+  // flip. Effect 2 passes it to the new hook's start({ priorTurns }) so
+  // Kelion picks up the conversation instead of re-greeting.
+  const pendingFallbackTurnsRef = useRef([])
   useEffect(() => {
     if (status === 'listening') autoFallbackTriedRef.current = false
   }, [status])
@@ -1842,10 +1846,30 @@ export default function KelionStage() {
     }
     autoFallbackTriedRef.current = true
     pendingFallbackRef.current = true
+    // F4 — snapshot the outgoing provider's accumulated turns BEFORE we
+    // flip. After setLiveProvider runs, the destructured `turns` rebinds
+    // to the (empty) state of the incoming hook. We keep only finalised
+    // turns with real text, strip anything else so the persona block on
+    // the server stays compact, and cap to the last 20 so long sessions
+    // don't blow the instruction budget.
+    try {
+      const snapshot = Array.isArray(turns)
+        ? turns
+            .filter((t) => t && typeof t.text === 'string' && t.text.trim().length > 0)
+            .slice(-20)
+            .map((t) => ({
+              role: t.role === 'assistant' ? 'assistant' : 'user',
+              text: t.text,
+            }))
+        : []
+      pendingFallbackTurnsRef.current = snapshot
+    } catch (_) {
+      pendingFallbackTurnsRef.current = []
+    }
     const nextProvider = liveProvider === 'openai' ? 'gemini' : 'openai'
-    console.warn('[kelionStage] live provider', liveProvider, 'terminal — switching to', nextProvider, '·', msg)
+    console.warn('[kelionStage] live provider', liveProvider, 'terminal — switching to', nextProvider, '·', msg, '· carrying', pendingFallbackTurnsRef.current.length, 'turns')
     setLiveProvider(nextProvider)
-  }, [status, error, liveProvider])
+  }, [status, error, liveProvider, turns])
   useEffect(() => {
     if (!pendingFallbackRef.current) return
     pendingFallbackRef.current = false
@@ -1857,7 +1881,9 @@ export default function KelionStage() {
     // on #118). Keep this block below that effect.
     try {
       const active = liveProvider === 'openai' ? openaiHookRef.current : geminiHookRef.current
-      active.start()
+      const priorTurns = pendingFallbackTurnsRef.current
+      pendingFallbackTurnsRef.current = []
+      active.start({ priorTurns })
     } catch (e) {
       console.warn('[kelionStage] auto-fallback start() threw', e)
     }
