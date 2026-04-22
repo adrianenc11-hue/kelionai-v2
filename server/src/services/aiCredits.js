@@ -156,9 +156,10 @@ async function probeGroq() {
   if (!apiKey) {
     // `unconfigured` (not `error`) because Groq is an opt-in coding helper;
     // an admin leaving the key unset is a valid choice, not a misconfiguration
-    // we should email-alert about every 6h. Admin UI still renders this as a
-    // visible "not set up" card — see admin.js which treats 'error' and
-    // 'unconfigured' the same visually but skips alerting on 'unconfigured'.
+    // we should email-alert about every 6h. Admin UI still renders a visible
+    // "NOT SET" card (slate / muted styling — see KelionStage.jsx creditsCards
+    // badge map), distinct from the red `error` badge, so the admin sees the
+    // state at a glance without triggering the email alert in admin.js.
     card.status = 'unconfigured';
     card.message = 'GROQ_API_KEY not set — solve_problem / code_review / explain_code will return a graceful "not configured" response until you add the key in Railway.';
     return card;
