@@ -221,7 +221,13 @@ router.post('/execute', async (req, res) => {
     return res.status(200).json({ ok: false, unavailable: true, error: `Tool "${name}" is not available on this build.` });
   }
   try {
-    const result = await executeRealTool(name, args);
+    // PR C adds user-intern tools (`get_my_credits`, `get_my_usage`,
+    // `get_my_profile`) that need the caller identity. They return a
+    // "sign in first" message when the ctx is absent, so this peek
+    // never fails the request — it only enriches it.
+    const user = await peekUser(req);
+    const ctx = user ? { user } : undefined;
+    const result = await executeRealTool(name, args, ctx);
     if (result == null) {
       return res.status(200).json({ ok: false, unavailable: true, error: `Tool "${name}" has no executor.` });
     }

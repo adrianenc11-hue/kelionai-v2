@@ -75,6 +75,14 @@ const EXPECTED_TOOL_NAMES = [
   'read_docx',
   'ocr_image',
   'ocr_passport',
+  // PR C — regex tester + sandboxed code runner + user-intern tools.
+  // run_code needs E2B_API_KEY; get_my_* need a signed-in user passed
+  // through ctx. All degrade gracefully when the requirement is absent.
+  'run_regex',
+  'run_code',
+  'get_my_credits',
+  'get_my_usage',
+  'get_my_profile',
 ];
 
 describe('Kelion tool catalog', () => {

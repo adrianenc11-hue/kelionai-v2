@@ -36,5 +36,8 @@
       "/node_modules/",
       "__tests__/helpers/"
     ]
+  },
+  "optionalDependencies": {
+    "@e2b/code-interpreter": "^1.5.1"
   }
 }
