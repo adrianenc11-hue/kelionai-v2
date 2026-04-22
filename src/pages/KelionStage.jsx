@@ -1036,15 +1036,25 @@ export default function KelionStage() {
   const [visitorsOpen, setVisitorsOpen] = useState(false)
   const [visitorsRows, setVisitorsRows] = useState([])
   const [visitorsStats, setVisitorsStats] = useState(null)
+  // PR E4 — advanced analytics: 30-day chart, country list, device mix,
+  // login→topup→usage funnel. Fetched alongside the raw rows.
+  const [visitorsAnalytics, setVisitorsAnalytics] = useState(null)
   const [visitorsLoading, setVisitorsLoading] = useState(false)
   const [visitorsError, setVisitorsError] = useState(null)
   const refreshVisitors = useCallback(async () => {
     try {
-      const r = await fetch('/api/admin/visitors?limit=200&windowHours=24', { credentials: 'include' })
-      if (!r.ok) throw new Error(`HTTP ${r.status}`)
-      const j = await r.json()
+      const [rRaw, rStats] = await Promise.all([
+        fetch('/api/admin/visitors?limit=200&windowHours=24', { credentials: 'include' }),
+        fetch('/api/admin/visitors/analytics?days=30', { credentials: 'include' }),
+      ])
+      if (!rRaw.ok) throw new Error(`HTTP ${rRaw.status}`)
+      const j = await rRaw.json()
       setVisitorsRows(Array.isArray(j.visits) ? j.visits : [])
       setVisitorsStats(j.stats || null)
+      if (rStats.ok) {
+        const s = await rStats.json()
+        setVisitorsAnalytics(s)
+      }
       setVisitorsError(null)
     } catch (err) {
       setVisitorsError(err.message || 'Could not load visitors')
@@ -4358,54 +4368,11 @@ export default function KelionStage() {
           </div>
           <AdminTabBar active="visitors" onSelect={switchAdminTab} />
 
-          {/* Stats header — last 24h summary. */}
-          {visitorsStats && (
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3, 1fr)',
-              gap: 8,
-              marginBottom: 16,
-            }}>
-              <div style={{
-                padding: '10px 12px', borderRadius: 10,
-                background: 'rgba(167, 139, 250, 0.06)',
-                border: '1px solid rgba(167, 139, 250, 0.2)',
-              }}>
-                <div style={{ fontSize: 10, opacity: 0.6, letterSpacing: '0.1em' }}>
-                  VISITS ({visitorsStats.windowHours}H)
-                </div>
-                <div style={{ fontSize: 22, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
-                  {visitorsStats.totalVisits}
-                </div>
-              </div>
-              <div style={{
-                padding: '10px 12px', borderRadius: 10,
-                background: 'rgba(167, 139, 250, 0.06)',
-                border: '1px solid rgba(167, 139, 250, 0.2)',
-              }}>
-                <div style={{ fontSize: 10, opacity: 0.6, letterSpacing: '0.1em' }}>
-                  UNIQUE IPS
-                </div>
-                <div style={{ fontSize: 22, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
-                  {visitorsStats.uniqueIps}
-                </div>
-              </div>
-              <div style={{
-                padding: '10px 12px', borderRadius: 10,
-                background: 'rgba(167, 139, 250, 0.06)',
-                border: '1px solid rgba(167, 139, 250, 0.2)',
-              }}>
-                <div style={{ fontSize: 10, opacity: 0.6, letterSpacing: '0.1em' }}>
-                  TOP COUNTRIES
-                </div>
-                <div style={{ fontSize: 13, marginTop: 4 }}>
-                  {Array.isArray(visitorsStats.topCountries) && visitorsStats.topCountries.length > 0
-                    ? visitorsStats.topCountries.map((c) => `${c.country} (${c.n})`).join(', ')
-                    : <span style={{ opacity: 0.55 }}>—</span>}
-                </div>
-              </div>
-            </div>
-          )}
+          {/* PR E4 — advanced analytics block (replaces the old 3-card
+              24h header). Chart + country list + device mix + funnel.
+              Renders only when the new endpoint returned data; the old
+              rows table below is unchanged. */}
+          <VisitorsAnalyticsPanel data={visitorsAnalytics} />
 
           {visitorsLoading && (
             <div style={{ opacity: 0.55, fontSize: 14 }}>Loading visitors…</div>
@@ -4822,6 +4789,190 @@ function AdminTabBar({ active, onSelect }) {
       })}
     </div>
   );
+}
+
+// PR E4 — Visitors analytics. Replaces the old "super rudimentar"
+// top-5 country tally with a 30-day chart, full country list, device
+// mix, and login→topup→usage funnel. Renders whatever fields the
+// server returned; missing pieces degrade silently instead of
+// blanking the whole block.
+function flagEmoji(code) {
+  // Two-letter ISO country code → Unicode flag emoji. We don't ship a
+  // country-code table just to render flags: the emoji is assembled
+  // from the two regional-indicator code points.
+  if (!code || typeof code !== 'string' || code.length < 2) return ''
+  const cc = code.trim().toUpperCase()
+  if (!/^[A-Z]{2}$/.test(cc)) return ''
+  const base = 0x1f1e6 - 65
+  return String.fromCodePoint(base + cc.charCodeAt(0), base + cc.charCodeAt(1))
+}
+
+function VisitorsAnalyticsPanel({ data }) {
+  if (!data) return null
+  const totals = data.totals || { visits: 0, signedInVisits: 0, uniqueUsers: 0 }
+  const byCountry = Array.isArray(data.byCountry) ? data.byCountry : []
+  const byDevice = data.byDevice || {}
+  const byDay = Array.isArray(data.byDay) ? data.byDay : []
+  const funnel = data.funnel || {}
+
+  // Sparkline path for the 30-day visitors chart. Inline SVG keeps us
+  // from pulling a charting dep for one line + a filled area.
+  const w = 600, h = 90, pad = 4
+  const maxDay = Math.max(1, ...byDay.map((d) => d.count))
+  const pts = byDay.map((d, i) => {
+    const x = pad + (byDay.length > 1 ? (i / (byDay.length - 1)) * (w - 2 * pad) : w / 2)
+    const y = h - pad - ((d.count / maxDay) * (h - 2 * pad))
+    return [x, y]
+  })
+  const linePath = pts.map((p, i) => (i === 0 ? `M${p[0]},${p[1]}` : `L${p[0]},${p[1]}`)).join(' ')
+  const areaPath = pts.length
+    ? `${linePath} L${pts[pts.length - 1][0]},${h - pad} L${pts[0][0]},${h - pad} Z`
+    : ''
+
+  const deviceOrder = [
+    ['desktop', 'Desktop', '#818cf8'],
+    ['mobile', 'Mobil', '#f472b6'],
+    ['tablet', 'Tabletă', '#34d399'],
+    ['bot', 'Bot', '#fbbf24'],
+    ['unknown', 'Necunoscut', '#64748b'],
+  ]
+  const deviceTotal = deviceOrder.reduce((a, [k]) => a + (byDevice[k] || 0), 0) || 1
+
+  const funnelSteps = [
+    { label: 'Vizite', count: funnel.visits || 0 },
+    { label: 'Vizite cu cont logat', count: funnel.signedInVisits || 0 },
+    { label: 'Utilizatori unici logați', count: funnel.uniqueSignedInUsers || 0 },
+    { label: 'Au făcut top-up', count: funnel.usersWithTopup || 0 },
+    { label: 'Au consumat credite', count: funnel.usersWithConsumption || 0 },
+  ]
+  const funnelMax = Math.max(1, ...funnelSteps.map((s) => s.count))
+
+  const maxCountry = byCountry[0] ? byCountry[0].count : 1
+  const topCountries = byCountry.slice(0, 10)
+
+  const card = {
+    padding: '12px 14px', borderRadius: 10,
+    background: 'rgba(167, 139, 250, 0.06)',
+    border: '1px solid rgba(167, 139, 250, 0.2)',
+  }
+  const label = { fontSize: 10, opacity: 0.6, letterSpacing: '0.1em' }
+  const value = { fontSize: 22, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
+      {/* KPI row — last 30 days totals. */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+        <div style={card}>
+          <div style={label}>VIZITE 30Z</div>
+          <div style={value}>{totals.visits}</div>
+        </div>
+        <div style={card}>
+          <div style={label}>LOGAȚI</div>
+          <div style={value}>{totals.uniqueUsers}</div>
+        </div>
+        <div style={card}>
+          <div style={label}>% LOGAT</div>
+          <div style={value}>
+            {totals.visits > 0 ? Math.round((totals.signedInVisits * 100) / totals.visits) : 0}%
+          </div>
+        </div>
+      </div>
+
+      {/* 30-day chart */}
+      <div style={card}>
+        <div style={{ ...label, marginBottom: 4 }}>TRAFIC / ZI · ULTIMELE 30 ZILE</div>
+        <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ width: '100%', height: 90 }}>
+          {areaPath && <path d={areaPath} fill="rgba(167, 139, 250, 0.25)" />}
+          {linePath && <path d={linePath} fill="none" stroke="#a78bfa" strokeWidth="1.5" />}
+        </svg>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, opacity: 0.5 }}>
+          <span>{byDay[0] ? byDay[0].day : ''}</span>
+          <span>azi</span>
+        </div>
+      </div>
+
+      {/* Geografie — full country list (replaces old top-5) */}
+      <div style={card}>
+        <div style={{ ...label, marginBottom: 6 }}>
+          GEOGRAFIE · {byCountry.length} țări
+        </div>
+        {topCountries.length === 0 ? (
+          <div style={{ fontSize: 12, opacity: 0.55 }}>
+            Niciun country header primit. Pe Railway nu e CDN geo-header
+            (cf-ipcountry); vezi middleware/visitorLog.js.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {topCountries.map((c) => (
+              <div key={c.country} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                <span style={{ width: 24, fontSize: 16 }}>{flagEmoji(c.country)}</span>
+                <span style={{ width: 40, fontFamily: 'ui-monospace, monospace' }}>{c.country}</span>
+                <div style={{ flex: 1, height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 3 }}>
+                  <div style={{
+                    height: '100%', width: `${(c.count / maxCountry) * 100}%`,
+                    background: '#a78bfa', borderRadius: 3,
+                  }} />
+                </div>
+                <span style={{ width: 40, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                  {c.count}
+                </span>
+              </div>
+            ))}
+            {byCountry.length > topCountries.length && (
+              <div style={{ fontSize: 11, opacity: 0.5, marginTop: 4 }}>
+                + încă {byCountry.length - topCountries.length} țări
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Device mix */}
+      <div style={card}>
+        <div style={{ ...label, marginBottom: 6 }}>DISPOZITIVE</div>
+        <div style={{ display: 'flex', height: 10, borderRadius: 5, overflow: 'hidden', background: 'rgba(255,255,255,0.05)' }}>
+          {deviceOrder.map(([k, , color]) => {
+            const n = byDevice[k] || 0
+            if (!n) return null
+            return (
+              <div key={k} style={{ width: `${(n * 100) / deviceTotal}%`, background: color }} />
+            )
+          })}
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 8, fontSize: 12 }}>
+          {deviceOrder.map(([k, lbl, color]) => (
+            <span key={k} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ width: 8, height: 8, background: color, borderRadius: 2, display: 'inline-block' }} />
+              {lbl}: <b style={{ fontVariantNumeric: 'tabular-nums' }}>{byDevice[k] || 0}</b>
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Funnel */}
+      <div style={card}>
+        <div style={{ ...label, marginBottom: 6 }}>CONVERSIE (VIZITĂ → CLIENT)</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {funnelSteps.map((s) => (
+            <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+              <span style={{ flex: '0 0 180px', opacity: 0.8 }}>{s.label}</span>
+              <div style={{ flex: 1, height: 8, background: 'rgba(255,255,255,0.05)', borderRadius: 4 }}>
+                <div style={{
+                  height: '100%',
+                  width: `${(s.count / funnelMax) * 100}%`,
+                  background: 'linear-gradient(90deg,#a78bfa,#f472b6)',
+                  borderRadius: 4,
+                }} />
+              </div>
+              <span style={{ width: 48, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                {s.count}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
 }
 
 // PR E3 — Payouts panel. Live Stripe balance + destination + recent

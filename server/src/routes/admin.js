@@ -21,6 +21,7 @@ const { sendEmailAlert } = require('../services/emailAlerts');
 const { bootstrapAdmin } = require('../services/adminBootstrap');
 const autoTopup = require('../services/autoTopup');
 const payoutsService = require('../services/payouts');
+const { getVisitorAnalytics } = require('../services/visitorAnalytics');
 
 const router = Router();
 
@@ -352,6 +353,24 @@ router.get('/visitors', async (req, res) => {
   } catch (err) {
     console.error('[admin/visitors] Error:', err && err.message);
     res.status(500).json({ error: 'Failed to fetch visitors' });
+  }
+});
+
+/**
+ * GET /api/admin/visitors/analytics?days=30
+ * Richer aggregate over the visitor_events table + credit ledger —
+ * replaces the rudimentary top-5 country tally on the Visitors tab
+ * with a proper breakdown (country list, device mix, 30-day chart,
+ * login→topup→usage funnel). Read-only, admin-only.
+ */
+router.get('/visitors/analytics', async (req, res) => {
+  try {
+    const days = Math.min(365, Math.max(1, Number(req.query.days) || 30));
+    const data = await getVisitorAnalytics({ days });
+    res.json(data);
+  } catch (err) {
+    console.error('[admin/visitors/analytics] Error:', err && err.message);
+    res.status(500).json({ error: 'Failed to fetch visitor analytics' });
   }
 });
 
