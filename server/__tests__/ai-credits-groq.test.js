@@ -5,7 +5,9 @@
  *
  * We don't want to hit the live Groq API in CI, so:
  *   - When GROQ_API_KEY is missing, the card must be `configured:false`,
- *     status:'error', and carry a helpful message — no network call.
+ *     status:'unconfigured' (NOT 'error' — Groq is opt-in, and 'error'
+ *     triggers admin email alerts in /api/admin/credits), and carry a
+ *     helpful message — no network call.
  *   - getAllCredits() must surface Groq between OpenAI and ElevenLabs so
  *     the admin dashboard renders it with the other AI providers.
  */
@@ -20,12 +22,15 @@ describe('probeGroq — unavailable path (GROQ_API_KEY missing)', () => {
   beforeEach(() => { delete process.env.GROQ_API_KEY; });
   afterAll(() => { if (prevKey !== undefined) process.env.GROQ_API_KEY = prevKey; });
 
-  test('returns a well-formed error card with the reload link intact', async () => {
+  test('returns a well-formed unconfigured card with the reload link intact', async () => {
     const card = await probeGroq();
     expect(card.id).toBe('groq');
     expect(card.name).toBe('Groq');
     expect(card.configured).toBe(false);
-    expect(card.status).toBe('error');
+    // `unconfigured` (not `error`) so the admin-credits route at
+    // server/src/routes/admin.js doesn't email-alert every 6h for a
+    // provider the admin intentionally left opt-in.
+    expect(card.status).toBe('unconfigured');
     expect(card.message).toMatch(/GROQ_API_KEY/);
     // Admin UI turns the whole card into an <a href=topUpUrl> — this
     // has to point at the Groq key console so admins can self-serve a
