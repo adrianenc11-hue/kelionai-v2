@@ -1842,6 +1842,402 @@ async function toolGetMyProfile(_args, ctx) {
 }
 
 // ──────────────────────────────────────────────────────────────────
+// PR D — communications + automations + package info
+//
+// These tools are ADDITIVE only. None of them modify existing tools or the
+// frozen chat module. Keys are all opt-in: when the relevant env var is
+// missing the tool returns `{ ok:false, unavailable:true }` with a human
+// error, instead of crashing, so the catalog can advertise the tool
+// unconditionally.
+
+// Shared helper for "sign-in first" style responses (mirrors PR C ctx flow).
+function needConfig(msg) {
+  return { ok: false, unavailable: true, error: msg };
+}
+
+function isRfc5322ish(addr) {
+  if (typeof addr !== 'string') return false;
+  if (addr.length > 320) return false;
+  return /^[^\s@<>"']+@[^\s@<>"']+\.[^\s@<>"']+$/.test(addr.trim());
+}
+
+async function toolSendEmail(args) {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) {
+    return needConfig('Email sending is not configured. Set RESEND_API_KEY (https://resend.com/api-keys) to enable send_email.');
+  }
+  const defaultFrom = process.env.RESEND_FROM || process.env.EMAIL_FROM || '';
+  const from = String(args?.from || defaultFrom || '').trim();
+  if (!from) {
+    return needConfig('No sender address. Set RESEND_FROM (a verified Resend domain address) or pass the `from` argument.');
+  }
+  if (!isRfc5322ish(from)) return { ok: false, error: 'invalid "from" address' };
+  const rawTo = args?.to;
+  const toList = Array.isArray(rawTo) ? rawTo : (rawTo ? [rawTo] : []);
+  const to = toList.map((x) => String(x || '').trim()).filter(Boolean);
+  if (!to.length) return { ok: false, error: 'missing recipient (to)' };
+  if (to.length > 50) return { ok: false, error: 'too many recipients (max 50)' };
+  for (const addr of to) if (!isRfc5322ish(addr)) return { ok: false, error: `invalid recipient: ${addr}` };
+  const subject = String(args?.subject || '').slice(0, 300);
+  if (!subject) return { ok: false, error: 'missing subject' };
+  const text = args?.text != null ? String(args.text) : '';
+  const html = args?.html != null ? String(args.html) : '';
+  if (!text && !html) return { ok: false, error: 'missing body (text or html)' };
+  if (text.length > 200_000 || html.length > 500_000) {
+    return { ok: false, error: 'body too large (text ≤ 200 KB, html ≤ 500 KB)' };
+  }
+  const body = { from, to, subject };
+  if (text) body.text = text;
+  if (html) body.html = html;
+  if (Array.isArray(args?.cc) && args.cc.length) body.cc = args.cc.slice(0, 20);
+  if (Array.isArray(args?.bcc) && args.bcc.length) body.bcc = args.bcc.slice(0, 20);
+  if (args?.reply_to && isRfc5322ish(String(args.reply_to))) body.reply_to = String(args.reply_to);
+  try {
+    const r = await fetchWithTimeout('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }, 10_000);
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      return {
+        ok: false,
+        status: r.status,
+        error: (j && (j.message || j.error || j.name)) || `Resend HTTP ${r.status}`,
+      };
+    }
+    return { ok: true, id: j.id || null, provider: 'resend', to, subject };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+}
+
+function e164ish(s) {
+  return typeof s === 'string' && /^\+?[1-9]\d{6,14}$/.test(s.replace(/[\s\-()]/g, ''));
+}
+
+async function toolSendSms(args) {
+  const sid   = process.env.TWILIO_ACCOUNT_SID;
+  const token = process.env.TWILIO_AUTH_TOKEN;
+  const from  = (args?.from || process.env.TWILIO_FROM || '').toString().trim();
+  if (!sid || !token) {
+    return needConfig('SMS sending is not configured. Set TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN (https://www.twilio.com/console) to enable send_sms.');
+  }
+  if (!from) {
+    return needConfig('No Twilio sender number. Set TWILIO_FROM (E.164, e.g. +14155550123) or pass `from`.');
+  }
+  if (!e164ish(from)) return { ok: false, error: 'invalid "from" number (must be E.164, e.g. +14155550123)' };
+  const rawTo = String(args?.to || '').trim();
+  if (!rawTo) return { ok: false, error: 'missing recipient (to)' };
+  if (!e164ish(rawTo)) return { ok: false, error: 'invalid "to" number (must be E.164)' };
+  const message = String(args?.message || args?.body || '').trim();
+  if (!message) return { ok: false, error: 'missing message' };
+  if (message.length > 1600) return { ok: false, error: 'message too long (max 1600 chars — 10 SMS segments)' };
+  const auth = Buffer.from(`${sid}:${token}`).toString('base64');
+  const form = new URLSearchParams({ From: from, To: rawTo, Body: message });
+  try {
+    const r = await fetchWithTimeout(
+      `https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(sid)}/Messages.json`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Basic ${auth}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: form.toString(),
+      },
+      10_000,
+    );
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      return {
+        ok: false,
+        status: r.status,
+        error: (j && (j.message || j.code)) || `Twilio HTTP ${r.status}`,
+      };
+    }
+    return {
+      ok: true,
+      sid: j.sid || null,
+      status: j.status || 'queued',
+      provider: 'twilio',
+      to: rawTo,
+      from,
+      segments: j.num_segments != null ? Number(j.num_segments) : undefined,
+    };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+}
+
+// ── create_calendar_ics ───────────────────────────────────────────
+// Build a minimal but valid RFC 5545 VCALENDAR/VEVENT. No external dep.
+// Returns the .ics text and a base64 data URL the caller can surface as
+// a download link. This is not a scheduler — callers that want a
+// "real" calendar entry can feed the output to a mailer (via
+// send_email) or an MDM system.
+
+function icsEscape(s) {
+  return String(s || '')
+    .replace(/\\/g, '\\\\')
+    .replace(/\n/g, '\\n')
+    .replace(/,/g, '\\,')
+    .replace(/;/g, '\\;');
+}
+
+function icsFmtDate(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.valueOf())) return null;
+  const pad = (n) => String(n).padStart(2, '0');
+  return (
+    d.getUTCFullYear() +
+    pad(d.getUTCMonth() + 1) +
+    pad(d.getUTCDate()) +
+    'T' +
+    pad(d.getUTCHours()) +
+    pad(d.getUTCMinutes()) +
+    pad(d.getUTCSeconds()) +
+    'Z'
+  );
+}
+
+function toolCreateCalendarIcs(args) {
+  const title = String(args?.title || '').trim();
+  if (!title) return { ok: false, error: 'missing title' };
+  if (title.length > 200) return { ok: false, error: 'title too long (max 200 chars)' };
+  const startRaw = String(args?.start || '').trim();
+  const endRaw   = String(args?.end   || '').trim();
+  const dtStart = icsFmtDate(startRaw);
+  if (!dtStart) return { ok: false, error: 'invalid `start` (expected ISO 8601)' };
+  let dtEnd = icsFmtDate(endRaw);
+  if (!dtEnd) {
+    const fallback = new Date(new Date(startRaw).valueOf() + 60 * 60 * 1000);
+    dtEnd = icsFmtDate(fallback.toISOString());
+  }
+  if (!dtEnd) return { ok: false, error: 'invalid `end` (expected ISO 8601)' };
+  const description = String(args?.description || '').slice(0, 2000);
+  const location    = String(args?.location    || '').slice(0, 200);
+  const attendees   = Array.isArray(args?.attendees) ? args.attendees.slice(0, 50) : [];
+  const validAttendees = [];
+  for (const a of attendees) {
+    const email = String(a && a.email != null ? a.email : a).trim();
+    if (!isRfc5322ish(email)) continue;
+    const name = a && a.name ? String(a.name).slice(0, 100) : null;
+    validAttendees.push({ email, name });
+  }
+  const uid = `${Date.now()}-${Math.random().toString(16).slice(2, 10)}@kelion.local`;
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Kelion//EN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'BEGIN:VEVENT',
+    `UID:${uid}`,
+    `DTSTAMP:${icsFmtDate(new Date().toISOString())}`,
+    `DTSTART:${dtStart}`,
+    `DTEND:${dtEnd}`,
+    `SUMMARY:${icsEscape(title)}`,
+  ];
+  if (description) lines.push(`DESCRIPTION:${icsEscape(description)}`);
+  if (location)    lines.push(`LOCATION:${icsEscape(location)}`);
+  for (const at of validAttendees) {
+    const cn = at.name ? `CN=${icsEscape(at.name)};` : '';
+    lines.push(`ATTENDEE;${cn}RSVP=TRUE:mailto:${at.email}`);
+  }
+  lines.push('END:VEVENT', 'END:VCALENDAR', '');
+  const ics = lines.join('\r\n');
+  const base64 = Buffer.from(ics, 'utf8').toString('base64');
+  return {
+    ok: true,
+    uid,
+    start: dtStart,
+    end: dtEnd,
+    ics,
+    dataUrl: `data:text/calendar;charset=utf-8;base64,${base64}`,
+    attendees: validAttendees,
+  };
+}
+
+// ── zapier_trigger ────────────────────────────────────────────────
+// Generic webhook POST restricted to the official Zapier ingress host
+// so the tool can't be repurposed as a general SSRF sink. Users paste
+// their Catch Hook URL from Zapier and we POST the payload as JSON.
+
+async function toolZapierTrigger(args) {
+  const url = String(args?.webhook_url || args?.url || '').trim();
+  if (!url) return { ok: false, error: 'missing webhook_url' };
+  if (!/^https:\/\/hooks\.zapier\.com\/hooks\/catch\//i.test(url)) {
+    return { ok: false, error: 'webhook_url must be a Zapier Catch Hook (https://hooks.zapier.com/hooks/catch/…)' };
+  }
+  const payload = args?.payload && typeof args.payload === 'object' ? args.payload : {};
+  let body;
+  try { body = JSON.stringify(payload); }
+  catch { return { ok: false, error: 'payload is not JSON-serialisable' }; }
+  if (body.length > 100_000) return { ok: false, error: 'payload too large (max 100 KB serialised)' };
+  try {
+    const r = await fetchWithTimeout(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    }, 10_000);
+    const txt = await r.text().catch(() => '');
+    let parsed = null;
+    try { parsed = txt ? JSON.parse(txt) : null; } catch { /* leave as text */ }
+    if (!r.ok) {
+      return { ok: false, status: r.status, error: (parsed && (parsed.message || parsed.status)) || `Zapier HTTP ${r.status}` };
+    }
+    return {
+      ok: true,
+      status: r.status,
+      zapierStatus: parsed ? (parsed.status || null) : null,
+      zapierId:     parsed ? (parsed.id || parsed.request_id || null) : null,
+      response:     parsed || (txt ? txt.slice(0, 500) : null),
+    };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+}
+
+// ── github_repo_info / npm_package_info / pypi_package_info ───────
+// All three hit public APIs (no key required). GITHUB_TOKEN, if set,
+// simply raises the unauth rate limit from 60→5 000 req/h.
+
+function validSlugRepo(s) {
+  return typeof s === 'string' && /^[a-zA-Z0-9._-]{1,100}\/[a-zA-Z0-9._-]{1,100}$/.test(s);
+}
+
+async function toolGithubRepoInfo(args) {
+  let slug = String(args?.repo || args?.slug || '').trim();
+  if (!slug && args?.owner && args?.name) slug = `${args.owner}/${args.name}`;
+  slug = slug.replace(/^https?:\/\/github\.com\//i, '').replace(/\.git$/i, '').replace(/\/$/, '');
+  if (!validSlugRepo(slug)) return { ok: false, error: 'invalid repo slug (expected owner/name)' };
+  const headers = { Accept: 'application/vnd.github+json', 'User-Agent': 'kelion-ai-tools' };
+  if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+  try {
+    const r = await fetchWithTimeout(`https://api.github.com/repos/${slug}`, { headers });
+    if (r.status === 404) return { ok: false, status: 404, error: 'repo not found' };
+    if (!r.ok) return { ok: false, status: r.status, error: `GitHub HTTP ${r.status}` };
+    const j = await r.json();
+    return {
+      ok: true,
+      fullName:   j.full_name,
+      description: j.description || null,
+      homepage:   j.homepage || null,
+      url:        j.html_url,
+      stars:      j.stargazers_count,
+      forks:      j.forks_count,
+      watchers:   j.subscribers_count,
+      openIssues: j.open_issues_count,
+      language:   j.language || null,
+      license:    j.license ? (j.license.spdx_id || j.license.name || null) : null,
+      topics:     Array.isArray(j.topics) ? j.topics.slice(0, 20) : [],
+      archived:   !!j.archived,
+      fork:       !!j.fork,
+      defaultBranch: j.default_branch,
+      createdAt:  j.created_at,
+      pushedAt:   j.pushed_at,
+      updatedAt:  j.updated_at,
+    };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+}
+
+function validSlugNpm(s) {
+  if (typeof s !== 'string' || !s) return false;
+  if (s.length > 214) return false;
+  if (s.startsWith('@')) return /^@[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._-]*$/i.test(s);
+  return /^[a-z0-9][a-z0-9._-]*$/i.test(s);
+}
+
+async function toolNpmPackageInfo(args) {
+  const name = String(args?.name || args?.package || '').trim();
+  if (!validSlugNpm(name)) return { ok: false, error: 'invalid npm package name' };
+  const encoded = name.startsWith('@')
+    ? `@${encodeURIComponent(name.slice(1).replace('/', '__SLASH__')).replace('__SLASH__', '/')}`
+    : encodeURIComponent(name);
+  try {
+    const r = await fetchWithTimeout(`https://registry.npmjs.org/${encoded}`, {
+      headers: { Accept: 'application/json', 'User-Agent': 'kelion-ai-tools' },
+    });
+    if (r.status === 404) return { ok: false, status: 404, error: 'package not found' };
+    if (!r.ok) return { ok: false, status: r.status, error: `npm HTTP ${r.status}` };
+    const j = await r.json();
+    const latest = (j['dist-tags'] && j['dist-tags'].latest) || null;
+    const pkg = latest && j.versions ? j.versions[latest] : null;
+    let weekly = null;
+    try {
+      const d = await fetchWithTimeout(
+        `https://api.npmjs.org/downloads/point/last-week/${encoded}`,
+        { headers: { Accept: 'application/json' } },
+        5000,
+      );
+      if (d.ok) {
+        const dj = await d.json();
+        weekly = dj && Number.isFinite(dj.downloads) ? dj.downloads : null;
+      }
+    } catch { /* best-effort */ }
+    return {
+      ok: true,
+      name: j.name,
+      latest,
+      description: (pkg && pkg.description) || j.description || null,
+      homepage:    (pkg && pkg.homepage) || null,
+      license:     (pkg && pkg.license) || j.license || null,
+      repository:  pkg && pkg.repository ? (pkg.repository.url || pkg.repository) : null,
+      keywords:    Array.isArray(pkg && pkg.keywords) ? pkg.keywords.slice(0, 20) : [],
+      weeklyDownloads: weekly,
+      modified:    j.time && j.modified ? j.time.modified : null,
+      versions:    Array.isArray(Object.keys(j.versions || {}))
+        ? Object.keys(j.versions || {}).slice(-10)
+        : [],
+    };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+}
+
+function validSlugPypi(s) {
+  return typeof s === 'string' && /^[A-Za-z0-9]([A-Za-z0-9._-]{0,99})$/i.test(s);
+}
+
+async function toolPypiPackageInfo(args) {
+  const name = String(args?.name || args?.package || '').trim();
+  if (!validSlugPypi(name)) return { ok: false, error: 'invalid PyPI package name' };
+  try {
+    const r = await fetchWithTimeout(`https://pypi.org/pypi/${encodeURIComponent(name)}/json`, {
+      headers: { Accept: 'application/json', 'User-Agent': 'kelion-ai-tools' },
+    });
+    if (r.status === 404) return { ok: false, status: 404, error: 'package not found' };
+    if (!r.ok) return { ok: false, status: r.status, error: `PyPI HTTP ${r.status}` };
+    const j = await r.json();
+    const info = j.info || {};
+    return {
+      ok: true,
+      name: info.name || name,
+      latest: info.version || null,
+      summary: info.summary || null,
+      description: typeof info.description === 'string'
+        ? (info.description.length > 2000 ? info.description.slice(0, 2000) + '…' : info.description)
+        : null,
+      homepage:   info.home_page || (info.project_urls && info.project_urls.Homepage) || null,
+      author:     info.author || null,
+      authorEmail: info.author_email || null,
+      license:    info.license || null,
+      requiresPython: info.requires_python || null,
+      yanked:     !!(info.yanked),
+      releases:   Array.isArray(Object.keys(j.releases || {}))
+        ? Object.keys(j.releases || {}).slice(-10)
+        : [],
+      projectUrls: info.project_urls || null,
+    };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────
 // Dispatch
 
 async function executeRealTool(name, args, ctx) {
@@ -1900,6 +2296,14 @@ async function executeRealTool(name, args, ctx) {
     case 'read_docx':         return toolReadDocx(a);
     case 'ocr_image':         return toolOcrImage(a);
     case 'ocr_passport':      return toolOcrPassport(a);
+    // ── PR D — communications + automations + package info ──
+    case 'send_email':            return toolSendEmail(a);
+    case 'send_sms':              return toolSendSms(a);
+    case 'create_calendar_ics':   return toolCreateCalendarIcs(a);
+    case 'zapier_trigger':        return toolZapierTrigger(a);
+    case 'github_repo_info':      return toolGithubRepoInfo(a);
+    case 'npm_package_info':      return toolNpmPackageInfo(a);
+    case 'pypi_package_info':     return toolPypiPackageInfo(a);
     // ── PR C — sandbox + regex + user-intern ──
     case 'run_regex':         return toolRunRegex(a);
     case 'run_code':          return toolRunCode(a);
@@ -1932,6 +2336,12 @@ const REAL_TOOL_NAMES = [
   // run_code needs E2B_API_KEY; get_my_* need a signed-in user passed
   // through ctx. Both degrade gracefully when the requirement is missing.
   'run_regex', 'run_code', 'get_my_credits', 'get_my_usage', 'get_my_profile',
+  // PR D — communications + automations + package info.
+  // send_email / send_sms / zapier_trigger are opt-in via env keys;
+  // the ics / github / npm / pypi tools work against public APIs
+  // (GITHUB_TOKEN, if set, just raises the unauth rate limit).
+  'send_email', 'send_sms', 'create_calendar_ics', 'zapier_trigger',
+  'github_repo_info', 'npm_package_info', 'pypi_package_info',
 ];
 
 module.exports = {
@@ -1988,4 +2398,12 @@ module.exports = {
   toolGetMyCredits,
   toolGetMyUsage,
   toolGetMyProfile,
+  // PR D — communications + automations + package info
+  toolSendEmail,
+  toolSendSms,
+  toolCreateCalendarIcs,
+  toolZapierTrigger,
+  toolGithubRepoInfo,
+  toolNpmPackageInfo,
+  toolPypiPackageInfo,
 };

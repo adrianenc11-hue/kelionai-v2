@@ -83,6 +83,9 @@ const EXPECTED_TOOL_NAMES = [
   'get_my_credits',
   'get_my_usage',
   'get_my_profile',
+  // PR D — communications + automations + package info.
+  'send_email', 'send_sms', 'create_calendar_ics', 'zapier_trigger',
+  'github_repo_info', 'npm_package_info', 'pypi_package_info',
 ];
 
 describe('Kelion tool catalog', () => {
