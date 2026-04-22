@@ -148,9 +148,10 @@ async function assertPublicHttpsUrl(rawUrl) {
   if (
     host === 'localhost'
     || host.endsWith('.localhost')
+    // `.internal` also covers `metadata.google.internal` (GCP) and
+    // `instance-data.internal` (AWS IMDS) without needing explicit entries.
     || host.endsWith('.internal')
     || host.endsWith('.local')
-    || host === 'metadata.google.internal'
   ) {
     return { ok: false, error: 'private host blocked' };
   }
@@ -1309,7 +1310,17 @@ function pickForcedTool(lastUserMessage) {
 // Dispatch
 
 async function executeRealTool(name, args) {
-  const a = args || {};
+  // Strip any leading-underscore keys from caller-supplied args. These are
+  // reserved for internal wrappers (e.g. toolGetForecast passes `_maxDays`
+  // to relax toolGetWeather's 7-day ceiling). An external caller posting
+  // `{ _maxDays: 16 }` to /api/tools/execute shouldn't be able to bypass
+  // the public contract of a tool. The reserved prefix is documented in
+  // the tool schemas so this is a defence-in-depth, not a breaking change.
+  const a = {};
+  for (const [k, v] of Object.entries(args || {})) {
+    if (k.startsWith('_')) continue;
+    a[k] = v;
+  }
   switch (name) {
     // ── math / offline ──
     case 'calculate':         return toolCalculate(a);

@@ -69,6 +69,32 @@ function summarizeRealTool(name, j) {
     const c = j.current
     return `${loc}: ${c.temperature_2m}°C, wind ${c.wind_speed_10m} m/s, precipitation ${c.precipitation} mm.`
   }
+  if (name === 'get_forecast' && (j.current || j.daily)) {
+    // `get_forecast` calls `toolGetWeather` internally with `_maxDays: 16`
+    // so it can return up to 16 days of daily data. Without this handler
+    // the whole payload would fall through to the 2 KB JSON fallback,
+    // which is both noisier and unfriendly to the voice model.
+    const loc = j.location?.name || ''
+    const parts = []
+    if (j.current) {
+      parts.push(`${loc}: now ${j.current.temperature_2m}°C, wind ${j.current.wind_speed_10m} m/s.`)
+    } else if (loc) {
+      parts.push(`${loc}:`)
+    }
+    if (j.daily && Array.isArray(j.daily.time)) {
+      const days = j.daily.time.slice(0, 16).map((date, i) => {
+        const hi = j.daily.temperature_2m_max?.[i]
+        const lo = j.daily.temperature_2m_min?.[i]
+        const rain = j.daily.precipitation_sum?.[i]
+        const seg = [date]
+        if (hi != null && lo != null) seg.push(`${lo}…${hi}°C`)
+        if (rain != null) seg.push(`${rain} mm rain`)
+        return seg.join(' ')
+      })
+      if (days.length) parts.push(`Forecast: ${days.join(' | ')}.`)
+    }
+    return parts.join(' ') || 'Forecast returned no data.'
+  }
   if (name === 'get_crypto_price' && j.prices) {
     // `vs` echoes the requested fiat (usd/eur/ron/…). The server returns
     // `{ bitcoin: { eur: 50000 } }`, so hardcoding `p.usd` gave
