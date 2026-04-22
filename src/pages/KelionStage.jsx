@@ -471,6 +471,65 @@ function useNYCSkylineTexture() {
   }, [])
 }
 
+// Pick the right copy for the external "Open in new tab" card based on
+// what the monitor is trying to show. Before this helper existed every
+// external fallback (video, blocked-by-XFO hosts, linux-in-browser)
+// rendered the WebVM-specific "This Linux-in-the-browser requires
+// cross-origin isolation" message — users saw that line on a Mr. Bean
+// YouTube card and (rightly) asked what it had to do with anything.
+// Four distinct cases:
+//   - kind='video'                      → YouTube/search card
+//   - WebVM / CheerpX / JSLinux hosts   → cross-origin-isolation card
+//   - kind='web' | everything else that  → generic "site blocks embed"
+//     hits `embedType: 'external'`         card
+export function externalCardCopy(m) {
+  const title = (m && m.title) || 'External app'
+  const src = (m && m.src) || ''
+  let host = ''
+  try { host = new URL(src).hostname.toLowerCase() } catch { /* ignore */ }
+
+  // kind='video' never hits the WebVM hosts — it's always YouTube (or
+  // another video host we don't have a bespoke embed for yet). Phrase it
+  // as "open search results" because that's what the URL actually is on
+  // the free-text path (YouTube search page).
+  if (m && m.kind === 'video') {
+    return {
+      icon: '▶',
+      headline: title,
+      body: 'YouTube blocks the search embed, so the video can\'t play inline. Open the results page in a new tab to watch.',
+      ctaLabel: 'Open search results in new tab',
+    }
+  }
+
+  // WebVM / CheerpX / JSLinux / v86 — these *legitimately* need cross-
+  // origin isolation and we cannot render them in-app. Keep the specific
+  // explanation so the user knows this is a browser-platform limit.
+  const WEBVM_HOSTS = [
+    'webvm.io', 'www.webvm.io',
+    'copy.sh', 'www.copy.sh',
+    'bellard.org', 'www.bellard.org',
+  ]
+  if (WEBVM_HOSTS.includes(host)) {
+    return {
+      icon: '🖥️',
+      headline: `${title} needs its own tab`,
+      body: 'This Linux-in-the-browser requires cross-origin isolation that the embedded frame cannot provide. Open it in a new tab — files persist in your browser.',
+      ctaLabel: `Open ${title} in new tab`,
+    }
+  }
+
+  // Everything else that landed on the external card — usually sites
+  // that send `X-Frame-Options: DENY` (Google/Facebook/etc.) and would
+  // otherwise paint an empty gray box.
+  const hostLabel = host.replace(/^www\./, '') || title
+  return {
+    icon: '🔗',
+    headline: title,
+    body: `${hostLabel} blocks being embedded in another page, so it can\'t render here. Open it in a new tab to use it.`,
+    ctaLabel: `Open ${hostLabel} in new tab`,
+  }
+}
+
 // MonitorOverlay — half-page 2D panel that renders whatever `monitorStore`
 // currently holds. Anchored to the left 50vw of the viewport on desktop, or
 // as a bottom sheet (100vw × 55vh) on narrow screens so the avatar — which
@@ -496,6 +555,7 @@ function MonitorOverlay() {
 
   const isImage = m.embedType === 'image'
   const isExternal = m.embedType === 'external'
+  const externalCopy = isExternal ? externalCardCopy(m) : null
   const onClose = (e) => {
     e.stopPropagation()
     handleShowOnMonitor({ kind: 'clear' })
@@ -603,13 +663,12 @@ function MonitorOverlay() {
               background: 'radial-gradient(ellipse at center, #1a1230 0%, #0d0b1d 70%)',
             }}
           >
-            <div style={{ fontSize: 40, lineHeight: 1 }}>🖥️</div>
+            <div style={{ fontSize: 40, lineHeight: 1 }}>{externalCopy.icon}</div>
             <div style={{ fontSize: 15, fontWeight: 600, color: '#c4b5fd', maxWidth: 360 }}>
-              {m.title || 'External app'} needs its own tab
+              {externalCopy.headline}
             </div>
             <div style={{ fontSize: 13, opacity: 0.75, maxWidth: 360, lineHeight: 1.5 }}>
-              This Linux-in-the-browser requires cross-origin isolation that the embedded
-              frame cannot provide. Open it in a new tab — files persist in your browser.
+              {externalCopy.body}
             </div>
             <a
               href={m.src}
@@ -629,7 +688,7 @@ function MonitorOverlay() {
                 letterSpacing: 0.2,
               }}
             >
-              Open {m.title || 'app'} in new tab ↗
+              {externalCopy.ctaLabel} ↗
             </a>
           </div>
         ) : (
