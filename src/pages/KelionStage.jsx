@@ -1768,7 +1768,10 @@ export default function KelionStage() {
     const tryOnce = () => {
       if (calledOnce) return
       calledOnce = true
-      try { startCamera() } catch (_) { /* banner surfaces the error */ }
+      // startCamera is async and now rejects on getUserMedia failure — use
+      // .catch() so an unhandled rejection doesn't crash the page. The
+      // visionError banner already surfaces the human-readable reason.
+      try { const p = startCamera(); if (p && typeof p.catch === 'function') p.catch(() => {}) } catch (_) { /* sync guard — same banner */ }
     }
     const onGesture = () => {
       tryOnce()
@@ -2751,7 +2754,11 @@ export default function KelionStage() {
           >
             Tools
           </div>
-          <MenuItem onClick={() => { cameraStream ? stopCamera() : startCamera(); setMenuOpen(false) }}>
+          <MenuItem onClick={() => {
+            if (cameraStream) { stopCamera() }
+            else { startCamera().catch(() => { /* banner surfaces the error */ }) }
+            setMenuOpen(false)
+          }}>
             {cameraStream ? '📹 Turn camera off' : '📹 Turn camera on'}
           </MenuItem>
           <MenuItem onClick={() => { screenStream ? stopScreen() : startScreen(); setMenuOpen(false) }}>

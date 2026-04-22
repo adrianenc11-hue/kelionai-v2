@@ -274,7 +274,9 @@ export async function runTool(name, args) {
             name: 'reverse_geocode',
             args: { lat: coords.lat, lon: coords.lon },
           })
-          const place = j?.display_name || j?.address?.city || j?.address?.town || j?.address?.village
+          // Server reverse_geocode returns `displayName` (camelCase) — the snake_case
+          // `display_name` check was left over from the raw Nominatim shape and never fired.
+          const place = j?.displayName || j?.display_name || j?.address?.city || j?.address?.town || j?.address?.village
           if (place) parts.unshift(String(place))
         } catch { /* ignore — numeric answer is fine */ }
       }
