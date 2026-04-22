@@ -58,6 +58,12 @@ const EXPECTED_TOOL_NAMES = [
   'rss_read',
   'wikipedia_search',
   'dictionary',
+  // Groq-powered coding helpers (opt-in via GROQ_API_KEY). Advertised
+  // unconditionally because the server returns a graceful "not
+  // configured" message when the key is missing.
+  'solve_problem',
+  'code_review',
+  'explain_code',
 ];
 
 describe('Kelion tool catalog', () => {
