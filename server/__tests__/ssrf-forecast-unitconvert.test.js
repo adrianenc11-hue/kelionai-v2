@@ -99,6 +99,19 @@ describe('SSRF guard on fetch_url', () => {
     expect(FETCH_CALLS).toHaveLength(0);
   });
 
+  test('rejects fe80::/10 link-local across fe80-febf (not only fe80)', async () => {
+    // Regression guard: the original `startsWith('fe80')` check only caught
+    // fe80:: but missed fea0::, fe91::, febf::, all of which are in the
+    // same /10 link-local block. An attacker could have used e.g.
+    // https://[fea0::1]/ to reach link-local hosts.
+    for (const host of ['fe80::1', 'fe91::1', 'fea0::1', 'febf::1']) {
+      const r = await realTools.toolFetchUrl({ url: `https://[${host}]/` });
+      expect(r.ok).toBe(false);
+      expect(String(r.error)).toMatch(/private IP/);
+    }
+    expect(FETCH_CALLS).toHaveLength(0);
+  });
+
   test('allows IPv4-mapped IPv6 pointing at a public address', async () => {
     // Regression guard for the Devin Review finding: before the fix
     // isPrivateIPv6 blanket-blocked every ::ffff:* host because

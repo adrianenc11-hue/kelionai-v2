@@ -127,7 +127,7 @@ function isPrivateIPv6(ip) {
   const lower = ip.toLowerCase();
   if (lower === '::1' || lower === '::') return true;
   if (lower.startsWith('fc') || lower.startsWith('fd')) return true;  // ULA
-  if (lower.startsWith('fe80')) return true;                          // link-local
+  if (/^fe[89ab]/i.test(lower)) return true;                          // link-local fe80::/10 (fe80-febf)
   if (lower.startsWith('::ffff:')) {
     // Node's WHATWG URL parser normalises ::ffff:A.B.C.D to ::ffff:XXXX:XXXX
     // (hex pair). Without the hex→dotted conversion below, isPrivateIPv4
