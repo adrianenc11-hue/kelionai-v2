@@ -96,6 +96,13 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
   // post-sign-in re-renders widen the stale-closure window that lets two
   // concurrent starts slip past the status check.
   const startInFlightRef = useRef(false)
+  // F5 — when start() is called on a handoff (priorTurns.length > 0), the
+  // persona already tells Kelion to continue the conversation rather than
+  // re-greet. We must NOT fire the setupComplete kickstart ("Greet me with
+  // a short hello…") in that case — an explicit user turn would override
+  // the system instruction and Gemini would re-greet anyway, defeating F4.
+  // handleMessage reads this ref to decide whether to skip the kickstart.
+  const handoffSessionRef = useRef(false)
 
   const wsRef = useRef(null)
   const audioCtxRef = useRef(null)       // 16kHz capture context for Gemini — MUST match SAMPLE_RATE_IN
@@ -379,7 +386,18 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
       // violates Google's protocol and triggers close-code 1007. If
       // send fails we silently skip; next user utterance still triggers
       // a response like before. Adrian 2026-04-20.
-      if (ws && ws.readyState === WebSocket.OPEN) {
+      //
+      // F5 — skip the kickstart entirely on F4 handoff sessions. The
+      // persona already carries the prior-turns block with a "do NOT
+      // re-greet, continue from the last Kelion turn" directive; firing
+      // a fresh "Greet me" user turn here would override that system
+      // instruction and Gemini would re-greet anyway.
+      if (handoffSessionRef.current) {
+        // Nothing to do — the model already has context and will speak
+        // when the user does (or on first mic audio). Reset the flag so
+        // the next fresh start() behaves normally.
+        handoffSessionRef.current = false
+      } else if (ws && ws.readyState === WebSocket.OPEN) {
         try {
           ws.send(JSON.stringify({
             clientContent: {
@@ -407,6 +425,10 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
     // session transcript so Gemini continues rather than re-greeting.
     // Fresh sessions call start() with no args and stay on GET.
     const priorTurns = Array.isArray(opts.priorTurns) ? opts.priorTurns : []
+    // F5 — stash the handoff flag BEFORE opening the socket so the
+    // setupComplete handler sees it. Fresh sessions reset it to false so
+    // the kickstart greeting keeps firing as before.
+    handoffSessionRef.current = priorTurns.length > 0
     // Concurrent-call guard — see comment on `startInFlightRef`. Tap and
     // wake-word both call start() off stale closures; without this lock
     // two WebSockets open in parallel, wsRef gets clobbered, and the
