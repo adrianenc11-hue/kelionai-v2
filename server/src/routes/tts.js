@@ -12,10 +12,11 @@ const DEFAULT_ELEVENLABS_VOICE = 'pNInz6obpgDQGcFmaJgB'; // Adam (American male,
 
 // Native male voice per language.
 //
-// `eleven_multilingual_v2` can speak 29 languages with any voice, but the
-// accent bleeds through — e.g. Adam (American) speaking Italian sounds
-// Italian-American, not Italian. Adrian asked for a native-sounding male
-// voice per language.
+// Any multilingual ElevenLabs model (default here: `eleven_turbo_v2_5`,
+// legacy `eleven_multilingual_v2`) can speak its full language list with
+// any voice, but the accent bleeds through — e.g. Adam (American)
+// speaking Italian sounds Italian-American, not Italian. Adrian asked
+// for a native-sounding male voice per language.
 //
 // Strategy: curate ElevenLabs' public default library (available to every
 // ElevenLabs account without extra subscription) into language families,
