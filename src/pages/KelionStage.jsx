@@ -1219,6 +1219,28 @@ export default function KelionStage() {
     else if (tab === 'payouts')  { setPayoutsOpen(true) }
   }, [openBusiness, openCredits, openVisitors])
 
+  // Keyboard ESC closes whichever admin drawer is on screen. Matches
+  // the backdrop click behaviour so power users don't have to reach
+  // for the mouse. Bound once at the document level so all five
+  // drawers (Business / AI / Visitors / Users / Payouts) share a single
+  // handler — flagged by PR #141 review as a regression on the new
+  // Users and Payouts tabs where the close affordance was originally
+  // missing.
+  useEffect(() => {
+    const anyOpen = businessOpen || creditsOpen || visitorsOpen || usersOpen || payoutsOpen
+    if (!anyOpen) return undefined
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return
+      setBusinessOpen(false)
+      setCreditsOpen(false)
+      setVisitorsOpen(false)
+      setUsersOpen(false)
+      setPayoutsOpen(false)
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [businessOpen, creditsOpen, visitorsOpen, usersOpen, payoutsOpen])
+
   // Stage 6 — emotion mirroring + voice style
   const emotion = useEmotion()
   const [voiceStyle, setVoiceStyleState] = useState(() => readVoiceStyleCookie())

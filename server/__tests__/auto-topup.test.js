@@ -227,6 +227,40 @@ describe('autoTopup service (PR E2)', () => {
     expect(out.triggered[0].limit).toBe(10000);
   });
 
+  test('Stripe hang is aborted by the 10s timeout and recorded as an error (cooldown armed)', async () => {
+    // Replay a fetch that never resolves until the AbortController
+    // triggers. We assert the abort surfaces as a normal failure so
+    // the caller still marks _lastRun — otherwise every admin refresh
+    // would queue up another orphan charge (PR #142 Devin Review).
+    jest.useFakeTimers();
+    try {
+      global.fetch = jest.fn((url, opts) => new Promise((_resolve, reject) => {
+        opts.signal.addEventListener('abort', () => {
+          const err = new Error('aborted');
+          err.name = 'AbortError';
+          reject(err);
+        });
+      }));
+      process.env.STRIPE_SECRET_KEY = 'sk_test_dummy';
+      process.env.OWNER_STRIPE_CUSTOMER_ID = 'cus_X';
+      process.env.OWNER_STRIPE_PAYMENT_METHOD_ID = 'pm_Y';
+      process.env.AUTO_TOPUP_THRESHOLD = '0.2';
+      const svc = load();
+      const p = svc.checkAndTrigger([eleven({ remaining: 500, limit: 10000 })]);
+      // Let the AbortController fire. 15s > the 10s STRIPE_FETCH_TIMEOUT_MS.
+      await jest.advanceTimersByTimeAsync(15_000);
+      const out = await p;
+      expect(out.triggered).toHaveLength(0);
+      expect(out.errors).toHaveLength(1);
+      expect(out.errors[0].error).toMatch(/timed out/i);
+      // Cooldown is armed so the next refresh does NOT re-fire the charge.
+      const status = svc.getStatus();
+      expect(status.history.elevenlabs.status).toBe('error');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   test('getStatus mirrors config + history', async () => {
     process.env.STRIPE_SECRET_KEY = 'sk_test_dummy';
     process.env.OWNER_STRIPE_CUSTOMER_ID = 'cus_X';
