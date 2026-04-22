@@ -100,6 +100,16 @@ async function initDb() {
   if (!cols.find(c => c.name === 'current_webauthn_challenge')) {
     await db.exec("ALTER TABLE users ADD COLUMN current_webauthn_challenge TEXT");
   }
+  // F8 — preferred language (BCP-47 short, e.g. 'ro', 'en', 'fr'). Captured
+  // from the browser's Accept-Language on first login and kept in sync via
+  // /api/me/language so Kelion greets the user in their native tongue on
+  // every new session instead of forcing the default-English opener each
+  // time. We also mirror it as a `locale` memory_item so chat.js picks it
+  // up through the existing `listMemoryItems` injection — that keeps
+  // chat.js at zero lines modified while still making the model see it.
+  if (!cols.find(c => c.name === 'preferred_language')) {
+    await db.exec('ALTER TABLE users ADD COLUMN preferred_language TEXT');
+  }
 
   // Create index for faster lookups
   await db.exec('CREATE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id)');
@@ -292,6 +302,39 @@ async function deleteMemoryItem(userId, id) {
 async function clearMemoryForUser(userId) {
   const r = await db.run('DELETE FROM memory_items WHERE user_id = ?', [userId]);
   return r.changes;
+}
+
+// F8 — preferred language helpers.
+//
+// `setPreferredLanguage` persists the short BCP-47 primary tag on the
+// users row AND mirrors it as a `locale` memory_item. The memory row is
+// what chat.js / realtime.js already inject into the persona via
+// `listMemoryItems`, so every provider (text + OpenAI Realtime + Gemini
+// Live) sees the fact without chat.js being touched.
+//
+// Older `locale` rows for the same user are pruned first so the persona
+// never receives contradictory "Preferred language: English" +
+// "Preferred language: Romanian" lines after the user changes it.
+async function setPreferredLanguage(userId, shortTag, factText) {
+  if (!userId || !shortTag) return null;
+  await db.run(
+    'UPDATE users SET preferred_language = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+    [shortTag, userId]
+  );
+  if (factText && typeof factText === 'string') {
+    await db.run('DELETE FROM memory_items WHERE user_id = ? AND kind = ?', [userId, 'locale']);
+    await db.run(
+      'INSERT INTO memory_items (user_id, kind, fact) VALUES (?, ?, ?)',
+      [userId, 'locale', factText.slice(0, 500)]
+    );
+  }
+  return getUserById(userId);
+}
+
+async function getPreferredLanguage(userId) {
+  if (!userId) return null;
+  const row = await db.get('SELECT preferred_language FROM users WHERE id = ?', [userId]);
+  return (row && row.preferred_language) || null;
 }
 
 // ─── Conversation history helpers ────────────────────────────────
@@ -900,6 +943,9 @@ module.exports = {
   listMemoryItems,
   deleteMemoryItem,
   clearMemoryForUser,
+  // F8 — preferred language
+  setPreferredLanguage,
+  getPreferredLanguage,
   // Conversation history
   createConversation,
   appendConversationMessage,
