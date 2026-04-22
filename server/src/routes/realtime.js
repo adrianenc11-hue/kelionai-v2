@@ -600,6 +600,46 @@ const KELION_TOOLS = [
     },
     required: [],
   },
+  {
+    name: 'run_regex',
+    description: "Test a JavaScript regular expression against an input string. mode=test returns a boolean, mode=match returns the matches (up to 100) with capture groups, mode=replace returns the replaced string. Useful when the user is debugging a regex or asks 'does this pattern match'.",
+    properties: {
+      pattern:     { type: 'string', description: 'Regex pattern (max 500 chars).' },
+      input:       { type: 'string', description: 'Input string to test against (max 50 000 chars).' },
+      flags:       { type: 'string', description: "Regex flags. Any subset of g,i,m,s,u,y. Defaults to 'g'." },
+      mode:        { type: 'string', description: 'One of test | match | replace.', enum: ['test', 'match', 'replace'] },
+      replacement: { type: 'string', description: "Replacement string for mode=replace. Supports $1, $2… backrefs." },
+    },
+    required: ['pattern', 'input'],
+  },
+  {
+    name: 'run_code',
+    description: "Execute a short Python or JavaScript snippet inside a disposable e2b sandbox and return stdout / stderr / result. Strict limits: code ≤ 20 KB, wall-clock ≤ 15 s. Prefer this when the user explicitly asks to run, try, execute, or verify a piece of code. Do not use for networked API calls — prefer the dedicated tools for those.",
+    properties: {
+      language: { type: 'string', description: "Language of the snippet.", enum: ['python', 'javascript'] },
+      code:     { type: 'string', description: "Source code to execute (max 20 000 chars)." },
+      timeout:  { type: 'number', description: "Optional wall-clock limit in ms (1000..30000, default 15000)." },
+    },
+    required: ['language', 'code'],
+  },
+  {
+    name: 'get_my_credits',
+    description: "Return the currently signed-in user's voice-minute balance. Use when the user asks 'how many minutes do I have left', 'ce credit am', etc. Does not reveal personal data beyond the balance.",
+    properties: {},
+    required: [],
+  },
+  {
+    name: 'get_my_usage',
+    description: "Return a short summary of the signed-in user's recent credit activity: total minutes consumed and topped up over the last 20 ledger rows, plus the 10 most recent entries (kind, delta, amount, note, timestamp). Use when the user asks 'what did I spend', 'when did I top up', etc.",
+    properties: {},
+    required: [],
+  },
+  {
+    name: 'get_my_profile',
+    description: "Return the signed-in user's id, display name, email, credits balance (minutes) and account creation date. Use only when the user explicitly asks 'what's on my profile' or 'who am I signed in as'.",
+    properties: {},
+    required: [],
+  },
 ];
 
 // Gemini v1alpha BidiGenerateContent — JSON schema with UPPERCASE types and

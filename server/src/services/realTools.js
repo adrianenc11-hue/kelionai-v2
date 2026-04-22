@@ -1615,9 +1615,223 @@ async function toolExplainCode(args) {
 }
 
 // ──────────────────────────────────────────────────────────────────
+// PR C — sandboxed code runner, regex tester, and user-intern tools.
+//
+// Tools whose name starts with `get_my_*` need a signed-in user and
+// read it from the optional third `ctx` argument of executeRealTool.
+// When the caller omits ctx (e.g. the text-chat route, which keeps
+// the legacy two-argument call site) they return a polite "sign in
+// first" message rather than crashing.
+
+function toolRunRegex(args) {
+  const pattern = String(args?.pattern || '');
+  if (!pattern) return { ok: false, error: 'missing pattern' };
+  if (pattern.length > 500) return { ok: false, error: 'pattern too long (max 500 chars)' };
+  const input = String(args?.input ?? '');
+  if (input.length > 50_000) return { ok: false, error: 'input too long (max 50 000 chars)' };
+  // Allow only the standard flag subset — anything else is most likely
+  // a caller mistake or an injection attempt.
+  const flags = String(args?.flags || 'g').replace(/[^gimsuy]/g, '').slice(0, 6);
+  const mode = String(args?.mode || 'match').toLowerCase();
+  let re;
+  try { re = new RegExp(pattern, flags); }
+  catch (err) { return { ok: false, error: `invalid regex: ${err.message}` }; }
+  try {
+    if (mode === 'test') {
+      return { ok: true, mode, matched: re.test(input) };
+    }
+    if (mode === 'replace') {
+      const replacement = String(args?.replacement ?? '');
+      const out = input.replace(re, replacement);
+      const truncated = out.length > 50_000;
+      return {
+        ok: true,
+        mode,
+        output: truncated ? out.slice(0, 50_000) + '… [truncated]' : out,
+        truncated,
+      };
+    }
+    const maxMatches = Math.max(1, Math.min(500, Number.parseInt(args?.max_matches, 10) || 200));
+    const matches = [];
+    if (flags.includes('g')) {
+      let m;
+      while ((m = re.exec(input)) !== null) {
+        matches.push({ match: m[0], index: m.index, groups: m.slice(1) });
+        if (matches.length >= maxMatches) break;
+        // Guard zero-length matches (e.g. /a*/g) against an infinite loop.
+        if (m.index === re.lastIndex) re.lastIndex += 1;
+      }
+    } else {
+      const m = re.exec(input);
+      if (m) matches.push({ match: m[0], index: m.index, groups: m.slice(1) });
+    }
+    return { ok: true, mode: 'match', count: matches.length, matches };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+}
+
+let _e2bModule = null;
+let _e2bLoadFailed = false;
+async function getE2BModule() {
+  if (_e2bLoadFailed) return null;
+  if (_e2bModule) return _e2bModule;
+  try {
+    _e2bModule = require('@e2b/code-interpreter');
+    return _e2bModule;
+  } catch (_) {
+    _e2bLoadFailed = true;
+    return null;
+  }
+}
+
+async function toolRunCode(args) {
+  const key = process.env.E2B_API_KEY;
+  if (!key) {
+    return {
+      ok: false,
+      unavailable: true,
+      error: 'Code sandbox not configured. Set E2B_API_KEY to enable run_code.',
+    };
+  }
+  const mod = await getE2BModule();
+  if (!mod || !mod.Sandbox) {
+    return {
+      ok: false,
+      unavailable: true,
+      error: 'e2b SDK is not installed on this build. Install @e2b/code-interpreter to enable run_code.',
+    };
+  }
+  const code = String(args?.code || '').trim();
+  if (!code) return { ok: false, error: 'missing code' };
+  if (code.length > 20_000) return { ok: false, error: 'code too long (max 20 000 chars)' };
+  const rawLang = String(args?.language || 'python').toLowerCase();
+  const language = rawLang === 'js' ? 'javascript' : rawLang === 'ts' ? 'typescript' : rawLang;
+  if (!['python', 'javascript', 'typescript'].includes(language)) {
+    return { ok: false, error: `unsupported language "${rawLang}" (try python, javascript)` };
+  }
+  const timeoutMs = Math.max(1000, Math.min(60_000, Number.parseInt(args?.timeout_ms, 10) || 15_000));
+  const cap = (s) => {
+    const t = String(s || '');
+    return t.length > 8000 ? t.slice(0, 8000) + '… [truncated]' : t;
+  };
+  let sandbox = null;
+  try {
+    sandbox = await mod.Sandbox.create({ apiKey: key, timeoutMs });
+    const execution = await sandbox.runCode(code, { language, timeoutMs });
+    return {
+      ok: true,
+      language,
+      stdout: cap((execution.logs?.stdout || []).join('')),
+      stderr: cap((execution.logs?.stderr || []).join('')),
+      text: cap(execution.text || ''),
+      error: execution.error
+        ? cap(execution.error.value || execution.error.name || 'execution error')
+        : null,
+      results: Array.isArray(execution.results)
+        ? execution.results.slice(0, 5).map((r) => ({ type: r.type || 'text', text: cap(r.text || '') }))
+        : [],
+    };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  } finally {
+    if (sandbox && typeof sandbox.kill === 'function') {
+      try { await sandbox.kill(); } catch (_) { /* no-op */ }
+    }
+  }
+}
+
+function needSignIn() {
+  return {
+    ok: false,
+    unavailable: true,
+    error: "Sign in first — I can only read your account when you're signed in.",
+  };
+}
+
+async function toolGetMyCredits(_args, ctx) {
+  const user = ctx && ctx.user;
+  if (!user || !user.id) return needSignIn();
+  try {
+    const db = require('../db');
+    const minutes = await db.getCreditsBalance(user.id);
+    return {
+      ok: true,
+      minutes,
+      displayMinutes: `${Math.round(minutes * 10) / 10} min`,
+      low: minutes < 2,
+      empty: minutes <= 0,
+    };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+}
+
+async function toolGetMyUsage(_args, ctx) {
+  const user = ctx && ctx.user;
+  if (!user || !user.id) return needSignIn();
+  try {
+    const db = require('../db');
+    const dbh = db.getDb ? await db.getDb() : null;
+    if (!dbh) return { ok: false, error: 'db unavailable' };
+    // credit_transactions is shared between SQLite and Postgres via the
+    // abstraction that normalises params to `?`. No exported per-user
+    // helper exists yet, so we read the 20 most recent rows directly
+    // and summarise them client-side.
+    const rows = await dbh.all(
+      `SELECT delta_minutes, amount_cents, currency, kind, note, created_at
+         FROM credit_transactions
+        WHERE user_id = ?
+        ORDER BY created_at DESC
+        LIMIT 20`,
+      [user.id],
+    );
+    const topups   = rows.filter((r) => r.kind === 'topup');
+    const consumed = rows.filter((r) => Number(r.delta_minutes) < 0);
+    const minutesConsumed = consumed.reduce((s, r) => s + Math.abs(Number(r.delta_minutes) || 0), 0);
+    const minutesTopped   = topups.reduce((s, r) => s + Math.max(0, Number(r.delta_minutes) || 0), 0);
+    return {
+      ok: true,
+      minutesConsumed,
+      minutesTopped,
+      recent: rows.slice(0, 10).map((r) => ({
+        kind: r.kind,
+        deltaMinutes: Number(r.delta_minutes) || 0,
+        amountCents: r.amount_cents != null ? Number(r.amount_cents) : null,
+        currency: r.currency || null,
+        note: r.note || null,
+        at: r.created_at,
+      })),
+    };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+}
+
+async function toolGetMyProfile(_args, ctx) {
+  const user = ctx && ctx.user;
+  if (!user || !user.id) return needSignIn();
+  try {
+    const db = require('../db');
+    const full = await db.getUserById(user.id);
+    if (!full) return { ok: false, error: 'user not found' };
+    return {
+      ok: true,
+      id: full.id,
+      name: full.name || user.name || null,
+      email: full.email || user.email || null,
+      creditsMinutes: Number(full.credits_balance_minutes || 0),
+      createdAt: full.created_at || null,
+    };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────
 // Dispatch
 
-async function executeRealTool(name, args) {
+async function executeRealTool(name, args, ctx) {
   // Strip any leading-underscore keys from caller-supplied args. These are
   // reserved for internal wrappers (e.g. toolGetForecast passes `_maxDays`
   // to relax toolGetWeather's 7-day ceiling). An external caller posting
@@ -1673,6 +1887,12 @@ async function executeRealTool(name, args) {
     case 'read_docx':         return toolReadDocx(a);
     case 'ocr_image':         return toolOcrImage(a);
     case 'ocr_passport':      return toolOcrPassport(a);
+    // ── PR C — sandbox + regex + user-intern ──
+    case 'run_regex':         return toolRunRegex(a);
+    case 'run_code':          return toolRunCode(a);
+    case 'get_my_credits':    return toolGetMyCredits(a, ctx);
+    case 'get_my_usage':      return toolGetMyUsage(a, ctx);
+    case 'get_my_profile':    return toolGetMyProfile(a, ctx);
     default:                  return null; // signal "not handled here"
   }
 }
@@ -1695,6 +1915,10 @@ const REAL_TOOL_NAMES = [
   // PR B — documents + OCR (pdf-parse / mammoth / tesseract.js).
   // Inputs accept either a public HTTPS URL or a base64 blob.
   'read_pdf', 'read_docx', 'ocr_image', 'ocr_passport',
+  // PR C — sandboxed runners + user-intern tools.
+  // run_code needs E2B_API_KEY; get_my_* need a signed-in user passed
+  // through ctx. Both degrade gracefully when the requirement is missing.
+  'run_regex', 'run_code', 'get_my_credits', 'get_my_usage', 'get_my_profile',
 ];
 
 module.exports = {
@@ -1745,4 +1969,10 @@ module.exports = {
   toolOcrImage,
   toolOcrPassport,
   parseMrz,
+  // PR C — sandbox + regex + user-intern
+  toolRunRegex,
+  toolRunCode,
+  toolGetMyCredits,
+  toolGetMyUsage,
+  toolGetMyProfile,
 };
