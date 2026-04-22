@@ -80,7 +80,10 @@ async function groqChat(messages, opts = {}) {
   const body = {
     model: opts.model || DEFAULT_MODEL,
     messages: capped,
-    max_tokens: Math.min(Math.max(opts.maxTokens || MAX_OUTPUT_TOKENS, 64), 4000),
+    // `??` not `||` so a caller explicitly passing 0 doesn't silently
+    // fall back to MAX_OUTPUT_TOKENS; the clamp below still keeps us
+    // inside Groq's free-tier ceiling regardless of what was passed.
+    max_tokens: Math.min(Math.max(opts.maxTokens ?? MAX_OUTPUT_TOKENS, 64), 4000),
     temperature: typeof opts.temperature === 'number' ? opts.temperature : 0.2,
     stream: false,
   };

@@ -1275,15 +1275,15 @@ async function toolExplainCode(args) {
   if (!code) return { ok: false, error: 'missing code' };
   const audience = String(args?.audience || 'an intermediate developer').trim();
   const language = String(args?.language || '').trim();
-  const prompt = [
+  // Keep the metadata lines separate from the code fence with a blank
+  // line so the model sees the same visual structure as toolCodeReview.
+  // We can't put '' inside filter(Boolean) because filter(Boolean) drops
+  // empty strings, so assemble the header and the code block separately.
+  const header = [
     language ? `Language: ${language}` : null,
     `Audience: ${audience}`,
-    '',
-    'Code:',
-    '```',
-    code,
-    '```',
   ].filter(Boolean).join('\n');
+  const prompt = `${header}\n\nCode:\n\`\`\`\n${code}\n\`\`\``;
   const r = await groqChat([
     { role: 'system', content: EXPLAIN_CODE_SYSTEM },
     { role: 'user', content: prompt },
