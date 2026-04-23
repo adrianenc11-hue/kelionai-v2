@@ -1067,6 +1067,19 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
     return () => setCameraController(null)
   }, [startCamera])
 
+  // Audit M6 — `isBusy()` lets KelionStage's auto-fallback effect
+  // (2) detect whether the user already kicked off a manual
+  // start() between the provider flip and the handoff call.
+  // Returns true while `start()` is in flight OR while the live
+  // ws is anything other than CLOSED. Reading refs directly so a
+  // caller sees the latest value without waiting for a re-render.
+  const isBusy = useCallback(() => {
+    if (startInFlightRef.current) return true
+    const ws = wsRef.current
+    if (ws && ws.readyState !== WebSocket.CLOSED) return true
+    return false
+  }, [])
+
   return {
     status, error, start, stop, turns, userLevel,
     // Stage 2
@@ -1074,5 +1087,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
     startCamera, stopCamera, startScreen, stopScreen,
     // Trial countdown (null for signed-in users, object for guests).
     trial,
+    // Audit M6 — handoff double-start guard (see lib/handoffGuard.js).
+    isBusy,
   }
 }

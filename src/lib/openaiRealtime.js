@@ -931,10 +931,23 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
     return () => setCameraController(null)
   }, [startCamera])
 
+  // Audit M6 — see lib/handoffGuard.js. True while `start()` is in
+  // flight OR while the live RTCPeerConnection is anything other
+  // than 'closed'. KelionStage's auto-fallback effect reads this to
+  // avoid stepping on a session the user just manually opened.
+  const isBusy = useCallback(() => {
+    if (startInFlightRef.current) return true
+    const pc = pcRef.current
+    if (pc && pc.connectionState && pc.connectionState !== 'closed') return true
+    return false
+  }, [])
+
   return {
     status, error, start, stop, turns, userLevel,
     cameraStream, screenStream, visionError,
     startCamera, stopCamera, startScreen, stopScreen,
     trial,
+    // Audit M6 — handoff double-start guard.
+    isBusy,
   }
 }

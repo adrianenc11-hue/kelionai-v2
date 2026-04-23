@@ -9,6 +9,7 @@ import { setClientGeoProvider } from '../lib/clientGeoProvider'
 import { STATUS_COLORS, STATUS_PULSE_HZ } from '../lib/kelionStatus'
 import { useGeminiLive } from '../lib/geminiLive'
 import { useOpenAIRealtime } from '../lib/openaiRealtime'
+import { decideHandoff } from '../lib/handoffGuard'
 import { useWakeWord } from '../lib/useWakeWord'
 import { useTrial } from '../lib/useTrial'
 import { useClientGeo } from '../lib/useClientGeo'
@@ -2107,6 +2108,22 @@ export default function KelionStage() {
       const active = liveProvider === 'openai' ? openaiHookRef.current : geminiHookRef.current
       const priorTurns = pendingFallbackTurnsRef.current
       pendingFallbackTurnsRef.current = []
+      // Audit M6 — ask the incoming hook whether it is already busy
+      // (user tapped / wake-word fired between the two effects). If so,
+      // skip the handoff entirely: calling start() now would either be
+      // rejected by the in-flight lock (priorTurns silently lost) or,
+      // worse, close the user's fresh ws mid-connect. See
+      // lib/handoffGuard.js for the full reasoning.
+      const hookBusy = typeof active?.isBusy === 'function' ? active.isBusy() : false
+      const decision = decideHandoff({
+        pending: true,
+        hookBusy,
+        priorTurnCount: Array.isArray(priorTurns) ? priorTurns.length : 0,
+      })
+      if (decision.action !== 'start') {
+        console.warn('[kelionStage] auto-fallback skipped —', decision.reason)
+        return
+      }
       active.start({ priorTurns })
     } catch (e) {
       console.warn('[kelionStage] auto-fallback start() threw', e)
