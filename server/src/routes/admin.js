@@ -43,6 +43,15 @@ router.use(requireAdmin);
  */
 const _alertCooldown = new Map(); // provider id -> last alert sent (ms)
 const ALERT_COOLDOWN_MS = 6 * 60 * 60 * 1000; // 6h
+// Best-effort GC so the Map doesn't grow unboundedly if a provider id
+// rotates (ex: a TTS provider rebrand). Run once per /credits call,
+// not on a timer, so it imposes no idle CPU. O(n) in providers (<20
+// in practice) is cheap. Audit finding #8.
+function _pruneAlertCooldown(now) {
+  for (const [key, ts] of _alertCooldown) {
+    if (now - ts > ALERT_COOLDOWN_MS) _alertCooldown.delete(key);
+  }
+}
 
 /**
  * GET /api/admin/business
@@ -275,6 +284,7 @@ router.get('/credits', async (req, res) => {
     // Fire-and-forget email alerts for low/error providers we care about.
     // Cooldown per provider so we don't spam the inbox on every refresh.
     const now = Date.now();
+    _pruneAlertCooldown(now);
     for (const c of cards) {
       if (c.kind === 'revenue') continue; // revenue providers don't trigger low alerts
       // `unconfigured` = opt-in provider (e.g. Groq) that the admin
