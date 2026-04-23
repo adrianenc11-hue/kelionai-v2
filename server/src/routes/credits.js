@@ -283,10 +283,10 @@ router.post('/consume', requireAuth, async (req, res) => {
 
     const raw = Number(req.body && req.body.minutes);
     let minutes = Number.isFinite(raw) && raw > 0 ? Math.min(Math.ceil(raw), 5) : 1;
-    // Forced debits ignore client-requested minutes — always 1. A
-    // tampered client that sent minutes=5 together with silent=true
-    // must not be able to pay less per forced tick than a normal
-    // heartbeat would cost.
+    // Forced debits always charge exactly 1 min — ignore the
+    // client-requested `minutes` so a tampered payload can't inflate
+    // the charge (e.g. `{ minutes: 5, silent: true }` after the
+    // streak cap would otherwise debit 5).
     if (decision.action === 'charge_forced') minutes = 1;
 
     const current = await getCreditsBalance(req.user.id);
