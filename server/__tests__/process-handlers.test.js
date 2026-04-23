@@ -136,6 +136,22 @@ describe('installProcessHandlers — uncaughtException', () => {
     expect(exit).not.toHaveBeenCalled();
   });
 
+  it('log message reflects whether the process will actually exit', () => {
+    // exit path
+    const t1 = new EventEmitter();
+    const l1 = makeLogger();
+    installProcessHandlers(t1, { logger: l1, exit: jest.fn() });
+    t1.emit('uncaughtException', new Error('x'));
+    expect(l1.error.mock.calls[0][0]).toMatch(/exiting for clean restart/);
+
+    // no-exit path (test mode)
+    const t2 = new EventEmitter();
+    const l2 = makeLogger();
+    installProcessHandlers(t2, { logger: l2, exit: jest.fn(), exitOnException: false });
+    t2.emit('uncaughtException', new Error('x'));
+    expect(l2.error.mock.calls[0][0]).toMatch(/continuing \(exitOnException=false\)/);
+  });
+
   it('swallows exit() itself throwing (shouldn\'t ever happen but defensive)', () => {
     const target = new EventEmitter();
     const logger = makeLogger();

@@ -154,6 +154,39 @@ router.get('/db-path', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/diag/process — surfaces the counters collected by the
+ * `unhandledRejection` / `uncaughtException` / `warning` handlers
+ * installed in `server/src/index.js`. Follows up on the H3 PR, where
+ * the stats were wired to `app.locals.processHandlerStats` but not yet
+ * exposed to any endpoint (flagged by Devin Review). Zero secrets.
+ */
+router.get('/process', (req, res) => {
+  const processStats = (req.app && req.app.locals && req.app.locals.processHandlerStats) || null;
+  const clientStats = (req.app && req.app.locals && req.app.locals.clientErrorStats) || null;
+  res.json({
+    now: new Date().toISOString(),
+    uptimeSeconds: process.uptime(),
+    memoryMB: Math.round(process.memoryUsage().rss / (1024 * 1024)),
+    pid: process.pid,
+    node: process.version,
+    processHandlers: processStats || {
+      unhandledRejections: 0,
+      uncaughtExceptions: 0,
+      warnings: 0,
+      lastReason: null,
+      lastAt: null,
+      note: 'handlers not installed (NODE_ENV=test?)',
+    },
+    clientErrors: clientStats || {
+      total: 0,
+      byKind: {},
+      lastReason: null,
+      lastAt: null,
+    },
+  });
+});
+
 const DEFAULT_ADMIN_EMAIL = 'adrianenc11@gmail.com';
 
 router.get('/admin-bootstrap', async (req, res) => {
@@ -258,6 +291,64 @@ router.post('/purge-users', async (req, res) => {
     console.error('[diag/purge-users] failed:', err && err.message);
     return res.status(500).json({ error: err && err.message });
   }
+});
+
+/**
+ * Audit H4 — POST /api/diag/client-error — telemetry sink for the
+ * client-side global error reporter (src/lib/errorReporter.js).
+ *
+ * Accepts a JSON body with { kind, message, stack?, filename?, lineno?,
+ * colno?, url?, userAgent?, at? }. All fields are bounded to prevent
+ * spam. Logs to console with a stable prefix so Railway log search +
+ * external log drains can filter on it. Also increments counters on
+ * `app.locals.clientErrorStats` for /diag dashboards.
+ *
+ * Intentionally does not require auth — errors must still be reported
+ * for guests and for sessions where auth itself broke. Rate-limit /
+ * dedup is enforced client-side and by network-level limits.
+ *
+ * Always responds 204 No Content on success. The reporter shouldn't
+ * care about the response body, and 204 keeps bandwidth minimal.
+ */
+const MAX_MESSAGE_CHARS = 1000;
+const MAX_STACK_CHARS = 4000;
+const ALLOWED_KINDS = new Set(['error', 'unhandledrejection']);
+
+function clampString(v, max) {
+  if (typeof v !== 'string') return '';
+  return v.length <= max ? v : `${v.slice(0, max)}… [truncated-server]`;
+}
+
+router.post('/client-error', (req, res) => {
+  const body = req.body || {};
+  const kind = ALLOWED_KINDS.has(body.kind) ? body.kind : 'unknown';
+  const message = clampString(body.message || '', MAX_MESSAGE_CHARS) || '(no message)';
+  const stack = body.stack ? clampString(body.stack, MAX_STACK_CHARS) : null;
+  const filename = typeof body.filename === 'string' ? clampString(body.filename, 512) : null;
+  const lineno = Number.isFinite(body.lineno) ? body.lineno : null;
+  const colno = Number.isFinite(body.colno) ? body.colno : null;
+  const url = typeof body.url === 'string' ? clampString(body.url, 2048) : null;
+  const userAgent = typeof body.userAgent === 'string' ? clampString(body.userAgent, 512) : null;
+
+  // Stats surface on app.locals so /api/diag dashboards (or a future
+  // prometheus exporter) can read them without importing routes.
+  const stats = (req.app && req.app.locals && req.app.locals.clientErrorStats)
+    || { total: 0, byKind: {}, lastReason: null, lastAt: null };
+  stats.total += 1;
+  stats.byKind[kind] = (stats.byKind[kind] || 0) + 1;
+  stats.lastReason = message;
+  stats.lastAt = Date.now();
+  if (req.app && req.app.locals) {
+    req.app.locals.clientErrorStats = stats;
+  }
+
+  console.warn('[client-error]', JSON.stringify({
+    kind, message, filename, lineno, colno, url, userAgent,
+    // stack goes on its own line so Railway log UI doesn't collapse it.
+  }));
+  if (stack) console.warn('[client-error] stack:\n' + stack);
+
+  res.status(204).end();
 });
 
 module.exports = router;

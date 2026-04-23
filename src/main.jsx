@@ -2,7 +2,19 @@ import { StrictMode, Suspense, lazy } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import ErrorBoundary from './components/ErrorBoundary'
+import { installErrorReporter } from './lib/errorReporter'
+import { getCsrfToken } from './lib/api'
 import './index.css'
+
+// Audit H4: install global safety net on the client side. Before this,
+// any uncaught exception or unhandled promise rejection inside the
+// React app (a voice hook throws, a WebAudio graph node rejects, a
+// useEffect cleanup with a bad fetch) died silently in the user's
+// browser — no server telemetry, no user-facing feedback, no record
+// of why. Now every such event is rate-limited + deduped + POSTed to
+// /api/diag/client-error so it shows up in Railway logs the same way
+// server errors do.
+installErrorReporter({ csrfToken: getCsrfToken })
 
 // Silence a single-line noise warning emitted from THREE r183's
 // `Clock` constructor every time @react-three/fiber boots its render
