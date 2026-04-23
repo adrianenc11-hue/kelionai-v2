@@ -525,6 +525,27 @@ async function appendConversationMessage(userId, conversationId, role, content) 
   const cleanRole    = String(role || '').slice(0, 20) || 'user';
   const cleanContent = String(content || '').slice(0, MAX_MSG_CONTENT);
   if (!cleanContent) return null;
+  // Defense-in-depth dedupe. The client-side autosave loop advances its
+  // cursor unconditionally after each successful POST, but on flaky
+  // networks (retry with the same payload), and on legacy clients that
+  // predate the cursor fix, the same (role, content) pair can arrive
+  // back-to-back — which is how the orphan/duplicate-message threads
+  // ended up on prod. If the most recent row on this conversation
+  // matches exactly, return it instead of inserting a duplicate. The
+  // lookup is a cheap single-row index scan on (conversation_id, id DESC).
+  const lastRow = await db.get(
+    'SELECT id, role, content, created_at FROM conversation_messages WHERE conversation_id = ? ORDER BY id DESC LIMIT 1',
+    [conversationId]
+  );
+  if (lastRow && lastRow.role === cleanRole && lastRow.content === cleanContent) {
+    return {
+      id: lastRow.id,
+      conversation_id: conversationId,
+      role: lastRow.role,
+      content: lastRow.content,
+      created_at: lastRow.created_at,
+    };
+  }
   const r = await db.run(
     'INSERT INTO conversation_messages (conversation_id, role, content) VALUES (?, ?, ?)',
     [conversationId, cleanRole, cleanContent]

@@ -2347,7 +2347,18 @@ export default function KelionStage() {
         if (isLast && chatBusy && (m.role || 'user') === 'assistant') break
         try {
           await appendConversationMessage({ role: m.role || 'user', content: m.content })
-          if (!cancelled) savedUpToRef.current = i + 1
+          // IMPORTANT: advance the cursor even when the effect got
+          // cancelled mid-await. The SSE streaming path flips
+          // `chatMessages` ~30×/s, so every chunk triggers a cleanup
+          // that sets `cancelled=true` on the in-flight save. Gating
+          // the cursor update on `!cancelled` meant a message that
+          // was *successfully* persisted could still be re-sent on
+          // the next effect run — which is how the same user turn
+          // ended up in the DB 2–3 times (audit #1, orphan threads).
+          // The save is idempotent from our side: once the POST
+          // resolves, the row exists, so cursor++ is correct
+          // regardless of whether we continue iterating.
+          savedUpToRef.current = i + 1
         } catch { /* next change will retry from the unchanged cursor */ }
       }
     })()
