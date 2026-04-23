@@ -124,7 +124,9 @@ Tools you can use (Stage 4):
 - web_search(query, limit) — live web search with URLs and snippets. Whenever the user asks about anything time-sensitive (news, prices, events, who-is) — call this tool. Never invent a URL, price, or fact.
 - translate(text, to, from) — real translation engine (DeepL when available, otherwise LibreTranslate). Whenever the user asks you to translate a phrase to another language — call this tool.
 - get_my_location(include_address?) — REAL user coordinates from the device. Whenever the user asks "where am I?", "what's my location?", "ce orașe sunt aproape de mine?", or anything that depends on their current position — call this tool FIRST, then use the returned coords with get_weather / get_route / nearby_places. Never guess the city from IP, never say "I don't know where you are" without calling this first.
-- switch_camera(side) — flip the phone camera between front ('user' / selfie) and back ('environment' / rear). Call this whenever the user says "flip the camera", "show me the other side", "use the back camera", "schimbă camera", "arată-mi camera din spate". The camera must already be on; if it isn't, ask the user to tap the camera button first. Pass side='front' or side='back'; when the user just says "flip" / "switch" pass the opposite of the current side.
+- switch_camera(side) — flip the phone camera between front ('user' / selfie) and back ('environment' / rear). Call this whenever the user says "flip the camera", "show me the other side", "use the back camera", "schimbă camera", "arată-mi camera din spate". The camera must already be on; if it isn't, ask the user to tap the camera button first. Pass side='front' or side='back'; when the user just says "flip" / "switch" pass the opposite of the current side. On phones with multiple back lenses the client auto-selects the best main sensor.
+- zoom_camera(level) — apply a hardware zoom to the live camera so you can see detail at distance (license plates, signs, small text past ~2 m). Call this when the user says "zoom in", "get closer", "read that sign", "ce scrie pe placuta", "citeste numarul", "vezi mai de aproape". Pass level as a numeric factor (e.g. "2", "3") or one of "in" / "out" / "reset". Only Android Chrome exposes hardware zoom today; if the tool returns an error saying zoom is unsupported, tell the user honestly and offer to move closer instead. Right after zooming, call what_do_you_see with a focus hint (e.g. focus="license plate number") so the vision model reads the zoomed frame.
+- generate_image(prompt) — real AI image generation (Stable-Diffusion family, via Pollinations). Call this whenever the user says "genereaza o imagine cu…", "deseneaza-mi…", "make a picture of…", "show me an AI image of…", "create an image that…". Always prefer this over show_on_monitor('image', …) when the user asked to GENERATE — be specific and visual in the prompt.
 
 HARD rule for all tools above: if the user question clearly needs one of them, YOU MUST call it. Saying "I'll check that for you" or "let me see" without calling the tool counts as a lie. If no tool fits, say honestly "I don't know" — never guess.
 
@@ -138,6 +140,13 @@ Long-term memory:
 - If a "Known facts about the user" section is included below, those are durable facts you remember about THIS user from past conversations. Use them naturally — do not recite them, do not say "according to my memory". Weave them in only when relevant.
 - If a user says "what do you know about me?", answer from the facts you have. If you have none, say so honestly.
 - If the user is NOT signed in and seems to be sharing something you would want to remember (their name, a goal, a preference, a relationship), gently mention — once per session, not repeatedly — that you can remember them across conversations if they tap the menu and choose "Remember me". Don't push.
+
+User identity (HARD — read carefully, this is the #1 source of wrong answers):
+- The person currently talking to you is THIS user only${user && user.name ? ` — ${user.name}` : ''}${user && user.id != null ? ` (id ${user.id})` : ''}. Every "I", "me", "my" you hear in this session refers to THEM, unless they are clearly quoting someone else ("my sister said…", "he told me…", "a friend of mine…").
+- When the user mentions other people (family, friends, colleagues), those are OTHER people, NOT the user. Do NOT merge their traits into what you know about the user. "My wife loves tennis" does NOT mean the user loves tennis.
+- The "Known facts about the user" list below is about THIS user alone. Never use a fact from it to describe another person. If an item sounds like it was mis-attributed (e.g. it says "has a daughter named X" but the user now tells you they have no children), trust the LIVE user, tell them plainly that you had an inconsistent memory, and offer to forget it.
+- If you ever suspect the voice has changed (someone else picked up the phone, a different person is in front of the camera), say so ("you sound different — am I still talking to ${user && user.name ? user.name : 'the same person'}?") before continuing with personal facts. Never blurt out private memories to a new voice without confirmation.
+- In camera view, the person the user shows you (themselves or anyone else) is NOT automatically the signed-in user. Faces are not identity proof. Stick to names the user gives you in the conversation.
 
 Safety:
 - Not a substitute for medical, legal, or financial professionals. For high-stakes questions, give useful context but also recommend a qualified human.
@@ -264,7 +273,7 @@ const KELION_TOOLS = [
   },
   {
     name: 'switch_camera',
-    description: "Flip the device camera between the front ('user' / selfie) and back ('environment' / rear) camera. Call this whenever the user says 'flip the camera', 'show me the other side', 'use the back camera', 'schimbă camera', 'arată-mi camera din spate'. The camera must already be on — if not, the tool returns an error asking the user to tap the camera button first. On desktops with a single webcam the browser may ignore the constraint; the tool reports the resulting facingMode so you can tell the user if the switch didn't actually take effect.",
+    description: "Flip the device camera between the front ('user' / selfie) and back ('environment' / rear) camera. Call this whenever the user says 'flip the camera', 'show me the other side', 'use the back camera', 'schimbă camera', 'arată-mi camera din spate'. On phones with multiple back lenses (wide / ultra-wide / telephoto), the client automatically picks the most performant main sensor. The camera must already be on — if not, the tool returns an error asking the user to tap the camera button first. On desktops with a single webcam the browser may ignore the constraint; the tool reports the resulting facingMode so you can tell the user if the switch didn't actually take effect.",
     properties: {
       side: {
         type: 'string',
@@ -273,6 +282,28 @@ const KELION_TOOLS = [
       },
     },
     required: [],
+  },
+  {
+    name: 'zoom_camera',
+    description: "Apply a hardware zoom level to the currently-active camera. Call this when the user asks you to 'zoom in', 'get closer', 'read that sign', 'citeste numarul de pe placuta', 'vezi mai de aproape', or any request that needs fine detail past ~2 m (license plates, distant text, small objects). Android Chrome supports zoom on most modern phones; iOS Safari does not expose the capability and the tool will return an error you should relay honestly to the user. Pass `level` as a number (e.g. 2 for 2×) or 'in' / 'out' / 'reset' for relative steps.",
+    properties: {
+      level: {
+        type: 'string',
+        description: "Either a numeric zoom factor (as a string, e.g. '2', '3.5') clamped to the camera's [min,max] range, or one of the relative keywords 'in' / 'out' / 'reset'. Defaults to 'in' if omitted.",
+      },
+    },
+    required: [],
+  },
+  {
+    name: 'generate_image',
+    description: "Generate a brand-new image from a natural-language prompt and display it on the stage monitor. This is TRUE image generation (Stable-Diffusion-family model via Pollinations.ai), not stock-photo search. Call this whenever the user says 'genereaza o imagine cu …', 'deseneaza …', 'make a picture of …', 'show me an AI image of …'. Keep prompts concrete and visual (subject + style + setting). After the image renders, narrate briefly what you generated.",
+    properties: {
+      prompt: {
+        type: 'string',
+        description: "Rich visual prompt in English or Romanian. Example: 'a fluffy orange cat wearing a tiny wizard hat, studio lighting, highly detailed'.",
+      },
+    },
+    required: ['prompt'],
   },
   {
     name: 'calculate',

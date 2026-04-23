@@ -7,7 +7,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { runTool } from './kelionTools'
-import { setCameraController, setCurrentFacingMode } from './cameraControl'
+import { setCameraController, setCurrentFacingMode, pickBestRearCameraDeviceId } from './cameraControl'
 import { getCsrfToken } from './api'
 
 const SAMPLE_RATE_IN = 16000   // Gemini Live expects 16kHz PCM16 mic
@@ -883,8 +883,19 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
     if (cameraStreamRef.current) return
     cameraFacingRef.current = nextFacing
     setCurrentFacingMode(nextFacing)
+    // Best-rear-camera selection: when the user asked for the back side,
+    // enumerate devices and pick the main/wide lens (iPhone Pro, Pixel 6+,
+    // Galaxy S-series). Labels are only populated after the first
+    // permission grant; the ladder below falls back to plain facingMode
+    // when labels are empty. Callers (cameraControl.requestCameraSwitch)
+    // may also inject a pre-chosen deviceId through opts.
+    let deviceId = typeof opts.deviceId === 'string' ? opts.deviceId : null
+    if (!deviceId && nextFacing === 'environment') {
+      deviceId = await pickBestRearCameraDeviceId().catch(() => null)
+    }
     // Ladder of progressively looser constraints. The first rung is what
-    // we actually want (requested camera at 640×480); the fallbacks exist
+    // we actually want (requested camera at HD 1280×720 — license plates
+    // and distant text were unreadable at 640×480); the fallbacks exist
     // because Chromium on Windows/Edge throws NotReadableError with
     // the unhelpful message "Could not start video source" when the
     // *constraint set* is incompatible with the specific camera
@@ -893,11 +904,19 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
     // NVIDIA Broadcast) that only honours default constraints. Trying
     // `facingMode: 'user'` explicitly is a known offender on
     // external webcams. Dropping constraints almost always recovers.
-    const constraintLadder = [
+    const constraintLadder = []
+    if (deviceId) {
+      constraintLadder.push({
+        video: { width: { ideal: 1280 }, height: { ideal: 720 }, deviceId: { exact: deviceId } },
+        audio: false,
+      })
+    }
+    constraintLadder.push(
+      { video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: nextFacing }, audio: false },
       { video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: nextFacing }, audio: false },
       { video: { width: { ideal: 640 }, height: { ideal: 480 } }, audio: false },
       { video: true, audio: false },
-    ]
+    )
     let lastError = null
     for (const constraints of constraintLadder) {
       try {
@@ -1054,6 +1073,68 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
 
   useEffect(() => () => { stop() }, [stop])
 
+  // Apply a live zoom level to the active video track. See
+  // openaiRealtime.js for the full capability rationale — on Android
+  // Chrome this maps to hardware zoom on supported sensors; iOS Safari
+  // does not expose the `zoom` capability so we return a speakable
+  // error instead of silently no-op'ing.
+  const applyZoom = useCallback(async (level) => {
+    const stream = cameraStreamRef.current
+    const track = stream && stream.getVideoTracks && stream.getVideoTracks()[0]
+    if (!track) return { ok: false, error: 'Camera is not active.' }
+    const caps = typeof track.getCapabilities === 'function' ? track.getCapabilities() : {}
+    const settings = typeof track.getSettings === 'function' ? track.getSettings() : {}
+    if (!caps || caps.zoom == null) {
+      return { ok: false, error: 'This camera does not support zoom.' }
+    }
+    const min = Number(caps.zoom.min) || 1
+    const max = Number(caps.zoom.max) || min
+    const step = Number(caps.zoom.step) || 0.1
+    const current = Number(settings.zoom) || min
+    let target
+    const s = String(level || '').toLowerCase()
+    if (s === 'in')         target = Math.min(max, current + Math.max(step, (max - min) / 6))
+    else if (s === 'out')   target = Math.max(min, current - Math.max(step, (max - min) / 6))
+    else if (s === 'reset') target = min
+    else if (Number.isFinite(Number(level))) target = Math.max(min, Math.min(max, Number(level)))
+    else return { ok: false, error: "Zoom level must be a number or 'in'/'out'/'reset'." }
+    try {
+      await track.applyConstraints({ advanced: [{ zoom: target }] })
+      return { ok: true, zoom: target, min, max, step }
+    } catch (err) {
+      return { ok: false, error: (err && err.message) || 'Zoom constraint rejected.' }
+    }
+  }, [])
+
+  // Native-resolution snapshot for on-demand vision. Gemini Live already
+  // streams live video at ~15 fps so the model already "sees"; this
+  // helper exists so the `what_do_you_see` tool (which is declared on
+  // both transports for parity) can still hand a sharp frame to the
+  // Gemini Vision side-car endpoint when the user asks to read a
+  // license plate or a distant sign.
+  const captureHighResSnapshot = useCallback(async (opts = {}) => {
+    const video = hiddenVideoCameraRef.current
+    if (!video || !video.videoWidth || !video.videoHeight) {
+      return { ok: false, error: 'Camera is off.' }
+    }
+    const maxWidth = Number(opts.maxWidth) || 1600
+    const scale = Math.min(1, maxWidth / video.videoWidth)
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, Math.floor(video.videoWidth * scale))
+    canvas.height = Math.max(1, Math.floor(video.videoHeight * scale))
+    try {
+      canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height)
+    } catch (err) {
+      return { ok: false, error: 'Snapshot draw failed.' }
+    }
+    try {
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.9)
+      return { ok: true, dataUrl, width: canvas.width, height: canvas.height }
+    } catch (err) {
+      return { ok: false, error: 'Snapshot encode failed.' }
+    }
+  }, [])
+
   // Register the camera controller so the `switch_camera` tool handler
   // in kelionTools.js can flip front/back without reaching into this
   // hook directly. Keeps the coupling one-way: the tool dispatches via
@@ -1063,9 +1144,11 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
     setCameraController({
       restart: (opts) => startCamera(opts),
       getFacingMode: () => cameraFacingRef.current || 'user',
+      applyZoom,
+      captureHighResSnapshot,
     })
     return () => setCameraController(null)
-  }, [startCamera])
+  }, [startCamera, applyZoom, captureHighResSnapshot])
 
   // Audit M6 — `isBusy()` lets KelionStage's auto-fallback effect
   // (2) detect whether the user already kicked off a manual

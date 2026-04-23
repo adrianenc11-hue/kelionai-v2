@@ -300,10 +300,30 @@ function resolveMonitor(kind, query) {
 
     case 'image': {
       if (!q) return null;
-      // LoremFlickr returns a topic-matching Flickr image directly, no key,
-      // CORS-friendly. Replaces source.unsplash.com which was retired by
-      // Unsplash in 2024 and now returns 503 for every request.
-      const src = `https://loremflickr.com/1280/720/${encodeURIComponent(q)}`;
+      // Real, prompt-driven image generation via Pollinations.ai — a free
+      // public endpoint that returns a JPEG rendered from the prompt by a
+      // Stable-Diffusion-family model. No API key, no CORS pain (it serves
+      // standard image bytes under our `imgSrc https:` CSP).
+      //
+      // Previously this branch pulled from LoremFlickr, which only returns
+      // tagged stock photos — so "show me a red cat wearing a top hat" used
+      // to land a generic cat photo. Adrian's "nu genereaza imagini"
+      // report was exactly that: the monitor looked like it was "finding"
+      // photos, never actually generating. We embed with `model=flux`
+      // (fast, strong default), `enhance=true` (prompt rewrite for better
+      // composition), and `nologo=true` (no watermark). A stable `seed`
+      // derived from the prompt keeps repeat calls idempotent-ish.
+      let seed = 0;
+      for (let i = 0; i < q.length; i += 1) seed = (seed * 31 + q.charCodeAt(i)) | 0;
+      const params = new URLSearchParams({
+        width: '1024',
+        height: '1024',
+        model: 'flux',
+        nologo: 'true',
+        enhance: 'true',
+        seed: String(Math.abs(seed) || 1),
+      });
+      const src = `https://image.pollinations.ai/prompt/${encodeURIComponent(q)}?${params.toString()}`;
       return { kind: 'image', src, title: `Image — ${q}`, embedType: 'image' };
     }
 

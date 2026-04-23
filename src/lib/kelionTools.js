@@ -15,7 +15,12 @@ import {
   readClientGeoPermission,
   tryRequestClientGeo,
 } from './clientGeoProvider'
-import { requestCameraSwitch, getCurrentFacingMode } from './cameraControl'
+import {
+  requestCameraSwitch,
+  getCurrentFacingMode,
+  requestCameraZoom,
+  captureHighResSnapshot,
+} from './cameraControl'
 import { getCsrfToken } from './api'
 
 async function postJSON(url, body) {
@@ -219,29 +224,43 @@ export async function runTool(name, args) {
     case 'what_do_you_see': {
       // Hybrid voice+vision: OpenAI handles speech, Gemini Vision handles
       // camera. The tool only fires when the user asks the avatar to look
-      // (persona gates this in the system prompt); here we pull the most
-      // recent frame from the passive buffer (openaiRealtime.js grabs one
-      // every ~1s while the camera is on) and POST it to the server,
-      // which forwards to Gemini Vision and returns plain-text description.
-      // If the camera is off or we haven't grabbed a frame yet, tell the
-      // model that so it can ask the user to turn it on instead of making
-      // up a description.
-      const frame = getLatestCameraFrame()
-      if (!frame?.dataUrl) {
-        return "Camera is off. Tell the user to tap the camera button so you can see."
-      }
-      // Stale-frame guard: if the last grab was > 30s ago (tab was
-      // backgrounded, grab loop stalled, etc.) we'd rather ask the user
-      // to verify than describe a minute-old still.
-      if (Date.now() - (frame.capturedAt || 0) > 30_000) {
-        return "My last camera frame is stale. Ask the user to move or tap the camera button again."
+      // (persona gates this in the system prompt); we prefer a fresh
+      // high-resolution snapshot from the active transport (native camera
+      // resolution, typically 1280×720+) so Kelion can actually read
+      // distant text (license plates, signs, labels) — the passive 480 px
+      // buffer was hopeless past ~2 m. Falls back to the passive buffer
+      // when the HD path isn't available (older transport, snapshot
+      // encode failure, etc.).
+      const focus = typeof args?.focus === 'string' ? args.focus.toLowerCase() : ''
+      // If the user's focus hints at fine detail ("citeste", "read",
+      // "plate", "sign", "text", "small"), request the largest snapshot
+      // the client can produce; otherwise 1600 px is plenty.
+      const detailPatterns = /plate|placu|inmatricul|license|sign|text|read|cite|mic|small|detail|numar/i
+      const maxWidth = detailPatterns.test(focus) ? 2400 : 1600
+      let frameDataUrl = null
+      try {
+        const hi = await captureHighResSnapshot({ maxWidth })
+        if (hi && hi.ok && hi.dataUrl) frameDataUrl = hi.dataUrl
+      } catch (_) { /* fall through to passive buffer */ }
+      if (!frameDataUrl) {
+        const frame = getLatestCameraFrame()
+        if (!frame?.dataUrl) {
+          return "Camera is off. Tell the user to tap the camera button so you can see."
+        }
+        // Stale-frame guard: if the last grab was > 30s ago (tab was
+        // backgrounded, grab loop stalled, etc.) we'd rather ask the user
+        // to verify than describe a minute-old still.
+        if (Date.now() - (frame.capturedAt || 0) > 30_000) {
+          return "My last camera frame is stale. Ask the user to move or tap the camera button again."
+        }
+        frameDataUrl = frame.dataUrl
       }
       try {
         const r = await fetch('/api/realtime/vision', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
           credentials: 'include',
-          body: JSON.stringify({ frame: frame.dataUrl, focus: args?.focus || '' }),
+          body: JSON.stringify({ frame: frameDataUrl, focus: args?.focus || '' }),
         })
         if (!r.ok) {
           // Surface a graceful, speakable failure — don't crash the voice
@@ -326,6 +345,29 @@ export async function runTool(name, args) {
       const res = await requestCameraSwitch(side)
       if (!res.ok) return res.error || 'Camera switch failed.'
       return `ok:facingMode=${res.facingMode}`
+    }
+    case 'zoom_camera': {
+      // Hardware zoom on supported sensors. Call this when the user asks
+      // Kelion to "zoom in", "get closer", "read that sign", "citeste
+      // numarul de pe placuta", etc. Browser support: Android Chrome
+      // exposes the `zoom` capability on most 2019+ phones; iOS Safari
+      // does not (yet) — the controller returns a speakable error we
+      // relay so Kelion tells the user honestly.
+      const rawLevel = args?.level
+      const res = await requestCameraZoom(rawLevel != null ? rawLevel : 'in')
+      if (!res.ok) return res.error || 'Zoom failed.'
+      return `ok:zoom=${res.zoom}:range=${res.min}-${res.max}`
+    }
+    case 'generate_image': {
+      // Prompt-driven image generation surfaced on the stage monitor.
+      // Internally this routes through handleShowOnMonitor('image', q)
+      // which now calls Pollinations.ai (free, no key, Stable-Diffusion
+      // family) — so the monitor finally shows a REAL generated image
+      // instead of the old LoremFlickr stock-photo stand-in that
+      // triggered Adrian's "nu genereaza imagini" report.
+      const prompt = (args?.prompt || args?.query || '').toString().trim()
+      if (!prompt) return 'Generate-image needs a prompt (describe what to draw).'
+      return handleShowOnMonitor({ kind: 'image', query: prompt })
     }
     default:
       // Real-API tools (calculate, get_weather, web_search, …) are proxied

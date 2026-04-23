@@ -31,7 +31,14 @@ router.post('/extract-and-store', async (req, res) => {
     const turns = Array.isArray(req.body?.turns) ? req.body.turns : [];
     if (turns.length === 0) return res.json({ added: [] });
 
-    const facts = await extractFacts(turns);
+    // Thread the signed-in user's display name through so the
+    // extractor can tell apart "I love tennis" (user fact — keep)
+    // from "my wife loves tennis" (third-party — skip). Before this
+    // change the extractor greedily kept every "likes X" phrase it
+    // found, which is how facts about spouses and friends were
+    // ending up attached to the user's memory record.
+    const userName = (req.user && (req.user.name || req.user.displayName || req.user.email)) || '';
+    const facts = await extractFacts(turns, { userName });
     const added = await addMemoryItems(req.user.id, facts);
     res.json({ added, candidates: facts.length });
   } catch (err) {

@@ -69,6 +69,14 @@ const EXPECTED_TOOL_NAMES = [
   // (clientGeoProvider, cameraControl) rather than the server.
   'get_my_location',
   'switch_camera',
+  // Kelion UX batch (Apr-2026) — hardware zoom on the live camera
+  // (for distant detail like license plates) + prompt-driven AI
+  // image generation surfaced on the stage monitor. Both are
+  // client-handled: zoom_camera calls applyConstraints on the
+  // active MediaStreamTrack; generate_image routes through
+  // monitorStore → Pollinations.ai.
+  'zoom_camera',
+  'generate_image',
   // PR B — document readers + OCR (pdf-parse / mammoth / tesseract.js).
   // Inputs accept either a public HTTPS URL or a base64 blob.
   'read_pdf',

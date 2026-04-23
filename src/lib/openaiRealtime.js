@@ -29,7 +29,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { runTool } from './kelionTools'
 import { setLatestCameraFrame, clearLatestCameraFrame, getLatestCameraFrame } from './cameraFrameBuffer'
 import { subscribeNarrationMode, getNarrationMode, setNarrationMode } from './narrationMode'
-import { setCameraController, setCurrentFacingMode } from './cameraControl'
+import { setCameraController, setCurrentFacingMode, pickBestRearCameraDeviceId } from './cameraControl'
 import { getCsrfToken } from './api'
 
 // Public signature matches useGeminiLive exactly so swapping is a
@@ -829,10 +829,52 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
         }
         return null
       })
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode },
-        audio: false,
-      })
+      // Best-rear-camera selection on phones with multi-lens back modules
+      // (iPhone 13 Pro+, Samsung S-series, Pixel 6+): when the caller
+      // asked for the environment side, enumerateDevices + pick the
+      // main/wide lens. Falls back to plain `facingMode: 'environment'`
+      // when labels aren't available yet (pre-permission, single-camera
+      // desktops). The switch_camera tool already passes a deviceId in
+      // its opts after the second call; honour that when supplied.
+      let deviceId = typeof opts.deviceId === 'string' ? opts.deviceId : null
+      if (!deviceId && facingMode === 'environment') {
+        deviceId = await pickBestRearCameraDeviceId().catch(() => null)
+      }
+      // Bump the requested resolution — license plates and distant text
+      // were unreadable at 640×480. HD cameras on every phone from 2015
+      // onward support 1280×720 natively; the 1-Hz vision path still
+      // downscales to ~720 px for upload so we're not paying bandwidth
+      // for the passive frame buffer.
+      const videoConstraints = {
+        width:  { ideal: 1280 },
+        height: { ideal: 720  },
+      }
+      if (deviceId) {
+        videoConstraints.deviceId = { exact: deviceId }
+      } else {
+        videoConstraints.facingMode = facingMode
+      }
+      let stream
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: videoConstraints,
+          audio: false,
+        })
+      } catch (firstErr) {
+        // Ladder: if the deviceId selection fails (device went away
+        // between enumerateDevices and getUserMedia, or the driver
+        // rejected the HD constraint), retry with plain facingMode so
+        // the user always ends up with *some* stream instead of an
+        // error toast.
+        if (deviceId || videoConstraints.width) {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode },
+            audio: false,
+          })
+        } else {
+          throw firstErr
+        }
+      }
       setCameraStream(stream)
       setVisionError(null)
 
@@ -919,6 +961,68 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
     setVisionError(null)
   }, [])
 
+  // Apply a live zoom level to the active video track. Most Android
+  // Chrome builds expose a `zoom` capability (min/max/step) through
+  // MediaStreamTrack.getCapabilities(); iOS Safari does not yet. When
+  // the capability is absent we report a clear error so Kelion can
+  // tell the user their device doesn't support zoom — better than
+  // claiming success silently.
+  const applyZoom = useCallback(async (level) => {
+    const stream = cameraVideoRef.current?.srcObject
+    const track = stream && stream.getVideoTracks && stream.getVideoTracks()[0]
+    if (!track) return { ok: false, error: 'Camera is not active.' }
+    const caps = typeof track.getCapabilities === 'function' ? track.getCapabilities() : {}
+    const settings = typeof track.getSettings === 'function' ? track.getSettings() : {}
+    if (!caps || caps.zoom == null) {
+      return { ok: false, error: 'This camera does not support zoom.' }
+    }
+    const min = Number(caps.zoom.min) || 1
+    const max = Number(caps.zoom.max) || min
+    const step = Number(caps.zoom.step) || 0.1
+    const current = Number(settings.zoom) || min
+    let target
+    const s = String(level || '').toLowerCase()
+    if (s === 'in')         target = Math.min(max, current + Math.max(step, (max - min) / 6))
+    else if (s === 'out')   target = Math.max(min, current - Math.max(step, (max - min) / 6))
+    else if (s === 'reset') target = min
+    else if (Number.isFinite(Number(level))) target = Math.max(min, Math.min(max, Number(level)))
+    else return { ok: false, error: "Zoom level must be a number or 'in'/'out'/'reset'." }
+    try {
+      await track.applyConstraints({ advanced: [{ zoom: target }] })
+      return { ok: true, zoom: target, min, max, step }
+    } catch (err) {
+      return { ok: false, error: (err && err.message) || 'Zoom constraint rejected.' }
+    }
+  }, [])
+
+  // Pull a native-resolution JPEG for on-demand vision (what_do_you_see).
+  // The 1-Hz passive buffer is 480 px wide which is hopeless for reading
+  // a license plate at 5 m. Here we draw the full video frame at its
+  // real resolution (typically 1280×720 after the constraint bump) and
+  // return a data URL the tool handler can POST to /api/realtime/vision.
+  const captureHighResSnapshot = useCallback(async (opts = {}) => {
+    const video = cameraVideoRef.current
+    if (!video || !video.videoWidth || !video.videoHeight) {
+      return { ok: false, error: 'Camera is off.' }
+    }
+    const maxWidth = Number(opts.maxWidth) || 1600
+    const scale = Math.min(1, maxWidth / video.videoWidth)
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, Math.floor(video.videoWidth * scale))
+    canvas.height = Math.max(1, Math.floor(video.videoHeight * scale))
+    try {
+      canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height)
+    } catch (err) {
+      return { ok: false, error: 'Snapshot draw failed.' }
+    }
+    try {
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.9)
+      return { ok: true, dataUrl, width: canvas.width, height: canvas.height }
+    } catch (err) {
+      return { ok: false, error: 'Snapshot encode failed.' }
+    }
+  }, [])
+
   // Register the camera controller so the `switch_camera` tool handler
   // in kelionTools.js can flip front/back without reaching into this
   // hook directly. We re-register whenever startCamera's identity
@@ -927,9 +1031,11 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
     setCameraController({
       restart: (opts) => startCamera(opts),
       getFacingMode: () => cameraFacingRef.current || 'user',
+      applyZoom,
+      captureHighResSnapshot,
     })
     return () => setCameraController(null)
-  }, [startCamera])
+  }, [startCamera, applyZoom, captureHighResSnapshot])
 
   // Audit M6 — see lib/handoffGuard.js. True while `start()` is in
   // flight OR while the live RTCPeerConnection is anything other
