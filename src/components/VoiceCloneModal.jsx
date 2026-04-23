@@ -21,6 +21,7 @@
 //   DELETE /api/voice/clone          → clears the clone on ElevenLabs + DB
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { getCsrfToken } from '../lib/api'
 
 const CONSENT_VERSION = '2026-04-20.v1'
 const MIN_SECONDS = 30
@@ -229,7 +230,7 @@ export default function VoiceCloneModal({ open, onClose, userEmail, userName }) 
       const r = await fetch('/api/voice/clone', {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
         body: JSON.stringify({
           audioBase64,
           mimeType: sampleBlob.type || 'audio/webm',
@@ -258,7 +259,7 @@ export default function VoiceCloneModal({ open, onClose, userEmail, userName }) 
       const r = await fetch('/api/voice/clone', {
         method: 'PATCH',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
         body: JSON.stringify({ enabled: Boolean(next) }),
       })
       const j = await r.json().catch(() => ({}))
@@ -275,7 +276,11 @@ export default function VoiceCloneModal({ open, onClose, userEmail, userName }) 
     if (!window.confirm('Delete your cloned voice? This also removes it from ElevenLabs. This cannot be undone.')) return
     setBusy(true); setError(null)
     try {
-      const r = await fetch('/api/voice/clone', { method: 'DELETE', credentials: 'include' })
+      const r = await fetch('/api/voice/clone', {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: { 'X-CSRF-Token': getCsrfToken() },
+      })
       const j = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error((j && j.error) || 'Delete failed.')
       setExisting(null)

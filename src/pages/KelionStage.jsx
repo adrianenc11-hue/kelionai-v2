@@ -16,6 +16,7 @@ import { TUNING, isTuningEnabled } from '../lib/tuning'
 import TuningPanel from '../components/TuningPanel'
 import SignInModal from '../components/SignInModal'
 import VoiceCloneModal from '../components/VoiceCloneModal'
+import { getCsrfToken } from '../lib/api'
 import {
   supportsPasskey,
   registerPasskey,
@@ -60,7 +61,7 @@ async function setVoiceStyle(style) {
     const r = await fetch('/api/realtime/voice-style', {
       method: 'POST',
       credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
       body: JSON.stringify({ style }),
     })
     const j = await r.json().catch(() => ({}))
@@ -1143,6 +1144,7 @@ export default function KelionStage() {
         headers: {
           'Content-Type': 'application/json',
           'Idempotency-Key': idempotencyKey,
+          'X-CSRF-Token': getCsrfToken(),
         },
         body: JSON.stringify({
           email,
@@ -1285,7 +1287,7 @@ export default function KelionStage() {
       const r = await fetch('/api/credits/checkout', {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
         body: JSON.stringify({ packageId: pkgId }),
       })
       const j = await r.json().catch(() => ({}))
@@ -1434,7 +1436,7 @@ export default function KelionStage() {
     setDupBusyKey(key)
     setDupResult(null)
     try {
-      const h = { 'Content-Type': 'application/json' }
+      const h = { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() }
       if (authTokenRef.current) h['Authorization'] = `Bearer ${authTokenRef.current}`
       const r = await fetch('/api/admin/users/merge', {
         method: 'POST',
@@ -1505,7 +1507,7 @@ export default function KelionStage() {
       const r = await fetch('/api/admin/payouts/instant', {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
         // Empty body → Stripe pays out the full instant-available balance.
         body: JSON.stringify({}),
       })
@@ -1592,7 +1594,7 @@ export default function KelionStage() {
     if (fileInputRef.current) fileInputRef.current.value = ''
     setChatBusy(true)
     try {
-      const chatHeaders = { 'Content-Type': 'application/json' }
+      const chatHeaders = { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() }
       if (authTokenRef.current) {
         chatHeaders['Authorization'] = `Bearer ${authTokenRef.current}`
       }
@@ -1788,7 +1790,7 @@ export default function KelionStage() {
       try { resetTtsLipSync() } catch (_) { /* hook already reset */ }
     }
 
-    const ttsHeaders = { 'Content-Type': 'application/json' }
+    const ttsHeaders = { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() }
     if (authTokenRef.current) ttsHeaders['Authorization'] = `Bearer ${authTokenRef.current}`
 
     // Browser locale is a highly reliable signal for which language the user
