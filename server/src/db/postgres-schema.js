@@ -162,4 +162,18 @@ CREATE TABLE IF NOT EXISTS visitor_events (
   user_email  TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_visitor_events_ts ON visitor_events(ts DESC);
+
+-- Audit M7 — cross-instance consume state for the H1 silent-bypass
+-- cap. Mirrors the SQLite definition in server/src/db/index.js. The
+-- timestamps are stored as epoch-ms INTEGER so the same
+-- evaluateConsumeDecision() policy works byte-for-byte across SQLite
+-- and Postgres. Payload is three integers per active user.
+CREATE TABLE IF NOT EXISTS credits_consume_state (
+  user_id          BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  last_billable_at BIGINT NOT NULL DEFAULT 0,
+  silent_streak    INTEGER NOT NULL DEFAULT 0,
+  silent_since     BIGINT NOT NULL DEFAULT 0,
+  updated_at       BIGINT NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_credits_consume_state_updated ON credits_consume_state(updated_at);
 `;
