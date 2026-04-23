@@ -271,6 +271,33 @@ describe('installErrorReporter', () => {
     expect(fetchFn).not.toHaveBeenCalled();
   });
 
+  // PR #180 follow-up — cross-origin script failures surface as
+  // ev.message === 'Script error.' with ev.error == null. The browser
+  // strips file/line/column so the report has zero actionable detail.
+  // Our onError filter now rejects that specific shape as well.
+  it('ignores cross-origin "Script error." events (message set, error null)', () => {
+    const { stats } = installErrorReporter({ target, fetchFn, now });
+    fireError(target, { message: 'Script error.', error: null, filename: '', lineno: 0, colno: 0 });
+    fireError(target, { message: 'script error', error: null });
+    expect(stats.reported).toBe(0);
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  // Same-origin errors with a real message (but no Error object) are
+  // still reported — they carry filename/lineno the developer can act on.
+  it('still reports same-origin error events that carry filename + lineno', () => {
+    const { stats } = installErrorReporter({ target, fetchFn, now });
+    fireError(target, {
+      message: 'ReferenceError: foo is not defined',
+      error: null,
+      filename: 'https://kelion.app/chunk.js',
+      lineno: 42,
+      colno: 7,
+    });
+    expect(stats.reported).toBe(1);
+    expect(fetchFn.calls[0].body.message).toMatch(/ReferenceError/);
+  });
+
   it('reporter never re-enters on fetch rejection (swallows own errors)', () => {
     const brokenFetch = jest.fn(() => Promise.reject(new Error('network down')));
     const { stats, uninstall } = installErrorReporter({
@@ -305,7 +332,63 @@ describe('installErrorReporter', () => {
     const { stats } = installErrorReporter({ target, fetchFn: null, now });
     fireUnhandledRejection(target, new Error('offline'));
     expect(stats.dropped).toBe(1);
+    expect(stats.droppedNoFetch).toBe(1);
+    expect(stats.droppedDedup).toBe(0);
     expect(stats.reported).toBe(1);
+  });
+
+  // PR #180 follow-up — `stats.dropped` previously conflated dedup-hits
+  // and no-fetch failures. Split into two counters so a downstream
+  // Prometheus exporter can distinguish them, while keeping `dropped`
+  // as the back-compat sum.
+  it('splits droppedDedup vs droppedNoFetch while preserving total', () => {
+    const { stats } = installErrorReporter({
+      target, fetchFn, now,
+      dedupMs: 5000,
+    });
+    fireUnhandledRejection(target, new Error('same'));
+    fireUnhandledRejection(target, new Error('same'));
+    fireUnhandledRejection(target, new Error('same'));
+    expect(stats.reported).toBe(1);
+    expect(stats.droppedDedup).toBe(2);
+    expect(stats.droppedNoFetch).toBe(0);
+    expect(stats.dropped).toBe(stats.droppedDedup + stats.droppedNoFetch);
+  });
+
+  // PR #180 follow-up — harmonise falsy-value handling. Passing
+  // `rateLimit: 0` now means "allow 0 reports per window" (= block all),
+  // matching the `dedupMs: 0` = "disable dedup" semantics. Before this
+  // change, `0` silently fell back to the 10/60s default because
+  // `opts.rateLimit || DEFAULT` coerced it.
+  it('accepts rateLimit: 0 as "block all reports" (harmonised with dedupMs)', () => {
+    const { stats } = installErrorReporter({
+      target, fetchFn, now,
+      rateLimit: 0,
+      rateWindowMs: 60_000,
+      dedupMs: 0,
+    });
+    fireUnhandledRejection(target, new Error('a'));
+    fireUnhandledRejection(target, new Error('b'));
+    expect(stats.reported).toBe(0);
+    expect(stats.rateLimited).toBe(2);
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  // Non-finite / negative rateLimit values still fall back to the
+  // default so a mis-wired caller doesn't accidentally wedge the
+  // reporter permanently.
+  it('falls back to default when rateLimit is non-finite or negative', () => {
+    const { stats } = installErrorReporter({
+      target, fetchFn, now,
+      rateLimit: -5,
+      dedupMs: 0,
+    });
+    for (let i = 0; i < 12; i++) {
+      fireUnhandledRejection(target, new Error(`msg-${i}`));
+    }
+    // Default cap is 10 per window, so exactly 10 pass.
+    expect(stats.reported).toBe(10);
+    expect(stats.rateLimited).toBe(2);
   });
 
   it('returns no-op handle when target is absent (SSR / non-browser)', () => {
