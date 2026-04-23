@@ -2258,6 +2258,17 @@ async function toolPypiPackageInfo(args) {
 // ──────────────────────────────────────────────────────────────────
 // Dispatch
 
+// F11 — OpenAI image generation. Returns a short-lived URL pointing at
+// the in-process cache served by routes/generatedImages.js — the voice
+// model's read-back stays tiny while the client gets a real PNG URL to
+// embed on the avatar's stage monitor.
+const { generateImage } = require('./imageGen');
+async function toolGenerateImage(args) {
+  const prompt = typeof args?.prompt === 'string' ? args.prompt : '';
+  const size = typeof args?.size === 'string' ? args.size : undefined;
+  return generateImage({ prompt, size });
+}
+
 async function executeRealTool(name, args, ctx) {
   // Strip any leading-underscore keys from caller-supplied args. These are
   // reserved for internal wrappers (e.g. toolGetForecast passes `_maxDays`
@@ -2328,6 +2339,8 @@ async function executeRealTool(name, args, ctx) {
     case 'get_my_credits':    return toolGetMyCredits(a, ctx);
     case 'get_my_usage':      return toolGetMyUsage(a, ctx);
     case 'get_my_profile':    return toolGetMyProfile(a, ctx);
+    // ── F11 — image generation (gpt-image-1) ──
+    case 'generate_image':    return toolGenerateImage(a);
     default:                  return null; // signal "not handled here"
   }
 }
@@ -2360,6 +2373,10 @@ const REAL_TOOL_NAMES = [
   // (GITHUB_TOKEN, if set, just raises the unauth rate limit).
   'send_email', 'send_sms', 'create_calendar_ics', 'zapier_trigger',
   'github_repo_info', 'npm_package_info', 'pypi_package_info',
+  // F11 — AI image generation (OpenAI gpt-image-1). Returns a short-lived
+  // URL that the client hands off to the avatar's stage monitor so the
+  // freshly-generated PNG shows up inline instead of via a link.
+  'generate_image',
 ];
 
 module.exports = {
@@ -2424,4 +2441,6 @@ module.exports = {
   toolGithubRepoInfo,
   toolNpmPackageInfo,
   toolPypiPackageInfo,
+  // F11 — image generation
+  toolGenerateImage,
 };
