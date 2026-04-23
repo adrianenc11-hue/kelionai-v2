@@ -16,6 +16,7 @@ import {
   tryRequestClientGeo,
 } from './clientGeoProvider'
 import { requestCameraSwitch, getCurrentFacingMode } from './cameraControl'
+import { requestUINotify, requestUINavigate, listAllowedRoutes } from './uiActionStore'
 import { getCsrfToken } from './api'
 
 async function postJSON(url, body) {
@@ -359,6 +360,33 @@ export async function runTool(name, args) {
       const res = await requestCameraSwitch(side)
       if (!res.ok) return res.error || 'Camera switch failed.'
       return `ok:facingMode=${res.facingMode}`
+    }
+    case 'ui_notify': {
+      // Kelion paints a visible status note on the stage ("am deschis
+      // harta", "am salvat conversația"). Gives the avatar a visual
+      // channel for actions it just performed so the user can see
+      // them complete, instead of trusting spoken claims alone. First
+      // concrete agency primitive — "apasă butoane" starts here.
+      const res = await requestUINotify({
+        text: args?.text ?? args?.message,
+        variant: args?.variant,
+        ttl_s: args?.ttl_s,
+      })
+      if (!res.ok) return res.error || 'Notification failed.'
+      return `ok:ui_notify:id=${res.id}`
+    }
+    case 'ui_navigate': {
+      // Move the user between the small set of SPA routes Kelion
+      // knows about ("/", "/studio", "/contact"). Allowlisted inside
+      // uiActionStore so a hallucinated route can't silently
+      // navigate anywhere. When the route is unknown the tool
+      // returns a speakable error that includes the allowed set,
+      // so the model can correct itself.
+      const res = await requestUINavigate(args?.route)
+      if (!res.ok) {
+        return res.error || `Navigation failed. Allowed routes: ${listAllowedRoutes().join(', ')}.`
+      }
+      return `ok:ui_navigate:route=${res.route}`
     }
     default:
       // Real-API tools (calculate, get_weather, web_search, …) are proxied

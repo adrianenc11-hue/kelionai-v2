@@ -125,6 +125,8 @@ Tools you can use (Stage 4):
 - translate(text, to, from) — real translation engine (DeepL when available, otherwise LibreTranslate). Whenever the user asks you to translate a phrase to another language — call this tool.
 - get_my_location(include_address?) — REAL user coordinates from the device. Whenever the user asks "where am I?", "what's my location?", "ce orașe sunt aproape de mine?", or anything that depends on their current position — call this tool FIRST, then use the returned coords with get_weather / get_route / nearby_places. Never guess the city from IP, never say "I don't know where you are" without calling this first.
 - switch_camera(side) — flip the phone camera between front ('user' / selfie) and back ('environment' / rear). Call this whenever the user says "flip the camera", "show me the other side", "use the back camera", "schimbă camera", "arată-mi camera din spate". The camera must already be on; if it isn't, ask the user to tap the camera button first. Pass side='front' or side='back'; when the user just says "flip" / "switch" pass the opposite of the current side.
+- ui_notify(text, variant?) — paint a short visible note on the stage so the user SEES what you just did ("am deschis harta", "am salvat conversația", "searching Wikipedia…"). Use this whenever you complete a real action (a tool call succeeded, a monitor render finished, memory was saved). Variant is one of 'info' | 'success' | 'warning' | 'error' (default 'info'). Keep the note ≤ 80 characters and match the user's language. This is how you prove to the user that an action actually happened — speaking alone is not enough.
+- ui_navigate(route) — move the user to another page of the app. Allowed routes: '/' (main stage with the avatar), '/studio' (Python / Node Dev Studio), '/contact'. Call this when the user asks to "deschide Studio", "take me to the studio", "go back to the main page", "open the contact page". If the user asks for a page you don't recognise, say so — do NOT guess a route.
 
 HARD rule for all tools above: if the user question clearly needs one of them, YOU MUST call it. Saying "I'll check that for you" or "let me see" without calling the tool counts as a lie. If no tool fits, say honestly "I don't know" — never guess.
 
@@ -273,6 +275,38 @@ const KELION_TOOLS = [
       },
     },
     required: [],
+  },
+  {
+    name: 'ui_notify',
+    description: "Paint a short visible note on the stage so the user SEES that an action actually completed (e.g. 'map opened', 'conversation saved', 'căutare în curs…'). Use this to prove tool calls or monitor renders succeeded — speaking alone is not enough. Keep text ≤ 80 characters and match the user's language. Variant controls the color: info (default, blue), success (green), warning (amber), error (red).",
+    properties: {
+      text: {
+        type: 'string',
+        description: 'Short message to display to the user. ≤ 80 characters. Use the language the conversation is currently in.',
+      },
+      variant: {
+        type: 'string',
+        enum: ['info', 'success', 'warning', 'error'],
+        description: "Visual tone. Default 'info'. Use 'success' when a real action completed, 'warning' when partial, 'error' when a tool failed.",
+      },
+      ttl_s: {
+        type: 'number',
+        description: 'Optional time-to-live in seconds (1–15). Default 4.5 s.',
+      },
+    },
+    required: ['text'],
+  },
+  {
+    name: 'ui_navigate',
+    description: "Move the user to another page of the app via SPA navigation. Allowed routes: '/' (main stage with the avatar), '/studio' (the Python / Node Dev Studio), '/contact'. Call this when the user says 'deschide Studio', 'take me to the studio', 'go back to the main page', 'open the contact page'. If the user asks for a page you don't recognise, say so — do NOT guess a route; the tool will reject it.",
+    properties: {
+      route: {
+        type: 'string',
+        enum: ['/', '/studio', '/contact'],
+        description: "Exact route path. Must match the allowed list. Hallucinated paths (e.g. '/admin', '/dashboard') are rejected by the client.",
+      },
+    },
+    required: ['route'],
   },
   {
     name: 'calculate',
