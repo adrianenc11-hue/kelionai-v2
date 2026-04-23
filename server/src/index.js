@@ -254,37 +254,20 @@ app.post('/api/referral/use', requireAuth, async (req, res) => {
   }
 });
 
-// Free trial token (no auth, rate limited per IP - 1 per day)
-const trialTokens = new Map(); // ip -> timestamp
-app.get('/api/realtime/trial-token', async (req, res) => {
-  const ip = req.ip || req.connection.remoteAddress;
-  const now = Date.now();
-  const last = trialTokens.get(ip);
-  if (last && (now - last) < 24 * 60 * 60 * 1000) {
-    return res.status(429).json({ error: 'Free trial: one session per day' });
-  }
-
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return res.status(503).json({ error: 'Not configured' });
-
-  try {
-    const voice = process.env.OPENAI_VOICE_KELION || 'ash';
-    const r = await fetch('https://api.openai.com/v1/realtime/sessions', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: process.env.OPENAI_REALTIME_MODEL || 'gpt-4o-realtime-preview',
-        voice,
-      }),
-    });
-    if (!r.ok) return res.status(500).json({ error: 'Failed to create session' });
-    const data = await r.json();
-    trialTokens.set(ip, now);
-    res.json({ token: data.client_secret.value, expiresAt: data.client_secret.expires_at, trial: true, voice });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to create session' });
-  }
-});
+// Audit M2 — the legacy /api/realtime/trial-token endpoint (mounted
+// here directly on `app`, _before_ the realtime router) has been
+// removed. It was:
+//   - bypassing the shared 15-min/day trial window enforced by
+//     /api/trial/status + /api/chat + /api/tts, so a guest could mint
+//     a new OpenAI Realtime session every 24 h _on top of_ their
+//     text-chat quota — effectively doubling free minutes.
+//   - storing a per-IP last-issued timestamp in a Map that was never
+//     garbage-collected (same leak shape as H2 `consumeStateByUser`).
+//   - duplicating the mint logic of the canonical /api/realtime/token
+//     handler (in ./routes/realtime.js), which already applies
+//     chatLimiter + admin-project routing.
+// Guests reach voice via the regular /api/realtime/token flow, gated
+// by the shared trial window. Removing the shadow closes the bypass.
 
 // API routes (auth required)
 app.use('/api/users', requireAuth, usersRouter);
