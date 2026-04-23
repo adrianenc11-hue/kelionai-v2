@@ -1207,6 +1207,7 @@ module.exports = {
   // Stage 7 — credits / monetization
   getCreditsBalance,
   addCreditsTransaction,
+  getCreditTopupByPaymentIntent,
   listCreditTransactions,
   listRecentCreditTransactions,
   getCreditRevenueSummary,
@@ -1309,6 +1310,14 @@ function addCreditsTransaction({
   stripePaymentIntent = null,
   idempotencyKey = null,
   note = null,
+  // Audit M3 — refunds MUST be able to push the balance below zero. If
+  // a user has already consumed minutes from a top-up that Stripe
+  // later refunds (chargeback, manual refund, subscription cancel),
+  // the ledger still has to invert — otherwise reports, audits, and
+  // `creditsBalance` diverge from reality. The next top-up naturally
+  // pulls the balance back above zero. Default remains false so
+  // consumption paths keep their safety net.
+  allowNegative = false,
 }) {
   if (!Number.isFinite(deltaMinutes) || deltaMinutes === 0) {
     return Promise.reject(new Error('deltaMinutes must be a non-zero number'));
@@ -1328,7 +1337,7 @@ function addCreditsTransaction({
         if (!row) { await c.exec('ROLLBACK'); throw new Error('user not found'); }
         const current = Number(row.credits_balance_minutes || 0);
         const next = current + deltaMinutes;
-        if (next < 0) { await c.exec('ROLLBACK'); throw new Error('insufficient credits'); }
+        if (next < 0 && !allowNegative) { await c.exec('ROLLBACK'); throw new Error('insufficient credits'); }
         await c.run('UPDATE users SET credits_balance_minutes = ? WHERE id = ?', [next, userId]);
         await c.run(
           `INSERT INTO credit_transactions
@@ -1360,7 +1369,7 @@ function addCreditsTransaction({
       }
       const current = Number(row.credits_balance_minutes || 0);
       const next = current + deltaMinutes;
-      if (next < 0) {
+      if (next < 0 && !allowNegative) {
         // Refuse to go negative; caller should check balance first.
         await db.run('ROLLBACK');
         throw new Error('insufficient credits');
@@ -1387,6 +1396,33 @@ function addCreditsTransaction({
       throw err;
     }
   });
+}
+
+/**
+ * Audit M3 — look up the original top-up row for a Stripe PaymentIntent.
+ * Used by the `charge.refunded` webhook handler to compute how many
+ * minutes to invert from the ledger (proportional to the refunded
+ * amount vs the original charge). Returns `null` when the PaymentIntent
+ * is unknown to us — either the charge was never fulfilled
+ * (checkout.session.completed never arrived) or the refund is for a
+ * charge created outside the credits flow.
+ *
+ * Matches against `kind = 'topup'` explicitly so a previous partial
+ * refund on the same PaymentIntent doesn't mask the original top-up.
+ */
+async function getCreditTopupByPaymentIntent(paymentIntent) {
+  if (!paymentIntent || typeof paymentIntent !== 'string') return null;
+  const row = await db.get(
+    `SELECT id, user_id, delta_minutes, amount_cents, currency,
+            stripe_session_id, stripe_payment_intent, idempotency_key,
+            kind, note, created_at
+       FROM credit_transactions
+      WHERE stripe_payment_intent = ? AND kind = 'topup'
+      ORDER BY created_at ASC
+      LIMIT 1`,
+    [paymentIntent],
+  );
+  return row || null;
 }
 
 async function listCreditTransactions(userId, limit = 50) {
