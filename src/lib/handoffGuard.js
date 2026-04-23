@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Audit M6 — handoff double-start guard.
  *
@@ -80,7 +78,7 @@
  * @param {HandoffDecisionInput} input
  * @returns {HandoffDecision}
  */
-function decideHandoff(input) {
+export function decideHandoff(input) {
   const pending = !!(input && input.pending);
   const busy    = !!(input && input.hookBusy);
   const count   = Number(input && input.priorTurnCount) || 0;
@@ -115,5 +113,3 @@ function decideHandoff(input) {
   }
   return { action: 'start', reason: 'handoff accepted' };
 }
-
-module.exports = { decideHandoff };

@@ -4,8 +4,32 @@
 // KelionStage auto-fallback effect from clobbering a session the
 // user just manually started. See src/lib/handoffGuard.js for the
 // full problem statement.
+//
+// We pull from server/src/util/handoffGuard.js (the CJS twin) rather
+// than src/lib/handoffGuard.js (the ESM copy used by Vite) because
+// the server Jest config has no ESM transform. The two files are
+// kept in lockstep by hand — a regression test at the end of this
+// suite exercises both to make sure the two shapes agree.
 
-const { decideHandoff } = require('../../src/lib/handoffGuard');
+const { decideHandoff } = require('../src/util/handoffGuard');
+
+// Hand-rolled ESM parser for the frontend twin. We can't `require()`
+// the ESM file directly in this Jest config, but the logic is small
+// enough to extract and verify the two copies do not drift. If the
+// parser can't find the function, the parity test is skipped with
+// a clear message rather than silently passing.
+const fs = require('fs');
+const path = require('path');
+const frontendSource = (() => {
+  try {
+    return fs.readFileSync(
+      path.join(__dirname, '..', '..', 'src', 'lib', 'handoffGuard.js'),
+      'utf8'
+    );
+  } catch (_) {
+    return '';
+  }
+})();
 
 describe('decideHandoff — M6 auto-fallback guard', () => {
   it('returns start when pending, not busy, and snapshot has turns', () => {
@@ -91,5 +115,42 @@ describe('decideHandoff — M6 auto-fallback guard', () => {
     const a = decideHandoff({ pending: true, hookBusy: false, priorTurnCount: 5 });
     const b = decideHandoff({ pending: true, hookBusy: false, priorTurnCount: 5 });
     expect(a).toEqual(b);
+  });
+
+  // Parity regression — the frontend (ESM, src/lib) and backend
+  // (CJS, server/src/util) copies of this module MUST agree. We
+  // evaluate the frontend source in a sandbox and run the same
+  // inputs against both. If either file is edited without updating
+  // the other, this test flags the drift immediately.
+  const describeParity = frontendSource
+    ? describe
+    : describe.skip;
+  describeParity('parity with src/lib/handoffGuard.js (ESM twin)', () => {
+    // Transform `export function` into a plain `function` + a capture,
+    // then eval in an isolated scope. No require/import involved.
+    // eslint-disable-next-line no-new-func
+    const frontendDecide = (() => {
+      const stripped = frontendSource.replace(/export\s+function\s+/g, 'function ');
+      const fn = new Function(stripped + '\nreturn decideHandoff;');
+      return fn();
+    })();
+
+    const matrix = [
+      { pending: true,  hookBusy: false, priorTurnCount: 3 },
+      { pending: false, hookBusy: false, priorTurnCount: 3 },
+      { pending: true,  hookBusy: true,  priorTurnCount: 4 },
+      { pending: true,  hookBusy: true,  priorTurnCount: 0 },
+      { pending: true,  hookBusy: false, priorTurnCount: 0 },
+      { pending: true,  hookBusy: false, priorTurnCount: -1 },
+      { pending: 1,     hookBusy: 0,     priorTurnCount: '2' },
+    ];
+
+    it('both copies return identical action + reason for every input', () => {
+      for (const input of matrix) {
+        const backend  = decideHandoff(input);
+        const frontend = frontendDecide(input);
+        expect(frontend).toEqual(backend);
+      }
+    });
   });
 });
