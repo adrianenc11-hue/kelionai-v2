@@ -31,9 +31,23 @@ const youtubeRouter    = require('./routes/youtube');
 const voiceCloneRouter = require('./routes/voiceClone');
 const proactive        = require('./services/proactive');
 const { bootstrapAdmin } = require('./services/adminBootstrap');
+const { installProcessHandlers } = require('./util/processHandlers');
+
+// Audit H3: install global safety net before anything else can throw.
+// - `unhandledRejection` is logged and swallowed — one missing `.catch()`
+//   shouldn't take down every other user's live voice session.
+// - `uncaughtException` is logged and followed by a clean exit(1) so
+//   Railway can spin a replacement with known-good state. Skipped under
+//   Jest so a single failing test never kills the runner.
+const processHandlerStats = installProcessHandlers(process, {
+  exitOnException: process.env.NODE_ENV !== 'test',
+}).stats;
 
 const app = express();
 app.disable('x-powered-by');
+// Expose process-handler counters on `app.locals` so /api/diag can
+// surface them without importing this module back.
+app.locals.processHandlerStats = processHandlerStats;
 
 // Initialize database, then seed admin if ADMIN_BOOTSTRAP_PASSWORD is set.
 // Seeding is idempotent — running every boot lets Adrian rotate the admin
