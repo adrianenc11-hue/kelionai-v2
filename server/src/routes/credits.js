@@ -35,6 +35,7 @@ const { requireAuth } = require('../middleware/auth');
 const {
   getCreditsBalance,
   addCreditsTransaction,
+  getCreditTopupByPaymentIntent,
   listCreditTransactions,
 } = require('../db');
 
@@ -536,6 +537,95 @@ function verifyStripeSignature(rawBody, header, secret, toleranceSeconds = 300) 
   });
 }
 
+/**
+ * Audit M3 — invert a Stripe `charge.refunded` event against our ledger.
+ * Factored out of `webhookHandler` so tests can drive the pure event
+ * path without going through Express. Exported on module.exports for
+ * unit coverage.
+ *
+ * Behaviour:
+ *   - No original top-up row → log + no-op (refund is for a charge we
+ *     never fulfilled, or for a non-credits product).
+ *   - amount_refunded == amount_total on the original → invert full
+ *     minutes. amount_refunded < amount_total → invert proportionally,
+ *     rounded down so we never refund "extra" minutes.
+ *   - Multiple partial refunds on the same charge arrive as separate
+ *     events, each carrying a new entry in `charge.refunds.data[]`.
+ *     We pick the most recent refund by `created` and use its ID as
+ *     the idempotency key. A replay of the same event collapses into
+ *     a no-op via the UNIQUE(idempotency_key) index.
+ */
+async function handleChargeRefunded(event) {
+  const charge = event && event.data && event.data.object;
+  if (!charge || typeof charge !== 'object') {
+    console.warn('[credits/webhook] charge.refunded missing object', event?.id);
+    return;
+  }
+  const paymentIntent = typeof charge.payment_intent === 'string'
+    ? charge.payment_intent : null;
+  if (!paymentIntent) {
+    console.warn('[credits/webhook] charge.refunded missing payment_intent', charge.id);
+    return;
+  }
+  const topup = await getCreditTopupByPaymentIntent(paymentIntent);
+  if (!topup) {
+    console.warn('[credits/webhook] charge.refunded has no matching top-up', {
+      charge: charge.id, pi: paymentIntent,
+    });
+    return;
+  }
+  const originalCents = Number(topup.amount_cents || 0);
+  const originalMinutes = Number(topup.delta_minutes || 0);
+  if (!(originalCents > 0) || !(originalMinutes > 0)) {
+    console.warn('[credits/webhook] charge.refunded top-up has zero base', {
+      charge: charge.id, topupId: topup.id,
+    });
+    return;
+  }
+  // Pick the most recent refund so retries on the same event still
+  // settle against a stable idempotency key. Stripe orders
+  // refunds.data newest-first in practice, but we sort explicitly.
+  const refunds = (charge.refunds && Array.isArray(charge.refunds.data))
+    ? charge.refunds.data.slice().sort((a, b) => (b.created || 0) - (a.created || 0))
+    : [];
+  const latest = refunds[0];
+  if (!latest || !latest.id) {
+    console.warn('[credits/webhook] charge.refunded missing refunds.data[0]', charge.id);
+    return;
+  }
+  const refundCents = Number(latest.amount || 0);
+  if (!(refundCents > 0)) {
+    console.warn('[credits/webhook] charge.refunded has zero amount', {
+      charge: charge.id, refund: latest.id,
+    });
+    return;
+  }
+  // Proportional minutes to invert. Clamp to the original so a Stripe
+  // rounding quirk on partial refunds can't back out more than what
+  // was granted.
+  const rawMinutes = Math.floor((originalMinutes * refundCents) / originalCents);
+  const minutesToRevert = Math.max(1, Math.min(originalMinutes, rawMinutes));
+  const result = await addCreditsTransaction({
+    userId: topup.user_id,
+    deltaMinutes: -minutesToRevert,
+    amountCents: -refundCents,
+    currency: (latest.currency || topup.currency || 'gbp').toLowerCase(),
+    kind: 'refund',
+    stripePaymentIntent: paymentIntent,
+    idempotencyKey: latest.id,
+    note: `refund of topup:${topup.id} (${refundCents}/${originalCents})`,
+    allowNegative: true,
+  });
+  console.log('[credits/webhook] refunded', {
+    charge: charge.id,
+    refund: latest.id,
+    userId: topup.user_id,
+    topupId: topup.id,
+    minutesReverted: minutesToRevert,
+    duplicate: Boolean(result.duplicate),
+  });
+}
+
 const webhookHandler = async (req, res) => {
   const secret = config.stripe && config.stripe.webhookSecret;
   if (!secret) {
@@ -587,6 +677,26 @@ const webhookHandler = async (req, res) => {
       console.log('[credits/webhook] fulfilled', {
         session: session.id, userId, minutes, duplicate: Boolean(result.duplicate),
       });
+    } else if (event.type === 'charge.refunded') {
+      // Audit M3 — Stripe fires `charge.refunded` when the merchant
+      // (or chargeback flow) refunds part or all of a charge. Previously
+      // we silently ACK'd this event, which meant Kelion's ledger kept
+      // the user's top-up intact even though the money had flowed
+      // back to them. The revenue dashboard, /api/credits/balance, and
+      // the admin ledger all drifted from Stripe's source of truth.
+      //
+      // We handle both full and partial refunds:
+      //   - Look up the original top-up row by PaymentIntent.
+      //   - Compute the minutes to subtract, prorated on cents refunded
+      //     vs cents originally charged (so a 50% refund backs out 50%
+      //     of the minutes, rounded down to avoid over-crediting).
+      //   - Pass allowNegative:true so an already-spent balance can
+      //     still be inverted correctly. The next top-up pulls it back
+      //     above zero.
+      //   - Use the Stripe Refund ID as idempotency_key so Stripe's
+      //     retry-at-least-once semantics + multiple partial refunds
+      //     each settle to their own ledger row exactly once.
+      await handleChargeRefunded(event);
     }
     // Other events (payment_intent.succeeded etc) are harmless to ack.
     res.status(200).send('ok');
@@ -613,6 +723,7 @@ router.post(
 
 module.exports = router;
 module.exports.verifyStripeSignature = verifyStripeSignature;
+module.exports.handleChargeRefunded = handleChargeRefunded;
 module.exports.getPackages = getPackages;
 module.exports.evaluateConsumeDecision = evaluateConsumeDecision;
 module.exports.CONSUME_COOLDOWN_MS = CONSUME_COOLDOWN_MS;
