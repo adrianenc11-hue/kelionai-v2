@@ -106,11 +106,16 @@ function installProcessHandlers(target, options = {}) {
     stats.lastReason = serializeReason(err);
     stats.lastAt = now();
     logger.error(
-      '[process] uncaughtException — exiting for clean restart',
+      exitOnException
+        ? '[process] uncaughtException — exiting for clean restart'
+        : '[process] uncaughtException — continuing (exitOnException=false)',
       { count: stats.uncaughtExceptions, reason: stats.lastReason },
     );
     if (exitOnException) {
-      // Give a tick for the logger to flush, then exit.
+      // `console.error` writes synchronously to stderr, so the line
+      // above is already flushed by the time we reach here. Custom
+      // buffered loggers (which we never pass in production) would
+      // need their own flush-on-fatal contract.
       try { exit(1); } catch { /* swallow — test spy may throw */ }
     }
   };
