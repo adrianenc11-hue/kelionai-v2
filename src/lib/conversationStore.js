@@ -22,12 +22,39 @@ const GUEST_MAX_MSGS_CONV = 500;
 
 let authTokenGetter = () => null;
 let isSignedInGetter = () => false;
+let sessionExpiredHandler = null;
+let sessionExpiredNotified = false;
 
 // KelionStage wires these up once after auth state resolves so the store
 // can pick the right backend without re-reading React state per call.
-export function configureConversationStore({ getAuthToken, getIsSignedIn }) {
+// `onSessionExpired` is invoked (at most once per auth cycle) the first
+// time a `/api/conversations/*` request comes back 401 while we
+// believed the user was signed in — this lets the UI surface a
+// re-login prompt instead of silently mirroring the message into
+// localStorage under a guest id (audit #3 — "nu salveaza intre
+// sesiuni"). The latch is cleared on successful auth via
+// `resetSessionExpiredLatch`.
+export function configureConversationStore({ getAuthToken, getIsSignedIn, onSessionExpired }) {
   if (typeof getAuthToken === 'function') authTokenGetter = getAuthToken;
   if (typeof getIsSignedIn === 'function') isSignedInGetter = getIsSignedIn;
+  if (typeof onSessionExpired === 'function') sessionExpiredHandler = onSessionExpired;
+}
+
+export function resetSessionExpiredLatch() {
+  sessionExpiredNotified = false;
+}
+
+function notifySessionExpired() {
+  if (sessionExpiredNotified) return;
+  sessionExpiredNotified = true;
+  try { sessionExpiredHandler && sessionExpiredHandler(); } catch { /* UI handler threw */ }
+  // Additionally broadcast a window event so any other module
+  // (not just KelionStage) can react without wiring a new callback.
+  try {
+    if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+      window.dispatchEvent(new CustomEvent('kelion:session-expired'));
+    }
+  } catch { /* ignore */ }
 }
 
 function authHeaders() {
@@ -166,6 +193,7 @@ export async function ensureActiveConversation(firstMessageHint) {
             return activeConversationId;
           }
         }
+        if (r.status === 401) notifySessionExpired();
       } catch { /* fall through to guest path */ }
     }
 
@@ -209,6 +237,12 @@ export async function appendMessage({ role, content }) {
       // a fresh thread, and fall through to the guest-store mirror so
       // the message isn't silently lost.
       if (r.status === 401 || r.status === 404) setActiveConversationId(null);
+      // On 401, tell the UI — the user's JWT expired mid-session.
+      // Without this, subsequent turns write to a hidden `g-*` guest
+      // thread; from the user's POV the history "disappears" on the
+      // next reload because the real server-side thread no longer
+      // receives messages. The UI can then prompt re-login.
+      if (r.status === 401) notifySessionExpired();
     } catch { /* fall through → mirror in guest store */ }
   }
 

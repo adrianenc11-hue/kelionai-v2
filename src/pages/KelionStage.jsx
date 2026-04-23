@@ -30,6 +30,7 @@ import {
 } from '../lib/memoryClient'
 import {
   configureConversationStore,
+  resetSessionExpiredLatch,
   appendMessage as appendConversationMessage,
   listConversations as listConversationsApi,
   loadConversation as loadConversationApi,
@@ -545,11 +546,49 @@ export function externalCardCopy(m) {
 // only drops to the bottom sheet on narrow phones / tablets.
 const MONITOR_NARROW_BREAKPOINT = 640
 
+// Iframe wrapper that detects silent CSP/X-Frame-Options blocks. If
+// `onload` never fires within `MONITOR_LOAD_TIMEOUT_MS`, we assume the
+// target refused the frame and call `onBlocked` so the parent can swap
+// in a fallback card. Also forwards real `onerror` events.
+const MONITOR_LOAD_TIMEOUT_MS = 6000
+
+function IframeWithFallback({ src, title, onBlocked }) {
+  const loadedRef = useRef(false)
+  useEffect(() => {
+    loadedRef.current = false
+    const timer = setTimeout(() => {
+      if (!loadedRef.current) {
+        try { onBlocked && onBlocked() } catch (_) {}
+      }
+    }, MONITOR_LOAD_TIMEOUT_MS)
+    return () => clearTimeout(timer)
+  }, [src, onBlocked])
+  return (
+    <iframe
+      src={src}
+      title={title}
+      referrerPolicy="no-referrer"
+      sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation"
+      allow="fullscreen; geolocation; autoplay; encrypted-media"
+      onLoad={() => { loadedRef.current = true }}
+      onError={() => { try { onBlocked && onBlocked() } catch (_) {} }}
+      style={{ width: '100%', height: '100%', border: 'none', background: '#0d0b1d', display: 'block' }}
+    />
+  )
+}
+
 function MonitorOverlay() {
   const [m, setM] = useState({ kind: null, src: null, title: null, embedType: 'iframe', updatedAt: 0 })
   const [isNarrow, setIsNarrow] = useState(() => (
     typeof window !== 'undefined' && window.innerWidth < MONITOR_NARROW_BREAKPOINT
   ))
+  // Audit #5: iframes can be silently refused by the target's CSP /
+  // X-Frame-Options without firing onError. We start a load timer
+  // whenever `m.src` changes and, if `onLoad` hasn't fired within the
+  // budget, flip into a fallback card with "Open in new tab". Also
+  // shows the fallback if the iframe throws (rare, but some hosts
+  // emit `onError` for network-level blocks).
+  const [iframeBlocked, setIframeBlocked] = useState(false)
 
   useEffect(() => subscribeMonitor((s) => setM({ ...s })), [])
 
@@ -559,6 +598,9 @@ function MonitorOverlay() {
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
   }, [])
+
+  // Reset the "blocked" flag every time the monitor payload changes.
+  useEffect(() => { setIframeBlocked(false) }, [m.src, m.updatedAt])
 
   if (!m.src) return null
 
@@ -577,11 +619,17 @@ function MonitorOverlay() {
     width: '50vw',
     height: '100vh',
   }
+  // Mobile: top-sheet rather than bottom-sheet. The chat composer sits
+  // fixed at the bottom of the viewport, so a 55vh bottom-sheet used to
+  // overlap the composer — users couldn't type or send while a map /
+  // video was on screen (audit #5). Anchoring to the top keeps the
+  // composer area clear and matches how Google Maps / YouTube handle
+  // split-view on mobile.
   const mobileStyle = {
     position: 'fixed',
     left: 0,
     right: 0,
-    bottom: 0,
+    top: 0,
     width: '100vw',
     height: '55vh',
   }
@@ -597,7 +645,7 @@ function MonitorOverlay() {
         background: 'rgba(10, 8, 20, 0.96)',
         backdropFilter: 'blur(14px)',
         borderRight: isNarrow ? 'none' : '1px solid rgba(167, 139, 250, 0.28)',
-        borderTop: isNarrow ? '1px solid rgba(167, 139, 250, 0.28)' : 'none',
+        borderBottom: isNarrow ? '1px solid rgba(167, 139, 250, 0.28)' : 'none',
         boxShadow: '0 0 40px rgba(0,0,0,0.55)',
         color: '#ede9fe',
         fontFamily: 'system-ui, -apple-system, sans-serif',
@@ -700,14 +748,56 @@ function MonitorOverlay() {
               {externalCopy.ctaLabel} ↗
             </a>
           </div>
+        ) : iframeBlocked ? (
+          <div
+            style={{
+              width: '100%',
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 14,
+              padding: 24,
+              textAlign: 'center',
+              color: '#ede9fe',
+              background: 'radial-gradient(ellipse at center, #1a1230 0%, #0d0b1d 70%)',
+            }}
+          >
+            <div style={{ fontSize: 36, lineHeight: 1 }}>🔒</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: '#c4b5fd', maxWidth: 360 }}>
+              This site refused to embed
+            </div>
+            <div style={{ fontSize: 12, opacity: 0.7, maxWidth: 340, lineHeight: 1.5 }}>
+              Its Content-Security-Policy (X-Frame-Options) blocks iframes. Open it in a new tab instead.
+            </div>
+            <a
+              href={m.src}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                textDecoration: 'none',
+                border: '1px solid rgba(167, 139, 250, 0.55)',
+                background: 'rgba(124, 58, 237, 0.28)',
+                color: '#ede9fe',
+                padding: '9px 18px',
+                borderRadius: 8,
+                fontSize: 13,
+                fontWeight: 600,
+                letterSpacing: 0.2,
+              }}
+            >
+              Open in new tab ↗
+            </a>
+          </div>
         ) : (
-          <iframe
+          <IframeWithFallback
             src={m.src}
             title={m.title || 'Kelion monitor'}
-            referrerPolicy="no-referrer"
-            sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation"
-            allow="fullscreen; geolocation; autoplay; encrypted-media"
-            style={{ width: '100%', height: '100%', border: 'none', background: '#0d0b1d', display: 'block' }}
+            onBlocked={() => {
+              try { console.warn('[monitor] iframe never loaded — likely CSP/XFO block', m.src) } catch (_) {}
+              setIframeBlocked(true)
+            }}
           />
         )}
       </div>
@@ -1036,15 +1126,29 @@ export default function KelionStage() {
     }
     setGrantBusy(true)
     setGrantMessage(null)
+    // Per-submission idempotency key — a double-click or retry uses
+    // the same key, and the server's UNIQUE index collapses it into
+    // a no-op (audit #7). The key includes email+minutes+timestamp+
+    // random so two *different* intentional grants to the same user
+    // stay distinct. Use crypto.randomUUID when available, fall back
+    // to Date.now + Math.random for older iOS Safari.
+    const rand = (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+    const idempotencyKey = `ui:${email}:${Math.trunc(minutes)}:${rand}`
     try {
       const r = await fetch('/api/admin/credits/grant', {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': idempotencyKey,
+        },
         body: JSON.stringify({
           email,
           minutes: Math.trunc(minutes),
           note: grantNote.trim() || undefined,
+          idempotencyKey,
         }),
       })
       const j = await r.json().catch(() => ({}))
@@ -1053,7 +1157,9 @@ export default function KelionStage() {
       }
       setGrantMessage({
         ok: true,
-        text: `Granted ${j.deltaMinutes} min to ${j.email}. New balance: ${j.balanceMinutes} min.`,
+        text: j.duplicate
+          ? `Already granted (duplicate). Balance: ${j.balanceMinutes} min.`
+          : `Granted ${j.deltaMinutes} min to ${j.email}. New balance: ${j.balanceMinutes} min.`,
       })
       setGrantEmail('')
       setGrantMinutes('')
@@ -2172,9 +2278,30 @@ export default function KelionStage() {
   // effect is intentionally a one-time configuration, the getters stay
   // live across auth transitions.
   useEffect(() => {
+    // Fresh auth cycle (either newly signed-in or back to signed-out)
+    // re-arms the "session expired" one-shot so a future 401 triggers
+    // the modal again.
+    if (authState.signedIn) {
+      try { resetSessionExpiredLatch() } catch (_) {}
+    }
     configureConversationStore({
       getAuthToken: () => authTokenRef.current,
       getIsSignedIn: () => !!authState.signedIn,
+      onSessionExpired: () => {
+        // Audit #3: when the JWT expires mid-session, /api/conversations
+        // starts returning 401. Without a prompt, the user's turns leak
+        // into a hidden `g-*` guest thread and the real server thread
+        // silently stops receiving messages — from their POV the
+        // history "vanishes" on next reload. Tell them explicitly and
+        // reopen the sign-in modal so they can restore the session.
+        try { setAuthState({ signedIn: false, user: null }) } catch (_) {}
+        try { setSignInModalOpen(true) } catch (_) {}
+        try {
+          window.alert(
+            'Session expired — please sign in again to keep saving your chat history.'
+          )
+        } catch (_) { /* alert blocked (iframe sandbox) */ }
+      },
     })
   }, [authState.signedIn])
 

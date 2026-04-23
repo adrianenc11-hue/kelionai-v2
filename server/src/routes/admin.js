@@ -132,7 +132,7 @@ router.get('/credits/ledger', async (req, res) => {
  */
 router.post('/credits/grant', async (req, res) => {
   try {
-    const { email, minutes, note } = req.body || {};
+    const { email, minutes, note, idempotencyKey } = req.body || {};
     if (!email || typeof email !== 'string') {
       return res.status(400).json({ error: 'email (string) is required' });
     }
@@ -150,18 +150,30 @@ router.post('/credits/grant', async (req, res) => {
       `admin_grant by ${adminEmail}`,
       note ? `— ${String(note).slice(0, 200)}` : '',
     ].filter(Boolean).join(' ');
+    // Accept a caller-supplied idempotency key so a double-click on
+    // the "Grant" button (or a retry after a dropped connection)
+    // can't double-refund a user. The DB's UNIQUE index on
+    // `idempotency_key` collapses the second write into a no-op and
+    // returns the current balance. Also accepts the standard
+    // `Idempotency-Key` HTTP header (Stripe convention) so
+    // server-to-server callers get it for free.
+    const headerKey = (req.get && req.get('idempotency-key')) || null;
+    const rawKey = (typeof idempotencyKey === 'string' && idempotencyKey.trim()) || headerKey;
+    const cleanKey = rawKey ? `admin_grant:${String(rawKey).slice(0, 120)}` : null;
     const result = await addCreditsTransaction({
       userId: user.id,
       deltaMinutes: rounded,
       kind: 'admin_grant',
+      idempotencyKey: cleanKey,
       note: safeNote,
     });
     return res.json({
       userId: user.id,
       email: user.email,
-      deltaMinutes: rounded,
+      deltaMinutes: result.duplicate ? 0 : rounded,
       balanceMinutes: result.balance,
       previous: result.previous,
+      duplicate: !!result.duplicate,
       note: safeNote,
     });
   } catch (err) {
