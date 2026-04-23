@@ -108,21 +108,47 @@ export function installErrorReporter(opts = {}) {
   if (!target) {
     // No window (SSR / Node test). Return a dummy handle so callers
     // don't need to branch.
-    return { stats: { reported: 0, dropped: 0, rateLimited: 0 }, uninstall() {} };
+    return {
+      stats: {
+        reported: 0,
+        dropped: 0,
+        droppedDedup: 0,
+        droppedNoFetch: 0,
+        rateLimited: 0,
+        lastKind: null,
+        lastMessage: null,
+      },
+      uninstall() {},
+    };
   }
 
   const fetchFn = opts.fetchFn || (typeof window !== 'undefined' && window.fetch
     ? window.fetch.bind(window) : null);
   const endpoint = opts.endpoint || DEFAULT_ENDPOINT;
   const now = opts.now || (() => Date.now());
-  const rateLimit = opts.rateLimit || DEFAULT_RATE_LIMIT;
-  const rateWindowMs = opts.rateWindowMs || DEFAULT_RATE_WINDOW_MS;
+  // PR #180 follow-up — harmonise falsy-value handling with dedupMs so a
+  // future caller who wants to disable rate-limiting with { rateLimit: 0 }
+  // isn't silently bumped back to the default. We still treat non-finite
+  // / negative numbers as "use default" to avoid wedging the reporter.
+  const rateLimit = Number.isFinite(opts.rateLimit) && opts.rateLimit >= 0
+    ? opts.rateLimit
+    : DEFAULT_RATE_LIMIT;
+  const rateWindowMs = Number.isFinite(opts.rateWindowMs) && opts.rateWindowMs >= 0
+    ? opts.rateWindowMs
+    : DEFAULT_RATE_WINDOW_MS;
   const dedupMs = opts.dedupMs != null ? opts.dedupMs : DEFAULT_DEDUP_MS;
   const csrfToken = opts.csrfToken || null;
 
+  // PR #180 follow-up — split stats.dropped into two distinct buckets so a
+  // future Prometheus exporter can tell "we dedup'd an identical error"
+  // apart from "we never shipped it because fetch wasn't available". The
+  // legacy `dropped` field is preserved as the sum of the two new buckets
+  // so existing dashboards don't break.
   const stats = {
     reported: 0,
-    dropped: 0,
+    dropped: 0,        // = droppedDedup + droppedNoFetch (back-compat)
+    droppedDedup: 0,
+    droppedNoFetch: 0,
     rateLimited: 0,
     lastKind: null,
     lastMessage: null,
@@ -135,6 +161,7 @@ export function installErrorReporter(opts = {}) {
 
   const send = (body) => {
     if (!fetchFn) {
+      stats.droppedNoFetch += 1;
       stats.dropped += 1;
       return;
     }
@@ -175,6 +202,7 @@ export function installErrorReporter(opts = {}) {
     const dedupKey = `${kind}:${payload.message}`;
     const prev = dedup.get(dedupKey);
     if (prev != null && t - prev < dedupMs) {
+      stats.droppedDedup += 1;
       stats.dropped += 1;
       return;
     }
@@ -210,9 +238,15 @@ export function installErrorReporter(opts = {}) {
 
   const onError = (ev) => {
     // Resource-load failures (e.g. <img src="404.jpg">) surface here
-    // with ev.message === 'Script error.' or a missing .error — skip
-    // those, they're noisy and never actionable.
-    if (ev && ev.error == null && !ev.message) return;
+    // with a missing .error and no message. Cross-origin script errors
+    // surface as ev.message === 'Script error.' with ev.error == null
+    // and no filename/line/column (the browser strips the detail for
+    // same-origin-policy reasons) — neither shape is actionable, so
+    // skip both. See PR #180 Devin Review follow-up.
+    if (!ev) return;
+    if (ev.error == null && !ev.message) return;
+    if (ev.error == null && typeof ev.message === 'string'
+        && /^script error\.?$/i.test(ev.message)) return;
     maybeReport('error', serializeErrorEvent(ev));
   };
 
