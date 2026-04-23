@@ -62,7 +62,17 @@ CREATE TABLE IF NOT EXISTS memory_items (
   fact       TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX IF NOT EXISTS idx_memory_items_user ON memory_items(user_id, created_at DESC);
+-- Audit M8 — idempotent migrations for existing Supabase rows that
+-- pre-date the consolidator. New columns default to the same values
+-- the consolidator expects for fresh inserts. See
+-- server/src/services/memoryConsolidator.js for the full rationale.
+ALTER TABLE memory_items ADD COLUMN IF NOT EXISTS tier             TEXT NOT NULL DEFAULT 'recent';
+ALTER TABLE memory_items ADD COLUMN IF NOT EXISTS last_affirmed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE memory_items ADD COLUMN IF NOT EXISTS archived_at      TIMESTAMPTZ;
+ALTER TABLE memory_items ADD COLUMN IF NOT EXISTS archived_reason  TEXT;
+UPDATE memory_items SET last_affirmed_at = created_at WHERE last_affirmed_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_memory_items_user      ON memory_items(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_memory_items_user_live ON memory_items(user_id, archived_at, tier);
 
 CREATE TABLE IF NOT EXISTS push_subscriptions (
   id           BIGSERIAL PRIMARY KEY,

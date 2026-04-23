@@ -159,17 +159,45 @@ async function initDb() {
   // about the user. We keep it simple (no embeddings yet — retrieval dumps
   // the most-recent-N facts into the system prompt, which fits within
   // Gemini Live's budget for typical user memory sizes).
+  //
+  // Audit M8 (tier / last_affirmed_at / archived_at) — the consolidator
+  // in services/memoryConsolidator.js reads these columns to detect
+  // duplicates, contradictions, and stale notes, then flips the tier
+  // or archives rows in place. See that file for the full rationale.
   await db.exec(`
     CREATE TABLE IF NOT EXISTS memory_items (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
       kind TEXT NOT NULL DEFAULT 'fact',
       fact TEXT NOT NULL,
+      tier TEXT NOT NULL DEFAULT 'recent',
+      last_affirmed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      archived_at DATETIME,
+      archived_reason TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     )
   `);
+  // Idempotent migrations for existing rows. On Postgres these are
+  // handled inside postgres-schema.js with `ADD COLUMN IF NOT EXISTS`;
+  // here we read PRAGMA table_info because the SQLite dialect does
+  // not support the IF NOT EXISTS suffix on ALTER TABLE.
+  const memCols = await db.all('PRAGMA table_info(memory_items)');
+  if (!memCols.find((c) => c.name === 'tier')) {
+    await db.exec("ALTER TABLE memory_items ADD COLUMN tier TEXT NOT NULL DEFAULT 'recent'");
+  }
+  if (!memCols.find((c) => c.name === 'last_affirmed_at')) {
+    await db.exec('ALTER TABLE memory_items ADD COLUMN last_affirmed_at DATETIME');
+    await db.exec('UPDATE memory_items SET last_affirmed_at = created_at WHERE last_affirmed_at IS NULL');
+  }
+  if (!memCols.find((c) => c.name === 'archived_at')) {
+    await db.exec('ALTER TABLE memory_items ADD COLUMN archived_at DATETIME');
+  }
+  if (!memCols.find((c) => c.name === 'archived_reason')) {
+    await db.exec('ALTER TABLE memory_items ADD COLUMN archived_reason TEXT');
+  }
   await db.exec('CREATE INDEX IF NOT EXISTS idx_memory_items_user ON memory_items(user_id, created_at DESC)');
+  await db.exec('CREATE INDEX IF NOT EXISTS idx_memory_items_user_live ON memory_items(user_id, archived_at, tier)');
 
   // Stage 5 — M23: Web Push subscriptions. One row per device/browser; a
   // single user may have several (phone + laptop). endpoint is unique.
@@ -341,6 +369,14 @@ async function initDb() {
 }
 
 // Stage 3 — memory helpers
+//
+// Audit M8 note — every function here treats `archived_at IS NULL`
+// as the "live" set. Archived rows stay in the table so the user
+// can restore them from the admin panel; they just stop being
+// injected into Kelion's prompt. `addMemoryItems` now also re-
+// affirms (bumps last_affirmed_at) on an exact dup instead of
+// silently dropping it — that drives the consolidator's promotion
+// pass in services/memoryConsolidator.js.
 async function addMemoryItems(userId, items) {
   if (!Array.isArray(items) || items.length === 0) return [];
   const inserted = [];
@@ -349,14 +385,23 @@ async function addMemoryItems(userId, items) {
     const fact = it.fact.trim().slice(0, 500);
     if (!fact) continue;
     const kind = (it.kind && typeof it.kind === 'string') ? it.kind.slice(0, 40) : 'fact';
-    // De-dupe: skip if identical fact already exists for this user
+    // De-dupe: if an identical fact already exists, bump its
+    // last_affirmed_at so the consolidator sees the re-mention.
+    // We ignore archived rows here — restoring an archived fact
+    // is an explicit admin action.
     const dup = await db.get(
-      'SELECT id FROM memory_items WHERE user_id = ? AND fact = ? LIMIT 1',
+      'SELECT id FROM memory_items WHERE user_id = ? AND fact = ? AND archived_at IS NULL LIMIT 1',
       [userId, fact]
     );
-    if (dup) continue;
+    if (dup) {
+      await db.run(
+        'UPDATE memory_items SET last_affirmed_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?',
+        [dup.id, userId]
+      );
+      continue;
+    }
     const r = await db.run(
-      'INSERT INTO memory_items (user_id, kind, fact) VALUES (?, ?, ?)',
+      "INSERT INTO memory_items (user_id, kind, fact, tier) VALUES (?, ?, ?, 'recent')",
       [userId, kind, fact]
     );
     inserted.push({ id: r.lastID, user_id: userId, kind, fact });
@@ -364,9 +409,30 @@ async function addMemoryItems(userId, items) {
   return inserted;
 }
 
+// Live items only, core-tier first so the persona prompt leads
+// with durable identity even if the newest rows are noisy one-off
+// context notes.
 async function listMemoryItems(userId, limit = 100) {
   return db.all(
-    'SELECT id, kind, fact, created_at FROM memory_items WHERE user_id = ? ORDER BY created_at DESC LIMIT ?',
+    `SELECT id, kind, fact, tier, last_affirmed_at, created_at
+       FROM memory_items
+      WHERE user_id = ?
+        AND archived_at IS NULL
+      ORDER BY CASE WHEN tier = 'core' THEN 0 ELSE 1 END,
+               created_at DESC
+      LIMIT ?`,
+    [userId, limit]
+  );
+}
+
+// Full row (live + archived) for admin panel / consolidation.
+async function listAllMemoryItems(userId, limit = 500) {
+  return db.all(
+    `SELECT id, kind, fact, tier, last_affirmed_at, archived_at, archived_reason, created_at
+       FROM memory_items
+      WHERE user_id = ?
+      ORDER BY created_at DESC
+      LIMIT ?`,
     [userId, limit]
   );
 }
@@ -379,6 +445,43 @@ async function deleteMemoryItem(userId, id) {
 async function clearMemoryForUser(userId) {
   const r = await db.run('DELETE FROM memory_items WHERE user_id = ?', [userId]);
   return r.changes;
+}
+
+// Audit M8 — tier / archive helpers used by the consolidator.
+// All three are idempotent and scoped to (userId, id) so they
+// cannot accidentally touch another user's row.
+async function archiveMemoryItem(userId, id, reason) {
+  const r = await db.run(
+    `UPDATE memory_items
+        SET archived_at = CURRENT_TIMESTAMP,
+            archived_reason = ?
+      WHERE id = ? AND user_id = ? AND archived_at IS NULL`,
+    [reason ? String(reason).slice(0, 200) : null, id, userId]
+  );
+  return r.changes > 0;
+}
+
+async function restoreMemoryItem(userId, id) {
+  const r = await db.run(
+    `UPDATE memory_items
+        SET archived_at = NULL,
+            archived_reason = NULL,
+            last_affirmed_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND user_id = ? AND archived_at IS NOT NULL`,
+    [id, userId]
+  );
+  return r.changes > 0;
+}
+
+async function setMemoryItemTier(userId, id, tier) {
+  const safe = tier === 'core' || tier === 'recent' ? tier : 'recent';
+  const r = await db.run(
+    `UPDATE memory_items
+        SET tier = ?
+      WHERE id = ? AND user_id = ?`,
+    [safe, id, userId]
+  );
+  return r.changes > 0;
 }
 
 // ─── Voice clone helpers ──────────────────────────────────────────
@@ -1254,8 +1357,13 @@ module.exports = {
   // Stage 3 — memory
   addMemoryItems,
   listMemoryItems,
+  listAllMemoryItems,
   deleteMemoryItem,
   clearMemoryForUser,
+  // Audit M8 — consolidator writes
+  archiveMemoryItem,
+  restoreMemoryItem,
+  setMemoryItemTier,
   // F8 — preferred language
   setPreferredLanguage,
   getPreferredLanguage,
