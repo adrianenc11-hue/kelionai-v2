@@ -343,6 +343,27 @@ async function initDb() {
   `);
   await db.exec('CREATE INDEX IF NOT EXISTS idx_voice_clone_events_user ON voice_clone_events(user_id, created_at DESC)');
 
+  // Dev Studio (DS-1) — per-user Python project workspaces. Each row
+  // is one "project" Kelion can read/write into by voice. Files live
+  // inline as a JSON blob (path → {content,size,updated_at}) so the
+  // whole project round-trips in a single SELECT, keeping autosave
+  // cheap. Quotas (5 MB/file, 50 MB/project, 1 GB/user) are enforced
+  // in writeStudioFile below and mirrored in the Postgres DDL.
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS studio_workspaces (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      files TEXT NOT NULL DEFAULT '{}',
+      size_bytes INTEGER NOT NULL DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+  await db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_studio_workspaces_user_name ON studio_workspaces(user_id, name)');
+  await db.exec('CREATE INDEX IF NOT EXISTS idx_studio_workspaces_user ON studio_workspaces(user_id, updated_at DESC)');
+
   // Audit M7 — cross-instance consume state for the H1 silent-bypass
   // cap. The in-memory `consumeStateByUser` Map in routes/credits.js
   // is per-process — if Railway scales horizontally, a tampered
@@ -1324,6 +1345,356 @@ async function gcConsumeStateRows(cutoffMs) {
   return (r && typeof r.changes === 'number') ? r.changes : 0;
 }
 
+// ─── Dev Studio (DS-1) — per-user Python project workspaces ─────────
+//
+// Each row is one "project" Kelion can read/write into by voice. The
+// `files` column is a JSON object (path → {content,size,updated_at})
+// serialized as TEXT. The same schema works identically on SQLite and
+// Postgres because we never query into the blob — writeStudioFile
+// replaces the whole map atomically.
+//
+// Quotas (enforced below; writes past any cap return a structured
+// `RangeError` the route layer maps to 413):
+//   • MAX_STUDIO_FILE_BYTES      — 5 MB per file (post-UTF-8 encode)
+//   • MAX_STUDIO_WORKSPACE_BYTES — 50 MB per project
+//   • MAX_STUDIO_USER_BYTES      — 1 GB per user (sum of all projects)
+//   • MAX_STUDIO_FILES_PER_WS    — 500 files per project
+//   • MAX_STUDIO_NAME_LEN        — 120 chars, reasonable project name
+//   • MAX_STUDIO_PATH_LEN        — 512 chars, reasonable repo-style path
+
+const MAX_STUDIO_FILE_BYTES      = 5 * 1024 * 1024;
+const MAX_STUDIO_WORKSPACE_BYTES = 50 * 1024 * 1024;
+const MAX_STUDIO_USER_BYTES      = 1024 * 1024 * 1024;
+const MAX_STUDIO_FILES_PER_WS    = 500;
+const MAX_STUDIO_NAME_LEN        = 120;
+const MAX_STUDIO_PATH_LEN        = 512;
+
+// Only forward-slash repo-style paths are allowed. We explicitly reject:
+//   • absolute paths (leading /)
+//   • parent traversal (".." segment)
+//   • Windows drive letters or backslashes
+//   • NUL bytes and any other C0 control char
+//   • empty segments ("foo//bar") and trailing slashes
+function sanitizeStudioPath(raw) {
+  if (typeof raw !== 'string') return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  if (trimmed.length > MAX_STUDIO_PATH_LEN) return null;
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000-\u001f\\]/.test(trimmed)) return null;
+  if (trimmed.startsWith('/')) return null;
+  if (trimmed.endsWith('/')) return null;
+  const parts = trimmed.split('/');
+  for (const seg of parts) {
+    if (!seg || seg === '.' || seg === '..') return null;
+  }
+  return trimmed;
+}
+
+function sanitizeStudioName(raw) {
+  if (typeof raw !== 'string') return null;
+  // Reject control chars on the *raw* value — we check before trim()
+  // because trim() silently strips leading/trailing \n\t\r, which
+  // would mask a caller trying to smuggle newlines into a project
+  // name (chat-log spoofing, filesystem odd-paths, etc.).
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000-\u001f]/.test(raw)) return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  if (trimmed.length > MAX_STUDIO_NAME_LEN) return null;
+  return trimmed;
+}
+
+function parseStudioFiles(raw) {
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed;
+    }
+    return {};
+  } catch {
+    return {};
+  }
+}
+
+function studioBlobSize(files) {
+  let total = 0;
+  for (const key of Object.keys(files)) {
+    const entry = files[key];
+    const size = entry && typeof entry.size === 'number'
+      ? entry.size
+      : Buffer.byteLength(String(entry?.content ?? ''), 'utf8');
+    total += size;
+  }
+  return total;
+}
+
+function quotaError(code, message, extra = {}) {
+  const err = new RangeError(message);
+  err.studioQuota = code;
+  Object.assign(err, extra);
+  return err;
+}
+
+async function listStudioWorkspaces(userId, limit = 50) {
+  const safe = Math.max(1, Math.min(500, limit));
+  const rows = await db.all(
+    `SELECT id, name, size_bytes, created_at, updated_at
+     FROM studio_workspaces
+     WHERE user_id = ?
+     ORDER BY updated_at DESC
+     LIMIT ?`,
+    [userId, safe]
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    size_bytes: Number(r.size_bytes || 0),
+    created_at: r.created_at,
+    updated_at: r.updated_at,
+  }));
+}
+
+async function createStudioWorkspace(userId, name) {
+  const clean = sanitizeStudioName(name);
+  if (!clean) throw quotaError('NAME_INVALID', 'workspace name is invalid');
+  try {
+    const r = await db.run(
+      'INSERT INTO studio_workspaces (user_id, name, files, size_bytes) VALUES (?, ?, ?, ?)',
+      [userId, clean, '{}', 0]
+    );
+    return {
+      id: r.lastID,
+      user_id: userId,
+      name: clean,
+      files: {},
+      size_bytes: 0,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+  } catch (err) {
+    if (err && /UNIQUE/i.test(err.message || '')) {
+      throw quotaError('NAME_DUP', 'workspace name already exists');
+    }
+    throw err;
+  }
+}
+
+async function assertStudioOwner(userId, workspaceId) {
+  const row = await db.get(
+    'SELECT id, user_id FROM studio_workspaces WHERE id = ?',
+    [workspaceId]
+  );
+  if (!row) return null;
+  if (Number(row.user_id) !== Number(userId)) return null;
+  return row;
+}
+
+async function getStudioWorkspace(userId, workspaceId) {
+  const row = await db.get(
+    `SELECT id, user_id, name, files, size_bytes, created_at, updated_at
+     FROM studio_workspaces
+     WHERE id = ? AND user_id = ?`,
+    [workspaceId, userId]
+  );
+  if (!row) return null;
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    name: row.name,
+    files: parseStudioFiles(row.files),
+    size_bytes: Number(row.size_bytes || 0),
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+async function getStudioWorkspaceByName(userId, name) {
+  const clean = sanitizeStudioName(name);
+  if (!clean) return null;
+  const row = await db.get(
+    `SELECT id, user_id, name, files, size_bytes, created_at, updated_at
+     FROM studio_workspaces
+     WHERE user_id = ? AND name = ?`,
+    [userId, clean]
+  );
+  if (!row) return null;
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    name: row.name,
+    files: parseStudioFiles(row.files),
+    size_bytes: Number(row.size_bytes || 0),
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+async function renameStudioWorkspace(userId, workspaceId, newName) {
+  const clean = sanitizeStudioName(newName);
+  if (!clean) throw quotaError('NAME_INVALID', 'workspace name is invalid');
+  const own = await assertStudioOwner(userId, workspaceId);
+  if (!own) return false;
+  try {
+    const r = await db.run(
+      'UPDATE studio_workspaces SET name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [clean, workspaceId]
+    );
+    return r.changes > 0;
+  } catch (err) {
+    if (err && /UNIQUE/i.test(err.message || '')) {
+      throw quotaError('NAME_DUP', 'workspace name already exists');
+    }
+    throw err;
+  }
+}
+
+async function deleteStudioWorkspace(userId, workspaceId) {
+  const own = await assertStudioOwner(userId, workspaceId);
+  if (!own) return false;
+  const r = await db.run('DELETE FROM studio_workspaces WHERE id = ?', [workspaceId]);
+  return r.changes > 0;
+}
+
+async function getUserStudioUsage(userId) {
+  const row = await db.get(
+    `SELECT COUNT(*) AS workspaces,
+            COALESCE(SUM(size_bytes), 0) AS total_bytes
+     FROM studio_workspaces
+     WHERE user_id = ?`,
+    [userId]
+  );
+  return {
+    workspaces: Number(row?.workspaces || 0),
+    total_bytes: Number(row?.total_bytes || 0),
+    quota_bytes: MAX_STUDIO_USER_BYTES,
+  };
+}
+
+// Serialize concurrent writes per workspace so two autosaves in flight
+// can't race on the JSON blob (last-write-wins but one overwrite
+// clobbering the other's file is worse). Queue per-workspace keyed by id.
+const studioWriteQueues = new Map();
+function serializeStudioWrite(workspaceId, fn) {
+  const prev = studioWriteQueues.get(workspaceId) || Promise.resolve();
+  const next = prev.then(() => fn(), () => fn());
+  studioWriteQueues.set(workspaceId, next.catch(() => null).finally(() => {
+    if (studioWriteQueues.get(workspaceId) === next.catch(() => null)) {
+      studioWriteQueues.delete(workspaceId);
+    }
+  }));
+  return next;
+}
+
+async function writeStudioFile(userId, workspaceId, filePath, content) {
+  const cleanPath = sanitizeStudioPath(filePath);
+  if (!cleanPath) throw quotaError('PATH_INVALID', 'file path is invalid');
+  if (typeof content !== 'string') {
+    throw quotaError('CONTENT_INVALID', 'file content must be a string');
+  }
+  const size = Buffer.byteLength(content, 'utf8');
+  if (size > MAX_STUDIO_FILE_BYTES) {
+    throw quotaError('FILE_TOO_BIG', 'file exceeds 5 MB cap', {
+      size, limit: MAX_STUDIO_FILE_BYTES,
+    });
+  }
+  return serializeStudioWrite(workspaceId, async () => {
+    const ws = await getStudioWorkspace(userId, workspaceId);
+    if (!ws) return null;
+    const prev = ws.files[cleanPath];
+    const prevSize = prev ? Number(prev.size || 0) : 0;
+    const newWsSize = Number(ws.size_bytes || 0) - prevSize + size;
+    if (newWsSize > MAX_STUDIO_WORKSPACE_BYTES) {
+      throw quotaError('WORKSPACE_FULL', 'workspace exceeds 50 MB cap', {
+        size: newWsSize, limit: MAX_STUDIO_WORKSPACE_BYTES,
+      });
+    }
+    const fileCount = Object.keys(ws.files).length + (prev ? 0 : 1);
+    if (fileCount > MAX_STUDIO_FILES_PER_WS) {
+      throw quotaError('TOO_MANY_FILES', 'workspace exceeds file-count cap', {
+        files: fileCount, limit: MAX_STUDIO_FILES_PER_WS,
+      });
+    }
+    // User-level soft cap — sum of ALL workspaces excluding this one's old size.
+    const usage = await getUserStudioUsage(userId);
+    const otherBytes = Number(usage.total_bytes || 0) - Number(ws.size_bytes || 0);
+    if (otherBytes + newWsSize > MAX_STUDIO_USER_BYTES) {
+      throw quotaError('USER_QUOTA', 'user storage quota exceeded', {
+        size: otherBytes + newWsSize, limit: MAX_STUDIO_USER_BYTES,
+      });
+    }
+    const updated = {
+      ...ws.files,
+      [cleanPath]: {
+        content,
+        size,
+        updated_at: new Date().toISOString(),
+      },
+    };
+    const r = await db.run(
+      `UPDATE studio_workspaces
+         SET files = ?, size_bytes = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND user_id = ?`,
+      [JSON.stringify(updated), newWsSize, workspaceId, userId]
+    );
+    if (r.changes === 0) return null;
+    return {
+      path: cleanPath,
+      size,
+      workspace_size_bytes: newWsSize,
+      updated_at: new Date().toISOString(),
+    };
+  });
+}
+
+async function deleteStudioFile(userId, workspaceId, filePath) {
+  const cleanPath = sanitizeStudioPath(filePath);
+  if (!cleanPath) throw quotaError('PATH_INVALID', 'file path is invalid');
+  return serializeStudioWrite(workspaceId, async () => {
+    const ws = await getStudioWorkspace(userId, workspaceId);
+    if (!ws) return null;
+    const prev = ws.files[cleanPath];
+    if (!prev) return { deleted: false, workspace_size_bytes: ws.size_bytes };
+    const prevSize = Number(prev.size || 0);
+    const updated = { ...ws.files };
+    delete updated[cleanPath];
+    const newWsSize = Math.max(0, Number(ws.size_bytes || 0) - prevSize);
+    const r = await db.run(
+      `UPDATE studio_workspaces
+         SET files = ?, size_bytes = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND user_id = ?`,
+      [JSON.stringify(updated), newWsSize, workspaceId, userId]
+    );
+    if (r.changes === 0) return null;
+    return { deleted: true, workspace_size_bytes: newWsSize };
+  });
+}
+
+async function readStudioFile(userId, workspaceId, filePath) {
+  const cleanPath = sanitizeStudioPath(filePath);
+  if (!cleanPath) return null;
+  const ws = await getStudioWorkspace(userId, workspaceId);
+  if (!ws) return null;
+  const entry = ws.files[cleanPath];
+  if (!entry) return null;
+  return {
+    path: cleanPath,
+    content: String(entry.content ?? ''),
+    size: Number(entry.size || 0),
+    updated_at: entry.updated_at || ws.updated_at,
+  };
+}
+
+function listStudioFiles(workspace) {
+  if (!workspace || !workspace.files) return [];
+  return Object.keys(workspace.files).sort().map((path) => ({
+    path,
+    size: Number(workspace.files[path].size || 0),
+    updated_at: workspace.files[path].updated_at || workspace.updated_at,
+  }));
+}
+
 module.exports = {
   initDb,
   getDb,
@@ -1412,6 +1783,26 @@ module.exports = {
   recordVisitorEvent,
   listRecentVisitors,
   getVisitorStats,
+  // Dev Studio (DS-1) — per-user Python project workspaces
+  listStudioWorkspaces,
+  createStudioWorkspace,
+  getStudioWorkspace,
+  getStudioWorkspaceByName,
+  renameStudioWorkspace,
+  deleteStudioWorkspace,
+  getUserStudioUsage,
+  writeStudioFile,
+  deleteStudioFile,
+  readStudioFile,
+  listStudioFiles,
+  sanitizeStudioPath,
+  sanitizeStudioName,
+  MAX_STUDIO_FILE_BYTES,
+  MAX_STUDIO_WORKSPACE_BYTES,
+  MAX_STUDIO_USER_BYTES,
+  MAX_STUDIO_FILES_PER_WS,
+  MAX_STUDIO_NAME_LEN,
+  MAX_STUDIO_PATH_LEN,
 };
 
 // ─── Stage 5 helpers ────────────────────────────────────────────────

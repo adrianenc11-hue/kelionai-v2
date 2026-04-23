@@ -23,6 +23,7 @@ const realtimeRouter   = require('./routes/realtime');
 const passkeyRouter    = require('./routes/passkey');
 const memoryRouter     = require('./routes/memory');
 const conversationsRouter = require('./routes/conversations');
+const studioRouter     = require('./routes/studio');
 const toolsRouter      = require('./routes/tools');
 const pushRouter       = require('./routes/push');
 const creditsRouter    = require('./routes/credits');
@@ -325,6 +326,10 @@ app.use('/api/diag', diagRouter);
 app.use('/api/auth/passkey', chatLimiter, passkeyRouter);
 app.use('/api/memory', requireAuth, memoryRouter);
 app.use('/api/conversations', requireAuth, conversationsRouter);
+// Dev Studio (DS-1) — per-user Python project workspaces. All routes
+// require a signed-in user; ownership is enforced again inside every
+// DB helper (listStudioWorkspaces, getStudioWorkspace, …).
+app.use('/api/studio', requireAuth, studioRouter);
 
 // Stage 4 — M19 (browser use) + M20 (web search status) + M21 (MCP stubs).
 // Router is PUBLIC by design: Gemini Live tool-call flow has no login gate,
