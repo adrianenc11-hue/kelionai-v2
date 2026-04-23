@@ -173,6 +173,37 @@ CREATE TABLE IF NOT EXISTS visitor_events (
 );
 CREATE INDEX IF NOT EXISTS idx_visitor_events_ts ON visitor_events(ts DESC);
 
+-- Dev Studio (DS-1) — per-user Python project workspaces.
+-- Each row is one "project" that Kelion can read/write into by voice
+-- (see server/src/routes/studio.js). Files live inline as a JSON
+-- object mapping each repo-style path to a { content, size,
+-- updated_at } entry, so the whole project round-trips in a single
+-- SELECT / UPDATE and autosaves stay cheap.
+--
+-- Quotas (enforced in server/src/db/index.js writeStudioFile):
+--   - 5 MB per file
+--   - 50 MB per project
+--   - 1 GB per user (sum across all projects)
+-- The per-user cap is soft; writes past any cap return 413 and leave
+-- the workspace untouched.
+CREATE TABLE IF NOT EXISTS studio_workspaces (
+  id         BIGSERIAL PRIMARY KEY,
+  user_id    BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name       TEXT NOT NULL,
+  -- files is a JSON object serialized as TEXT so the same SELECT /
+  -- UPDATE round-trips verbatim on SQLite (which has no JSONB). We
+  -- never query into the blob — writeStudioFile replaces the whole
+  -- payload — so a real JSONB column would be overkill.
+  files      TEXT NOT NULL DEFAULT '{}',
+  size_bytes BIGINT NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_studio_workspaces_user_name
+  ON studio_workspaces(user_id, name);
+CREATE INDEX IF NOT EXISTS idx_studio_workspaces_user
+  ON studio_workspaces(user_id, updated_at DESC);
+
 -- Audit M7 — cross-instance consume state for the H1 silent-bypass
 -- cap. Mirrors the SQLite definition in server/src/db/index.js. The
 -- timestamps are stored as epoch-ms INTEGER so the same
