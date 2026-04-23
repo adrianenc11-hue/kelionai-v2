@@ -29,11 +29,22 @@ const {
   deleteStudioFile,
   readStudioFile,
   listStudioFiles,
+  sanitizeStudioPath,
   MAX_STUDIO_FILE_BYTES,
   MAX_STUDIO_WORKSPACE_BYTES,
   MAX_STUDIO_USER_BYTES,
   MAX_STUDIO_FILES_PER_WS,
 } = require('../db');
+const { runWorkspace } = require('../services/studioSandbox');
+
+// Package names in pip's own spec: letters, digits, `.-_`, plus the
+// version / extras modifiers we actually want to accept on the wire
+// (==, >=, <=, ~=, !=, [extras], ,). Intentionally NO whitespace, so
+// a user can't slip in `requests ; rm -rf /` via a crafted request.
+// Length cap is 200 chars — longest real-world PyPI package I could
+// find is ~40 chars (`google-cloud-bigquery-storage`), so 200 is
+// plenty of headroom without inviting abuse.
+const PIP_PACKAGE_RE = /^[A-Za-z0-9][A-Za-z0-9._\-\[\]=<>~!,]{0,199}$/;
 
 const router = Router();
 
@@ -216,6 +227,192 @@ router.delete('/workspaces/:id/file', async (req, res) => {
     if (mapQuotaError(err, res)) return;
     console.error('[studio/delete-file]', err);
     res.status(500).json({ error: 'Failed to delete file' });
+  }
+});
+
+// -------------------------------------------------------------------
+// DS-3 — Sandbox execution
+// -------------------------------------------------------------------
+// `runWorkspace` in services/studioSandbox.js encapsulates the full
+// sandbox lifecycle (create → hydrate → pip install → python → kill).
+// These routes are thin auth+validation wrappers around it.
+// Ownership is enforced by `getStudioWorkspace(userId, id)` returning
+// `null` for anyone else's id, which we map to 404 (not 403) to match
+// the non-owner behaviour of the DS-1 endpoints above.
+
+function readEntry(body, fallback = 'main.py') {
+  const raw = typeof body?.entry === 'string' && body.entry.trim()
+    ? body.entry.trim()
+    : fallback;
+  return sanitizeStudioPath(raw);
+}
+
+function mapSandboxError(err, res) {
+  if (err && err.studioSandbox === 'UNAVAILABLE') {
+    return res.status(503).json({
+      error: 'Code sandbox is not configured on this server. Set E2B_API_KEY.',
+      code: 'SANDBOX_UNAVAILABLE',
+    });
+  }
+  if (err && err.studioSandbox === 'CREATE_FAILED') {
+    return res.status(502).json({
+      error: err.message || 'Failed to start sandbox',
+      code: 'SANDBOX_CREATE_FAILED',
+    });
+  }
+  return res.status(500).json({ error: 'sandbox error', code: 'SANDBOX_ERROR' });
+}
+
+// POST /api/studio/workspaces/:id/run — install deps (if requirements.txt
+// exists) and run `python <entry>`. Default entry = main.py.
+// Body: { entry?: string, install_first?: boolean, timeout_ms?: number }
+router.post('/workspaces/:id/run', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return res.status(400).json({ error: 'bad id' });
+    const apiKey = process.env.E2B_API_KEY;
+    if (!apiKey) {
+      return res.status(503).json({
+        error: 'Code sandbox is not configured on this server. Set E2B_API_KEY.',
+        code: 'SANDBOX_UNAVAILABLE',
+      });
+    }
+    const ws = await getStudioWorkspace(req.user.id, id);
+    if (!ws) return res.status(404).json({ error: 'not found' });
+
+    const entry = readEntry(req.body);
+    if (!entry) {
+      return res.status(400).json({ error: 'invalid entry path', code: 'ENTRY_INVALID' });
+    }
+    if (!ws.files || !ws.files[entry]) {
+      return res.status(400).json({
+        error: `entry file not found in workspace: ${entry}`,
+        code: 'ENTRY_MISSING',
+      });
+    }
+    const installFirst = req.body?.install_first !== false;
+    const timeoutMs = Number(req.body?.timeout_ms);
+
+    const out = await runWorkspace({
+      files: ws.files,
+      entry,
+      installFirst,
+      timeoutMs: Number.isFinite(timeoutMs) ? timeoutMs : undefined,
+      apiKey,
+    });
+    res.json({ ok: true, entry, ...out });
+  } catch (err) {
+    if (err && (err.studioSandbox === 'UNAVAILABLE' || err.studioSandbox === 'CREATE_FAILED')) {
+      return mapSandboxError(err, res);
+    }
+    console.error('[studio/run]', err);
+    res.status(500).json({ error: 'sandbox error', code: 'SANDBOX_ERROR' });
+  }
+});
+
+// POST /api/studio/workspaces/:id/pip-install — validate packages by
+// running `pip install` in a fresh sandbox, then (on success) append
+// them to `requirements.txt` in the workspace. Failure leaves the
+// workspace untouched — the user sees stderr from pip and knows why.
+// Body: { packages: string[] }
+router.post('/workspaces/:id/pip-install', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return res.status(400).json({ error: 'bad id' });
+    const apiKey = process.env.E2B_API_KEY;
+    if (!apiKey) {
+      return res.status(503).json({
+        error: 'Code sandbox is not configured on this server. Set E2B_API_KEY.',
+        code: 'SANDBOX_UNAVAILABLE',
+      });
+    }
+    const raw = Array.isArray(req.body?.packages) ? req.body.packages : null;
+    if (!raw || !raw.length) {
+      return res.status(400).json({ error: 'packages[] required', code: 'PACKAGES_MISSING' });
+    }
+    if (raw.length > 50) {
+      return res.status(400).json({ error: 'too many packages (max 50)', code: 'PACKAGES_TOO_MANY' });
+    }
+    const validated = [];
+    for (const p of raw) {
+      if (typeof p !== 'string') {
+        return res.status(400).json({ error: 'invalid package', code: 'PACKAGE_INVALID' });
+      }
+      const clean = p.trim();
+      if (!PIP_PACKAGE_RE.test(clean)) {
+        return res.status(400).json({
+          error: `invalid package name: ${JSON.stringify(p)}`,
+          code: 'PACKAGE_INVALID',
+        });
+      }
+      validated.push(clean);
+    }
+
+    const ws = await getStudioWorkspace(req.user.id, id);
+    if (!ws) return res.status(404).json({ error: 'not found' });
+
+    // Merge into requirements.txt — preserve existing lines, add new
+    // ones at the end in the order the user requested. Dedup case-
+    // sensitively because `Flask` and `flask` are the same package to
+    // pip but a user might care about the spelling in their file.
+    const existing = ws.files?.['requirements.txt']?.content || '';
+    const existingLines = existing.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    const seen = new Set(existingLines);
+    const finalLines = [...existingLines];
+    for (const pkg of validated) {
+      if (!seen.has(pkg)) {
+        finalLines.push(pkg);
+        seen.add(pkg);
+      }
+    }
+    const nextRequirements = finalLines.join('\n') + '\n';
+
+    // Build an overlay so we validate the FUTURE requirements.txt
+    // without mutating the workspace row until we know pip succeeded.
+    const overlayFiles = {
+      ...(ws.files || {}),
+      'requirements.txt': {
+        content: nextRequirements,
+        size: Buffer.byteLength(nextRequirements, 'utf8'),
+        updated_at: new Date().toISOString(),
+      },
+    };
+
+    const timeoutMs = Number(req.body?.timeout_ms);
+    const out = await runWorkspace({
+      files: overlayFiles,
+      entry: null, // install-only — no python run
+      installFirst: true,
+      timeoutMs: Number.isFinite(timeoutMs) ? timeoutMs : 90_000,
+      apiKey,
+    });
+
+    const installed = out.pip && out.pip.exit_code === 0;
+    if (installed) {
+      try {
+        await writeStudioFile(req.user.id, id, 'requirements.txt', nextRequirements);
+      } catch (err) {
+        // If we couldn't persist (quota, etc.), tell the client pip
+        // succeeded but the workspace wasn't updated — they can
+        // clean up manually and try again.
+        if (mapQuotaError(err, res)) return;
+        throw err;
+      }
+    }
+
+    res.status(installed ? 200 : 422).json({
+      ok: installed,
+      added: validated,
+      requirements_preview: nextRequirements,
+      pip: out.pip,
+      duration_ms: out.duration_ms,
+    });
+  } catch (err) {
+    if (err && (err.studioSandbox === 'UNAVAILABLE' || err.studioSandbox === 'CREATE_FAILED')) {
+      return mapSandboxError(err, res);
+    }
+    console.error('[studio/pip-install]', err);
+    res.status(500).json({ error: 'sandbox error', code: 'SANDBOX_ERROR' });
   }
 });
 
