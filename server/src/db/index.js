@@ -732,6 +732,27 @@ const UPDATE_USER_ALLOWED_COLUMNS = new Set([
   'cloned_voice_enabled',
 ]);
 
+// mergeUsers() runs its own UPDATE on the users row (outside updateUser)
+// so it can sum `credits_balance_minutes` instead of picking one side —
+// a ledger column deliberately excluded from UPDATE_USER_ALLOWED_COLUMNS.
+// The set below pins every column mergeUsers may write. Keys filled into
+// the merge patch that are NOT in this set are rejected before any SQL
+// is emitted, so a future contributor who forwards user-controlled keys
+// into `fillIfEmpty` can't accidentally open an identifier-injection
+// hole on the `users` table.
+const MERGE_USERS_FILL_ALLOWED_COLUMNS = new Set([
+  'google_id',
+  'picture',
+  'stripe_customer_id',
+  'password_hash',
+  'referral_code',
+  'cloned_voice_id',
+  'cloned_voice_consent_at',
+  'cloned_voice_consent_version',
+  'cloned_voice_enabled',
+  'credits_balance_minutes',
+]);
+
 async function updateUser(id, data) {
   if (!data || typeof data !== 'object') {
     throw new Error('updateUser: data must be an object');
@@ -1109,6 +1130,18 @@ async function mergeUsers(sourceId, targetId) {
       fillIfEmpty.credits_balance_minutes = tgtBalance + srcBalance;
     }
     if (Object.keys(fillIfEmpty).length > 0) {
+      // Defence in depth: refuse to interpolate any key that isn't on
+      // the merge-users allowlist. Every key written above is hard-coded,
+      // so this only fires if a future contributor forwards unsanitised
+      // input — the transaction rolls back cleanly via the outer catch.
+      const unknown = Object.keys(fillIfEmpty).filter(
+        (k) => !MERGE_USERS_FILL_ALLOWED_COLUMNS.has(k),
+      );
+      if (unknown.length) {
+        throw new Error(
+          `mergeUsers: unknown column(s) rejected: ${unknown.join(', ')}`,
+        );
+      }
       const fields = Object.keys(fillIfEmpty).map(k => `${k} = ?`).join(', ');
       const values = Object.values(fillIfEmpty);
       await db.run(
