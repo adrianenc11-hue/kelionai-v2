@@ -2,7 +2,7 @@
 
 const jwt = require('jsonwebtoken');
 const config = require('../config');
-const { getUserByGoogleId, findById, findByEmail, getUserByEmail } = require('../db');
+const { getUserByGoogleId, findById, findByEmail, getUserByEmail, createUser } = require('../db');
 
 /**
  * Middleware pentru verificarea autentificării.
