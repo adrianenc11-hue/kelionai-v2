@@ -776,3 +776,173 @@ describe('REST /api/studio', () => {
     expect(r.body.total_bytes).toBe(6);
   });
 });
+
+// ───────────────── Followup fixes (post-#192 Devin Review) ─────────
+
+describe('mergeUsers moves studio_workspaces (prev CASCADE-lost)', () => {
+  // Regression for Devin Review finding on PR #192: userIdTables did
+  // not include studio_workspaces, so when mergeUsers deleted the
+  // source row the workspace rows were CASCADE-deleted — projects
+  // silently vanished on admin merge. The fix adds an explicit
+  // rename-on-collision pass before the UPDATE SET user_id.
+  //
+  // mergeUsers refuses cross-email merges (by design — it's the admin
+  // dedupe path), so each test provisions a *fresh* pair of rows
+  // with the SAME email and the same google_id format kept unique via
+  // a counter, then discards them after.
+  let mergeCounter = 0;
+  async function makeDuplicatePair() {
+    mergeCounter += 1;
+    const email = `dupe-${mergeCounter}@studio-merge.test`;
+    const src = await dbMod.createUser({
+      google_id: `dup-src-${mergeCounter}`,
+      email, name: `Source ${mergeCounter}`, picture: null,
+    });
+    const tgt = await dbMod.createUser({
+      google_id: `dup-tgt-${mergeCounter}`,
+      email, name: `Target ${mergeCounter}`, picture: null,
+    });
+    return { src, tgt };
+  }
+
+  test('moves workspaces whose names do not collide', async () => {
+    const { src, tgt } = await makeDuplicatePair();
+    await dbMod.createStudioWorkspace(tgt.id, 'a-only');
+    await dbMod.createStudioWorkspace(src.id, 'b-only');
+    const result = await dbMod.mergeUsers(src.id, tgt.id);
+    expect(result.moved.studio_workspaces).toBe(1);
+    const rows = await dbMod.listStudioWorkspaces(tgt.id);
+    expect(rows.map((r) => r.name).sort()).toEqual(['a-only', 'b-only']);
+    const orphans = await dbMod.listStudioWorkspaces(src.id);
+    expect(orphans).toHaveLength(0);
+  });
+
+  test('renames source workspace when its name collides with target', async () => {
+    const { src, tgt } = await makeDuplicatePair();
+    const tOwn = await dbMod.createStudioWorkspace(tgt.id, 'myproj');
+    const sDupe = await dbMod.createStudioWorkspace(src.id, 'myproj');
+    // Prove workspaces ARE distinct rows before merge.
+    expect(tOwn.id).not.toBe(sDupe.id);
+    const result = await dbMod.mergeUsers(src.id, tgt.id);
+    expect(result.moved.studio_workspaces).toBe(1);
+    const rows = await dbMod.listStudioWorkspaces(tgt.id);
+    expect(rows).toHaveLength(2);
+    const names = rows.map((r) => r.name).sort();
+    // Target's own "myproj" is unchanged; source's "myproj" got the
+    // " (merged)" suffix to clear the unique (user_id, name) index.
+    expect(names[0]).toBe('myproj');
+    expect(names[1]).toBe('myproj (merged)');
+  });
+
+  test('falls back to " (merged <sourceId>)" when " (merged)" is also taken', async () => {
+    const { src, tgt } = await makeDuplicatePair();
+    await dbMod.createStudioWorkspace(tgt.id, 'p');
+    await dbMod.createStudioWorkspace(tgt.id, 'p (merged)');
+    await dbMod.createStudioWorkspace(src.id, 'p');
+    const result = await dbMod.mergeUsers(src.id, tgt.id);
+    expect(result.moved.studio_workspaces).toBe(1);
+    const names = (await dbMod.listStudioWorkspaces(tgt.id))
+      .map((r) => r.name).sort();
+    expect(names).toContain('p');
+    expect(names).toContain('p (merged)');
+    // At least one name uses the sourceId-disambiguated suffix.
+    expect(names.some((n) => /^p \(merged /.test(n))).toBe(true);
+  });
+
+  test('preserves files blob after merge (no data loss)', async () => {
+    const { src, tgt } = await makeDuplicatePair();
+    const ws = await dbMod.createStudioWorkspace(src.id, 'payload');
+    await dbMod.writeStudioFile(src.id, ws.id, 'main.py', 'print("hi")');
+    await dbMod.mergeUsers(src.id, tgt.id);
+    const moved = await dbMod.getStudioWorkspace(tgt.id, ws.id);
+    expect(moved).toBeTruthy();
+    expect(moved.files['main.py'].content).toBe('print("hi")');
+  });
+
+  test('handles multiple collisions at once', async () => {
+    const { src, tgt } = await makeDuplicatePair();
+    await dbMod.createStudioWorkspace(tgt.id, 'one');
+    await dbMod.createStudioWorkspace(tgt.id, 'two');
+    await dbMod.createStudioWorkspace(src.id, 'one');
+    await dbMod.createStudioWorkspace(src.id, 'two');
+    await dbMod.createStudioWorkspace(src.id, 'three');
+    const result = await dbMod.mergeUsers(src.id, tgt.id);
+    expect(result.moved.studio_workspaces).toBe(3);
+    const names = (await dbMod.listStudioWorkspaces(tgt.id))
+      .map((r) => r.name).sort();
+    expect(names.filter((n) => n === 'one')).toHaveLength(1);
+    expect(names.filter((n) => n === 'two')).toHaveLength(1);
+    expect(names.some((n) => n.startsWith('one (merged'))).toBe(true);
+    expect(names.some((n) => n.startsWith('two (merged'))).toBe(true);
+    expect(names).toContain('three');
+  });
+
+  test('still deletes the source user row after moving the workspaces', async () => {
+    const { src, tgt } = await makeDuplicatePair();
+    await dbMod.createStudioWorkspace(src.id, 'to-move');
+    await dbMod.mergeUsers(src.id, tgt.id);
+    const srcRow = await dbMod.findById(src.id);
+    expect(srcRow).toBeFalsy();
+    const tgtRows = await dbMod.listStudioWorkspaces(tgt.id);
+    expect(tgtRows.map((r) => r.name)).toContain('to-move');
+  });
+});
+
+describe('studioWriteQueues Map no longer leaks (post-#192 fix)', () => {
+  // Previously: `next.catch(() => null)` created a fresh promise for
+  // the `.set(...)` call and another fresh one inside the `finally`
+  // identity check, so `===` was always false and the Map entry was
+  // never deleted. Over time every workspace that received a write
+  // accumulated a permanent entry. Fix: build the "stored" promise
+  // once, use the same reference on both sides.
+  test('size returns to 0 after the last write on a workspace settles', async () => {
+    const sizeBefore = dbMod.__getStudioWriteQueuesSizeForTests();
+    const ws = await dbMod.createStudioWorkspace(userA.id, 'queue1');
+    await dbMod.writeStudioFile(userA.id, ws.id, 'a.py', 'x');
+    // Let the micro-task queue drain the finally handler.
+    await new Promise((r) => setImmediate(r));
+    expect(dbMod.__getStudioWriteQueuesSizeForTests()).toBe(sizeBefore);
+  });
+
+  test('chained writes on the same workspace leave one entry during flight and zero after', async () => {
+    const ws = await dbMod.createStudioWorkspace(userA.id, 'queue2');
+    const base = dbMod.__getStudioWriteQueuesSizeForTests();
+    // Kick off three concurrent writes: the queue should hold at most
+    // one entry for this workspace at a time.
+    const writes = Promise.all([
+      dbMod.writeStudioFile(userA.id, ws.id, 'a.py', '1'),
+      dbMod.writeStudioFile(userA.id, ws.id, 'b.py', '22'),
+      dbMod.writeStudioFile(userA.id, ws.id, 'c.py', '333'),
+    ]);
+    // Mid-flight, size should be exactly +1 vs baseline (not +3).
+    expect(dbMod.__getStudioWriteQueuesSizeForTests() - base).toBeLessThanOrEqual(1);
+    await writes;
+    await new Promise((r) => setImmediate(r));
+    expect(dbMod.__getStudioWriteQueuesSizeForTests()).toBe(base);
+  });
+
+  test('does not leak even if the underlying write throws a quota error', async () => {
+    const base = dbMod.__getStudioWriteQueuesSizeForTests();
+    const ws = await dbMod.createStudioWorkspace(userA.id, 'queue3');
+    // 6 MB payload — blows past MAX_STUDIO_FILE_BYTES (5 MB) and
+    // must still clear the Map entry in the finally handler.
+    const big = 'a'.repeat(6 * 1024 * 1024);
+    await expect(dbMod.writeStudioFile(userA.id, ws.id, 'big.txt', big))
+      .rejects.toThrow();
+    await new Promise((r) => setImmediate(r));
+    expect(dbMod.__getStudioWriteQueuesSizeForTests()).toBe(base);
+  });
+
+  test('writes to DIFFERENT workspaces do not share queue entries', async () => {
+    const base = dbMod.__getStudioWriteQueuesSizeForTests();
+    const w1 = await dbMod.createStudioWorkspace(userA.id, 'q-a');
+    const w2 = await dbMod.createStudioWorkspace(userA.id, 'q-b');
+    await Promise.all([
+      dbMod.writeStudioFile(userA.id, w1.id, 'a.py', '1'),
+      dbMod.writeStudioFile(userA.id, w2.id, 'a.py', '1'),
+    ]);
+    await new Promise((r) => setImmediate(r));
+    // Both queue entries must have been cleaned up.
+    expect(dbMod.__getStudioWriteQueuesSizeForTests()).toBe(base);
+  });
+});
