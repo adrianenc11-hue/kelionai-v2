@@ -8,7 +8,7 @@ const cookieParser = require('cookie-parser');
 const rateLimit = require('express-rate-limit');
 
 const config = require('./config');
-const { csrfSeed } = require('./middleware/csrf');
+const { csrfSeed, csrfProtection } = require('./middleware/csrf');
 const { visitorLog } = require('./middleware/visitorLog');
 const { requireAuth } = require('./middleware/auth');
 const { checkSubscription, getPlans } = require('./middleware/subscription');
@@ -139,6 +139,23 @@ app.use((req, res, next) => {
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(csrfSeed);
+
+// Audit C2 — enforce the double-submit CSRF check on every state-changing
+// request. `csrfProtection` already:
+//   · skips GET / HEAD / OPTIONS (safe methods),
+//   · bypasses any request carrying `Authorization: Bearer ...` (mobile
+//     and external API callers authenticate via header, not cookie, so
+//     they are not CSRF-able in the first place),
+//   · is a no-op when NODE_ENV === 'test' (so the Jest suite is unaffected).
+// The one endpoint that legitimately receives cookie-less POSTs from a
+// third party is the Stripe webhook — it authenticates via raw-body
+// signature (`stripe-signature` header) and must not be fed through the
+// CSRF gate. Exempting it by path keeps the rest of /api/credits/*
+// protected.
+app.use((req, res, next) => {
+  if (req.path === '/api/credits/webhook') return next();
+  return csrfProtection(req, res, next);
+});
 
 // Visitor analytics — fires only on HTML page loads, never on API / static
 // requests. Wrapped internally so failure can't break a page load. See

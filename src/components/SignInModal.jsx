@@ -13,6 +13,7 @@
 //   (passkey is wired via props.onUsePasskey — the parent owns the flow)
 
 import { useState, useCallback, useEffect, useRef } from 'react'
+import { getCsrfToken } from '../lib/api'
 
 const MODES = {
   SIGN_IN: 'sign_in',
@@ -90,7 +91,7 @@ export default function SignInModal({
       const resp = await fetch(endpoint, {
         method: 'POST',
         credentials: 'include',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
         body: JSON.stringify(body),
       })
       const json = await resp.json().catch(() => ({}))

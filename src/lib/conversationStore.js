@@ -1,3 +1,5 @@
+import { getCsrfToken } from './api';
+
 // Conversation history — client-side store with two backends:
 //   • Signed-in users hit `/api/conversations/*` (Postgres / SQLite
 //     on the server, survives across devices & browsers).
@@ -58,7 +60,7 @@ function notifySessionExpired() {
 }
 
 function authHeaders() {
-  const h = { 'Content-Type': 'application/json' };
+  const h = { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() };
   try {
     const tok = authTokenGetter && authTokenGetter();
     if (tok) h['Authorization'] = `Bearer ${tok}`;
