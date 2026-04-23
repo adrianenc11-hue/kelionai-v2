@@ -3,7 +3,7 @@ import { useGLTF, Environment, ContactShadows, Float } from '@react-three/drei'
 import { Suspense, useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import * as THREE from 'three'
-import { useLipSync } from '../lib/lipSync'
+import { useLipSync, useAudioElementLipSync } from '../lib/lipSync'
 import { subscribeMonitor, handleShowOnMonitor, setMonitorGeoProvider } from '../lib/monitorStore'
 import { setClientGeoProvider } from '../lib/clientGeoProvider'
 import { STATUS_COLORS, STATUS_PULSE_HZ } from '../lib/kelionStatus'
@@ -1632,14 +1632,26 @@ export default function KelionStage() {
   // We now POST the assistant's reply to /api/tts — the server synthesizes
   // with ElevenLabs (Adam — male, multilingual) or Gemini "Charon" (male)
   // and returns an audio/mpeg or audio/wav blob. We play it via an offscreen
-  // <audio> element; a cosine envelope drives the mouth while it plays so
-  // the avatar lip-flaps along (no real-time analyser on CORS-restricted
-  // HTMLMediaElement is needed for coarse correlation).
-  const [ttsMouthOpen, setTtsMouthOpen] = useState(0)
+  // <audio> element and drive the mouth from the *actual* audio amplitude
+  // via `useAudioElementLipSync` (MediaElementSource → analyzer), so the
+  // avatar opens its mouth on vowels and closes it on pauses/consonants —
+  // same envelope shape as the realtime-voice `useLipSync` path. If the
+  // AudioContext can't be created (autoplay policy, older browsers) we
+  // fall back to the legacy 4 Hz cosine so the avatar still lip-flaps.
+  const {
+    mouthOpen: ttsMouthOpen,
+    attach: attachTtsLipSync,
+    reset: resetTtsLipSync,
+  } = useAudioElementLipSync()
+  const [ttsCosineMouth, setTtsCosineMouth] = useState(0)
   const lastSpokenRef = useRef('')
   const ttsRafRef = useRef(null)
   const ttsAudioRef = useRef(null)
   const ttsAbortRef = useRef(null)
+  // Mirror the hook's envelope into a ref so the analyzer-vs-cosine guard
+  // can read the current value without waiting for a React re-render.
+  const ttsMouthOpenRef = useRef(0)
+  useEffect(() => { ttsMouthOpenRef.current = ttsMouthOpen }, [ttsMouthOpen])
   useEffect(() => {
     if (chatBusy) return
     const last = chatMessages[chatMessages.length - 1]
@@ -1655,16 +1667,19 @@ export default function KelionStage() {
     const controller = new AbortController()
     ttsAbortRef.current = controller
 
-    const drive = () => {
-      // 4 Hz cosine envelope, 0..0.9, approximates jaw motion during speech.
+    // Cosine envelope used ONLY as a fallback when the analyzer can't
+    // attach (blocked autoplay, old browser). 4 Hz, 0..0.9, approximates
+    // average jaw motion during speech.
+    const driveCosine = () => {
       const t = performance.now() / 1000
       const v = 0.45 + 0.45 * Math.abs(Math.sin(t * 4 * Math.PI))
-      setTtsMouthOpen(v)
-      ttsRafRef.current = requestAnimationFrame(drive)
+      setTtsCosineMouth(v)
+      ttsRafRef.current = requestAnimationFrame(driveCosine)
     }
     const stopDrive = () => {
       if (ttsRafRef.current) { cancelAnimationFrame(ttsRafRef.current); ttsRafRef.current = null }
-      setTtsMouthOpen(0)
+      setTtsCosineMouth(0)
+      try { resetTtsLipSync() } catch (_) { /* hook already reset */ }
     }
 
     const ttsHeaders = { 'Content-Type': 'application/json' }
@@ -1693,7 +1708,30 @@ export default function KelionStage() {
         ttsAudioRef.current = audio
         audio.onplay = () => {
           if (ttsRafRef.current) cancelAnimationFrame(ttsRafRef.current)
-          drive()
+          // Try the real-audio analyzer first; the hook returns silently
+          // (envelope stays 0) if createMediaElementSource throws or the
+          // context can't resume. We detect that by checking the hook's
+          // envelope a couple of frames later — if it's still 0 while
+          // audio is playing, something's wrong, so we lip-flap via
+          // cosine to avoid the avatar standing still with a closed mouth.
+          try { attachTtsLipSync(audio) } catch (_) { /* fall through to cosine */ }
+          let cosineStarted = false
+          const guardStart = performance.now()
+          const guard = () => {
+            if (!ttsAudioRef.current || ttsAudioRef.current !== audio) return
+            // 250 ms grace period for the analyser — fast enough that any
+            // delay is imperceptible, slow enough to avoid false positives
+            // during the first few quiet frames after decoder warm-up.
+            if (performance.now() - guardStart < 250) {
+              ttsRafRef.current = requestAnimationFrame(guard)
+              return
+            }
+            if (ttsMouthOpenRef.current < 0.02 && !audio.paused && !cosineStarted) {
+              cosineStarted = true
+              driveCosine()
+            }
+          }
+          ttsRafRef.current = requestAnimationFrame(guard)
         }
         const cleanup = () => {
           stopDrive()
@@ -1723,7 +1761,7 @@ export default function KelionStage() {
                 || voices.find((v) => /male|daniel|alex|george|david|mark/i.test(v.name))
               if (pref) utt.voice = pref
             } catch (_) { /* best-effort */ }
-            utt.onstart = () => { if (ttsRafRef.current) cancelAnimationFrame(ttsRafRef.current); drive() }
+            utt.onstart = () => { if (ttsRafRef.current) cancelAnimationFrame(ttsRafRef.current); driveCosine() }
             utt.onend = stopDrive
             utt.onerror = stopDrive
             window.speechSynthesis.speak(utt)
@@ -1737,10 +1775,19 @@ export default function KelionStage() {
       if (ttsAudioRef.current) { try { ttsAudioRef.current.pause() } catch (_) {} ttsAudioRef.current = null }
       stopDrive()
     }
-  }, [chatMessages, chatBusy])
+  }, [chatMessages, chatBusy, attachTtsLipSync, resetTtsLipSync])
 
-  // Max of voice-chat lipsync and text-chat TTS envelope feeds the avatar.
-  const mouthOpen = Math.max(micMouthOpen || 0, ttsMouthOpen || 0)
+  // Max of voice-chat lipsync, real-audio text-chat envelope, and cosine
+  // fallback feeds the avatar. When the analyser is attached, ttsMouthOpen
+  // carries the real amplitude and ttsCosineMouth stays 0; when we fall
+  // back on autoplay-blocked browsers, ttsCosineMouth drives the jaw and
+  // ttsMouthOpen stays 0 — taking the max means we always render whichever
+  // source is active without double-counting.
+  const mouthOpen = Math.max(
+    micMouthOpen || 0,
+    ttsMouthOpen || 0,
+    ttsCosineMouth || 0,
+  )
 
   // Chat bubble auto-hide — Adrian: "chatul trebuie sa dispara dupa ce s-a
   // spus ramine doar in istoric, se afiseaza doar curent ce scrie user sau
