@@ -829,10 +829,35 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
         }
         return null
       })
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode },
-        audio: false,
-      })
+      // When the `camera_on` / `switch_camera` voice tool picks a specific
+      // rear lens (non-ultrawide, non-tele) we pass its deviceId here.
+      // Without a deviceId the browser may default to the ultrawide lens
+      // on phones with multiple rear cameras, which ruins the "see at
+      // distance" use case (license plate at 5m reads as a blur).
+      const deviceId = opts.deviceId || null
+      const videoConstraints = deviceId
+        ? { deviceId: { exact: deviceId }, width: { ideal: 3840 }, height: { ideal: 2160 } }
+        : { width: { ideal: 3840 }, height: { ideal: 2160 }, facingMode }
+      let stream
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints, audio: false })
+      } catch (e) {
+        // Constraint ladder fallback — some cameras reject 4K with
+        // OverconstrainedError. Retry at 1080p, then 720p, then defaults.
+        const ladder = [
+          { ...(deviceId ? { deviceId: { exact: deviceId } } : { facingMode }), width: { ideal: 1920 }, height: { ideal: 1080 } },
+          { ...(deviceId ? { deviceId: { exact: deviceId } } : { facingMode }), width: { ideal: 1280 }, height: { ideal: 720 } },
+          deviceId ? { deviceId: { exact: deviceId } } : { facingMode },
+          true,
+        ]
+        let recovered = null
+        for (const video of ladder) {
+          try { recovered = await navigator.mediaDevices.getUserMedia({ video, audio: false }); break }
+          catch { /* try next rung */ }
+        }
+        if (!recovered) throw e
+        stream = recovered
+      }
       setCameraStream(stream)
       setVisionError(null)
 
@@ -855,8 +880,12 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
       try { await video.play() } catch (_) { /* play failures fall through to grab loop */ }
 
       const canvas = cameraCanvasRef.current
-      const MAX_W = 480
-      const JPEG_Q = 0.6
+      // Bumped from 480 → 1024 so details like license plates survive
+      // the downsample when captured at 4K by the rear camera. Gemini
+      // Vision accepts up to ~3072px but charges per tile — 1024 is the
+      // sweet spot for detail vs. bandwidth.
+      const MAX_W = 1024
+      const JPEG_Q = 0.75
 
       const grab = () => {
         if (!video.videoWidth || !video.videoHeight) return
@@ -925,11 +954,25 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
   // changes (useCallback stable deps → once per mount in practice).
   useEffect(() => {
     setCameraController({
+      start: (opts) => startCamera(opts),
+      stop: () => stopCamera(),
       restart: (opts) => startCamera(opts),
       getFacingMode: () => cameraFacingRef.current || 'user',
+      // camera_zoom tool needs the live MediaStreamTrack to call
+      // applyConstraints({ advanced: [{ zoom }] }). Only the first
+      // video track is meaningful for us (we never capture audio).
+      getActiveTrack: () => {
+        const v = cameraVideoRef.current
+        const s = v && v.srcObject
+        if (s && typeof s.getVideoTracks === 'function') {
+          const tracks = s.getVideoTracks()
+          return tracks && tracks[0] ? tracks[0] : null
+        }
+        return null
+      },
     })
     return () => setCameraController(null)
-  }, [startCamera])
+  }, [startCamera, stopCamera])
 
   // Audit M6 — see lib/handoffGuard.js. True while `start()` is in
   // flight OR while the live RTCPeerConnection is anything other

@@ -893,8 +893,19 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
     // NVIDIA Broadcast) that only honours default constraints. Trying
     // `facingMode: 'user'` explicitly is a known offender on
     // external webcams. Dropping constraints almost always recovers.
+    // When the voice model picks a specific rear lens via camera_on /
+    // switch_camera (non-ultrawide, non-tele) we forward the deviceId
+    // so getUserMedia can lock to that lens instead of the default
+    // rear camera (which on multi-lens phones is often ultrawide).
+    const deviceId = opts.deviceId || null
+    const baseSelector = deviceId
+      ? { deviceId: { exact: deviceId } }
+      : { facingMode: nextFacing }
     const constraintLadder = [
-      { video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: nextFacing }, audio: false },
+      { video: { ...baseSelector, width: { ideal: 3840 }, height: { ideal: 2160 } }, audio: false },
+      { video: { ...baseSelector, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false },
+      { video: { ...baseSelector, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
+      { video: { ...baseSelector, width: { ideal: 640 }, height: { ideal: 480 } }, audio: false },
       { video: { width: { ideal: 640 }, height: { ideal: 480 } }, audio: false },
       { video: true, audio: false },
     ]
@@ -1061,11 +1072,27 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
   // the restart call.
   useEffect(() => {
     setCameraController({
+      start: (opts) => startCamera(opts),
+      stop: () => stopCamera(),
       restart: (opts) => startCamera(opts),
       getFacingMode: () => cameraFacingRef.current || 'user',
+      // camera_zoom tool reaches through to the live MediaStreamTrack
+      // and applies a native zoom constraint where supported. Gemini's
+      // hidden <video> element is tracked on hiddenVideoCameraRef; fall
+      // back to cameraStreamRef when the hidden video hasn't attached
+      // yet (first frame hasn't fired).
+      getActiveTrack: () => {
+        const v = hiddenVideoCameraRef.current
+        const src = (v && v.srcObject) || cameraStreamRef.current
+        if (src && typeof src.getVideoTracks === 'function') {
+          const tracks = src.getVideoTracks()
+          return tracks && tracks[0] ? tracks[0] : null
+        }
+        return null
+      },
     })
     return () => setCameraController(null)
-  }, [startCamera])
+  }, [startCamera, stopCamera])
 
   // Audit M6 — `isBusy()` lets KelionStage's auto-fallback effect
   // (2) detect whether the user already kicked off a manual

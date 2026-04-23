@@ -15,7 +15,13 @@ import {
   readClientGeoPermission,
   tryRequestClientGeo,
 } from './clientGeoProvider'
-import { requestCameraSwitch, getCurrentFacingMode } from './cameraControl'
+import {
+  requestCameraSwitch,
+  requestCameraStart,
+  requestCameraStop,
+  requestCameraZoom,
+  getCurrentFacingMode,
+} from './cameraControl'
 import { getCsrfToken } from './api'
 
 async function postJSON(url, body) {
@@ -316,16 +322,42 @@ export async function runTool(name, args) {
     case 'switch_camera': {
       // Flip front / back camera on mobile. The voice model invokes this
       // when the user says "flip the camera" / "show me what's behind you"
-      // / "schimbă camera". cameraControl.js restarts the active transport's
-      // getUserMedia stream with the new facingMode. On laptops / single-
-      // camera devices the browser may ignore the constraint and keep the
-      // same stream — we surface that so Kelion doesn't claim success.
+      // / "schimbă camera" / "comută camerele". cameraControl.js restarts
+      // the active transport's getUserMedia stream with the new facingMode.
+      // On laptops / single-camera devices the browser may ignore the
+      // constraint and keep the same stream — we surface that so Kelion
+      // doesn't claim success.
       const current = getCurrentFacingMode()
       const side = args?.side
         || (current === 'user' ? 'back' : 'front')
       const res = await requestCameraSwitch(side)
       if (!res.ok) return res.error || 'Camera switch failed.'
       return `ok:facingMode=${res.facingMode}`
+    }
+    case 'camera_on': {
+      // "pornește camera", "activează camera front/back", "camera spate".
+      // Default to back camera when side is omitted — it's the higher-
+      // resolution lens on phones and the one Adrian relies on for
+      // distance reads (number plates, signage).
+      const side = args?.side || 'back'
+      const res = await requestCameraStart(side)
+      if (!res.ok) return res.error || 'Camera failed to start.'
+      return `ok:camera_on:side=${res.side}:facingMode=${res.facingMode}`
+    }
+    case 'camera_off': {
+      // "oprește camera", "dezactivează camera".
+      const res = await requestCameraStop()
+      if (!res.ok) return res.error || 'Camera failed to stop.'
+      return 'ok:camera_off'
+    }
+    case 'zoom_camera': {
+      // "focalizează pe număr", "zoom 2x". Returns softZoom=true when
+      // the lens has no hardware zoom capability so the model can tell
+      // the user the effect is limited.
+      const level = Number(args?.level)
+      const res = await requestCameraZoom(level)
+      if (!res.ok) return res.error || 'Zoom failed.'
+      return `ok:zoom=${res.zoom}${res.softZoom ? ':soft' : ''}`
     }
     default:
       // Real-API tools (calculate, get_weather, web_search, …) are proxied

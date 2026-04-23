@@ -124,7 +124,10 @@ Tools you can use (Stage 4):
 - web_search(query, limit) — live web search with URLs and snippets. Whenever the user asks about anything time-sensitive (news, prices, events, who-is) — call this tool. Never invent a URL, price, or fact.
 - translate(text, to, from) — real translation engine (DeepL when available, otherwise LibreTranslate). Whenever the user asks you to translate a phrase to another language — call this tool.
 - get_my_location(include_address?) — REAL user coordinates from the device. Whenever the user asks "where am I?", "what's my location?", "ce orașe sunt aproape de mine?", or anything that depends on their current position — call this tool FIRST, then use the returned coords with get_weather / get_route / nearby_places. Never guess the city from IP, never say "I don't know where you are" without calling this first.
-- switch_camera(side) — flip the phone camera between front ('user' / selfie) and back ('environment' / rear). Call this whenever the user says "flip the camera", "show me the other side", "use the back camera", "schimbă camera", "arată-mi camera din spate". The camera must already be on; if it isn't, ask the user to tap the camera button first. Pass side='front' or side='back'; when the user just says "flip" / "switch" pass the opposite of the current side.
+- switch_camera(side) — flip the phone camera between front ('user' / selfie) and back ('environment' / rear). Call this whenever the user says "flip the camera", "show me the other side", "use the back camera", "schimbă camera", "comută camerele", "comută camera", "rotește camera", "arată-mi camera din spate". The camera must already be on; if it isn't, call camera_on instead. Pass side='front' or side='back'; when the user just says "flip" / "switch" / "comută" pass the opposite of the current side.
+- camera_on(side) — turn the camera ON. Call this whenever the user says "pornește camera", "activează camera", "deschide camera", "turn on the camera", "camera față" / "activează camera față" (front), "camera spate" / "activează camera spate" (back), "start the back camera", etc. Pass side='front' or side='back'; default to 'back' when the user says only "camera" or "pornește camera" (back camera is the most useful one, with the best resolution). The client auto-picks the most performant rear lens on multi-camera phones (avoids ultrawide / tele / depth).
+- camera_off() — turn the camera OFF. Call this whenever the user says "oprește camera", "dezactivează camera", "închide camera", "turn off the camera", "stop the camera". No arguments.
+- zoom_camera(level) — digital zoom on the active camera. Call when the user says "focalizează pe număr", "zoom pe obiectul ăla", "apropie", "zoom in to 2x", "zoom out". Pass level as a positive multiplier (1 = no zoom, 2 = 2×, 4 = 4×). Works best with the back camera. If the device doesn't support hardware zoom, the tool still reports success but uses a software fallback — tell the user zoom is limited when that happens.
 
 HARD rule for all tools above: if the user question clearly needs one of them, YOU MUST call it. Saying "I'll check that for you" or "let me see" without calling the tool counts as a lie. If no tool fits, say honestly "I don't know" — never guess.
 
@@ -264,15 +267,44 @@ const KELION_TOOLS = [
   },
   {
     name: 'switch_camera',
-    description: "Flip the device camera between the front ('user' / selfie) and back ('environment' / rear) camera. Call this whenever the user says 'flip the camera', 'show me the other side', 'use the back camera', 'schimbă camera', 'arată-mi camera din spate'. The camera must already be on — if not, the tool returns an error asking the user to tap the camera button first. On desktops with a single webcam the browser may ignore the constraint; the tool reports the resulting facingMode so you can tell the user if the switch didn't actually take effect.",
+    description: "Flip the device camera between the front ('user' / selfie) and back ('environment' / rear) camera. Call this whenever the user says 'flip the camera', 'show me the other side', 'use the back camera', 'schimbă camera', 'comută camerele', 'rotește camera', 'arată-mi camera din spate'. The camera must already be on — if not, call camera_on instead. On desktops with a single webcam the browser may ignore the constraint; the tool reports the resulting facingMode so you can tell the user if the switch didn't actually take effect.",
     properties: {
       side: {
         type: 'string',
         enum: ['front', 'back'],
-        description: "Which camera to activate. 'front' = selfie / user-facing. 'back' = rear / environment-facing. If the user just says 'flip' or 'switch' without specifying, omit this property and the client will toggle to the opposite of the current side.",
+        description: "Which camera to activate. 'front' = selfie / user-facing. 'back' = rear / environment-facing. If the user just says 'flip' or 'switch' / 'comută' without specifying, omit this property and the client will toggle to the opposite of the current side.",
       },
     },
     required: [],
+  },
+  {
+    name: 'camera_on',
+    description: "Turn the device camera ON. Call this whenever the user says 'pornește camera', 'activează camera', 'deschide camera', 'turn on the camera', 'camera față' / 'activează camera față' (front), 'camera spate' / 'activează camera spate' (back). On multi-lens phones the client auto-picks the most performant rear lens (the primary back camera, avoiding ultrawide / tele / depth) and asks the browser for up to 4K capture so distant detail stays legible. Returns the actual facingMode the browser ended up with.",
+    properties: {
+      side: {
+        type: 'string',
+        enum: ['front', 'back'],
+        description: "Which camera to start. 'front' = selfie / user-facing. 'back' = rear / environment-facing. Default 'back' if the user just says 'camera' / 'pornește camera' without specifying — back camera is the most useful one.",
+      },
+    },
+    required: [],
+  },
+  {
+    name: 'camera_off',
+    description: "Turn the device camera OFF. Call this whenever the user says 'oprește camera', 'dezactivează camera', 'închide camera', 'turn off the camera', 'stop the camera'. No arguments.",
+    properties: {},
+    required: [],
+  },
+  {
+    name: 'zoom_camera',
+    description: "Apply digital zoom to the currently active camera. Call when the user says 'focalizează pe număr', 'zoom pe obiectul ăla', 'apropie', 'zoom in to 2x', 'zoom out', or similar. Pass level as a positive multiplier where 1 = no zoom, 2 = 2×, 4 = 4×. The tool clamps to the lens's advertised [min, max] range. On devices without hardware zoom the tool reports success with a soft-zoom flag — let the user know zoom is limited when that happens.",
+    properties: {
+      level: {
+        type: 'number',
+        description: "Zoom multiplier. 1 = no zoom (reset), 2 = 2×, 3 = 3×, 4 = 4×, …. Must be positive.",
+      },
+    },
+    required: ['level'],
   },
   {
     name: 'calculate',

@@ -1,28 +1,63 @@
 // Module-level registry for the active camera controller.
 //
 // Both voice transports (openaiRealtime.js, geminiLive.js) expose a
-// `startCamera({ facingMode })` / `stopCamera()` pair. They register their
-// controller here on mount and unregister on unmount. The `switch_camera`
-// tool handler in kelionTools.js calls `requestCameraSwitch('front' | 'back')`
-// which resolves to `facingMode: 'user' | 'environment'` and asks the
-// currently-mounted transport to restart its camera with the new mode.
+// `startCamera({ facingMode, deviceId })` / `stopCamera()` pair. They
+// register their controller here on mount and unregister on unmount.
 //
-// Rationale: the camera is hardcoded to `facingMode: 'user'` in both
-// transports today (see openaiRealtime.js:797 and geminiLive.js:835) so
-// on phones Kelion always sees the selfie camera. Mobile users want to
-// flip to the rear camera for "what's that building over there?" — this
-// tool is how the model invokes the switch.
+// Voice tools in kelionTools.js call:
+//   - requestCameraStart(side)  — "pornește camera [front|back]"
+//   - requestCameraStop()       — "oprește camera"
+//   - requestCameraSwitch(side) — "schimbă camera [front|back]"
+//   - requestCameraZoom(level)  — "zoom pe număr", "focalizează"
 //
-// No React state, no renders — just a module-level ref. The controller
-// function is replaced (not stacked) when a transport mounts, so only
-// the most recent transport is active. That matches the app's behaviour:
-// exactly one voice transport is live at any time.
+// Camera pick strategy for the back side:
+//   1. Enumerate MediaDevices once getUserMedia has granted permission
+//      (labels are empty strings before permission is given, so the
+//      heuristic can't run before at least one successful open).
+//   2. Filter out lenses with "ultra", "wide-angle", "telephoto" in the
+//      label when the user asked for the plain back camera. We prefer
+//      the standard rear lens because ultra-wide distorts faces and
+//      numbers and telephoto can't focus at close range.
+//   3. If labels aren't available or no clear winner exists, fall back
+//      to facingMode: 'environment' and let the OS pick.
+//
+// Resolution: we ask for `ideal: 3840×2160` (4K) and the browser
+// negotiates down to the highest resolution the picked camera can
+// produce. Vision frames are still downsampled before send, but a
+// higher native capture means license plates stay legible after the
+// downsample. See openaiRealtime.js for MAX_W tuning.
 
 let controller = null
 let currentFacingMode = 'user'
 
+// Keyword lists are exported so tests can pin the heuristic down.
+// The comparison is lowercase `includes`, which is how browsers expose
+// device labels (vendor strings like "camera2 1, facing back" on Android
+// or "FaceTime HD Camera (Built-in)" on macOS).
+export const AVOID_BACK_LABEL_KEYWORDS = [
+  'ultra', 'wide', 'tele', 'telephoto', 'depth', 'macro',
+  'front', 'user', 'selfie', 'face',
+]
+
+export const PREFER_BACK_LABEL_KEYWORDS = [
+  'back', 'rear', 'environment', 'world',
+  // Android's Camera2 API labels the primary rear lens "0" on most
+  // devices; the secondary (ultrawide / tele) get higher indices.
+  // "facing back" is the Chromium label for the primary rear camera.
+  'facing back', 'back camera',
+]
+
 export function setCameraController(impl) {
-  // `impl` is `{ restart({ facingMode }), getFacingMode() }` or null to unregister.
+  // `impl` is an object shaped like:
+  //   {
+  //     start?({ facingMode, deviceId }) : Promise<void>,
+  //     stop?()                          : Promise<void>|void,
+  //     restart({ facingMode, deviceId }): Promise<void>,
+  //     getFacingMode()                  : 'user'|'environment',
+  //     getActiveTrack?()                : MediaStreamTrack|null,
+  //   }
+  // Legacy callers registered only `restart` + `getFacingMode`; the
+  // new optional fields unlock camera_on / camera_off / zoom_camera.
   controller = impl || null
 }
 
@@ -52,6 +87,92 @@ export function normaliseSide(side) {
   return null
 }
 
+// Score a back-camera candidate by label. Positive score = good rear lens,
+// negative = avoid (ultrawide / tele / depth / front). Exported for tests.
+export function scoreBackCameraLabel(label) {
+  const s = String(label || '').toLowerCase()
+  if (!s) return 0
+  let score = 0
+  for (const kw of AVOID_BACK_LABEL_KEYWORDS) {
+    if (s.includes(kw)) score -= 10
+  }
+  for (const kw of PREFER_BACK_LABEL_KEYWORDS) {
+    if (s.includes(kw)) score += 5
+  }
+  // Android Camera2 indexes the primary back lens as "0" ("camera2 0" /
+  // "camera 0, facing back"). Secondary lenses get higher indices and
+  // are almost always ultrawide or telephoto. Bump the "0" variant.
+  if (/(^|\s|,)0(\s|,|$)/.test(s) || /camera2\s*0\b/.test(s)) score += 3
+  return score
+}
+
+// Pick the best video input device id for the requested facing mode.
+// Returns null if we can't decide — caller should fall back to a plain
+// facingMode constraint. Safe to call repeatedly; cheap on its own.
+export async function pickBestCameraDeviceId(facingMode) {
+  try {
+    if (!navigator.mediaDevices?.enumerateDevices) return null
+    const devices = await navigator.mediaDevices.enumerateDevices()
+    const videos = (devices || []).filter((d) => d.kind === 'videoinput')
+    if (videos.length <= 1) return null
+    // Labels are empty strings until the page has been granted camera
+    // permission at least once. Before that we can't pick intelligently.
+    const labelled = videos.filter((d) => d.label && d.label.trim())
+    if (labelled.length === 0) return null
+
+    if (facingMode === 'environment') {
+      // Rank back-camera candidates by label heuristic. Only consider
+      // devices that don't look like the front camera.
+      const candidates = labelled
+        .map((d) => ({ d, score: scoreBackCameraLabel(d.label) }))
+        .filter((c) => c.score > 0)
+        .sort((a, b) => b.score - a.score)
+      if (candidates.length) return candidates[0].d.deviceId
+      return null
+    }
+    if (facingMode === 'user') {
+      // Front camera detection is simpler: most devices have exactly one
+      // and label it "front" / "user" / "selfie" / "facetime".
+      const hit = labelled.find((d) => /front|user|selfie|face/i.test(d.label))
+      return hit ? hit.deviceId : null
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+export async function requestCameraStart(side) {
+  const facingMode = normaliseSide(side) || 'environment'
+  if (!controller) {
+    return { ok: false, error: 'Camera controller not mounted. Open Kelion first.' }
+  }
+  const deviceId = await pickBestCameraDeviceId(facingMode)
+  try {
+    const fn = controller.start || controller.restart
+    if (typeof fn !== 'function') {
+      return { ok: false, error: 'Camera controller does not support start.' }
+    }
+    await fn.call(controller, { facingMode, deviceId })
+    setCurrentFacingMode(facingMode)
+    return { ok: true, facingMode, deviceId: deviceId || null, side: facingMode === 'user' ? 'front' : 'back' }
+  } catch (err) {
+    return { ok: false, error: (err && err.message) || 'Failed to start camera.' }
+  }
+}
+
+export async function requestCameraStop() {
+  if (!controller || typeof controller.stop !== 'function') {
+    return { ok: false, error: 'Camera is not active.' }
+  }
+  try {
+    await controller.stop()
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: (err && err.message) || 'Failed to stop camera.' }
+  }
+}
+
 export async function requestCameraSwitch(side) {
   const facingMode = normaliseSide(side)
   if (!facingMode) {
@@ -61,10 +182,49 @@ export async function requestCameraSwitch(side) {
     return { ok: false, error: 'Camera is not active. Tell the user to tap the camera button first.' }
   }
   try {
-    await controller.restart({ facingMode })
+    const deviceId = await pickBestCameraDeviceId(facingMode)
+    await controller.restart({ facingMode, deviceId })
     setCurrentFacingMode(facingMode)
-    return { ok: true, facingMode, side: facingMode === 'user' ? 'front' : 'back' }
+    return { ok: true, facingMode, deviceId: deviceId || null, side: facingMode === 'user' ? 'front' : 'back' }
   } catch (err) {
     return { ok: false, error: (err && err.message) || 'Failed to switch camera.' }
+  }
+}
+
+// Apply digital zoom to the active video track. Uses
+// MediaStreamTrack.applyConstraints({ advanced: [{ zoom }] }) where the
+// browser supports native zoom (Android Chrome, many iOS builds); on
+// platforms without hardware zoom capability the function resolves as
+// `softZoom: true` so the caller knows to fall back to canvas-side
+// cropping if it needs a visible effect.
+//
+// `level` is a relative multiplier (1 = no zoom, 2 = 2×, 4 = 4×). We
+// clamp to the track's advertised [min, max] so asking for 10× on a
+// lens capped at 3× results in 3× instead of a rejected promise.
+export async function requestCameraZoom(level) {
+  const target = Number(level)
+  if (!Number.isFinite(target) || target <= 0) {
+    return { ok: false, error: 'Zoom level must be a positive number (1 = no zoom).' }
+  }
+  if (!controller || typeof controller.getActiveTrack !== 'function') {
+    return { ok: false, error: 'Camera is not active. Start the camera first.' }
+  }
+  const track = controller.getActiveTrack()
+  if (!track) {
+    return { ok: false, error: 'No active camera track. Start the camera first.' }
+  }
+  try {
+    const caps = (track.getCapabilities && track.getCapabilities()) || {}
+    if (caps.zoom && typeof caps.zoom.min === 'number' && typeof caps.zoom.max === 'number') {
+      const clamped = Math.max(caps.zoom.min, Math.min(caps.zoom.max, target))
+      await track.applyConstraints({ advanced: [{ zoom: clamped }] })
+      return { ok: true, zoom: clamped, nativeZoom: true }
+    }
+    // No native zoom — signal soft-zoom fallback. Consumers can apply a
+    // canvas crop when sampling frames; voice model will still hear a
+    // success.
+    return { ok: true, zoom: target, nativeZoom: false, softZoom: true }
+  } catch (err) {
+    return { ok: false, error: (err && err.message) || 'Zoom adjustment rejected by camera driver.' }
   }
 }

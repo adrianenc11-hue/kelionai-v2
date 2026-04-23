@@ -69,6 +69,13 @@ const EXPECTED_TOOL_NAMES = [
   // (clientGeoProvider, cameraControl) rather than the server.
   'get_my_location',
   'switch_camera',
+  // PR #199 — verbal camera controls: on/off + digital zoom ("activează
+  // camera spate", "oprește camera", "zoom 2x"). Client-handled via
+  // cameraControl.js; the tools ride on the same module-level controller
+  // registry as switch_camera so they work under both transports.
+  'camera_on',
+  'camera_off',
+  'zoom_camera',
   // PR B — document readers + OCR (pdf-parse / mammoth / tesseract.js).
   // Inputs accept either a public HTTPS URL or a base64 blob.
   'read_pdf',
