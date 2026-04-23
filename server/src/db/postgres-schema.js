@@ -98,13 +98,22 @@ CREATE TABLE IF NOT EXISTS credit_transactions (
   kind                   TEXT NOT NULL,
   stripe_session_id      TEXT,
   stripe_payment_intent  TEXT,
+  idempotency_key        TEXT,
   note                   TEXT,
   created_at             TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+ALTER TABLE credit_transactions ADD COLUMN IF NOT EXISTS idempotency_key TEXT;
 CREATE INDEX IF NOT EXISTS idx_credit_tx_user ON credit_transactions(user_id, created_at DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_credit_tx_session
   ON credit_transactions(stripe_session_id)
   WHERE stripe_session_id IS NOT NULL;
+-- Non-Stripe callers (admin grants, auto-topup retries, proactive
+-- refunds) pass an idempotency_key to dedupe on their side. The
+-- partial unique index collapses duplicate writes into a no-op,
+-- just like Stripe webhook replays already do.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_credit_tx_idem
+  ON credit_transactions(idempotency_key)
+  WHERE idempotency_key IS NOT NULL;
 
 -- Conversation history — persists the text chat transcript so a signed-in
 -- user can return later and pick up where they left off. One row in

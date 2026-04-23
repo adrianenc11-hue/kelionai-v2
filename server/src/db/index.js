@@ -220,9 +220,10 @@ async function initDb() {
       delta_minutes INTEGER NOT NULL,           -- + for top-up, - for consumption
       amount_cents INTEGER,                     -- Minor units (e.g. GBP pence) charged by Stripe (null for consumption)
       currency TEXT DEFAULT 'gbp',
-      kind TEXT NOT NULL,                       -- 'topup' | 'consume' | 'bonus' | 'refund'
+      kind TEXT NOT NULL,                       -- 'topup' | 'consume' | 'bonus' | 'refund' | 'admin_grant'
       stripe_session_id TEXT,
       stripe_payment_intent TEXT,
+      idempotency_key TEXT,                     -- caller-supplied key for non-Stripe dedupe (admin grants, auto-topup retries)
       note TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -231,6 +232,18 @@ async function initDb() {
   await db.exec('CREATE INDEX IF NOT EXISTS idx_credit_tx_user ON credit_transactions(user_id, created_at DESC)');
   // Guard against double-fulfillment when Stripe retries webhooks.
   await db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_credit_tx_session ON credit_transactions(stripe_session_id) WHERE stripe_session_id IS NOT NULL');
+  // Legacy DBs predate the `idempotency_key` column — add it if missing
+  // (SQLite ALTER TABLE ADD COLUMN is safe on an existing table). The
+  // unique partial index lets callers pass a stable key (admin grants,
+  // retry-safe auto-topups) and have duplicate writes collapse into
+  // a no-op, the same way Stripe webhook replays already do.
+  try {
+    const cols = await db.all("PRAGMA table_info('credit_transactions')");
+    if (Array.isArray(cols) && !cols.some((c) => c.name === 'idempotency_key')) {
+      await db.exec('ALTER TABLE credit_transactions ADD COLUMN idempotency_key TEXT');
+    }
+  } catch (_) { /* postgres path handled in postgres-schema.js */ }
+  await db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_credit_tx_idem ON credit_transactions(idempotency_key) WHERE idempotency_key IS NOT NULL');
 
   // Visitor analytics — Adrian 2026-04-20: "nu vad buton vizite reale cine a
   // vizitat situl, ip tara restul datelor lor". One row per SPA page load
@@ -1229,6 +1242,7 @@ function addCreditsTransaction({
   kind,
   stripeSessionId = null,
   stripePaymentIntent = null,
+  idempotencyKey = null,
   note = null,
 }) {
   if (!Number.isFinite(deltaMinutes) || deltaMinutes === 0) {
@@ -1253,15 +1267,15 @@ function addCreditsTransaction({
         await c.run('UPDATE users SET credits_balance_minutes = ? WHERE id = ?', [next, userId]);
         await c.run(
           `INSERT INTO credit_transactions
-           (user_id, delta_minutes, amount_cents, currency, kind, stripe_session_id, stripe_payment_intent, note)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-          [userId, deltaMinutes, amountCents, currency, kind, stripeSessionId, stripePaymentIntent, note],
+           (user_id, delta_minutes, amount_cents, currency, kind, stripe_session_id, stripe_payment_intent, idempotency_key, note)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [userId, deltaMinutes, amountCents, currency, kind, stripeSessionId, stripePaymentIntent, idempotencyKey, note],
         );
         await c.exec('COMMIT');
         return { balance: next, previous: current, deltaMinutes };
       } catch (err) {
         try { await c.exec('ROLLBACK'); } catch (_) { /* ignore */ }
-        if (/UNIQUE/i.test(err && err.message) && stripeSessionId) {
+        if (/UNIQUE/i.test(err && err.message) && (stripeSessionId || idempotencyKey)) {
           const balance = await getCreditsBalance(userId);
           return { balance, previous: balance, deltaMinutes: 0, duplicate: true };
         }
@@ -1289,16 +1303,19 @@ function addCreditsTransaction({
       await db.run('UPDATE users SET credits_balance_minutes = ? WHERE id = ?', [next, userId]);
       await db.run(
         `INSERT INTO credit_transactions
-         (user_id, delta_minutes, amount_cents, currency, kind, stripe_session_id, stripe_payment_intent, note)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [userId, deltaMinutes, amountCents, currency, kind, stripeSessionId, stripePaymentIntent, note],
+         (user_id, delta_minutes, amount_cents, currency, kind, stripe_session_id, stripe_payment_intent, idempotency_key, note)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [userId, deltaMinutes, amountCents, currency, kind, stripeSessionId, stripePaymentIntent, idempotencyKey, note],
       );
       await db.run('COMMIT');
       return { balance: next, previous: current, deltaMinutes };
     } catch (err) {
       try { await db.run('ROLLBACK'); } catch (_) { /* ignore */ }
-      // UNIQUE stripe_session_id → duplicate webhook delivery. Treat as idempotent.
-      if (/UNIQUE/i.test(err && err.message) && stripeSessionId) {
+      // UNIQUE stripe_session_id OR idempotency_key → duplicate
+      // write (webhook retry, double-click on admin grant, retried
+      // auto-topup). Treat as idempotent no-op and return the
+      // current balance so the caller sees a successful response.
+      if (/UNIQUE/i.test(err && err.message) && (stripeSessionId || idempotencyKey)) {
         const balance = await getCreditsBalance(userId);
         return { balance, previous: balance, deltaMinutes: 0, duplicate: true };
       }
