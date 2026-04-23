@@ -13,11 +13,32 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const jwt = require('jsonwebtoken');
+const rateLimit = require('express-rate-limit');
 const config = require('../config');
 const { getUserByEmail, getUserByGoogleId, findByEmail, getDb } = require('../db');
 const { getLastBootstrapResult, bootstrapAdmin } = require('../services/adminBootstrap');
 
 const router = express.Router();
+
+/**
+ * Audit H4 follow-up (PR #180 Devin Review 🚩) — defence-in-depth
+ * rate-limiter on /client-error. The reporter already rate-limits
+ * 10 reports/60s per tab, but if an attacker gets XSS-equivalent
+ * access (or replays the CSRF cookie+header) they could bypass the
+ * client-side cap and flood Railway logs / inflate counters. This
+ * gate enforces the same budget server-side per-IP. No-op under
+ * NODE_ENV=test so Jest can burst-post without flake.
+ */
+const clientErrorLimiter =
+  process.env.NODE_ENV === 'test'
+    ? (req, res, next) => next()
+    : rateLimit({
+        windowMs: 60 * 1000,
+        max: 30, // 3× the client cap so shared NATs aren't punished
+        standardHeaders: true,
+        legacyHeaders: false,
+        message: { error: 'rate_limited' },
+      });
 
 /**
  * GET /api/diag/whoami — decodes the kelion.token cookie (or Bearer
@@ -319,7 +340,7 @@ function clampString(v, max) {
   return v.length <= max ? v : `${v.slice(0, max)}… [truncated-server]`;
 }
 
-router.post('/client-error', (req, res) => {
+router.post('/client-error', clientErrorLimiter, (req, res) => {
   const body = req.body || {};
   const kind = ALLOWED_KINDS.has(body.kind) ? body.kind : 'unknown';
   const message = clampString(body.message || '', MAX_MESSAGE_CHARS) || '(no message)';
