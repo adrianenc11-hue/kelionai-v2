@@ -154,6 +154,13 @@ const MAX_SILENT_STREAK = 3;
 // hasn't filled (e.g. client pings every 3 min so it never gets to 3
 // in 60 s of real time), a 5-min idle window forces a debit.
 const MAX_SILENT_WINDOW_MS = 5 * 60 * 1000;
+// Entries older than this are evicted by the periodic GC. 15 min is
+// generous: the client heartbeats at ≤60 s, so any user mid-session
+// will always have touched the map recently. A user this quiet for
+// 15 min is either disconnected or their tab was closed — in both
+// cases the next `/consume` will rebuild state fresh.
+const CONSUME_STATE_TTL_MS = 15 * 60 * 1000;
+const CONSUME_STATE_GC_INTERVAL_MS = 5 * 60 * 1000;
 const consumeStateByUser = new Map();
 // userId → { lastBillableAt, silentStreak, silentSince }
 
@@ -229,6 +236,75 @@ function evaluateConsumeDecision(state, now, silent) {
     nextState: { lastBillableAt: now, silentStreak: 0, silentSince: 0 },
   };
 }
+
+/**
+ * H2 fix: periodic GC for `consumeStateByUser`. Without this the Map
+ * grows one entry per user-who-ever-called-/consume for the lifetime
+ * of the process — Railway restarts every deploy mask the leak in
+ * production, but a long-running instance with steady signups still
+ * drifts upward. A user is considered stale when the newest timestamp
+ * in their state (`lastBillableAt` or `silentSince`) is older than
+ * `ttl`. The route rebuilds state from scratch on the next `/consume`
+ * call (any missing fields default to 0), so eviction is safe.
+ *
+ * Pure over inputs — takes the Map explicitly so tests can pass their
+ * own without touching module state.
+ *
+ * @returns {number} number of entries evicted
+ */
+function gcConsumeState(map, now, ttl = CONSUME_STATE_TTL_MS) {
+  let removed = 0;
+  const cutoff = now - ttl;
+  for (const [userId, state] of map) {
+    const newest = Math.max(
+      Number(state && state.lastBillableAt) || 0,
+      Number(state && state.silentSince) || 0,
+    );
+    if (newest < cutoff) {
+      map.delete(userId);
+      removed += 1;
+    }
+  }
+  return removed;
+}
+
+let consumeStateGcHandle = null;
+
+/**
+ * Starts the periodic GC. Idempotent — safe to call multiple times,
+ * extra calls are no-ops. Skipped automatically under Jest so tests
+ * that never tear down the process don't inherit a hanging interval.
+ */
+function startConsumeStateGc() {
+  if (consumeStateGcHandle) return consumeStateGcHandle;
+  if (process.env.NODE_ENV === 'test') return null;
+  consumeStateGcHandle = setInterval(() => {
+    try {
+      const n = gcConsumeState(consumeStateByUser, Date.now());
+      if (n > 0) {
+        console.log('[credits/consume] gc evicted stale state', { entries: n, remaining: consumeStateByUser.size });
+      }
+    } catch (e) {
+      console.warn('[credits/consume] gc error', e && e.message);
+    }
+  }, CONSUME_STATE_GC_INTERVAL_MS);
+  // Never let the GC keep the event loop alive on its own.
+  if (consumeStateGcHandle && typeof consumeStateGcHandle.unref === 'function') {
+    consumeStateGcHandle.unref();
+  }
+  return consumeStateGcHandle;
+}
+
+function stopConsumeStateGc() {
+  if (consumeStateGcHandle) {
+    clearInterval(consumeStateGcHandle);
+    consumeStateGcHandle = null;
+  }
+}
+
+// Boot the GC on module load so long-running Railway instances don't
+// leak. No-op under NODE_ENV=test.
+startConsumeStateGc();
 
 router.post('/consume', requireAuth, async (req, res) => {
   try {
@@ -542,3 +618,8 @@ module.exports.evaluateConsumeDecision = evaluateConsumeDecision;
 module.exports.CONSUME_COOLDOWN_MS = CONSUME_COOLDOWN_MS;
 module.exports.MAX_SILENT_STREAK = MAX_SILENT_STREAK;
 module.exports.MAX_SILENT_WINDOW_MS = MAX_SILENT_WINDOW_MS;
+module.exports.gcConsumeState = gcConsumeState;
+module.exports.startConsumeStateGc = startConsumeStateGc;
+module.exports.stopConsumeStateGc = stopConsumeStateGc;
+module.exports.CONSUME_STATE_TTL_MS = CONSUME_STATE_TTL_MS;
+module.exports.CONSUME_STATE_GC_INTERVAL_MS = CONSUME_STATE_GC_INTERVAL_MS;
