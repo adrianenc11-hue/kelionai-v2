@@ -315,6 +315,28 @@ async function initDb() {
   `);
   await db.exec('CREATE INDEX IF NOT EXISTS idx_voice_clone_events_user ON voice_clone_events(user_id, created_at DESC)');
 
+  // Audit M7 — cross-instance consume state for the H1 silent-bypass
+  // cap. The in-memory `consumeStateByUser` Map in routes/credits.js
+  // is per-process — if Railway scales horizontally, a tampered
+  // client can bounce between instances and reset its silent streak
+  // on each hop, re-opening the H1 bypass. We persist the tiny per-
+  // user policy state (lastBillableAt, silentStreak, silentSince) so
+  // every instance sees the same counters. Payload is three integers
+  // per user, written at most once per /consume call (~1/min/user).
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS credits_consume_state (
+      user_id INTEGER PRIMARY KEY,
+      last_billable_at INTEGER NOT NULL DEFAULT 0,
+      silent_streak    INTEGER NOT NULL DEFAULT 0,
+      silent_since     INTEGER NOT NULL DEFAULT 0,
+      updated_at       INTEGER NOT NULL DEFAULT 0,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+  // GC helper index — eviction scans by `updated_at` to drop rows
+  // that haven't touched /consume in > TTL.
+  await db.exec('CREATE INDEX IF NOT EXISTS idx_credits_consume_state_updated ON credits_consume_state(updated_at)');
+
   return db;
 }
 
@@ -1136,6 +1158,69 @@ async function mergeUsers(sourceId, targetId) {
   };
 }
 
+// ─── Audit M7 — cross-instance consume state ────────────────────────
+//
+// Per-user policy state for the H1 silent-bypass cap, persisted in
+// `credits_consume_state` so every process instance sees the same
+// counters. Read: one SELECT per /consume call. Write: one upsert
+// per decision transition. Payload is three integers per user.
+//
+// The in-memory Map in routes/credits.js is now a tiny L1 cache — if
+// a write to the DB fails we still have the per-process state, so
+// the cap can't collapse silently on transient DB hiccups.
+
+async function getConsumeState(userId) {
+  if (!userId && userId !== 0) return null;
+  const row = await db.get(
+    `SELECT last_billable_at AS lastBillableAt,
+            silent_streak    AS silentStreak,
+            silent_since     AS silentSince,
+            updated_at       AS updatedAt
+     FROM credits_consume_state
+     WHERE user_id = ?`,
+    [userId]
+  );
+  if (!row) return null;
+  return {
+    lastBillableAt: Number(row.lastBillableAt) || 0,
+    silentStreak:   Number(row.silentStreak)   || 0,
+    silentSince:    Number(row.silentSince)    || 0,
+    updatedAt:      Number(row.updatedAt)      || 0,
+  };
+}
+
+async function saveConsumeState(userId, state, nowMs) {
+  if (!userId && userId !== 0) return;
+  const s = state || {};
+  const lastBillableAt = Number(s.lastBillableAt) || 0;
+  const silentStreak   = Number(s.silentStreak)   || 0;
+  const silentSince    = Number(s.silentSince)    || 0;
+  const updatedAt      = Number.isFinite(nowMs) ? Number(nowMs) : Date.now();
+  // `INSERT ... ON CONFLICT DO UPDATE` is supported by sqlite ≥3.24
+  // (packaged sqlite3@5 ships 3.40+) and by Postgres. One round-trip
+  // whether the row exists or not, safe under race between instances.
+  await db.run(
+    `INSERT INTO credits_consume_state
+       (user_id, last_billable_at, silent_streak, silent_since, updated_at)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(user_id) DO UPDATE SET
+       last_billable_at = excluded.last_billable_at,
+       silent_streak    = excluded.silent_streak,
+       silent_since     = excluded.silent_since,
+       updated_at       = excluded.updated_at`,
+    [userId, lastBillableAt, silentStreak, silentSince, updatedAt]
+  );
+}
+
+async function gcConsumeStateRows(cutoffMs) {
+  const cutoff = Number.isFinite(cutoffMs) ? Number(cutoffMs) : 0;
+  const r = await db.run(
+    'DELETE FROM credits_consume_state WHERE updated_at < ?',
+    [cutoff]
+  );
+  return (r && typeof r.changes === 'number') ? r.changes : 0;
+}
+
 module.exports = {
   initDb,
   getDb,
@@ -1211,6 +1296,10 @@ module.exports = {
   listCreditTransactions,
   listRecentCreditTransactions,
   getCreditRevenueSummary,
+  // Audit M7 — cross-instance consume state
+  getConsumeState,
+  saveConsumeState,
+  gcConsumeStateRows,
   // Visitor analytics
   recordVisitorEvent,
   listRecentVisitors,
