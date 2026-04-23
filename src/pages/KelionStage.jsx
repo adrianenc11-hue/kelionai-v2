@@ -3,18 +3,21 @@ import { useGLTF, Environment, ContactShadows, Float } from '@react-three/drei'
 import { Suspense, useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import * as THREE from 'three'
-import { useLipSync } from '../lib/lipSync'
+import { useLipSync, useAudioElementLipSync } from '../lib/lipSync'
 import { subscribeMonitor, handleShowOnMonitor, setMonitorGeoProvider } from '../lib/monitorStore'
 import { setClientGeoProvider } from '../lib/clientGeoProvider'
 import { STATUS_COLORS, STATUS_PULSE_HZ } from '../lib/kelionStatus'
 import { useGeminiLive } from '../lib/geminiLive'
 import { useOpenAIRealtime } from '../lib/openaiRealtime'
+import { decideHandoff } from '../lib/handoffGuard'
 import { useWakeWord } from '../lib/useWakeWord'
 import { useTrial } from '../lib/useTrial'
 import { useClientGeo } from '../lib/useClientGeo'
 import { TUNING, isTuningEnabled } from '../lib/tuning'
 import TuningPanel from '../components/TuningPanel'
 import SignInModal from '../components/SignInModal'
+import VoiceCloneModal from '../components/VoiceCloneModal'
+import { getCsrfToken } from '../lib/api'
 import {
   supportsPasskey,
   registerPasskey,
@@ -29,6 +32,7 @@ import {
 } from '../lib/memoryClient'
 import {
   configureConversationStore,
+  resetSessionExpiredLatch,
   appendMessage as appendConversationMessage,
   listConversations as listConversationsApi,
   loadConversation as loadConversationApi,
@@ -58,7 +62,7 @@ async function setVoiceStyle(style) {
     const r = await fetch('/api/realtime/voice-style', {
       method: 'POST',
       credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
       body: JSON.stringify({ style }),
     })
     const j = await r.json().catch(() => ({}))
@@ -471,31 +475,140 @@ function useNYCSkylineTexture() {
   }, [])
 }
 
+// Pick the right copy for the external "Open in new tab" card based on
+// what the monitor is trying to show. Before this helper existed every
+// external fallback (video, blocked-by-XFO hosts, linux-in-browser)
+// rendered the WebVM-specific "This Linux-in-the-browser requires
+// cross-origin isolation" message — users saw that line on a Mr. Bean
+// YouTube card and (rightly) asked what it had to do with anything.
+// Four distinct cases:
+//   - kind='video'                      → YouTube/search card
+//   - WebVM / CheerpX / JSLinux hosts   → cross-origin-isolation card
+//   - kind='web' | everything else that  → generic "site blocks embed"
+//     hits `embedType: 'external'`         card
+export function externalCardCopy(m) {
+  const title = (m && m.title) || 'External app'
+  const src = (m && m.src) || ''
+  let host = ''
+  try { host = new URL(src).hostname.toLowerCase() } catch { /* ignore */ }
+
+  // kind='video' never hits the WebVM hosts — it's always YouTube (or
+  // another video host we don't have a bespoke embed for yet). Phrase it
+  // as "open search results" because that's what the URL actually is on
+  // the free-text path (YouTube search page).
+  if (m && m.kind === 'video') {
+    return {
+      icon: '▶',
+      headline: title,
+      body: 'YouTube blocks the search embed, so the video can\'t play inline. Open the results page in a new tab to watch.',
+      ctaLabel: 'Open search results in new tab',
+    }
+  }
+
+  // WebVM / CheerpX / JSLinux / v86 — these *legitimately* need cross-
+  // origin isolation and we cannot render them in-app. Keep the specific
+  // explanation so the user knows this is a browser-platform limit.
+  const WEBVM_HOSTS = [
+    'webvm.io', 'www.webvm.io',
+    'copy.sh', 'www.copy.sh',
+    'bellard.org', 'www.bellard.org',
+  ]
+  if (WEBVM_HOSTS.includes(host)) {
+    return {
+      icon: '🖥️',
+      headline: `${title} needs its own tab`,
+      body: 'This Linux-in-the-browser requires cross-origin isolation that the embedded frame cannot provide. Open it in a new tab — files persist in your browser.',
+      ctaLabel: `Open ${title} in new tab`,
+    }
+  }
+
+  // Everything else that landed on the external card — usually sites
+  // that send `X-Frame-Options: DENY` (Google/Facebook/etc.) and would
+  // otherwise paint an empty gray box.
+  const hostLabel = host.replace(/^www\./, '') || title
+  return {
+    icon: '🔗',
+    headline: title,
+    body: `${hostLabel} blocks being embedded in another page, so it can\'t render here. Open it in a new tab to use it.`,
+    ctaLabel: `Open ${hostLabel} in new tab`,
+  }
+}
+
 // MonitorOverlay — half-page 2D panel that renders whatever `monitorStore`
 // currently holds. Anchored to the left 50vw of the viewport on desktop, or
 // as a bottom sheet (100vw × 55vh) on narrow screens so the avatar — which
 // sits on the right half of the stage — always stays visible and can keep
 // talking / listening while the content is on screen. Hidden entirely when
 // there is nothing to display.
+// Below this viewport width we flip the overlay to a bottom-sheet
+// layout. Previously this was 900px which flipped plenty of desktop
+// windows (split-screen, devtools docked) into the mobile layout
+// and the sheet could end up behind the chat composer. 640px keeps
+// the side-by-side layout on every realistic desktop workflow and
+// only drops to the bottom sheet on narrow phones / tablets.
+const MONITOR_NARROW_BREAKPOINT = 640
+
+// Iframe wrapper that detects silent CSP/X-Frame-Options blocks. If
+// `onload` never fires within `MONITOR_LOAD_TIMEOUT_MS`, we assume the
+// target refused the frame and call `onBlocked` so the parent can swap
+// in a fallback card. Also forwards real `onerror` events.
+const MONITOR_LOAD_TIMEOUT_MS = 6000
+
+function IframeWithFallback({ src, title, onBlocked }) {
+  const loadedRef = useRef(false)
+  useEffect(() => {
+    loadedRef.current = false
+    const timer = setTimeout(() => {
+      if (!loadedRef.current) {
+        try { onBlocked && onBlocked() } catch (_) {}
+      }
+    }, MONITOR_LOAD_TIMEOUT_MS)
+    return () => clearTimeout(timer)
+  }, [src, onBlocked])
+  return (
+    <iframe
+      src={src}
+      title={title}
+      referrerPolicy="no-referrer"
+      sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation"
+      allow="fullscreen; geolocation; autoplay; encrypted-media"
+      onLoad={() => { loadedRef.current = true }}
+      onError={() => { try { onBlocked && onBlocked() } catch (_) {} }}
+      style={{ width: '100%', height: '100%', border: 'none', background: '#0d0b1d', display: 'block' }}
+    />
+  )
+}
+
 function MonitorOverlay() {
   const [m, setM] = useState({ kind: null, src: null, title: null, embedType: 'iframe', updatedAt: 0 })
   const [isNarrow, setIsNarrow] = useState(() => (
-    typeof window !== 'undefined' && window.innerWidth < 900
+    typeof window !== 'undefined' && window.innerWidth < MONITOR_NARROW_BREAKPOINT
   ))
+  // Audit #5: iframes can be silently refused by the target's CSP /
+  // X-Frame-Options without firing onError. We start a load timer
+  // whenever `m.src` changes and, if `onLoad` hasn't fired within the
+  // budget, flip into a fallback card with "Open in new tab". Also
+  // shows the fallback if the iframe throws (rare, but some hosts
+  // emit `onError` for network-level blocks).
+  const [iframeBlocked, setIframeBlocked] = useState(false)
 
   useEffect(() => subscribeMonitor((s) => setM({ ...s })), [])
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined
-    const onResize = () => setIsNarrow(window.innerWidth < 900)
+    const onResize = () => setIsNarrow(window.innerWidth < MONITOR_NARROW_BREAKPOINT)
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
   }, [])
+
+  // Reset the "blocked" flag every time the monitor payload changes.
+  useEffect(() => { setIframeBlocked(false) }, [m.src, m.updatedAt])
 
   if (!m.src) return null
 
   const isImage = m.embedType === 'image'
   const isExternal = m.embedType === 'external'
+  const externalCopy = isExternal ? externalCardCopy(m) : null
   const onClose = (e) => {
     e.stopPropagation()
     handleShowOnMonitor({ kind: 'clear' })
@@ -508,11 +621,17 @@ function MonitorOverlay() {
     width: '50vw',
     height: '100vh',
   }
+  // Mobile: top-sheet rather than bottom-sheet. The chat composer sits
+  // fixed at the bottom of the viewport, so a 55vh bottom-sheet used to
+  // overlap the composer — users couldn't type or send while a map /
+  // video was on screen (audit #5). Anchoring to the top keeps the
+  // composer area clear and matches how Google Maps / YouTube handle
+  // split-view on mobile.
   const mobileStyle = {
     position: 'fixed',
     left: 0,
     right: 0,
-    bottom: 0,
+    top: 0,
     width: '100vw',
     height: '55vh',
   }
@@ -528,7 +647,7 @@ function MonitorOverlay() {
         background: 'rgba(10, 8, 20, 0.96)',
         backdropFilter: 'blur(14px)',
         borderRight: isNarrow ? 'none' : '1px solid rgba(167, 139, 250, 0.28)',
-        borderTop: isNarrow ? '1px solid rgba(167, 139, 250, 0.28)' : 'none',
+        borderBottom: isNarrow ? '1px solid rgba(167, 139, 250, 0.28)' : 'none',
         boxShadow: '0 0 40px rgba(0,0,0,0.55)',
         color: '#ede9fe',
         fontFamily: 'system-ui, -apple-system, sans-serif',
@@ -603,13 +722,12 @@ function MonitorOverlay() {
               background: 'radial-gradient(ellipse at center, #1a1230 0%, #0d0b1d 70%)',
             }}
           >
-            <div style={{ fontSize: 40, lineHeight: 1 }}>🖥️</div>
+            <div style={{ fontSize: 40, lineHeight: 1 }}>{externalCopy.icon}</div>
             <div style={{ fontSize: 15, fontWeight: 600, color: '#c4b5fd', maxWidth: 360 }}>
-              {m.title || 'External app'} needs its own tab
+              {externalCopy.headline}
             </div>
             <div style={{ fontSize: 13, opacity: 0.75, maxWidth: 360, lineHeight: 1.5 }}>
-              This Linux-in-the-browser requires cross-origin isolation that the embedded
-              frame cannot provide. Open it in a new tab — files persist in your browser.
+              {externalCopy.body}
             </div>
             <a
               href={m.src}
@@ -629,17 +747,59 @@ function MonitorOverlay() {
                 letterSpacing: 0.2,
               }}
             >
-              Open {m.title || 'app'} in new tab ↗
+              {externalCopy.ctaLabel} ↗
+            </a>
+          </div>
+        ) : iframeBlocked ? (
+          <div
+            style={{
+              width: '100%',
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 14,
+              padding: 24,
+              textAlign: 'center',
+              color: '#ede9fe',
+              background: 'radial-gradient(ellipse at center, #1a1230 0%, #0d0b1d 70%)',
+            }}
+          >
+            <div style={{ fontSize: 36, lineHeight: 1 }}>🔒</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: '#c4b5fd', maxWidth: 360 }}>
+              This site refused to embed
+            </div>
+            <div style={{ fontSize: 12, opacity: 0.7, maxWidth: 340, lineHeight: 1.5 }}>
+              Its Content-Security-Policy (X-Frame-Options) blocks iframes. Open it in a new tab instead.
+            </div>
+            <a
+              href={m.src}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                textDecoration: 'none',
+                border: '1px solid rgba(167, 139, 250, 0.55)',
+                background: 'rgba(124, 58, 237, 0.28)',
+                color: '#ede9fe',
+                padding: '9px 18px',
+                borderRadius: 8,
+                fontSize: 13,
+                fontWeight: 600,
+                letterSpacing: 0.2,
+              }}
+            >
+              Open in new tab ↗
             </a>
           </div>
         ) : (
-          <iframe
+          <IframeWithFallback
             src={m.src}
             title={m.title || 'Kelion monitor'}
-            referrerPolicy="no-referrer"
-            sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation"
-            allow="fullscreen; geolocation; autoplay; encrypted-media"
-            style={{ width: '100%', height: '100%', border: 'none', background: '#0d0b1d', display: 'block' }}
+            onBlocked={() => {
+              try { console.warn('[monitor] iframe never loaded — likely CSP/XFO block', m.src) } catch (_) {}
+              setIframeBlocked(true)
+            }}
           />
         )}
       </div>
@@ -968,15 +1128,30 @@ export default function KelionStage() {
     }
     setGrantBusy(true)
     setGrantMessage(null)
+    // Per-submission idempotency key — a double-click or retry uses
+    // the same key, and the server's UNIQUE index collapses it into
+    // a no-op (audit #7). The key includes email+minutes+timestamp+
+    // random so two *different* intentional grants to the same user
+    // stay distinct. Use crypto.randomUUID when available, fall back
+    // to Date.now + Math.random for older iOS Safari.
+    const rand = (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+    const idempotencyKey = `ui:${email}:${Math.trunc(minutes)}:${rand}`
     try {
       const r = await fetch('/api/admin/credits/grant', {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': idempotencyKey,
+          'X-CSRF-Token': getCsrfToken(),
+        },
         body: JSON.stringify({
           email,
           minutes: Math.trunc(minutes),
           note: grantNote.trim() || undefined,
+          idempotencyKey,
         }),
       })
       const j = await r.json().catch(() => ({}))
@@ -985,7 +1160,9 @@ export default function KelionStage() {
       }
       setGrantMessage({
         ok: true,
-        text: `Granted ${j.deltaMinutes} min to ${j.email}. New balance: ${j.balanceMinutes} min.`,
+        text: j.duplicate
+          ? `Already granted (duplicate). Balance: ${j.balanceMinutes} min.`
+          : `Granted ${j.deltaMinutes} min to ${j.email}. New balance: ${j.balanceMinutes} min.`,
       })
       setGrantEmail('')
       setGrantMinutes('')
@@ -1111,7 +1288,7 @@ export default function KelionStage() {
       const r = await fetch('/api/credits/checkout', {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
         body: JSON.stringify({ packageId: pkgId }),
       })
       const j = await r.json().catch(() => ({}))
@@ -1260,7 +1437,7 @@ export default function KelionStage() {
     setDupBusyKey(key)
     setDupResult(null)
     try {
-      const h = { 'Content-Type': 'application/json' }
+      const h = { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() }
       if (authTokenRef.current) h['Authorization'] = `Bearer ${authTokenRef.current}`
       const r = await fetch('/api/admin/users/merge', {
         method: 'POST',
@@ -1331,7 +1508,7 @@ export default function KelionStage() {
       const r = await fetch('/api/admin/payouts/instant', {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
         // Empty body → Stripe pays out the full instant-available balance.
         body: JSON.stringify({}),
       })
@@ -1388,6 +1565,7 @@ export default function KelionStage() {
   // Signed-in users get server persistence via /api/conversations; guests
   // fall back to localStorage. See src/lib/conversationStore.js.
   const [historyOpen, setHistoryOpen] = useState(false)
+  const [voiceCloneOpen, setVoiceCloneOpen] = useState(false)
   const [historyItems, setHistoryItems] = useState([])
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyError, setHistoryError] = useState(null)
@@ -1417,7 +1595,7 @@ export default function KelionStage() {
     if (fileInputRef.current) fileInputRef.current.value = ''
     setChatBusy(true)
     try {
-      const chatHeaders = { 'Content-Type': 'application/json' }
+      const chatHeaders = { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() }
       if (authTokenRef.current) {
         chatHeaders['Authorization'] = `Bearer ${authTokenRef.current}`
       }
@@ -1563,14 +1741,26 @@ export default function KelionStage() {
   // We now POST the assistant's reply to /api/tts — the server synthesizes
   // with ElevenLabs (Adam — male, multilingual) or Gemini "Charon" (male)
   // and returns an audio/mpeg or audio/wav blob. We play it via an offscreen
-  // <audio> element; a cosine envelope drives the mouth while it plays so
-  // the avatar lip-flaps along (no real-time analyser on CORS-restricted
-  // HTMLMediaElement is needed for coarse correlation).
-  const [ttsMouthOpen, setTtsMouthOpen] = useState(0)
+  // <audio> element and drive the mouth from the *actual* audio amplitude
+  // via `useAudioElementLipSync` (MediaElementSource → analyzer), so the
+  // avatar opens its mouth on vowels and closes it on pauses/consonants —
+  // same envelope shape as the realtime-voice `useLipSync` path. If the
+  // AudioContext can't be created (autoplay policy, older browsers) we
+  // fall back to the legacy 4 Hz cosine so the avatar still lip-flaps.
+  const {
+    mouthOpen: ttsMouthOpen,
+    attach: attachTtsLipSync,
+    reset: resetTtsLipSync,
+  } = useAudioElementLipSync()
+  const [ttsCosineMouth, setTtsCosineMouth] = useState(0)
   const lastSpokenRef = useRef('')
   const ttsRafRef = useRef(null)
   const ttsAudioRef = useRef(null)
   const ttsAbortRef = useRef(null)
+  // Mirror the hook's envelope into a ref so the analyzer-vs-cosine guard
+  // can read the current value without waiting for a React re-render.
+  const ttsMouthOpenRef = useRef(0)
+  useEffect(() => { ttsMouthOpenRef.current = ttsMouthOpen }, [ttsMouthOpen])
   useEffect(() => {
     if (chatBusy) return
     const last = chatMessages[chatMessages.length - 1]
@@ -1586,19 +1776,22 @@ export default function KelionStage() {
     const controller = new AbortController()
     ttsAbortRef.current = controller
 
-    const drive = () => {
-      // 4 Hz cosine envelope, 0..0.9, approximates jaw motion during speech.
+    // Cosine envelope used ONLY as a fallback when the analyzer can't
+    // attach (blocked autoplay, old browser). 4 Hz, 0..0.9, approximates
+    // average jaw motion during speech.
+    const driveCosine = () => {
       const t = performance.now() / 1000
       const v = 0.45 + 0.45 * Math.abs(Math.sin(t * 4 * Math.PI))
-      setTtsMouthOpen(v)
-      ttsRafRef.current = requestAnimationFrame(drive)
+      setTtsCosineMouth(v)
+      ttsRafRef.current = requestAnimationFrame(driveCosine)
     }
     const stopDrive = () => {
       if (ttsRafRef.current) { cancelAnimationFrame(ttsRafRef.current); ttsRafRef.current = null }
-      setTtsMouthOpen(0)
+      setTtsCosineMouth(0)
+      try { resetTtsLipSync() } catch (_) { /* hook already reset */ }
     }
 
-    const ttsHeaders = { 'Content-Type': 'application/json' }
+    const ttsHeaders = { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() }
     if (authTokenRef.current) ttsHeaders['Authorization'] = `Bearer ${authTokenRef.current}`
 
     // Browser locale is a highly reliable signal for which language the user
@@ -1624,7 +1817,30 @@ export default function KelionStage() {
         ttsAudioRef.current = audio
         audio.onplay = () => {
           if (ttsRafRef.current) cancelAnimationFrame(ttsRafRef.current)
-          drive()
+          // Try the real-audio analyzer first; the hook returns silently
+          // (envelope stays 0) if createMediaElementSource throws or the
+          // context can't resume. We detect that by checking the hook's
+          // envelope a couple of frames later — if it's still 0 while
+          // audio is playing, something's wrong, so we lip-flap via
+          // cosine to avoid the avatar standing still with a closed mouth.
+          try { attachTtsLipSync(audio) } catch (_) { /* fall through to cosine */ }
+          let cosineStarted = false
+          const guardStart = performance.now()
+          const guard = () => {
+            if (!ttsAudioRef.current || ttsAudioRef.current !== audio) return
+            // 250 ms grace period for the analyser — fast enough that any
+            // delay is imperceptible, slow enough to avoid false positives
+            // during the first few quiet frames after decoder warm-up.
+            if (performance.now() - guardStart < 250) {
+              ttsRafRef.current = requestAnimationFrame(guard)
+              return
+            }
+            if (ttsMouthOpenRef.current < 0.02 && !audio.paused && !cosineStarted) {
+              cosineStarted = true
+              driveCosine()
+            }
+          }
+          ttsRafRef.current = requestAnimationFrame(guard)
         }
         const cleanup = () => {
           stopDrive()
@@ -1654,7 +1870,7 @@ export default function KelionStage() {
                 || voices.find((v) => /male|daniel|alex|george|david|mark/i.test(v.name))
               if (pref) utt.voice = pref
             } catch (_) { /* best-effort */ }
-            utt.onstart = () => { if (ttsRafRef.current) cancelAnimationFrame(ttsRafRef.current); drive() }
+            utt.onstart = () => { if (ttsRafRef.current) cancelAnimationFrame(ttsRafRef.current); driveCosine() }
             utt.onend = stopDrive
             utt.onerror = stopDrive
             window.speechSynthesis.speak(utt)
@@ -1668,10 +1884,19 @@ export default function KelionStage() {
       if (ttsAudioRef.current) { try { ttsAudioRef.current.pause() } catch (_) {} ttsAudioRef.current = null }
       stopDrive()
     }
-  }, [chatMessages, chatBusy])
+  }, [chatMessages, chatBusy, attachTtsLipSync, resetTtsLipSync])
 
-  // Max of voice-chat lipsync and text-chat TTS envelope feeds the avatar.
-  const mouthOpen = Math.max(micMouthOpen || 0, ttsMouthOpen || 0)
+  // Max of voice-chat lipsync, real-audio text-chat envelope, and cosine
+  // fallback feeds the avatar. When the analyser is attached, ttsMouthOpen
+  // carries the real amplitude and ttsCosineMouth stays 0; when we fall
+  // back on autoplay-blocked browsers, ttsCosineMouth drives the jaw and
+  // ttsMouthOpen stays 0 — taking the max means we always render whichever
+  // source is active without double-counting.
+  const mouthOpen = Math.max(
+    micMouthOpen || 0,
+    ttsMouthOpen || 0,
+    ttsCosineMouth || 0,
+  )
 
   // Chat bubble auto-hide — Adrian: "chatul trebuie sa dispara dupa ce s-a
   // spus ramine doar in istoric, se afiseaza doar curent ce scrie user sau
@@ -1883,6 +2108,22 @@ export default function KelionStage() {
       const active = liveProvider === 'openai' ? openaiHookRef.current : geminiHookRef.current
       const priorTurns = pendingFallbackTurnsRef.current
       pendingFallbackTurnsRef.current = []
+      // Audit M6 — ask the incoming hook whether it is already busy
+      // (user tapped / wake-word fired between the two effects). If so,
+      // skip the handoff entirely: calling start() now would either be
+      // rejected by the in-flight lock (priorTurns silently lost) or,
+      // worse, close the user's fresh ws mid-connect. See
+      // lib/handoffGuard.js for the full reasoning.
+      const hookBusy = typeof active?.isBusy === 'function' ? active.isBusy() : false
+      const decision = decideHandoff({
+        pending: true,
+        hookBusy,
+        priorTurnCount: Array.isArray(priorTurns) ? priorTurns.length : 0,
+      })
+      if (decision.action !== 'start') {
+        console.warn('[kelionStage] auto-fallback skipped —', decision.reason)
+        return
+      }
       active.start({ priorTurns })
     } catch (e) {
       console.warn('[kelionStage] auto-fallback start() threw', e)
@@ -2056,9 +2297,30 @@ export default function KelionStage() {
   // effect is intentionally a one-time configuration, the getters stay
   // live across auth transitions.
   useEffect(() => {
+    // Fresh auth cycle (either newly signed-in or back to signed-out)
+    // re-arms the "session expired" one-shot so a future 401 triggers
+    // the modal again.
+    if (authState.signedIn) {
+      try { resetSessionExpiredLatch() } catch (_) {}
+    }
     configureConversationStore({
       getAuthToken: () => authTokenRef.current,
       getIsSignedIn: () => !!authState.signedIn,
+      onSessionExpired: () => {
+        // Audit #3: when the JWT expires mid-session, /api/conversations
+        // starts returning 401. Without a prompt, the user's turns leak
+        // into a hidden `g-*` guest thread and the real server thread
+        // silently stops receiving messages — from their POV the
+        // history "vanishes" on next reload. Tell them explicitly and
+        // reopen the sign-in modal so they can restore the session.
+        try { setAuthState({ signedIn: false, user: null }) } catch (_) {}
+        try { setSignInModalOpen(true) } catch (_) {}
+        try {
+          window.alert(
+            'Session expired — please sign in again to keep saving your chat history.'
+          )
+        } catch (_) { /* alert blocked (iframe sandbox) */ }
+      },
     })
   }, [authState.signedIn])
 
@@ -2104,7 +2366,18 @@ export default function KelionStage() {
         if (isLast && chatBusy && (m.role || 'user') === 'assistant') break
         try {
           await appendConversationMessage({ role: m.role || 'user', content: m.content })
-          if (!cancelled) savedUpToRef.current = i + 1
+          // IMPORTANT: advance the cursor even when the effect got
+          // cancelled mid-await. The SSE streaming path flips
+          // `chatMessages` ~30×/s, so every chunk triggers a cleanup
+          // that sets `cancelled=true` on the in-flight save. Gating
+          // the cursor update on `!cancelled` meant a message that
+          // was *successfully* persisted could still be re-sent on
+          // the next effect run — which is how the same user turn
+          // ended up in the DB 2–3 times (audit #1, orphan threads).
+          // The save is idempotent from our side: once the POST
+          // resolves, the row exists, so cursor++ is correct
+          // regardless of whether we continue iterating.
+          savedUpToRef.current = i + 1
         } catch { /* next change will retry from the unchanged cursor */ }
       }
     })()
@@ -2687,7 +2960,33 @@ export default function KelionStage() {
           // this event, so both paths work.
           onPaste={(e) => {
             try {
-              const text = (e.clipboardData || window.clipboardData)?.getData('text')
+              const cd = e.clipboardData || window.clipboardData
+              if (!cd) return
+
+              // Image paste: if the clipboard carries a binary image
+              // (screenshot, copied-from-browser image, drag-and-drop
+              // preview), convert the first one into a File and wire it
+              // through the same attachment pipeline as the paperclip.
+              // This fires before the text branch so a screenshot never
+              // gets silently dropped.
+              const items = cd.items ? Array.from(cd.items) : []
+              const imgItem = items.find((it) => it && it.kind === 'file' && typeof it.type === 'string' && it.type.startsWith('image/'))
+              if (imgItem) {
+                const blob = imgItem.getAsFile()
+                if (blob) {
+                  e.preventDefault()
+                  const ext = (blob.type.split('/')[1] || 'png').split(';')[0]
+                  const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+                  const named = (typeof File !== 'undefined')
+                    ? new File([blob], `pasted-${stamp}.${ext}`, { type: blob.type })
+                    : blob
+                  setAttachedFile(named)
+                  if (fileInputRef.current) { try { fileInputRef.current.value = '' } catch (_) {} }
+                  return
+                }
+              }
+
+              const text = cd.getData ? cd.getData('text') : ''
               if (text == null || text === '') return
               e.preventDefault()
               const el = e.currentTarget
@@ -3024,6 +3323,12 @@ export default function KelionStage() {
               <MenuItem onClick={() => { openMemory(); setMenuOpen(false) }}>
                 What do you know about me?
               </MenuItem>
+              {/* Consensual voice clone — opens the multi-step modal
+                  (consent + record + manage). Signed-in only; the
+                  backend route is gated by requireAuth. */}
+              <MenuItem onClick={() => { setVoiceCloneOpen(true); setMenuOpen(false) }}>
+                Clone my voice
+              </MenuItem>
               {/* Stage 5 — proactive pings */}
               {pushState.supported && (
                 pushState.enabled ? (
@@ -3262,6 +3567,13 @@ export default function KelionStage() {
             console.warn('[passkey auth]', err && err.message)
           }
         }}
+      />
+
+      <VoiceCloneModal
+        open={voiceCloneOpen}
+        onClose={() => setVoiceCloneOpen(false)}
+        userEmail={authState.user && authState.user.email}
+        userName={authState.user && (authState.user.name || authState.user.displayName)}
       />
 
       {/* Stage 3 — "Remember me" soft prompt */}

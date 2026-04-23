@@ -30,6 +30,7 @@ import { runTool } from './kelionTools'
 import { setLatestCameraFrame, clearLatestCameraFrame, getLatestCameraFrame } from './cameraFrameBuffer'
 import { subscribeNarrationMode, getNarrationMode, setNarrationMode } from './narrationMode'
 import { setCameraController, setCurrentFacingMode } from './cameraControl'
+import { getCsrfToken } from './api'
 
 // Public signature matches useGeminiLive exactly so swapping is a
 // one-line change in KelionStage.
@@ -368,7 +369,7 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
         ? await fetch(tokenUrl, {
             method: 'POST',
             credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
             body: JSON.stringify({ priorTurns }),
           })
         : await fetch(tokenUrl, { credentials: 'include' })
@@ -465,7 +466,7 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
             const r = await fetch('/api/credits/consume', {
               method: 'POST',
               credentials: 'include',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
               body: JSON.stringify({ minutes: 1, silent }),
             })
             if (r.status === 401) {
@@ -688,7 +689,7 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
       try {
         const r = await fetch('/api/realtime/vision', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
           credentials: 'include',
           body: JSON.stringify({
             frame: frame.dataUrl,
@@ -930,10 +931,23 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
     return () => setCameraController(null)
   }, [startCamera])
 
+  // Audit M6 — see lib/handoffGuard.js. True while `start()` is in
+  // flight OR while the live RTCPeerConnection is anything other
+  // than 'closed'. KelionStage's auto-fallback effect reads this to
+  // avoid stepping on a session the user just manually opened.
+  const isBusy = useCallback(() => {
+    if (startInFlightRef.current) return true
+    const pc = pcRef.current
+    if (pc && pc.connectionState && pc.connectionState !== 'closed') return true
+    return false
+  }, [])
+
   return {
     status, error, start, stop, turns, userLevel,
     cameraStream, screenStream, visionError,
     startCamera, stopCamera, startScreen, stopScreen,
     trial,
+    // Audit M6 — handoff double-start guard.
+    isBusy,
   }
 }

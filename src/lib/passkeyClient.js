@@ -6,6 +6,7 @@ import {
   startAuthentication,
   browserSupportsWebAuthn,
 } from '@simplewebauthn/browser';
+import { getCsrfToken } from './api';
 
 export function supportsPasskey() {
   return browserSupportsWebAuthn();
@@ -21,7 +22,7 @@ export async function registerPasskey(name) {
   const optsResp = await fetch('/api/auth/passkey/register/options', {
     method: 'POST',
     credentials: 'include',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
     body: JSON.stringify({ name: (name || '').trim() }),
   });
   if (!optsResp.ok) throw new Error(`register/options failed (${optsResp.status})`);
@@ -32,7 +33,7 @@ export async function registerPasskey(name) {
   const verifyResp = await fetch('/api/auth/passkey/register/verify', {
     method: 'POST',
     credentials: 'include',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
     body: JSON.stringify({ userId, response: credential }),
   });
   if (!verifyResp.ok) {
@@ -49,7 +50,7 @@ export async function authenticateWithPasskey() {
   const optsResp = await fetch('/api/auth/passkey/authenticate/options', {
     method: 'POST',
     credentials: 'include',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
   });
   if (!optsResp.ok) throw new Error(`authenticate/options failed (${optsResp.status})`);
   const { options } = await optsResp.json();
@@ -59,7 +60,7 @@ export async function authenticateWithPasskey() {
   const verifyResp = await fetch('/api/auth/passkey/authenticate/verify', {
     method: 'POST',
     credentials: 'include',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
     body: JSON.stringify({ response: credential }),
   });
   if (!verifyResp.ok) {
@@ -79,5 +80,6 @@ export async function signOut() {
   await fetch('/api/auth/passkey/signout', {
     method: 'POST',
     credentials: 'include',
+    headers: { 'X-CSRF-Token': getCsrfToken() },
   });
 }

@@ -75,22 +75,12 @@ const password = 'Money-' + Math.random().toString(36).slice(2, 10) + '!';
   });
   check('Checkout for "free" plan returns 400', r.status() === 400, `status=${r.status()}`);
 
-  // 7. /api/realtime/trial-token: first call ok or 429 if test-IP already used today
+  // 7. /api/realtime/trial-token: removed in audit M2. The legacy shadow
+  // endpoint bypassed the shared 15-min/day trial quota and duplicated
+  // /api/realtime/token. Assert it's gone so a future revert is caught.
   const ctxAnon = await request.newContext({ baseURL: BASE });
   r = await ctxAnon.get('/api/realtime/trial-token');
-  const tt = await r.json().catch(() => ({}));
-  if (r.status() === 200) {
-    check('Trial token: first call 200', true);
-    check('Trial token: body.trial === true', tt.trial === true, `got=${tt.trial}`);
-    check('Trial token: contains client_secret token', typeof tt.token === 'string' && tt.token.length > 20);
-    // 7b. Second call immediately -> 429
-    const r2 = await ctxAnon.get('/api/realtime/trial-token');
-    check('Trial token: second call within 24h returns 429', r2.status() === 429, `status=${r2.status()}`);
-  } else if (r.status() === 429) {
-    check('Trial token: 429 (IP already used in last 24h)', true, 'server-side rate-limit works');
-  } else {
-    check('Trial token: 200 or 429', false, `got status=${r.status()} body=${JSON.stringify(tt).slice(0,120)}`);
-  }
+  check('Legacy trial-token endpoint returns 404 (audit M2)', r.status() === 404, `status=${r.status()}`);
   await ctxAnon.dispose();
 
   // 8. /api/realtime/token requires auth

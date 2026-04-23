@@ -16,11 +16,12 @@ import {
   tryRequestClientGeo,
 } from './clientGeoProvider'
 import { requestCameraSwitch, getCurrentFacingMode } from './cameraControl'
+import { getCsrfToken } from './api'
 
 async function postJSON(url, body) {
   const r = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
     credentials: 'include',
     body: JSON.stringify(body || {}),
   })
@@ -271,7 +272,7 @@ export async function runTool(name, args) {
       try {
         const r = await fetch('/api/realtime/vision', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
           credentials: 'include',
           body: JSON.stringify({ frame: frame.dataUrl, focus: args?.focus || '' }),
         })
