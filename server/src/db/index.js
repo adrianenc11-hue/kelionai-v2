@@ -703,10 +703,54 @@ async function createUser(data) {
   return { id: result.lastID, ...data };
 }
 
+// Whitelist of columns updateUser() may touch. Column identifiers are
+// interpolated into the UPDATE SQL (they cannot be parameterised), so
+// any caller that ever forwards `req.body` unsanitised would otherwise
+// become a SQL-injection on `users`. Callers today all whitelist their
+// own keys, but enforcing the list here turns a latent footgun into a
+// compile-time-style guarantee — unknown keys throw before any SQL is
+// emitted. Columns that are managed by their own helpers (credits
+// ledger, passkey challenges, timestamps) are intentionally excluded.
+const UPDATE_USER_ALLOWED_COLUMNS = new Set([
+  'google_id',
+  'email',
+  'name',
+  'picture',
+  'password_hash',
+  'role',
+  'subscription_tier',
+  'subscription_status',
+  'usage_today',
+  'usage_reset_date',
+  'referral_code',
+  'referred_by',
+  'stripe_customer_id',
+  'preferred_language',
+  'cloned_voice_id',
+  'cloned_voice_consent_at',
+  'cloned_voice_consent_version',
+  'cloned_voice_enabled',
+]);
+
 async function updateUser(id, data) {
-  const fields = Object.keys(data).map(k => `${k} = ?`).join(', ');
-  const values = Object.values(data);
-  await db.run(`UPDATE users SET ${fields}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [...values, id]);
+  if (!data || typeof data !== 'object') {
+    throw new Error('updateUser: data must be an object');
+  }
+  const keys = Object.keys(data);
+  const unknown = keys.filter((k) => !UPDATE_USER_ALLOWED_COLUMNS.has(k));
+  if (unknown.length) {
+    throw new Error(`updateUser: unknown column(s) rejected: ${unknown.join(', ')}`);
+  }
+  if (keys.length === 0) {
+    // No-op update — avoid emitting invalid SQL (`SET  , updated_at = …`).
+    return getUserById(id);
+  }
+  const fields = keys.map((k) => `${k} = ?`).join(', ');
+  const values = keys.map((k) => data[k]);
+  await db.run(
+    `UPDATE users SET ${fields}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+    [...values, id],
+  );
   return getUserById(id);
 }
 
