@@ -69,6 +69,13 @@ const EXPECTED_TOOL_NAMES = [
   // (clientGeoProvider, cameraControl) rather than the server.
   'get_my_location',
   'switch_camera',
+  // PR #200 — first UI-agency primitives. Client-handled; 'ui_notify'
+  // paints a visible status on the stage (so actions the avatar just
+  // took are observable, not just spoken), 'ui_navigate' flips the
+  // SPA route via an allowlist ('/', '/studio', '/contact'). Later
+  // PRs layer ui_click / ui_recording_* on the same controller.
+  'ui_notify',
+  'ui_navigate',
   // PR B — document readers + OCR (pdf-parse / mammoth / tesseract.js).
   // Inputs accept either a public HTTPS URL or a base64 blob.
   'read_pdf',
