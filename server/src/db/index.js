@@ -1207,6 +1207,49 @@ async function mergeUsers(sourceId, targetId) {
       const r = await db.run(`UPDATE ${t} SET user_id = ? WHERE user_id = ?`, [targetId, sourceId]);
       counts[t] = Number((r && (r.changes || r.rowCount)) || 0);
     }
+    // studio_workspaces carries a UNIQUE(user_id, name) index, so a
+    // plain UPDATE SET user_id would blow up if both users have a
+    // project with the same name. Rename any source workspace whose
+    // name already exists on the target before the bulk move. The
+    // ` (merged)` suffix is unique per attempt; if that's also taken,
+    // we fall back to ` (merged <sourceId>)` which cannot collide
+    // because sourceId is unique DB-wide. Merging is admin-triggered
+    // and rare, so we prioritise zero-data-loss over pretty names.
+    const tgtNameRows = await db.all(
+      'SELECT name FROM studio_workspaces WHERE user_id = ?',
+      [targetId]
+    );
+    const tgtNames = new Set(tgtNameRows.map((r) => String(r.name)));
+    const srcWs = await db.all(
+      'SELECT id, name FROM studio_workspaces WHERE user_id = ?',
+      [sourceId]
+    );
+    for (const row of srcWs) {
+      if (!tgtNames.has(String(row.name))) {
+        tgtNames.add(String(row.name));
+        continue;
+      }
+      // Collision. Pick a unique new name, keeping within
+      // MAX_STUDIO_NAME_LEN so the row still passes our own writers.
+      let candidate = `${row.name} (merged)`;
+      if (tgtNames.has(candidate)) candidate = `${row.name} (merged ${sourceId})`;
+      if (candidate.length > MAX_STUDIO_NAME_LEN) {
+        const suffix = ` (merged ${sourceId})`;
+        const base = String(row.name).slice(0, MAX_STUDIO_NAME_LEN - suffix.length);
+        candidate = `${base}${suffix}`;
+      }
+      await db.run(
+        'UPDATE studio_workspaces SET name = ? WHERE id = ?',
+        [candidate, row.id]
+      );
+      tgtNames.add(candidate);
+    }
+    const swMove = await db.run(
+      'UPDATE studio_workspaces SET user_id = ? WHERE user_id = ?',
+      [targetId, sourceId]
+    );
+    counts.studio_workspaces = Number((swMove && (swMove.changes || swMove.rowCount)) || 0);
+
     const refOwner = await db.run(
       'UPDATE referrals SET owner_id = ? WHERE owner_id = ?',
       [targetId, sourceId]
@@ -1575,16 +1618,31 @@ async function getUserStudioUsage(userId) {
 // Serialize concurrent writes per workspace so two autosaves in flight
 // can't race on the JSON blob (last-write-wins but one overwrite
 // clobbering the other's file is worse). Queue per-workspace keyed by id.
+//
+// The cleanup step compares against a SINGLE Promise object stored in
+// the Map — `next.catch(() => null)` creates a NEW promise each call
+// so we build `stored` once and reuse it for both the Map value and
+// the `finally` identity check. Without this, the `delete` never
+// fires and every workspace that receives a write keeps a permanent
+// Map entry (real leak, not just theoretical).
 const studioWriteQueues = new Map();
 function serializeStudioWrite(workspaceId, fn) {
   const prev = studioWriteQueues.get(workspaceId) || Promise.resolve();
   const next = prev.then(() => fn(), () => fn());
-  studioWriteQueues.set(workspaceId, next.catch(() => null).finally(() => {
-    if (studioWriteQueues.get(workspaceId) === next.catch(() => null)) {
+  const stored = next.catch(() => null).finally(() => {
+    if (studioWriteQueues.get(workspaceId) === stored) {
       studioWriteQueues.delete(workspaceId);
     }
-  }));
+  });
+  studioWriteQueues.set(workspaceId, stored);
   return next;
+}
+
+// Test-only: inspect live queue size (used by studio-workspaces.test.js
+// to assert the leak-fix: Map size returns to 0 after the tail of a
+// write chain settles).
+function __getStudioWriteQueuesSizeForTests() {
+  return studioWriteQueues.size;
 }
 
 async function writeStudioFile(userId, workspaceId, filePath, content) {
@@ -1803,6 +1861,7 @@ module.exports = {
   MAX_STUDIO_FILES_PER_WS,
   MAX_STUDIO_NAME_LEN,
   MAX_STUDIO_PATH_LEN,
+  __getStudioWriteQueuesSizeForTests,
 };
 
 // ─── Stage 5 helpers ────────────────────────────────────────────────
