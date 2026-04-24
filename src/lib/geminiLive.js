@@ -480,13 +480,27 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
       const geoQuery = (coords && Number.isFinite(coords.lat) && Number.isFinite(coords.lon))
         ? `&lat=${coords.lat.toFixed(6)}&lon=${coords.lon.toFixed(6)}&acc=${Math.round(coords.accuracy || 0)}`
         : ''
-      const tokenUrl = `/api/realtime/gemini-token?lang=${encodeURIComponent(langHint)}${geoQuery}`
+      // Backend selector: `?liveBackend=vertex` URL param or
+      // `localStorage.kelion_live_backend = 'vertex'` routes the session
+      // through our same-origin Vertex AI proxy
+      // (`/api/realtime/vertex-live-ws`). Default remains the legacy
+      // AI Studio ephemeral-token path until we flip the default in a
+      // follow-up PR.
+      let liveBackend = 'aistudio'
+      try {
+        const fromUrl = new URL(window.location.href).searchParams.get('liveBackend')
+        const fromStorage = window.localStorage?.getItem('kelion_live_backend')
+        const raw = (fromUrl || fromStorage || '').toString().toLowerCase()
+        if (raw === 'vertex') liveBackend = 'vertex'
+      } catch (_) { /* window/localStorage missing in SSR — default stays */ }
+      const backendQuery = liveBackend === 'vertex' ? '&backend=vertex' : ''
+      const tokenUrl = `/api/realtime/gemini-token?lang=${encodeURIComponent(langHint)}${geoQuery}${backendQuery}`
       const tokenRes = priorTurns.length
         ? await fetch(tokenUrl, {
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
-            body: JSON.stringify({ priorTurns }),
+            body: JSON.stringify({ priorTurns, backend: liveBackend }),
           })
         : await fetch(tokenUrl, { credentials: 'include' })
       // Guest trial exhaustion — propagate a clean user-facing error so
@@ -516,7 +530,10 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
       const tokenBody = await tokenRes.json()
       const token = tokenBody?.token
       const setupPayload = tokenBody?.setup
-      if (!token) throw new Error('No ephemeral token returned')
+      const resolvedBackend = tokenBody?.backend === 'vertex' ? 'vertex' : 'aistudio'
+      // Vertex path doesn't return a token (auth lives on the server-side
+      // proxy). Only enforce the token presence for AI Studio.
+      if (resolvedBackend !== 'vertex' && !token) throw new Error('No ephemeral token returned')
       if (!setupPayload) throw new Error('No live-connect setup returned')
 
       // Trial countdown. Server returns tokenBody.trial = null for
@@ -562,7 +579,21 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
       // accepted verbatim with all the rich fields (systemInstruction,
       // tools, transcription, realtimeInputConfig, speechConfig) that used
       // to trigger close code 1007 when baked into the token.
-      const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained?access_token=${encodeURIComponent(token)}`
+      // Vertex backend: connect to our same-origin proxy. The proxy
+      // holds a GCP service-account access token server-side and opens
+      // an upstream WebSocket to `<region>-aiplatform.googleapis.com`
+      // with the correct Bearer header — a step the browser WebSocket
+      // API cannot perform itself (no custom headers allowed). The
+      // JSON frame format on the client-facing side is identical to
+      // the AI Studio path, so nothing below this line needs to care
+      // which backend the session is on.
+      let wsUrl
+      if (resolvedBackend === 'vertex') {
+        const scheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+        wsUrl = `${scheme}//${window.location.host}/api/realtime/vertex-live-ws`
+      } else {
+        wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained?access_token=${encodeURIComponent(token)}`
+      }
       const ws = new WebSocket(wsUrl)
       wsRef.current = ws
 

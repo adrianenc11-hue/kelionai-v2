@@ -1033,6 +1033,20 @@ const { TRIAL_WINDOW_MS, trialStatus, stampTrialIfFresh } = trialQuota;
 // as before (no body, no priorTurns block).
 const geminiTokenHandler = async (req, res) => {
   const priorTurns = Array.isArray(req.body?.priorTurns) ? req.body.priorTurns : [];
+  // Backend selector. `vertex` routes the browser through the
+  // `/api/realtime/vertex-live-ws` proxy backed by a Google Cloud
+  // service account (see `routes/vertexLiveProxy.js`). Anything else
+  // (or omitted) preserves the legacy AI Studio ephemeral-token
+  // flow. We keep both paths wired in parallel so the switch is a
+  // client-side opt-in (`?liveBackend=vertex` URL param or
+  // `localStorage.kelion_live_backend`); flipping the default to
+  // `vertex` happens in a follow-up PR once the proxy has taken
+  // real production traffic.
+  const backend = ((req.body && req.body.backend)
+    || req.query.backend
+    || '').toString().toLowerCase() === 'vertex'
+    ? 'vertex'
+    : 'aistudio';
   // Admin key-override path: when `GEMINI_API_KEY_ADMIN` is set AND the
   // current caller is an admin, mint the ephemeral token against the
   // admin's own GCP project. Rationale: Gemini Live (v1alpha, preview)
@@ -1046,7 +1060,10 @@ const geminiTokenHandler = async (req, res) => {
   const apiKey    = (isAdmin && process.env.GEMINI_API_KEY_ADMIN)
     ? process.env.GEMINI_API_KEY_ADMIN
     : process.env.GEMINI_API_KEY;
-  if (!apiKey) {
+  // The Vertex backend authenticates server-side via a GCP service
+  // account (see `vertexLiveProxy.js`) and does not need a GEMINI_API_KEY.
+  // The legacy AI Studio path still does; we only 503 on its absence.
+  if (backend !== 'vertex' && !apiKey) {
     return res.status(503).json({ error: 'GEMINI_API_KEY not configured' });
   }
 
@@ -1146,7 +1163,16 @@ const geminiTokenHandler = async (req, res) => {
     // Docs: https://ai.google.dev/gemini-api/docs/live-api/ephemeral-tokens
     // Previous fallback `gemini-live-2.5-flash-preview` also returned
     // 404 from the v1alpha auth_tokens provisioning endpoint.
-    const model = process.env.GEMINI_LIVE_MODEL || 'gemini-3.1-flash-live-preview';
+    // Vertex AI Live API uses a different model id than AI Studio. The
+    // GA-on-Vertex model is `gemini-live-2.5-flash-native-audio` — Google's
+    // own Vertex Live docs advertise it as the recommended production
+    // target (native audio, 30 HD voices, 24 languages, affective dialog,
+    // improved barge-in). We keep AI Studio on the preview model id that
+    // actually accepts bidi traffic on our free-tier project, so the
+    // legacy path keeps working unchanged until the default switches.
+    const defaultAiStudioModel = process.env.GEMINI_LIVE_MODEL || 'gemini-3.1-flash-live-preview';
+    const defaultVertexModel = process.env.GEMINI_LIVE_MODEL_VERTEX || 'gemini-live-2.5-flash-native-audio';
+    const model = backend === 'vertex' ? defaultVertexModel : defaultAiStudioModel;
     // Language resolution for Gemini Live. `speechConfig.languageCode`
     // controls BOTH the TTS output voice locale AND biases the STT
     // model for the input audio — so if we hard-code en-US a user who
@@ -1220,8 +1246,29 @@ const geminiTokenHandler = async (req, res) => {
     // Trade-off: the persona text is now visible in the client Network tab.
     // Acceptable — the persona is a prompt, not a credential, and moving
     // it to the client is what finally unlocks voice chat end-to-end.
+    // Vertex expects a fully-qualified model path in the setup frame:
+    //   projects/<PROJECT>/locations/<LOCATION>/publishers/google/models/<MODEL>
+    // The `LlmBidiService/BidiGenerateContent` endpoint is regional and
+    // reads the project/location from this string. AI Studio, on the
+    // other hand, accepts just `models/<MODEL>` on the v1alpha bidi
+    // endpoint.
+    let setupModelPath = 'models/' + model;
+    if (backend === 'vertex') {
+      const vxProject = process.env.GOOGLE_CLOUD_PROJECT
+        || process.env.GCP_PROJECT_ID
+        || process.env.VERTEX_PROJECT_ID
+        || '';
+      const vxLocation = process.env.GOOGLE_CLOUD_LOCATION
+        || process.env.VERTEX_LOCATION
+        || 'us-central1';
+      if (vxProject) {
+        setupModelPath = 'projects/' + vxProject
+          + '/locations/' + vxLocation
+          + '/publishers/google/models/' + model;
+      }
+    }
     const fullSetup = {
-      model: 'models/' + model,
+      model: setupModelPath,
       generationConfig: {
         responseModalities: ['AUDIO'],
         speechConfig: {
@@ -1256,6 +1303,28 @@ const geminiTokenHandler = async (req, res) => {
       // our own server (via `/api/tools/browse_web`).
       tools: buildKelionToolsGemini(),
     };
+
+    // Vertex short-circuit: the browser WebSocket will connect to our
+    // same-origin proxy at `/api/realtime/vertex-live-ws`, which holds
+    // a GCP service-account access token server-side. No ephemeral
+    // token is needed; return the setup + gating info and let the
+    // client open the proxy WS directly.
+    if (backend === 'vertex') {
+      return res.json({
+        token:       null,
+        expiresAt:   expireTime,
+        model,
+        voice,
+        provider:    'gemini',
+        backend:     'vertex',
+        signedIn:    !!user,
+        userName:    user?.name || null,
+        memoryCount: memoryItems.length,
+        voiceStyle:  voiceStyle.label,
+        setup:       fullSetup,
+        trial,
+      });
+    }
 
     // Ephemeral tokens live under v1alpha only — v1beta/auth_tokens returns 404.
     // We mint the token with NO bidiGenerateContentSetup constraints so we can
@@ -1295,6 +1364,7 @@ const geminiTokenHandler = async (req, res) => {
       model,
       voice,
       provider:    'gemini',
+      backend:     'aistudio',
       signedIn:    !!user,
       userName:    user?.name || null,
       memoryCount: memoryItems.length,
