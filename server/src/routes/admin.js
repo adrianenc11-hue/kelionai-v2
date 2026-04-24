@@ -14,6 +14,7 @@ const {
   getCreditsBalance,
   listRecentVisitors,
   getVisitorStats,
+  listCreditTransactions,
   findDuplicateUsers,
   mergeUsers,
 } = require('../db');
@@ -23,6 +24,7 @@ const { sendEmailAlert } = require('../services/emailAlerts');
 const { bootstrapAdmin } = require('../services/adminBootstrap');
 const autoTopup = require('../services/autoTopup');
 const payoutsService = require('../services/payouts');
+const banCache = require('../services/banCache');
 const { getVisitorAnalytics } = require('../services/visitorAnalytics');
 
 const router = Router();
@@ -405,21 +407,54 @@ router.get('/visitors/analytics', async (req, res) => {
 router.get('/users', async (req, res) => {
   try {
     const users = await getAllUsers();
-    
-    // Sanitize user data
-    const sanitized = users.map(u => ({
-      id: u.id,
-      email: u.email,
-      name: u.name,
-      role: u.role,
-      subscription_tier: u.subscription_tier,
-      subscription_status: u.subscription_status,
-      usage_today: u.usage_today,
-      referral_code: u.referral_code,
-      created_at: u.created_at,
-    }));
+    const q = String(req.query.q || '').trim().toLowerCase();
+    const statusFilter = String(req.query.status || 'all').toLowerCase();
+    const limit = Math.min(500, Math.max(1, Number(req.query.limit) || 200));
 
-    res.json({ users: sanitized, total: sanitized.length });
+    let filtered = users;
+    if (q) {
+      filtered = filtered.filter((u) => {
+        const hay = `${u.email || ''} ${u.name || ''} ${u.id || ''}`.toLowerCase();
+        return hay.includes(q);
+      });
+    }
+    if (statusFilter === 'banned') {
+      filtered = filtered.filter((u) => Number(u.banned) === 1);
+    } else if (statusFilter === 'active') {
+      filtered = filtered.filter((u) => Number(u.banned) !== 1);
+    } else if (statusFilter === 'admin') {
+      filtered = filtered.filter((u) => u.role === 'admin');
+    }
+
+    const balancePromises = filtered.slice(0, limit).map(async (u) => {
+      let balance = null;
+      try { balance = await getCreditsBalance(u.id); } catch (_) { balance = null; }
+      return {
+        id: u.id,
+        email: u.email,
+        name: u.name,
+        role: u.role,
+        subscription_tier: u.subscription_tier,
+        subscription_status: u.subscription_status,
+        usage_today: u.usage_today,
+        referral_code: u.referral_code,
+        stripe_customer_id: u.stripe_customer_id || null,
+        banned: Number(u.banned) === 1,
+        banned_reason: u.banned_reason || null,
+        banned_at: u.banned_at || null,
+        credits_balance_minutes: balance,
+        created_at: u.created_at,
+      };
+    });
+    const sanitized = await Promise.all(balancePromises);
+
+    res.json({
+      users: sanitized,
+      total: sanitized.length,
+      totalAll: users.length,
+      query: q || null,
+      status: statusFilter,
+    });
   } catch (err) {
     console.error('[admin/users] Error:', err.message);
     res.status(500).json({ error: 'Failed to get users' });
@@ -487,10 +522,13 @@ router.post('/users/merge', async (req, res) => {
 router.get('/users/:id', async (req, res) => {
   try {
     const user = await getUserById(req.params.id);
-    
+
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
+
+    let balance = null;
+    try { balance = await getCreditsBalance(user.id); } catch (_) { balance = null; }
 
     res.json({
       id: user.id,
@@ -505,12 +543,156 @@ router.get('/users/:id', async (req, res) => {
       referral_code: user.referral_code,
       referred_by: user.referred_by,
       stripe_customer_id: user.stripe_customer_id,
+      banned: Number(user.banned) === 1,
+      banned_reason: user.banned_reason || null,
+      banned_at: user.banned_at || null,
+      credits_balance_minutes: balance,
       created_at: user.created_at,
       updated_at: user.updated_at,
     });
   } catch (err) {
     console.error('[admin/users/:id] Error:', err.message);
     res.status(500).json({ error: 'Failed to get user' });
+  }
+});
+
+/**
+ * GET /api/admin/users/:id/history
+ * Ledger for a single user — recent credit transactions (topup, consume,
+ * bonus, admin_grant). Drives the "Istoric" tab in the user drawer.
+ */
+router.get('/users/:id/history', async (req, res) => {
+  try {
+    const user = await getUserById(req.params.id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const limit = Math.min(500, Math.max(1, Number(req.query.limit) || 100));
+    const rows = await listCreditTransactions(user.id, limit);
+    res.json({
+      userId: user.id,
+      email: user.email,
+      rows: Array.isArray(rows) ? rows : [],
+      ts: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error('[admin/users/:id/history] Error:', err.message);
+    res.status(500).json({ error: 'Failed to get user history' });
+  }
+});
+
+/**
+ * POST /api/admin/users/:id/ban
+ * Body: { banned: boolean, reason?: string }
+ * Flips the `banned` bit on the user row. Ban cache is invalidated so
+ * the change takes effect on the user's next authed request (no wait
+ * for the 60s TTL). Admins cannot ban themselves — useful guard when
+ * Adrian accidentally types his own id.
+ */
+router.post('/users/:id/ban', async (req, res) => {
+  try {
+    const user = await getUserById(req.params.id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const banned = Boolean(req.body && req.body.banned);
+    const reason = req.body && typeof req.body.reason === 'string'
+      ? req.body.reason.slice(0, 500)
+      : null;
+
+    // Refuse to ban self or other admin accounts — admins unban via
+    // the same endpoint, so unban is allowed regardless of role.
+    if (banned) {
+      if (req.user && String(req.user.id) === String(user.id)) {
+        return res.status(400).json({ error: 'Cannot ban yourself' });
+      }
+      if (user.role === 'admin') {
+        return res.status(400).json({ error: 'Cannot ban an admin — demote first' });
+      }
+    }
+
+    await updateUser(user.id, {
+      banned: banned ? 1 : 0,
+      banned_reason: banned ? reason : null,
+      banned_at: banned ? new Date().toISOString() : null,
+    });
+    banCache.invalidate(user.id);
+
+    res.json({
+      id: user.id,
+      email: user.email,
+      banned,
+      banned_reason: banned ? reason : null,
+      banned_at: banned ? new Date().toISOString() : null,
+    });
+  } catch (err) {
+    console.error('[admin/users/:id/ban] Error:', err.message);
+    res.status(500).json({ error: 'Failed to update ban status' });
+  }
+});
+
+/**
+ * POST /api/admin/users/:id/credits/grant
+ * Legacy alias so the UI can grant credits directly from the user
+ * drawer without knowing the email. Delegates to the same logic as
+ * /api/admin/credits/grant.
+ */
+router.post('/users/:id/credits/grant', async (req, res) => {
+  try {
+    const user = await getUserById(req.params.id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const mins = Number(req.body && req.body.minutes);
+    if (!Number.isFinite(mins) || mins === 0) {
+      return res.status(400).json({ error: 'minutes must be a non-zero number' });
+    }
+    const note = req.body && typeof req.body.note === 'string' ? req.body.note.slice(0, 200) : '';
+    const adminEmail = (req.user && req.user.email) || 'unknown';
+    const safeNote = [
+      `admin_grant by ${adminEmail}`,
+      note ? `— ${note}` : '',
+    ].filter(Boolean).join(' ');
+    const result = await addCreditsTransaction({
+      userId: user.id,
+      deltaMinutes: Math.trunc(mins),
+      kind: 'admin_grant',
+      note: safeNote,
+    });
+    res.json({
+      userId: user.id,
+      email: user.email,
+      deltaMinutes: Math.trunc(mins),
+      balance: result && result.balance,
+    });
+  } catch (err) {
+    console.error('[admin/users/:id/credits/grant] Error:', err.message);
+    res.status(500).json({ error: 'Failed to grant credits' });
+  }
+});
+
+/**
+ * POST /api/admin/users/:id/reset-password
+ * Clears the user's password_hash + passkey credentials. Next sign-in
+ * via Google / WebAuthn / password-reset email re-establishes access.
+ * Intentionally minimal: we don't generate a magic-link token here —
+ * the repo doesn't have a transactional email service wired up.
+ * Admins get the info they need (user email, reset_at) to communicate
+ * with the user manually.
+ */
+router.post('/users/:id/reset-password', async (req, res) => {
+  try {
+    const user = await getUserById(req.params.id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    await updateUser(user.id, {
+      password_hash: null,
+      passkey_credentials: '[]',
+      current_webauthn_challenge: null,
+    });
+    res.json({
+      id: user.id,
+      email: user.email,
+      reset_at: new Date().toISOString(),
+      next_step: 'User must re-register via Google sign-in or passkey.',
+    });
+  } catch (err) {
+    console.error('[admin/users/:id/reset-password] Error:', err.message);
+    res.status(500).json({ error: 'Failed to reset password' });
   }
 });
 

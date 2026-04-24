@@ -24,6 +24,9 @@ CREATE TABLE IF NOT EXISTS users (
   passkey_credentials        TEXT DEFAULT '[]',
   current_webauthn_challenge TEXT,
   credits_balance_minutes    INTEGER NOT NULL DEFAULT 0,
+  banned                     INTEGER NOT NULL DEFAULT 0,
+  banned_reason              TEXT,
+  banned_at                  TIMESTAMPTZ,
   preferred_language         TEXT,
   created_at                 TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   updated_at                 TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
@@ -31,6 +34,12 @@ CREATE TABLE IF NOT EXISTS users (
 -- F8: idempotent migration for older Supabase clusters that existed
 -- before the column was added to the CREATE TABLE above.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS preferred_language TEXT;
+
+-- PR E5 — admin user management. Idempotent migration for clusters
+-- created before these columns existed.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS banned         INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS banned_reason  TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS banned_at      TIMESTAMPTZ;
 
 -- Voice clone — opt-in ElevenLabs Instant Voice Cloning (see
 -- server/src/db/index.js for the SQLite counterpart and the full

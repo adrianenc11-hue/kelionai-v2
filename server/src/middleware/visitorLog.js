@@ -49,12 +49,34 @@ function extractUserFromToken(req) {
   // Same cookie name and secret as middleware/auth.js `requireAuth`. We
   // decode best-effort here; if it's missing or invalid the visitor row
   // is still written as an anonymous page load.
+  //
+  // `signAppToken` writes the user id to the standard `sub` claim, not
+  // `id`. Reading `payload.id` here meant every signed-in page load was
+  // logged as anonymous, which made `signedInVisits` and `uniqueUsers`
+  // report 0 in the admin analytics panel even after many logins.
   try {
     const token = req.cookies && req.cookies['kelion.token'];
     if (!token) return null;
-    const payload = jwt.verify(token, config.jwt && config.jwt.secret);
+    const secret = config.jwt && config.jwt.secret;
+    if (!secret) return null;
+    const payload = jwt.verify(token, secret);
     if (!payload) return null;
-    return { id: payload.id || null, email: payload.email || null };
+    const rawSub = payload.sub != null ? payload.sub : payload.id;
+    // Postgres has BIGINT user ids; SQLite keeps the raw string. Mirror
+    // the USE_POSTGRES logic from middleware/optionalAuth.js so the
+    // visitor_events.user_id column (BIGINT in PG, TEXT-ish in SQLite)
+    // receives a value that fits.
+    const USE_POSTGRES = !!process.env.DATABASE_URL;
+    let id = null;
+    if (rawSub !== undefined && rawSub !== null) {
+      if (USE_POSTGRES) {
+        const n = Number.parseInt(rawSub, 10);
+        if (Number.isFinite(n) && String(n) === String(rawSub)) id = n;
+      } else {
+        id = rawSub;
+      }
+    }
+    return { id, email: payload.email || null };
   } catch (_) {
     return null;
   }
@@ -95,4 +117,4 @@ function visitorLog(req, res, next) {
   next();
 }
 
-module.exports = { visitorLog };
+module.exports = { visitorLog, _extractUserFromToken: extractUserFromToken };
