@@ -2196,30 +2196,21 @@ export default function KelionStage() {
     return () => { if (bubbleHideTimerRef.current) clearTimeout(bubbleHideTimerRef.current) }
   }, [chatMessages, chatBusy])
 
-  // Plan C — provider switch. Two stable transports are mounted in
-  // parallel (both hooks allocate refs/state only; neither opens a
-  // network connection until the user taps mic), and the HUD routes
-  // start/stop to whichever is currently selected. Default is the
-  // OpenAI Realtime GA transport — it does not depend on the Gemini
-  // Live preview keep-alive that Google closes at ~2 min on our key.
+  // Single voice transport — Gemini Live on Vertex AI.
   //
-  // Selection precedence (highest wins):
-  //   1. ?provider=openai | gemini query param (useful for A/B testing)
-  //   2. localStorage.kelion_live_provider (persisted user choice)
-  //   3. 'openai'                           (Plan C default)
-  const [liveProvider, setLiveProvider] = useState(() => {
-    try {
-      const q = new URL(window.location.href).searchParams.get('provider')
-      if (q === 'openai' || q === 'gemini') return q
-      const saved = window.localStorage.getItem('kelion_live_provider')
-      if (saved === 'openai' || saved === 'gemini') return saved
-    } catch (_) { /* no window in SSR / sandboxed iframes — fall through */ }
-    return 'openai'
-  })
-  useEffect(() => {
-    try { window.localStorage.setItem('kelion_live_provider', liveProvider) }
-    catch (_) { /* storage disabled — best-effort */ }
-  }, [liveProvider])
+  // Adrian's product decision (April 2026): "vreau un LLM care face tot".
+  // Vertex AI Gemini Live (`gemini-live-2.5-flash-native-audio`) is the
+  // only GA API that does voice + live video + tools in a single stream,
+  // with a Google Cloud SLA. OpenAI Realtime remains in the codebase as
+  // a dormant escape hatch (the hook is still allocated below with
+  // `active: false`) in case of an unforeseen Vertex incident; flipping
+  // `liveProvider` to `'openai'` via DevTools re-activates it. The
+  // previous auto-fallback + UI toggle + localStorage persistence have
+  // been removed — a single provider means a single mental model for
+  // users, and reconnect-on-1007/1008 (the actual failure modes we saw)
+  // is handled at the transport level in `geminiLive.js`, not by
+  // swapping to a different LLM.
+  const [liveProvider /* setLiveProvider intentionally unused */] = useState('gemini')
 
   const geminiHook = useGeminiLive({
     audioRef,
@@ -2269,155 +2260,15 @@ export default function KelionStage() {
     // also ticks for text-chat-only guests who never touch the mic.
     trial: voiceTrial,
   } = liveHook
-  // Hook refs — both useOpenAIRealtime and useGeminiLive return plain
-  // object literals without useMemo (geminiLive.js ~l.971, openaiRealtime.js
-  // ~l.575), so their identity changes every render. Holding them in refs
-  // and reading inside effects keeps the effects from re-firing on every
-  // keystroke and was the other half of why the #117 setTimeout-cleanup
-  // bug bit (Devin Review Info on #118, comment id 3116094529 also notes
-  // the prevProviderRef effect below shares this wart — same refs now).
-  const openaiHookRef = useRef(openaiHook)
-  const geminiHookRef = useRef(geminiHook)
-  openaiHookRef.current = openaiHook
-  geminiHookRef.current = geminiHook
-
-  // Flip providers cleanly: stop whatever's live on the old provider
-  // before the next tap spins up the new one. No-op when the switched-
-  // away provider is idle.
-  const prevProviderRef = useRef(liveProvider)
-  useEffect(() => {
-    if (prevProviderRef.current === liveProvider) return
-    const outgoing = prevProviderRef.current === 'openai' ? openaiHookRef.current : geminiHookRef.current
-    try { outgoing.stop() } catch (_) { /* hooks unmount-safe */ }
-    prevProviderRef.current = liveProvider
-  }, [liveProvider])
-
-  // Auto-fallback — silent provider swap on terminal transport error.
-  //
-  // Original #117 nested `start()` inside a setTimeout whose cleanup
-  // lived on the same effect that flipped `liveProvider`. `liveProvider`
-  // was a dep, so setLiveProvider immediately re-ran the effect; cleanup
-  // clear()ed the timer before the 120 ms budget elapsed and start()
-  // never fired. Codex / Copilot / Devin Review all flagged it P1.
-  //
-  // Fix (PR #118, refined here): split into two effects, no setTimeout.
-  //   1. On transport-level status='error', set pendingFallbackRef and
-  //      flip liveProvider.
-  //   2. A separate effect on [liveProvider] sees the flag and calls
-  //      .start() on the now-active hook. Because React runs effects
-  //      in declaration order within one component, the prevProviderRef
-  //      effect (declared just above) has already stopped the outgoing
-  //      transport on the same commit — no timer race.
-  //
-  // Latch: the one-shot `autoFallbackTriedRef` is intentionally reset
-  // ONLY on 'listening'. PR #118 also reset it on 'requesting' — but
-  // both transport hooks flip status to 'requesting' synchronously
-  // inside their own start() (openaiRealtime.js:290, geminiLive.js:411),
-  // which means the fallback's own start() call in effect (2) would
-  // clear the latch before the second provider's outcome is known.
-  // If that second attempt also errored, the error effect would see
-  // latch=false and flip providers again — infinite ping-pong between
-  // OpenAI and Gemini when both are genuinely down (Codex P1 +
-  // Devin Review P1 on #118). If a user is stuck after a double-failure,
-  // refreshing the page recreates the ref fresh (ref state doesn't
-  // survive unmount), so localStorage's last-persisted provider still
-  // gets one fresh fallback attempt on the next load.
-  //
-  // Account-level errors (credits / trial / auth) bypass fallback —
-  // swapping providers can't help those and doing so would race the
-  // Buy Credits modal / reauth redirect. The match list is aligned with
-  // setError(...) strings in src/lib/geminiLive.js + openaiRealtime.js;
-  // Devin Review (Info) flagged substring matching as fragile — a
-  // structured error code on the hook would be cleaner, but that's a
-  // cross-cutting refactor of both transport libs and out of scope.
-  const autoFallbackTriedRef = useRef(false)
-  const pendingFallbackRef = useRef(false)
-  // F4 — snapshot of the outgoing provider's transcript at the moment we
-  // flip. Effect 2 passes it to the new hook's start({ priorTurns }) so
-  // Kelion picks up the conversation instead of re-greeting.
-  const pendingFallbackTurnsRef = useRef([])
-  useEffect(() => {
-    if (status === 'listening') autoFallbackTriedRef.current = false
-  }, [status])
-  useEffect(() => {
-    if (status !== 'error' || !error) return
-    if (autoFallbackTriedRef.current) return
-    const msg = typeof error === 'string' ? error.toLowerCase() : String(error || '').toLowerCase()
-    // Account-level failures — not something another provider can fix.
-    // Keep this list aligned with the user-facing strings in
-    // src/lib/geminiLive.js + src/lib/openaiRealtime.js.
-    if (
-      msg.includes('no credits') ||
-      msg.includes('buy a package') ||
-      msg.includes('buy credits') ||
-      msg.includes('buy more') ||
-      msg.includes('free trial') ||
-      msg.includes('trial has ended') ||
-      msg.includes('session expired') ||
-      msg.includes('sign in again')
-    ) {
-      return
-    }
-    autoFallbackTriedRef.current = true
-    pendingFallbackRef.current = true
-    // F4 — snapshot the outgoing provider's accumulated turns BEFORE we
-    // flip. After setLiveProvider runs, the destructured `turns` rebinds
-    // to the (empty) state of the incoming hook. We keep only finalised
-    // turns with real text, strip anything else so the persona block on
-    // the server stays compact, and cap to the last 20 so long sessions
-    // don't blow the instruction budget.
-    try {
-      const snapshot = Array.isArray(turns)
-        ? turns
-            .filter((t) => t && typeof t.text === 'string' && t.text.trim().length > 0)
-            .slice(-20)
-            .map((t) => ({
-              role: t.role === 'assistant' ? 'assistant' : 'user',
-              text: t.text,
-            }))
-        : []
-      pendingFallbackTurnsRef.current = snapshot
-    } catch (_) {
-      pendingFallbackTurnsRef.current = []
-    }
-    const nextProvider = liveProvider === 'openai' ? 'gemini' : 'openai'
-    console.warn('[kelionStage] live provider', liveProvider, 'terminal — switching to', nextProvider, '·', msg, '· carrying', pendingFallbackTurnsRef.current.length, 'turns')
-    setLiveProvider(nextProvider)
-  }, [status, error, liveProvider, turns])
-  useEffect(() => {
-    if (!pendingFallbackRef.current) return
-    pendingFallbackRef.current = false
-    // prevProviderRef effect (declared earlier) already stop()-ed the
-    // outgoing transport on this same commit; it's safe to start the
-    // new one synchronously now. Effect declaration order is the
-    // coordination mechanism here — if this block is ever moved above
-    // prevProviderRef, the invariant breaks silently (Devin Review Info
-    // on #118). Keep this block below that effect.
-    try {
-      const active = liveProvider === 'openai' ? openaiHookRef.current : geminiHookRef.current
-      const priorTurns = pendingFallbackTurnsRef.current
-      pendingFallbackTurnsRef.current = []
-      // Audit M6 — ask the incoming hook whether it is already busy
-      // (user tapped / wake-word fired between the two effects). If so,
-      // skip the handoff entirely: calling start() now would either be
-      // rejected by the in-flight lock (priorTurns silently lost) or,
-      // worse, close the user's fresh ws mid-connect. See
-      // lib/handoffGuard.js for the full reasoning.
-      const hookBusy = typeof active?.isBusy === 'function' ? active.isBusy() : false
-      const decision = decideHandoff({
-        pending: true,
-        hookBusy,
-        priorTurnCount: Array.isArray(priorTurns) ? priorTurns.length : 0,
-      })
-      if (decision.action !== 'start') {
-        console.warn('[kelionStage] auto-fallback skipped —', decision.reason)
-        return
-      }
-      active.start({ priorTurns })
-    } catch (e) {
-      console.warn('[kelionStage] auto-fallback start() threw', e)
-    }
-  }, [liveProvider])
+  // Cross-provider auto-fallback and the flip-provider cleanup effect
+  // were removed with the single-provider consolidation — `liveProvider`
+  // is now a constant `'gemini'`, so there is nothing to swap between.
+  // Transport-level reconnect on transient close codes (1007/1008) lives
+  // in `geminiLive.js`. The `decideHandoff` import and `openaiHook` are
+  // retained as compile-time anchors so the dormant escape hatch keeps
+  // building; flipping `liveProvider` back to `'openai'` via DevTools
+  // will rewire the old behaviour.
+  void decideHandoff
 
   // Unified trial HUD source of truth. Applies to both voice AND text
   // chat via the shared 15-min/day IP window on the server. Collapses
