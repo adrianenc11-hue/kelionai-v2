@@ -800,8 +800,16 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
     // Kelion to "see" the camera).
     const TARGET_FPS = kind === 'screen' ? 8 : 15
     const MIN_INTERVAL_MS = Math.floor(1000 / TARGET_FPS)
-    const MAX_W = kind === 'screen' ? 960 : 480
-    const JPEG_Q = kind === 'screen' ? 0.6 : 0.55
+    // PR 5/N — high-quality live vision. Adrian 2026-04-20: "fiind o
+    // aplicație profesională, camerele trebuie să trimită către avatar
+    // imagini live de foarte bună calitate". Camera short-edge goes
+    // 480 → 1024 (4.5× pixel area) and JPEG_Q 0.55 → 0.78 — still well
+    // inside the 2 MB back-pressure budget at 15 fps because the
+    // existing `bufferedAmount > BACKPRESSURE_BYTES` guard already
+    // drops frames when the socket is full. Screen share keeps its
+    // higher ceiling (was already 960).
+    const MAX_W = kind === 'screen' ? 1280 : 1024
+    const JPEG_Q = kind === 'screen' ? 0.75 : 0.78
     const BACKPRESSURE_BYTES = 2_000_000
 
     let busy = false
@@ -893,9 +901,17 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
     // NVIDIA Broadcast) that only honours default constraints. Trying
     // `facingMode: 'user'` explicitly is a known offender on
     // external webcams. Dropping constraints almost always recovers.
+    // PR 5/N — high-quality live vision. Ask the browser for 1080p
+    // first so the camera actually opens at HD resolution (previous
+    // 640×480 ceiling capped the downsample budget no matter how high
+    // MAX_W was set in the frame sender). Every rung is wrapped in
+    // try/catch below, so a phone that can only produce 720p still
+    // succeeds on the second rung, and anything that rejects explicit
+    // resolutions still falls back to the permissive `video: true`.
     const constraintLadder = [
-      { video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: nextFacing }, audio: false },
-      { video: { width: { ideal: 640 }, height: { ideal: 480 } }, audio: false },
+      { video: { width: { ideal: 1920 }, height: { ideal: 1080 }, facingMode: nextFacing }, audio: false },
+      { video: { width: { ideal: 1280 }, height: { ideal: 720 },  facingMode: nextFacing }, audio: false },
+      { video: { width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
       { video: true, audio: false },
     ]
     let lastError = null

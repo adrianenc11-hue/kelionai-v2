@@ -69,6 +69,13 @@ const EXPECTED_TOOL_NAMES = [
   // (clientGeoProvider, cameraControl) rather than the server.
   'get_my_location',
   'switch_camera',
+  // PR #200 — first UI-agency primitives. Client-handled; 'ui_notify'
+  // paints a visible status on the stage (so actions the avatar just
+  // took are observable, not just spoken), 'ui_navigate' flips the
+  // SPA route via an allowlist ('/', '/studio', '/contact'). Later
+  // PRs layer ui_click / ui_recording_* on the same controller.
+  'ui_notify',
+  'ui_navigate',
   // PR B — document readers + OCR (pdf-parse / mammoth / tesseract.js).
   // Inputs accept either a public HTTPS URL or a base64 blob.
   'read_pdf',
@@ -89,6 +96,15 @@ const EXPECTED_TOOL_NAMES = [
   // F11 — AI image generation (OpenAI gpt-image-1). Graceful fallback when
   // OPENAI_API_KEY is absent.
   'generate_image',
+  // PR #7/N — Planner Brain. Routes a user goal to Gemini 2.5 Flash and
+  // returns a short JSON action plan so Kelion thinks before it acts on
+  // compound / multi-step requests. Degrades gracefully when
+  // GEMINI_API_KEY is absent (returns { ok:false, unavailable:true }).
+  'plan_task',
+  // PR #8/N — Memory of Actions. Read-only self-reflection tool: the
+  // voice model queries action_history for the signed-in user before
+  // repeating a tool call. Guests receive { ok:false, signed_in:false }.
+  'get_action_history',
 ];
 
 describe('Kelion tool catalog', () => {
