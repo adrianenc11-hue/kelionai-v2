@@ -699,6 +699,19 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
         // status / abnormal, 1008 = policy (wrong endpoint / bad token),
         // 1007 = protocol (double setup), 1011 = server / quota.
         console.warn('[geminiLive] ws close', { code: e?.code, reason: e?.reason, wasClean: e?.wasClean })
+        // Always tear down the credits heartbeat on socket close. Without
+        // this guard the 60s interval kept ticking after the ws died and
+        // fired a stray /api/credits/consume on tab wake hours later —
+        // audit 2026-04-22 saw a -1 credit ledger entry 7 h after the
+        // session actually ended. stop() handles the idle/error path;
+        // this handler is the only one for abnormal closes where stop()
+        // is never called by the UI.
+        if (creditsIntervalRef.current) {
+          clearInterval(creditsIntervalRef.current)
+          creditsIntervalRef.current = null
+        }
+        creditsStartedRef.current = false
+        creditsStartFnRef.current = null
         if (statusRef.current === 'idle') return
         if (statusRef.current === 'error') return
         // If we never reached 'listening' (i.e. the session died before
@@ -901,17 +914,29 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
     // NVIDIA Broadcast) that only honours default constraints. Trying
     // `facingMode: 'user'` explicitly is a known offender on
     // external webcams. Dropping constraints almost always recovers.
-    // PR 5/N — high-quality live vision. Ask the browser for 1080p
-    // first so the camera actually opens at HD resolution (previous
-    // 640×480 ceiling capped the downsample budget no matter how high
-    // MAX_W was set in the frame sender). Every rung is wrapped in
-    // try/catch below, so a phone that can only produce 720p still
-    // succeeds on the second rung, and anything that rejects explicit
-    // resolutions still falls back to the permissive `video: true`.
+    // When the voice model picks a specific rear lens via camera_on /
+    // switch_camera (non-ultrawide, non-tele) we forward the deviceId
+    // so getUserMedia can lock to that lens instead of the default
+    // rear camera (which on multi-lens phones is often ultrawide).
+    // PR 5/N — high-quality live vision: ask the browser for up to 4K
+    // first so the camera opens at the best resolution the device
+    // advertises (previous 640×480 ceiling capped the downsample
+    // budget no matter how high MAX_W was set in the frame sender).
+    // Every rung is wrapped in try/catch below, so a phone that can
+    // only produce 720p still succeeds on a lower rung, and anything
+    // that rejects explicit resolutions still falls back to the
+    // permissive `video: true`.
+    const deviceId = opts.deviceId || null
+    const baseSelector = deviceId
+      ? { deviceId: { exact: deviceId } }
+      : { facingMode: nextFacing }
     const constraintLadder = [
-      { video: { width: { ideal: 1920 }, height: { ideal: 1080 }, facingMode: nextFacing }, audio: false },
-      { video: { width: { ideal: 1280 }, height: { ideal: 720 },  facingMode: nextFacing }, audio: false },
+      { video: { ...baseSelector, width: { ideal: 3840 }, height: { ideal: 2160 } }, audio: false },
+      { video: { ...baseSelector, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false },
+      { video: { ...baseSelector, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
+      { video: { ...baseSelector, width: { ideal: 640 }, height: { ideal: 480 } }, audio: false },
       { video: { width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
+      { video: { width: { ideal: 640 }, height: { ideal: 480 } }, audio: false },
       { video: true, audio: false },
     ]
     let lastError = null
@@ -1077,11 +1102,27 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
   // the restart call.
   useEffect(() => {
     setCameraController({
+      start: (opts) => startCamera(opts),
+      stop: () => stopCamera(),
       restart: (opts) => startCamera(opts),
       getFacingMode: () => cameraFacingRef.current || 'user',
+      // camera_zoom tool reaches through to the live MediaStreamTrack
+      // and applies a native zoom constraint where supported. Gemini's
+      // hidden <video> element is tracked on hiddenVideoCameraRef; fall
+      // back to cameraStreamRef when the hidden video hasn't attached
+      // yet (first frame hasn't fired).
+      getActiveTrack: () => {
+        const v = hiddenVideoCameraRef.current
+        const src = (v && v.srcObject) || cameraStreamRef.current
+        if (src && typeof src.getVideoTracks === 'function') {
+          const tracks = src.getVideoTracks()
+          return tracks && tracks[0] ? tracks[0] : null
+        }
+        return null
+      },
     })
     return () => setCameraController(null)
-  }, [startCamera])
+  }, [startCamera, stopCamera])
 
   // Audit M6 — `isBusy()` lets KelionStage's auto-fallback effect
   // (2) detect whether the user already kicked off a manual
