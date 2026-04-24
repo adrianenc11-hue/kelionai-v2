@@ -81,11 +81,18 @@ async function bootstrapAdmin() {
     }
 
     // createUser does not take password_hash — fall back to a direct insert
-    // via updateUser after creating the shell row.
+    // via updateUser after creating the shell row. Derive the default
+    // display name from the email local-part (capitalised) rather than
+    // hard-coding "Adrian" — otherwise *every* Postgres fresh-start
+    // writes Adrian's real name into whatever bootstrap email is
+    // configured, which leaks the operator's identity to guest/test
+    // accounts that happen to land on that email.
+    const localPart = String(email).split('@')[0] || 'Admin';
+    const derivedName = localPart.charAt(0).toUpperCase() + localPart.slice(1);
     const created = await createUser({
       google_id: null,
       email,
-      name: 'Adrian',
+      name: derivedName,
       picture: null,
     });
     await updateUser(created.id, {

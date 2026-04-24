@@ -1,0 +1,24 @@
+{
+  "appId": "app.kelionai.mobile",
+  "appName": "Kelion",
+  "webDir": "dist",
+  "server": {
+    "url": "https://kelionai.app",
+    "cleartext": false,
+    "allowNavigation": [
+      "kelionai.app",
+      "*.kelionai.app",
+      "checkout.stripe.com",
+      "*.stripe.com",
+      "accounts.google.com",
+      "*.googleapis.com",
+      "*.googleusercontent.com"
+    ]
+  },
+  "ios": {
+    "contentInset": "always"
+  },
+  "android": {
+    "allowMixedContent": false
+  }
+}
