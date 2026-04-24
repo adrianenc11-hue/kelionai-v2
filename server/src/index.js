@@ -1,5 +1,6 @@
 ﻿'use strict';
 
+const http = require('http');
 const path = require('path');
 const express = require('express');
 const cors = require('cors');
@@ -31,6 +32,7 @@ const diagRouter       = require('./routes/diag');
 const youtubeRouter    = require('./routes/youtube');
 const generatedImagesRouter = require('./routes/generatedImages');
 const voiceCloneRouter = require('./routes/voiceClone');
+const { attachVertexLiveProxy } = require('./routes/vertexLiveProxy');
 const proactive        = require('./services/proactive');
 const { bootstrapAdmin, healAdminCredits } = require('./services/adminBootstrap');
 const { installProcessHandlers } = require('./util/processHandlers');
@@ -454,13 +456,23 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
+// Wrap the Express app in a raw http.Server so we can attach a
+// WebSocket upgrade handler for the Vertex AI Gemini Live proxy on
+// the same port (see `routes/vertexLiveProxy.js`). Keeping everything
+// on one port keeps Railway's single-port routing happy and means
+// the browser hits the proxy over the same origin it already talks
+// HTTP to, so no CORS/CSP changes are needed.
+const httpServer = http.createServer(app);
+attachVertexLiveProxy(httpServer);
+
 if (require.main === module) {
   const PORT = config.port;
-  app.listen(PORT, () => {
+  httpServer.listen(PORT, () => {
     console.log(`[kelion-api] Server listening on port ${PORT} (${config.nodeEnv})`);
     console.log(`[kelion-api] CORS origins: ${config.corsOrigins.join(', ')}`);
   });
 }
 
 module.exports = app;
+module.exports.httpServer = httpServer;
 
