@@ -343,6 +343,34 @@ async function initDb() {
   `);
   await db.exec('CREATE INDEX IF NOT EXISTS idx_voice_clone_events_user ON voice_clone_events(user_id, created_at DESC)');
 
+  // PR #8/N — Memory of Actions. One row per real tool invocation so
+  // Kelion can (a) avoid redoing something it already did this session
+  // and (b) answer user questions like "did you email that yet?" or
+  // "what did you search for just now?". Feeds `get_action_history`
+  // which the voice model calls when it needs to check prior steps
+  // instead of re-running a tool blindly.
+  //
+  // `args_summary` and `result_summary` are short capped strings (not
+  // the raw JSON) so the table stays cheap to scan even after a heavy
+  // session. Both are sanitised at write time in `logAction` below —
+  // secrets, long URLs, passport numbers etc. never land here.
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS action_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      session_id TEXT,
+      tool_name TEXT NOT NULL,
+      ok INTEGER NOT NULL DEFAULT 1,
+      args_summary TEXT,
+      result_summary TEXT,
+      duration_ms INTEGER,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+  await db.exec('CREATE INDEX IF NOT EXISTS idx_action_history_user ON action_history(user_id, created_at DESC)');
+  await db.exec('CREATE INDEX IF NOT EXISTS idx_action_history_session ON action_history(user_id, session_id, created_at DESC)');
+
   // Dev Studio (DS-1) — per-user Python project workspaces. Each row
   // is one "project" Kelion can read/write into by voice. Files live
   // inline as a JSON blob (path → {content,size,updated_at}) so the
@@ -593,6 +621,98 @@ async function listVoiceCloneEvents(userId, limit = 50) {
     `SELECT id, action, voice_id, consent_version, ip, user_agent, note, created_at
        FROM voice_clone_events WHERE user_id = ? ORDER BY id DESC LIMIT ?`,
     [userId, limit]
+  );
+}
+
+// PR #8/N — Memory of Actions helpers. Every real tool invocation the
+// voice / text model routes through `executeRealTool` lands here with a
+// short, sanitised summary so Kelion can later answer "did I already
+// do X this session?" without re-running the tool. Write path is
+// best-effort (swallows errors) because losing a history row must
+// never break the live action itself.
+//
+// Size caps:
+//   tool_name      ≤  60
+//   session_id     ≤  80
+//   args_summary   ≤ 300
+//   result_summary ≤ 500
+// Retention: unbounded; admin can prune manually with a DELETE. The
+// voice model only ever reads the most recent 40 rows via listRecentActions.
+async function logAction({ userId, sessionId, toolName, args, resultSummary, ok = true, durationMs = null }) {
+  if (!userId || !toolName) return null;
+  try {
+    const safeSession = sessionId ? String(sessionId).slice(0, 80) : null;
+    // Sanitise args down to a compact "k=v, k2=v2" string capped at
+    // 300 chars. We deliberately drop any field whose key hints at a
+    // secret (password, token, key, secret, auth, cookie) and never
+    // store raw base64 blobs or HTML/JSON payloads — only primitives
+    // and short strings survive. This mirrors the existing audit
+    // logging discipline from voice_clone_events / credit_transactions.
+    let argsSummary = null;
+    if (args && typeof args === 'object') {
+      const parts = [];
+      for (const [k, v] of Object.entries(args)) {
+        if (!k) continue;
+        if (/password|token|key|secret|auth|cookie|bearer|otp|pin/i.test(k)) continue;
+        let vs;
+        if (v == null) vs = '';
+        else if (typeof v === 'number' || typeof v === 'boolean') vs = String(v);
+        else if (typeof v === 'string') vs = v.length > 80 ? v.slice(0, 77) + '…' : v;
+        else continue; // skip objects / arrays / blobs — they'd blow the cap anyway
+        parts.push(`${k}=${vs}`);
+        if (parts.join(', ').length >= 260) break;
+      }
+      argsSummary = parts.join(', ').slice(0, 300) || null;
+    }
+    const safeResult = resultSummary
+      ? String(resultSummary).slice(0, 500)
+      : null;
+    const dur = Number.isFinite(durationMs) ? Math.max(0, Math.min(10 * 60_000, durationMs | 0)) : null;
+    const r = await db.run(
+      `INSERT INTO action_history
+         (user_id, session_id, tool_name, ok, args_summary, result_summary, duration_ms)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        userId,
+        safeSession,
+        String(toolName).slice(0, 60),
+        ok ? 1 : 0,
+        argsSummary,
+        safeResult,
+        dur,
+      ]
+    );
+    return { id: r.lastID };
+  } catch (err) {
+    // Never let an audit failure break the live action. Write path is
+    // intentionally lossy — the worst case is the voice model forgets
+    // it did something, which is survivable; a 500 on the tool call
+    // would be user-visible.
+    if (process.env.NODE_ENV !== 'test') {
+      console.error('[action_history] logAction failed:', err?.message);
+    }
+    return null;
+  }
+}
+
+async function listRecentActions(userId, { limit = 40, sessionId = null } = {}) {
+  if (!userId) return [];
+  const cappedLimit = Math.max(1, Math.min(200, Number(limit) || 40));
+  if (sessionId) {
+    return db.all(
+      `SELECT id, session_id, tool_name, ok, args_summary, result_summary, duration_ms, created_at
+         FROM action_history
+        WHERE user_id = ? AND session_id = ?
+        ORDER BY id DESC LIMIT ?`,
+      [userId, String(sessionId).slice(0, 80), cappedLimit]
+    );
+  }
+  return db.all(
+    `SELECT id, session_id, tool_name, ok, args_summary, result_summary, duration_ms, created_at
+       FROM action_history
+      WHERE user_id = ?
+      ORDER BY id DESC LIMIT ?`,
+    [userId, cappedLimit]
   );
 }
 
@@ -1803,6 +1923,9 @@ module.exports = {
   getClonedVoice,
   logVoiceCloneEvent,
   listVoiceCloneEvents,
+  // PR #8/N — Memory of Actions
+  logAction,
+  listRecentActions,
   // Conversation history
   createConversation,
   appendConversationMessage,

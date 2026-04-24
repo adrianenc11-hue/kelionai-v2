@@ -101,6 +101,10 @@ const EXPECTED_TOOL_NAMES = [
   // compound / multi-step requests. Degrades gracefully when
   // GEMINI_API_KEY is absent (returns { ok:false, unavailable:true }).
   'plan_task',
+  // PR #8/N — Memory of Actions. Read-only self-reflection tool: the
+  // voice model queries action_history for the signed-in user before
+  // repeating a tool call. Guests receive { ok:false, signed_in:false }.
+  'get_action_history',
 ];
 
 describe('Kelion tool catalog', () => {
