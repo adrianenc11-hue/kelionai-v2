@@ -69,11 +69,14 @@ const EXPECTED_TOOL_NAMES = [
   // (clientGeoProvider, cameraControl) rather than the server.
   'get_my_location',
   'switch_camera',
-  // Kelion UX batch (Apr-2026) — hardware zoom on the live camera
-  // (for distant detail like license plates). Client-handled:
-  // zoom_camera calls applyConstraints on the active
-  // MediaStreamTrack. generate_image from this batch lives in the
-  // already-merged 'F11' slot below (OpenAI gpt-image-1 path, master).
+  // PR #199 — verbal camera controls: on/off + digital zoom ("activează
+  // camera spate", "oprește camera", "zoom 2x"). Client-handled via
+  // cameraControl.js; the tools ride on the same module-level controller
+  // registry as switch_camera so they work under both transports.
+  // zoom_camera also adds hardware zoom via applyConstraints on the
+  // active MediaStreamTrack (Kelion UX batch Apr-2026).
+  'camera_on',
+  'camera_off',
   'zoom_camera',
   // PR #200 — first UI-agency primitives. Client-handled; 'ui_notify'
   // paints a visible status on the stage (so actions the avatar just

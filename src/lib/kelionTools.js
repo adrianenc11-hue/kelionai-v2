@@ -17,9 +17,11 @@ import {
 } from './clientGeoProvider'
 import {
   requestCameraSwitch,
-  getCurrentFacingMode,
+  requestCameraStart,
+  requestCameraStop,
   requestCameraZoom,
   captureHighResSnapshot,
+  getCurrentFacingMode,
 } from './cameraControl'
 import { requestUINotify, requestUINavigate, listAllowedRoutes } from './uiActionStore'
 import { getCsrfToken } from './api'
@@ -412,10 +414,11 @@ export async function runTool(name, args) {
     case 'switch_camera': {
       // Flip front / back camera on mobile. The voice model invokes this
       // when the user says "flip the camera" / "show me what's behind you"
-      // / "schimbă camera". cameraControl.js restarts the active transport's
-      // getUserMedia stream with the new facingMode. On laptops / single-
-      // camera devices the browser may ignore the constraint and keep the
-      // same stream — we surface that so Kelion doesn't claim success.
+      // / "schimbă camera" / "comută camerele". cameraControl.js restarts
+      // the active transport's getUserMedia stream with the new facingMode.
+      // On laptops / single-camera devices the browser may ignore the
+      // constraint and keep the same stream — we surface that so Kelion
+      // doesn't claim success.
       const current = getCurrentFacingMode()
       const side = args?.side
         || (current === 'user' ? 'back' : 'front')
@@ -423,17 +426,32 @@ export async function runTool(name, args) {
       if (!res.ok) return res.error || 'Camera switch failed.'
       return `ok:facingMode=${res.facingMode}`
     }
+    case 'camera_on': {
+      // "pornește camera", "activează camera front/back", "camera spate".
+      // Default to back camera when side is omitted — it's the higher-
+      // resolution lens on phones and the one Adrian relies on for
+      // distance reads (number plates, signage).
+      const side = args?.side || 'back'
+      const res = await requestCameraStart(side)
+      if (!res.ok) return res.error || 'Camera failed to start.'
+      return `ok:camera_on:side=${res.side}:facingMode=${res.facingMode}`
+    }
+    case 'camera_off': {
+      // "oprește camera", "dezactivează camera".
+      const res = await requestCameraStop()
+      if (!res.ok) return res.error || 'Camera failed to stop.'
+      return 'ok:camera_off'
+    }
     case 'zoom_camera': {
-      // Hardware zoom on supported sensors. Call this when the user asks
-      // Kelion to "zoom in", "get closer", "read that sign", "citeste
-      // numarul de pe placuta", etc. Browser support: Android Chrome
-      // exposes the `zoom` capability on most 2019+ phones; iOS Safari
-      // does not (yet) — the controller returns a speakable error we
-      // relay so Kelion tells the user honestly.
+      // "focalizează pe număr", "zoom 2x", "zoom in", "read that sign".
+      // Accepts either a numeric multiplier or 'in'/'out'/'reset'. The
+      // controller clamps against the active track's [min, max] and
+      // falls back to softZoom=true when the lens has no hardware zoom
+      // capability so the model can tell the user the effect is limited.
       const rawLevel = args?.level
       const res = await requestCameraZoom(rawLevel != null ? rawLevel : 'in')
       if (!res.ok) return res.error || 'Zoom failed.'
-      return `ok:zoom=${res.zoom}:range=${res.min}-${res.max}`
+      return `ok:zoom=${res.zoom}${res.softZoom ? ':soft' : ''}`
     }
     case 'ui_notify': {
       // Kelion paints a visible status note on the stage ("am deschis

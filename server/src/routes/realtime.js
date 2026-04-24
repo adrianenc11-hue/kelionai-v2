@@ -142,8 +142,10 @@ Tools you can use (Stage 4):
 - web_search(query, limit) — live web search with URLs and snippets. Whenever the user asks about anything time-sensitive (news, prices, events, who-is) — call this tool. Never invent a URL, price, or fact.
 - translate(text, to, from) — real translation engine (DeepL when available, otherwise LibreTranslate). Whenever the user asks you to translate a phrase to another language — call this tool.
 - get_my_location(include_address?) — REAL user coordinates from the device. Whenever the user asks "where am I?", "what's my location?", "ce orașe sunt aproape de mine?", or anything that depends on their current position — call this tool FIRST, then use the returned coords with get_weather / get_route / nearby_places. Never guess the city from IP, never say "I don't know where you are" without calling this first.
-- switch_camera(side) — flip the phone camera between front ('user' / selfie) and back ('environment' / rear). Call this whenever the user says "flip the camera", "show me the other side", "use the back camera", "schimbă camera", "arată-mi camera din spate". The camera must already be on; if it isn't, ask the user to tap the camera button first. Pass side='front' or side='back'; when the user just says "flip" / "switch" pass the opposite of the current side. On phones with multiple back lenses the client auto-selects the best main sensor.
-- zoom_camera(level) — apply a hardware zoom to the live camera so you can see detail at distance (license plates, signs, small text past ~2 m). Call this when the user says "zoom in", "get closer", "read that sign", "ce scrie pe placuta", "citeste numarul", "vezi mai de aproape". Pass level as a numeric factor (e.g. "2", "3") or one of "in" / "out" / "reset". Only Android Chrome exposes hardware zoom today; if the tool returns an error saying zoom is unsupported, tell the user honestly and offer to move closer instead. Right after zooming, call what_do_you_see with a focus hint (e.g. focus="license plate number") so the vision model reads the zoomed frame.
+- switch_camera(side) — flip the phone camera between front ('user' / selfie) and back ('environment' / rear). Call this whenever the user says "flip the camera", "show me the other side", "use the back camera", "schimbă camera", "comută camerele", "comută camera", "rotește camera", "arată-mi camera din spate". The camera must already be on; if it isn't, call camera_on instead. Pass side='front' or side='back'; when the user just says "flip" / "switch" / "comută" pass the opposite of the current side. On phones with multiple back lenses the client auto-selects the best main sensor.
+- camera_on(side) — turn the camera ON. Call this whenever the user says "pornește camera", "activează camera", "deschide camera", "turn on the camera", "camera față" / "activează camera față" (front), "camera spate" / "activează camera spate" (back), "start the back camera", etc. Pass side='front' or side='back'; default to 'back' when the user says only "camera" or "pornește camera" (back camera is the most useful one, with the best resolution). The client auto-picks the most performant rear lens on multi-camera phones (avoids ultrawide / tele / depth).
+- camera_off() — turn the camera OFF. Call this whenever the user says "oprește camera", "dezactivează camera", "închide camera", "turn off the camera", "stop the camera". No arguments.
+- zoom_camera(level) — apply a zoom to the live camera (hardware where supported, software otherwise) so you can see detail at distance (license plates, signs, small text past ~2 m). Call when the user says "zoom in", "get closer", "read that sign", "ce scrie pe placuta", "citeste numarul", "vezi mai de aproape", "focalizează pe număr", "zoom pe obiectul ăla", "apropie", "zoom in to 2x", "zoom out". Pass level as a positive multiplier (1 = no zoom, 2 = 2×, 4 = 4×) or one of "in" / "out" / "reset". Works best with the back camera. If the device doesn't support hardware zoom, the tool falls back to software zoom and reports the limitation — tell the user zoom is limited when that happens. Right after zooming, call what_do_you_see with a focus hint (e.g. focus="license plate number") so the vision model reads the zoomed frame.
 - ui_notify(text, variant?) — paint a short visible note on the stage so the user SEES what you just did ("am deschis harta", "am salvat conversația", "searching Wikipedia…"). Use this whenever you complete a real action (a tool call succeeded, a monitor render finished, memory was saved). Variant is one of 'info' | 'success' | 'warning' | 'error' (default 'info'). Keep the note ≤ 80 characters and match the user's language. This is how you prove to the user that an action actually happened — speaking alone is not enough.
 - ui_navigate(route) — move the user to another page of the app. Allowed routes: '/' (main stage with the avatar), '/studio' (Python / Node Dev Studio), '/contact'. Call this when the user asks to "deschide Studio", "take me to the studio", "go back to the main page", "open the contact page". If the user asks for a page you don't recognise, say so — do NOT guess a route.
 - plan_task(goal, context_hint?, max_steps?) — THINK BEFORE YOU ACT. Call this FIRST on any user request that needs 3+ real actions, any compound request ("find X, then open it on the monitor, then email me the link"), any ambiguous goal, and any time you're not already certain which single tool solves the ask. A dedicated planner (Gemini Flash) returns a numbered action plan referencing Kelion's own tools. Tell the user the plan in 1–2 natural sentences ("iau asta în trei pași: caut, confirm, execut"), then run the steps one by one. If the planner reports the goal is under-specified, ASK the clarifying question it returned — do NOT guess. Skip plan_task only for single-shot obvious asks (e.g. "what's the weather in Cluj", "set a timer"). When in doubt, plan first.
@@ -334,26 +336,44 @@ const KELION_TOOLS = [
   },
   {
     name: 'switch_camera',
-    description: "Flip the device camera between the front ('user' / selfie) and back ('environment' / rear) camera. Call this whenever the user says 'flip the camera', 'show me the other side', 'use the back camera', 'schimbă camera', 'arată-mi camera din spate'. On phones with multiple back lenses (wide / ultra-wide / telephoto), the client automatically picks the most performant main sensor. The camera must already be on — if not, the tool returns an error asking the user to tap the camera button first. On desktops with a single webcam the browser may ignore the constraint; the tool reports the resulting facingMode so you can tell the user if the switch didn't actually take effect.",
+    description: "Flip the device camera between the front ('user' / selfie) and back ('environment' / rear) camera. Call this whenever the user says 'flip the camera', 'show me the other side', 'use the back camera', 'schimbă camera', 'comută camerele', 'rotește camera', 'arată-mi camera din spate'. On phones with multiple back lenses (wide / ultra-wide / telephoto), the client automatically picks the most performant main sensor. The camera must already be on — if not, call camera_on instead. On desktops with a single webcam the browser may ignore the constraint; the tool reports the resulting facingMode so you can tell the user if the switch didn't actually take effect.",
     properties: {
       side: {
         type: 'string',
         enum: ['front', 'back'],
-        description: "Which camera to activate. 'front' = selfie / user-facing. 'back' = rear / environment-facing. If the user just says 'flip' or 'switch' without specifying, omit this property and the client will toggle to the opposite of the current side.",
+        description: "Which camera to activate. 'front' = selfie / user-facing. 'back' = rear / environment-facing. If the user just says 'flip' or 'switch' / 'comută' without specifying, omit this property and the client will toggle to the opposite of the current side.",
       },
     },
     required: [],
   },
   {
-    name: 'zoom_camera',
-    description: "Apply a hardware zoom level to the currently-active camera. Call this when the user asks you to 'zoom in', 'get closer', 'read that sign', 'citeste numarul de pe placuta', 'vezi mai de aproape', or any request that needs fine detail past ~2 m (license plates, distant text, small objects). Android Chrome supports zoom on most modern phones; iOS Safari does not expose the capability and the tool will return an error you should relay honestly to the user. Pass `level` as a number (e.g. 2 for 2×) or 'in' / 'out' / 'reset' for relative steps.",
+    name: 'camera_on',
+    description: "Turn the device camera ON. Call this whenever the user says 'pornește camera', 'activează camera', 'deschide camera', 'turn on the camera', 'camera față' / 'activează camera față' (front), 'camera spate' / 'activează camera spate' (back). On multi-lens phones the client auto-picks the most performant rear lens (the primary back camera, avoiding ultrawide / tele / depth) and asks the browser for up to 4K capture so distant detail stays legible. Returns the actual facingMode the browser ended up with.",
     properties: {
-      level: {
+      side: {
         type: 'string',
-        description: "Either a numeric zoom factor (as a string, e.g. '2', '3.5') clamped to the camera's [min,max] range, or one of the relative keywords 'in' / 'out' / 'reset'. Defaults to 'in' if omitted.",
+        enum: ['front', 'back'],
+        description: "Which camera to start. 'front' = selfie / user-facing. 'back' = rear / environment-facing. Default 'back' if the user just says 'camera' / 'pornește camera' without specifying — back camera is the most useful one.",
       },
     },
     required: [],
+  },
+  {
+    name: 'camera_off',
+    description: "Turn the device camera OFF. Call this whenever the user says 'oprește camera', 'dezactivează camera', 'închide camera', 'turn off the camera', 'stop the camera'. No arguments.",
+    properties: {},
+    required: [],
+  },
+  {
+    name: 'zoom_camera',
+    description: "Apply digital zoom to the currently active camera. Call when the user says 'focalizează pe număr', 'zoom pe obiectul ăla', 'apropie', 'zoom in to 2x', 'zoom out', or similar. Pass level as a positive multiplier where 1 = no zoom, 2 = 2×, 4 = 4×. The tool clamps to the lens's advertised [min, max] range. On devices without hardware zoom the tool reports success with a soft-zoom flag — let the user know zoom is limited when that happens.",
+    properties: {
+      level: {
+        type: 'number',
+        description: "Zoom multiplier. 1 = no zoom (reset), 2 = 2×, 3 = 3×, 4 = 4×, …. Must be positive.",
+      },
+    },
+    required: ['level'],
   },
   {
     name: 'ui_notify',

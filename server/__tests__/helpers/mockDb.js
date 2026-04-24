@@ -70,6 +70,33 @@ function createMockDb() {
     updateUser:            jest.fn((id, data) => { const u=users.get(id); if(!u) return null; Object.assign(u, data); return u; }),
     getAllUsers:            jest.fn(() => Array.from(users.values())),
     deleteUser:            jest.fn((id) => { users.delete(id); }),
+    // PR E5 — user-drawer reads credit history + balance. Tests don't
+    // drive credit flows directly; stubs return empty / zero so the
+    // admin route handlers can render without crashing.
+    listCreditTransactions: jest.fn((userId, limit = 100) => {
+      const rows = users.get(userId)?.__credits || [];
+      return rows.slice(0, limit);
+    }),
+    addCreditsTransaction: jest.fn(({ userId, deltaMinutes, kind, note }) => {
+      const u = users.get(userId); if (!u) throw new Error('user not found');
+      u.__credits = u.__credits || [];
+      u.__credits.unshift({
+        id: u.__credits.length + 1,
+        delta_minutes: deltaMinutes, amount_cents: 0, currency: 'USD',
+        kind, note: note || null, created_at: new Date().toISOString(),
+      });
+      u.credits_balance_minutes = (u.credits_balance_minutes || 0) + deltaMinutes;
+      return { balance: u.credits_balance_minutes, previous: u.credits_balance_minutes - deltaMinutes, deltaMinutes };
+    }),
+    // Default to a healthy balance so tests that exercise endpoints
+    // which paywall-gate on credits (tts, realtime) don't 402. Tests
+    // that care about zero-balance behaviour should explicitly set
+    // `credits_balance_minutes = 0` on the user row.
+    getCreditsBalance: jest.fn((userId) => {
+      const u = users.get(userId);
+      if (!u) return 0;
+      return Number.isFinite(u.credits_balance_minutes) ? u.credits_balance_minutes : 999;
+    }),
     // F3 — admin user de-duplication (mirrors real db/index.js semantics).
     findDuplicateUsers:     jest.fn(() => {
       const byEmail = new Map();
