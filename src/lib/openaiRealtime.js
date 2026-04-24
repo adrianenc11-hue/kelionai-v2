@@ -829,17 +829,26 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
         }
         return null
       })
-      // PR 5/N — high-quality live vision. Ask for 1080p first so the
-      // camera opens at HD resolution (the previous 640×480 ceiling
-      // capped the downsample budget no matter how high MAX_W was set
-      // in the snapshot loop). Fall through a ladder so devices that
-      // only produce 720p, or webcams that reject explicit resolutions
-      // entirely, still succeed on a later rung.
+      // When the `camera_on` / `switch_camera` voice tool picks a specific
+      // rear lens (non-ultrawide, non-tele) we pass its deviceId here.
+      // Without a deviceId the browser may default to the ultrawide lens
+      // on phones with multiple rear cameras, which ruins the "see at
+      // distance" use case (license plate at 5m reads as a blur).
+      //
+      // PR 5/N — high-quality live vision: ask for up to 4K first so the
+      // camera opens at the best resolution the device advertises (the
+      // previous 640×480 ceiling capped the downsample budget no matter
+      // how high MAX_W was set in the snapshot loop). Fall through a
+      // ladder so devices that only produce 720p, or webcams that reject
+      // explicit resolutions entirely, still succeed on a later rung.
+      const deviceId = opts.deviceId || null
+      const selector = deviceId ? { deviceId: { exact: deviceId } } : { facingMode }
       const constraintLadder = [
-        { video: { width: { ideal: 1920 }, height: { ideal: 1080 }, facingMode }, audio: false },
-        { video: { width: { ideal: 1280 }, height: { ideal: 720 },  facingMode }, audio: false },
+        { video: { ...selector, width: { ideal: 3840 }, height: { ideal: 2160 } }, audio: false },
+        { video: { ...selector, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false },
+        { video: { ...selector, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
+        { video: { ...selector }, audio: false },
         { video: { width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
-        { video: { facingMode }, audio: false },
         { video: true, audio: false },
       ]
       let stream = null
@@ -883,7 +892,10 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
       // frames feed the OpenAI + Gemini hybrid vision tool, so
       // legibility on distant license plates / small labels matters
       // more than wire cost. 1 snapshot/sec keeps the bandwidth
-      // budget reasonable even at 1600 px + q=0.88.
+      // budget reasonable even at 1600 px + q=0.88. When camera_on /
+      // switch_camera opened the camera at 4K on a modern rear lens,
+      // this ceiling ensures we downsample to a sweet spot — not
+      // upscale a weaker lens's native frame.
       const MAX_W = 1600
       const JPEG_Q = 0.88
 
@@ -958,11 +970,25 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
   // changes (useCallback stable deps → once per mount in practice).
   useEffect(() => {
     setCameraController({
+      start: (opts) => startCamera(opts),
+      stop: () => stopCamera(),
       restart: (opts) => startCamera(opts),
       getFacingMode: () => cameraFacingRef.current || 'user',
+      // camera_zoom tool needs the live MediaStreamTrack to call
+      // applyConstraints({ advanced: [{ zoom }] }). Only the first
+      // video track is meaningful for us (we never capture audio).
+      getActiveTrack: () => {
+        const v = cameraVideoRef.current
+        const s = v && v.srcObject
+        if (s && typeof s.getVideoTracks === 'function') {
+          const tracks = s.getVideoTracks()
+          return tracks && tracks[0] ? tracks[0] : null
+        }
+        return null
+      },
     })
     return () => setCameraController(null)
-  }, [startCamera])
+  }, [startCamera, stopCamera])
 
   // Audit M6 — see lib/handoffGuard.js. True while `start()` is in
   // flight OR while the live RTCPeerConnection is anything other
