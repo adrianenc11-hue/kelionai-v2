@@ -14,11 +14,16 @@ const {
   getCreditsBalance,
   listRecentVisitors,
   getVisitorStats,
+  findDuplicateUsers,
+  mergeUsers,
 } = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { getAllCredits, probeStripe, buildRevenueSplit } = require('../services/aiCredits');
 const { sendEmailAlert } = require('../services/emailAlerts');
 const { bootstrapAdmin } = require('../services/adminBootstrap');
+const autoTopup = require('../services/autoTopup');
+const payoutsService = require('../services/payouts');
+const { getVisitorAnalytics } = require('../services/visitorAnalytics');
 
 const router = Router();
 
@@ -38,6 +43,15 @@ router.use(requireAdmin);
  */
 const _alertCooldown = new Map(); // provider id -> last alert sent (ms)
 const ALERT_COOLDOWN_MS = 6 * 60 * 60 * 1000; // 6h
+// Best-effort GC so the Map doesn't grow unboundedly if a provider id
+// rotates (ex: a TTS provider rebrand). Run once per /credits call,
+// not on a timer, so it imposes no idle CPU. O(n) in providers (<20
+// in practice) is cheap. Audit finding #8.
+function _pruneAlertCooldown(now) {
+  for (const [key, ts] of _alertCooldown) {
+    if (now - ts > ALERT_COOLDOWN_MS) _alertCooldown.delete(key);
+  }
+}
 
 /**
  * GET /api/admin/business
@@ -127,7 +141,7 @@ router.get('/credits/ledger', async (req, res) => {
  */
 router.post('/credits/grant', async (req, res) => {
   try {
-    const { email, minutes, note } = req.body || {};
+    const { email, minutes, note, idempotencyKey } = req.body || {};
     if (!email || typeof email !== 'string') {
       return res.status(400).json({ error: 'email (string) is required' });
     }
@@ -145,18 +159,30 @@ router.post('/credits/grant', async (req, res) => {
       `admin_grant by ${adminEmail}`,
       note ? `— ${String(note).slice(0, 200)}` : '',
     ].filter(Boolean).join(' ');
+    // Accept a caller-supplied idempotency key so a double-click on
+    // the "Grant" button (or a retry after a dropped connection)
+    // can't double-refund a user. The DB's UNIQUE index on
+    // `idempotency_key` collapses the second write into a no-op and
+    // returns the current balance. Also accepts the standard
+    // `Idempotency-Key` HTTP header (Stripe convention) so
+    // server-to-server callers get it for free.
+    const headerKey = (req.get && req.get('idempotency-key')) || null;
+    const rawKey = (typeof idempotencyKey === 'string' && idempotencyKey.trim()) || headerKey;
+    const cleanKey = rawKey ? `admin_grant:${String(rawKey).slice(0, 120)}` : null;
     const result = await addCreditsTransaction({
       userId: user.id,
       deltaMinutes: rounded,
       kind: 'admin_grant',
+      idempotencyKey: cleanKey,
       note: safeNote,
     });
     return res.json({
       userId: user.id,
       email: user.email,
-      deltaMinutes: rounded,
+      deltaMinutes: result.duplicate ? 0 : rounded,
       balanceMinutes: result.balance,
       previous: result.previous,
+      duplicate: !!result.duplicate,
       note: safeNote,
     });
   } catch (err) {
@@ -177,6 +203,80 @@ router.get('/revenue-split', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/admin/payouts
+ * Payout dashboard data: Stripe balance (available / pending / instant-
+ * available), the linked external account, the automatic payout
+ * schedule, the last ~10 payouts, and the 50/50 split snapshot pulled
+ * straight from buildRevenueSplit. The admin UI renders all of this
+ * without needing the Stripe Dashboard tab open.
+ */
+router.get('/payouts', async (req, res) => {
+  const days = Math.min(365, Math.max(1, Number(req.query.days) || 30));
+  // Always try to return *something* — if Stripe is healthy but the DB
+  // (summary / split) errors, the admin still needs to see balance and
+  // recent payouts. `getPayoutSnapshot()` itself never throws; it writes
+  // partial failures into `snapshot.errors[]`.
+  let snapshot;
+  try {
+    snapshot = await payoutsService.getPayoutSnapshot();
+  } catch (err) {
+    console.error('[admin/payouts] snapshot error:', err && err.message);
+    return res.status(500).json({ error: 'Failed to load payouts dashboard' });
+  }
+  let split = null;
+  try {
+    const summary = await getCreditRevenueSummary(days);
+    split = await buildRevenueSplit(summary, { days });
+  } catch (err) {
+    console.warn('[admin/payouts] split error (non-fatal):', err && err.message);
+    snapshot.errors = [...(snapshot.errors || []), { source: 'split', message: err.message || 'split failed' }];
+  }
+  res.json({
+    ...snapshot,
+    split, // 50/50 revenue split over the same window (null if DB failed)
+  });
+});
+
+/**
+ * POST /api/admin/payouts/instant
+ * Fires an on-demand Stripe instant payout. Body: { amountCents?,
+ * currency?, description? }. When amount is omitted Stripe pays out
+ * the full instant-available balance. Stripe's own error messages are
+ * forwarded verbatim so the admin can triage (e.g. "external account
+ * does not support instant payouts" when IBAN is the only destination).
+ */
+router.post('/payouts/instant', async (req, res) => {
+  try {
+    const { amountCents, currency, description } = req.body || {};
+    const parsedAmount = Number(amountCents);
+    const out = await payoutsService.triggerInstantPayout({
+      amountCents: Number.isFinite(parsedAmount) && parsedAmount > 0 ? parsedAmount : undefined,
+      currency: typeof currency === 'string' ? currency : undefined,
+      description: typeof description === 'string' ? description : undefined,
+    });
+    const adminEmail = (req.user && req.user.email) || 'unknown';
+    sendEmailAlert({
+      subject: `[Kelion] Instant payout triggered (${out.display})`,
+      text: [
+        `Admin ${adminEmail} fired an instant payout.`,
+        `Amount: ${out.display}`,
+        `Stripe payout id: ${out.id} (status: ${out.status})`,
+        out.arrivalDateMs ? `Arrival: ${new Date(out.arrivalDateMs).toISOString()}` : '',
+        'Dashboard: https://dashboard.stripe.com/payouts',
+      ].filter(Boolean).join('\n'),
+    }).catch((err) => console.warn('[admin/payouts/instant] alert failed:', err && err.message));
+    res.json(out);
+  } catch (err) {
+    console.error('[admin/payouts/instant] Error:', err && err.message);
+    const status = Number.isFinite(err && err.status) ? err.status : 500;
+    res.status(status >= 400 && status < 600 ? status : 500).json({
+      error: err && err.message || 'Failed to trigger instant payout',
+      stripe: err && err.stripe,
+    });
+  }
+});
+
 router.get('/credits', async (req, res) => {
   try {
     const cards = await getAllCredits();
@@ -184,8 +284,12 @@ router.get('/credits', async (req, res) => {
     // Fire-and-forget email alerts for low/error providers we care about.
     // Cooldown per provider so we don't spam the inbox on every refresh.
     const now = Date.now();
+    _pruneAlertCooldown(now);
     for (const c of cards) {
       if (c.kind === 'revenue') continue; // revenue providers don't trigger low alerts
+      // `unconfigured` = opt-in provider (e.g. Groq) that the admin
+      // intentionally hasn't set up. Admin still sees the red card in the
+      // dashboard, but we don't spam their inbox every 6h about it.
       if (c.status !== 'low' && c.status !== 'error') continue;
       const last = _alertCooldown.get(c.id) || 0;
       if (now - last < ALERT_COOLDOWN_MS) continue;
@@ -203,10 +307,38 @@ router.get('/credits', async (req, res) => {
       });
     }
 
-    res.json({ cards, ts: new Date().toISOString() });
+    // Fire-and-forget auto-topup pass. Only providers with a numeric
+    // balance/limit ratio below the configured threshold (default 20%)
+    // will actually charge the owner's saved Stripe card; everything
+    // else is a no-op. Errors never bubble up to the admin response.
+    autoTopup.checkAndTrigger(cards).catch((err) => {
+      console.warn('[admin/credits] auto-topup check failed:', err && err.message);
+    });
+
+    res.json({
+      cards,
+      autoTopup: autoTopup.getStatus(),
+      ts: new Date().toISOString(),
+    });
   } catch (err) {
     console.error('[admin/credits] Error:', err && err.message);
     res.status(500).json({ error: 'Failed to fetch AI credits' });
+  }
+});
+
+/**
+ * GET /api/admin/auto-topup
+ * Surfaces the owner-facing auto-topup configuration + in-memory
+ * history (last attempt per provider: timestamp, success/error,
+ * PaymentIntent id). Used by the admin UI to render the "Auto-topup:
+ * X% threshold · Y EUR from saved card · last run …" info strip.
+ */
+router.get('/auto-topup', async (req, res) => {
+  try {
+    res.json(autoTopup.getStatus());
+  } catch (err) {
+    console.error('[admin/auto-topup] Error:', err && err.message);
+    res.status(500).json({ error: 'Failed to load auto-topup status' });
   }
 });
 
@@ -249,6 +381,24 @@ router.get('/visitors', async (req, res) => {
 });
 
 /**
+ * GET /api/admin/visitors/analytics?days=30
+ * Richer aggregate over the visitor_events table + credit ledger —
+ * replaces the rudimentary top-5 country tally on the Visitors tab
+ * with a proper breakdown (country list, device mix, 30-day chart,
+ * login→topup→usage funnel). Read-only, admin-only.
+ */
+router.get('/visitors/analytics', async (req, res) => {
+  try {
+    const days = Math.min(365, Math.max(1, Number(req.query.days) || 30));
+    const data = await getVisitorAnalytics({ days });
+    res.json(data);
+  } catch (err) {
+    console.error('[admin/visitors/analytics] Error:', err && err.message);
+    res.status(500).json({ error: 'Failed to fetch visitor analytics' });
+  }
+});
+
+/**
  * GET /api/admin/users
  * List all users
  */
@@ -273,6 +423,60 @@ router.get('/users', async (req, res) => {
   } catch (err) {
     console.error('[admin/users] Error:', err.message);
     res.status(500).json({ error: 'Failed to get users' });
+  }
+});
+
+/**
+ * GET /api/admin/users/duplicates
+ *
+ * F3 — Adrian 2026-04-22: audit found adrianenc11@gmail.com sitting as
+ * two separate user rows (id=5 from Google sign-in, id=6 from local
+ * signup). Surface every email that has more than one row so the
+ * admin UI can prompt the operator to merge them.
+ */
+router.get('/users/duplicates', async (_req, res) => {
+  try {
+    const groups = await findDuplicateUsers();
+    res.json({ groups, total: groups.length });
+  } catch (err) {
+    console.error('[admin/users/duplicates] Error:', err.message);
+    res.status(500).json({ error: 'Failed to list duplicate users' });
+  }
+});
+
+/**
+ * POST /api/admin/users/merge
+ *
+ * F3 — merge `sourceId` into `targetId`. All FK'd rows (conversations,
+ * credits ledger, memory, push subs, proactive log, referrals,
+ * visitor events) move to the target, credits_balance_minutes is
+ * summed, and the source row is deleted. Source and target must share
+ * the same (case-insensitive) email — we refuse a cross-account merge.
+ */
+router.post('/users/merge', async (req, res) => {
+  try {
+    const rawSource = req.body && req.body.sourceId;
+    const rawTarget = req.body && req.body.targetId;
+    if (rawSource == null || rawTarget == null) {
+      return res.status(400).json({ error: 'sourceId and targetId are required' });
+    }
+    // Preserve non-numeric IDs for stores that don't use BIGINT (future
+    // UUID migration, mocked DBs in tests). Numbers still get through.
+    const sourceId = typeof rawSource === 'string' && /^\d+$/.test(rawSource)
+      ? Number.parseInt(rawSource, 10)
+      : rawSource;
+    const targetId = typeof rawTarget === 'string' && /^\d+$/.test(rawTarget)
+      ? Number.parseInt(rawTarget, 10)
+      : rawTarget;
+    const result = await mergeUsers(sourceId, targetId);
+    res.json(result);
+  } catch (err) {
+    const msg = err && err.message ? err.message : String(err);
+    console.error('[admin/users/merge] Error:', msg);
+    // Client errors (bad IDs, different emails) get 400 so the UI
+    // can surface the message; genuine server crashes stay 500.
+    const is4xx = /not found|must differ|required|different email/i.test(msg);
+    res.status(is4xx ? 400 : 500).json({ error: msg || 'Failed to merge users' });
   }
 });
 

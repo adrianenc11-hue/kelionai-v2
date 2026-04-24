@@ -7,6 +7,8 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { runTool } from './kelionTools'
+import { setCameraController, setCurrentFacingMode } from './cameraControl'
+import { getCsrfToken } from './api'
 
 const SAMPLE_RATE_IN = 16000   // Gemini Live expects 16kHz PCM16 mic
 const SAMPLE_RATE_OUT = 24000  // Gemini Live returns 24kHz PCM16 audio
@@ -57,6 +59,12 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
   // remainingMs so the HUD can tick locally without a poll loop.
   const [trial, setTrial] = useState(null)
   const trialTimeoutRef = useRef(null)
+  // Timestamp (epoch ms) of the most recent VAD activity from either
+  // side. Used by the credits heartbeat below to send silent=true on
+  // /api/credits/consume when the session has been idle >30 s — the
+  // server then skips the deduction, preventing the idle drain Adrian
+  // reported (-1 min x 28 min at idle).
+  const lastActivityAtRef = useRef(Date.now())
   // Credits heartbeat (signed-in non-admin only). While a Gemini Live
   // session is open we POST /api/credits/consume every 60s to deduct
   // one minute from the user's balance. When the server reports
@@ -74,6 +82,28 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
   // only fires when Kelion has demonstrably served something.
   const creditsStartedRef = useRef(false)
   const creditsStartFnRef = useRef(null)
+
+  // In-flight lock for start(). Tap-to-talk and wake-word both call start()
+  // from click/voice handlers that read `status` from a stale closure —
+  // React hasn't re-rendered between setStatus('requesting') and the second
+  // caller's check, so both can slip through and open TWO WebSockets in
+  // parallel. When that happens `wsRef.current` is overwritten by the
+  // second ws while the first ws's `setupComplete` handler still runs,
+  // and the greet-first `clientContent` kickstart lands on a ws that has
+  // NOT yet received its own setupComplete ack — Google kills it with
+  // 1007 "setup must be the first message and only the first". This lock
+  // gates the entire start() body and is released on completion or error.
+  // Adrian 2026-04-20: "problema apare doar pe admin" — admin's extra
+  // post-sign-in re-renders widen the stale-closure window that lets two
+  // concurrent starts slip past the status check.
+  const startInFlightRef = useRef(false)
+  // F5 — when start() is called on a handoff (priorTurns.length > 0), the
+  // persona already tells Kelion to continue the conversation rather than
+  // re-greet. We must NOT fire the setupComplete kickstart ("Greet me with
+  // a short hello…") in that case — an explicit user turn would override
+  // the system instruction and Gemini would re-greet anyway, defeating F4.
+  // handleMessage reads this ref to decide whether to skip the kickstart.
+  const handoffSessionRef = useRef(false)
 
   const wsRef = useRef(null)
   const audioCtxRef = useRef(null)       // 16kHz capture context for Gemini — MUST match SAMPLE_RATE_IN
@@ -241,7 +271,15 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
   }, [])
 
   // ───── WebSocket handlers ─────
-  const handleMessage = useCallback(async (raw) => {
+  //
+  // `ws` is the concrete WebSocket instance that delivered this message.
+  // Previously we read `wsRef.current` to send toolResponses and the
+  // greet-first kickstart, which races when two starts overlap: the
+  // orphaned ws's setupComplete handler would target the LIVE ws (via
+  // the shared ref) before IT had received its own setupComplete ack,
+  // triggering 1007. Binding sends to the local ws keeps each session
+  // talking to itself.
+  const handleMessage = useCallback(async (raw, ws) => {
     let msg
     try { msg = JSON.parse(typeof raw === 'string' ? raw : await raw.text()) }
     catch { return }
@@ -265,15 +303,18 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
       // Interruption — user spoke over Kelion
       if (sc.interrupted) {
         clearAudioQueue()
+        lastActivityAtRef.current = Date.now()
         setStatus('listening')
         return
       }
 
       if (sc.inputTranscription?.text) {
         appendTurn('user', sc.inputTranscription.text, false)
+        lastActivityAtRef.current = Date.now()
       }
       if (sc.outputTranscription?.text) {
         appendTurn('assistant', sc.outputTranscription.text, false)
+        lastActivityAtRef.current = Date.now()
       }
 
       const parts = sc.modelTurn?.parts || []
@@ -302,7 +343,6 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
     // /api/tools/* backend endpoint, then send back a toolResponse with the
     // matching id so Gemini can continue the turn with the result.
     if (msg.toolCall?.functionCalls?.length) {
-      const ws = wsRef.current
       const fcs = msg.toolCall.functionCalls
       // Narrate to the transcript so the user SEES what Kelion is doing
       // (audio narration is handled by the model itself per the persona).
@@ -347,8 +387,18 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
       // violates Google's protocol and triggers close-code 1007. If
       // send fails we silently skip; next user utterance still triggers
       // a response like before. Adrian 2026-04-20.
-      const ws = wsRef.current
-      if (ws && ws.readyState === WebSocket.OPEN) {
+      //
+      // F5 — skip the kickstart entirely on F4 handoff sessions. The
+      // persona already carries the prior-turns block with a "do NOT
+      // re-greet, continue from the last Kelion turn" directive; firing
+      // a fresh "Greet me" user turn here would override that system
+      // instruction and Gemini would re-greet anyway.
+      if (handoffSessionRef.current) {
+        // Nothing to do — the model already has context and will speak
+        // when the user does (or on first mic audio). Reset the flag so
+        // the next fresh start() behaves normally.
+        handoffSessionRef.current = false
+      } else if (ws && ws.readyState === WebSocket.OPEN) {
         try {
           ws.send(JSON.stringify({
             clientContent: {
@@ -371,9 +421,43 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
   }, [appendTurn, enqueueAudio, clearAudioQueue])
 
   // ───── Start full pipeline ─────
-  const start = useCallback(async () => {
+  const start = useCallback(async (opts = {}) => {
+    // F4 — on auto-fallback from OpenAI, KelionStage passes the current
+    // session transcript so Gemini continues rather than re-greeting.
+    // Fresh sessions call start() with no args and stay on GET.
+    const priorTurns = Array.isArray(opts.priorTurns) ? opts.priorTurns : []
+    // Concurrent-call guard — see comment on `startInFlightRef`. Tap and
+    // wake-word both call start() off stale closures; without this lock
+    // two WebSockets open in parallel, wsRef gets clobbered, and the
+    // orphaned ws's setupComplete handler fires clientContent on the
+    // live ws BEFORE its own setup ack arrives → 1007.
+    //
+    // F6 — the guard MUST run before we touch `handoffSessionRef`.
+    // Otherwise a rejected concurrent start() (a tap firing while a
+    // handoff is still in-flight) would clobber the flag for the
+    // session that is actually opening the socket. Reject-first,
+    // mutate-after.
+    if (startInFlightRef.current) return
+    // F5 — stash the handoff flag AFTER the concurrent guard so only
+    // the winning call writes it. The setupComplete handler reads it
+    // on the next microtask; fresh sessions explicitly reset to false
+    // so the kickstart greeting keeps firing as before.
+    handoffSessionRef.current = priorTurns.length > 0
+    // If a previous ws is still live (or in CONNECTING), tear it down
+    // before opening a new one — otherwise the old handlers keep firing
+    // against `wsRef.current` after we reassign it below.
+    if (wsRef.current && wsRef.current.readyState !== WebSocket.CLOSED) {
+      try { wsRef.current.close(1000, 'restart') } catch (_) { /* ignore */ }
+      wsRef.current = null
+    }
+    startInFlightRef.current = true
     setError(null)
     setStatus('requesting')
+    // Reset silence-idle timestamp on every new session — otherwise a stale
+    // value from component mount (or a previous session) makes the first
+    // heartbeat wrongly mark the session silent and skip a billable minute.
+    // Devin Review BUG_0003 on PR #133.
+    lastActivityAtRef.current = Date.now()
     try {
       // 1. Request mic
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -396,7 +480,15 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
       const geoQuery = (coords && Number.isFinite(coords.lat) && Number.isFinite(coords.lon))
         ? `&lat=${coords.lat.toFixed(6)}&lon=${coords.lon.toFixed(6)}&acc=${Math.round(coords.accuracy || 0)}`
         : ''
-      const tokenRes = await fetch(`/api/realtime/gemini-token?lang=${encodeURIComponent(langHint)}${geoQuery}`, { credentials: 'include' })
+      const tokenUrl = `/api/realtime/gemini-token?lang=${encodeURIComponent(langHint)}${geoQuery}`
+      const tokenRes = priorTurns.length
+        ? await fetch(tokenUrl, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+            body: JSON.stringify({ priorTurns }),
+          })
+        : await fetch(tokenUrl, { credentials: 'include' })
       // Guest trial exhaustion — propagate a clean user-facing error so
       // the HUD can render "Sign in / buy credits" instead of a raw
       // "HTTP 429".
@@ -519,11 +611,16 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
         creditsStartedRef.current = false
         const consumeCredits = async () => {
           try {
+            // Silence-aware heartbeat — matches server /api/credits/consume.
+            // If no VAD activity in the last 30 s, send silent=true so the
+            // server skips the deduction. Prevents the idle-drain Adrian
+            // reported (-1 min x 28 min at idle).
+            const silent = (Date.now() - lastActivityAtRef.current) > 30_000
             const r = await fetch('/api/credits/consume', {
               method: 'POST',
               credentials: 'include',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ minutes: 1 }),
+              headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+              body: JSON.stringify({ minutes: 1, silent }),
             })
             if (r.status === 401) {
               // Guest (no JWT) — nothing to deduct, stop polling.
@@ -589,7 +686,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
         }
       }
 
-      ws.onmessage = (event) => handleMessage(event.data)
+      ws.onmessage = (event) => handleMessage(event.data, ws)
       ws.onerror = (e) => {
         console.error('[geminiLive] ws error', e)
         setError('Connection error')
@@ -599,20 +696,29 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
         // Surface Google's close code + reason so bad-endpoint or
         // expired-token failures show up in the console instead of being
         // silently flipped back to 'idle'. 1000 = normal, 1005/1006 = no
-        // status / abnormal, 1008 = policy (wrong endpoint / bad token).
+        // status / abnormal, 1008 = policy (wrong endpoint / bad token),
+        // 1007 = protocol (double setup), 1011 = server / quota.
         console.warn('[geminiLive] ws close', { code: e?.code, reason: e?.reason, wasClean: e?.wasClean })
         if (statusRef.current === 'idle') return
+        if (statusRef.current === 'error') return
         // If we never reached 'listening' (i.e. the session died before
         // setupComplete), keep the error visible rather than bouncing back
         // to the "Tap to talk" label — otherwise the user thinks nothing
         // happened.
         const neverOpened = statusRef.current === 'connecting' || statusRef.current === 'requesting'
-        if (statusRef.current === 'error') return
-        if (neverOpened) {
+        // Protocol / auth / quota failures must never silently bounce to
+        // 'idle' — the wake-word is armed on 'idle' and will re-fire
+        // start(), which opens a new WS that hits the same 1007/1008/1011
+        // in a loop (Adrian 2026-04-20, "crapa dupa 2 min de funtionare
+        // 1007"). Surface the error and require a manual tap to retry.
+        const PROTOCOL_FAILURES = new Set([1007, 1008, 1011])
+        if (neverOpened || PROTOCOL_FAILURES.has(e?.code)) {
           setError(`Connection closed (${e?.code || 'unknown'})${e?.reason ? `: ${e.reason}` : ''}`)
           setStatus('error')
           return
         }
+        // Clean close mid-session (Google's idle timeout, user-initiated
+        // stop) — flip to idle so the HUD shows "Tap to talk" again.
         setStatus('idle')
       }
 
@@ -652,6 +758,10 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
       console.error('[geminiLive] start error', e)
       setError(e.message || String(e))
       setStatus('error')
+    } finally {
+      // Always release the in-flight lock so a subsequent tap/wake-word
+      // can start a fresh session. Pairs with the guard at the top.
+      startInFlightRef.current = false
     }
   }, [handleMessage, startMicLevel])
 
@@ -690,8 +800,16 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
     // Kelion to "see" the camera).
     const TARGET_FPS = kind === 'screen' ? 8 : 15
     const MIN_INTERVAL_MS = Math.floor(1000 / TARGET_FPS)
-    const MAX_W = kind === 'screen' ? 960 : 480
-    const JPEG_Q = kind === 'screen' ? 0.6 : 0.55
+    // PR 5/N — high-quality live vision. Adrian 2026-04-20: "fiind o
+    // aplicație profesională, camerele trebuie să trimită către avatar
+    // imagini live de foarte bună calitate". Camera short-edge goes
+    // 480 → 1024 (4.5× pixel area) and JPEG_Q 0.55 → 0.78 — still well
+    // inside the 2 MB back-pressure budget at 15 fps because the
+    // existing `bufferedAmount > BACKPRESSURE_BYTES` guard already
+    // drops frames when the socket is full. Screen share keeps its
+    // higher ceiling (was already 960).
+    const MAX_W = kind === 'screen' ? 1280 : 1024
+    const JPEG_Q = kind === 'screen' ? 0.75 : 0.78
     const BACKPRESSURE_BYTES = 2_000_000
 
     let busy = false
@@ -751,11 +869,30 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
     }
   }, [])
 
-  const startCamera = useCallback(async () => {
+  const cameraFacingRef = useRef('user')
+  const startCamera = useCallback(async (opts = {}) => {
     setVisionError(null)
+    // If a side was explicitly requested (e.g. by the `switch_camera`
+    // tool) we tear down the existing stream first so the new call to
+    // getUserMedia can open the opposite lens. Without the teardown
+    // mobile browsers keep the current track live and silently ignore
+    // the new constraint.
+    const nextFacing = (opts.facingMode === 'user' || opts.facingMode === 'environment')
+      ? opts.facingMode
+      : cameraFacingRef.current
+    if (opts.facingMode && cameraStreamRef.current && nextFacing !== cameraFacingRef.current) {
+      try {
+        stopFrameSender('camera')
+        cameraStreamRef.current.getTracks().forEach((t) => t.stop())
+      } catch (_) { /* ignore */ }
+      cameraStreamRef.current = null
+      setCameraStream(null)
+    }
     if (cameraStreamRef.current) return
+    cameraFacingRef.current = nextFacing
+    setCurrentFacingMode(nextFacing)
     // Ladder of progressively looser constraints. The first rung is what
-    // we actually want (front-camera 640×480); the fallbacks exist
+    // we actually want (requested camera at 640×480); the fallbacks exist
     // because Chromium on Windows/Edge throws NotReadableError with
     // the unhelpful message "Could not start video source" when the
     // *constraint set* is incompatible with the specific camera
@@ -764,9 +901,17 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
     // NVIDIA Broadcast) that only honours default constraints. Trying
     // `facingMode: 'user'` explicitly is a known offender on
     // external webcams. Dropping constraints almost always recovers.
+    // PR 5/N — high-quality live vision. Ask the browser for 1080p
+    // first so the camera actually opens at HD resolution (previous
+    // 640×480 ceiling capped the downsample budget no matter how high
+    // MAX_W was set in the frame sender). Every rung is wrapped in
+    // try/catch below, so a phone that can only produce 720p still
+    // succeeds on the second rung, and anything that rejects explicit
+    // resolutions still falls back to the permissive `video: true`.
     const constraintLadder = [
-      { video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }, audio: false },
-      { video: { width: { ideal: 640 }, height: { ideal: 480 } }, audio: false },
+      { video: { width: { ideal: 1920 }, height: { ideal: 1080 }, facingMode: nextFacing }, audio: false },
+      { video: { width: { ideal: 1280 }, height: { ideal: 720 },  facingMode: nextFacing }, audio: false },
+      { video: { width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
       { video: true, audio: false },
     ]
     let lastError = null
@@ -798,6 +943,11 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
       friendly = 'Camera is in use by another app (Teams, Zoom, OBS…). Close it and try again.'
     }
     setVisionError(friendly)
+    // Propagate so the cameraControl.restart() wrapper used by the
+    // switch_camera tool sees the failure. Without the rethrow the
+    // tool returned ok:true on every call because the ladder caught
+    // every getUserMedia rejection without re-signalling it upward.
+    throw (lastError instanceof Error) ? lastError : new Error(friendly)
   }, [startFrameSender])
 
   const stopCamera = useCallback(() => {
@@ -920,6 +1070,32 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
 
   useEffect(() => () => { stop() }, [stop])
 
+  // Register the camera controller so the `switch_camera` tool handler
+  // in kelionTools.js can flip front/back without reaching into this
+  // hook directly. Keeps the coupling one-way: the tool dispatches via
+  // cameraControl.js and whichever voice transport is mounted picks up
+  // the restart call.
+  useEffect(() => {
+    setCameraController({
+      restart: (opts) => startCamera(opts),
+      getFacingMode: () => cameraFacingRef.current || 'user',
+    })
+    return () => setCameraController(null)
+  }, [startCamera])
+
+  // Audit M6 — `isBusy()` lets KelionStage's auto-fallback effect
+  // (2) detect whether the user already kicked off a manual
+  // start() between the provider flip and the handoff call.
+  // Returns true while `start()` is in flight OR while the live
+  // ws is anything other than CLOSED. Reading refs directly so a
+  // caller sees the latest value without waiting for a re-render.
+  const isBusy = useCallback(() => {
+    if (startInFlightRef.current) return true
+    const ws = wsRef.current
+    if (ws && ws.readyState !== WebSocket.CLOSED) return true
+    return false
+  }, [])
+
   return {
     status, error, start, stop, turns, userLevel,
     // Stage 2
@@ -927,5 +1103,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
     startCamera, stopCamera, startScreen, stopScreen,
     // Trial countdown (null for signed-in users, object for guests).
     trial,
+    // Audit M6 — handoff double-start guard (see lib/handoffGuard.js).
+    isBusy,
   }
 }
