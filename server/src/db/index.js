@@ -1554,6 +1554,16 @@ async function saveConsumeState(userId, state, nowMs) {
   // `INSERT ... ON CONFLICT DO UPDATE` is supported by sqlite ≥3.24
   // (packaged sqlite3@5 ships 3.40+) and by Postgres. One round-trip
   // whether the row exists or not, safe under race between instances.
+  //
+  // The explicit `RETURNING user_id` clause is load-bearing on
+  // Postgres: our pg-adapter auto-appends ` RETURNING id` to every
+  // INSERT that has no RETURNING of its own, and `credits_consume_state`
+  // has no `id` column (user_id IS the primary key). Without our own
+  // RETURNING clause the upsert would fail in production clusters
+  // (M7 fix effectively disabled — flagged P1 by Codex on #186). The
+  // clause is harmless on SQLite (ignored when lastID isn't read) and
+  // compiles identically on Postgres, so a single SQL string works
+  // across both dialects.
   await db.run(
     `INSERT INTO credits_consume_state
        (user_id, last_billable_at, silent_streak, silent_since, updated_at)
@@ -1562,7 +1572,8 @@ async function saveConsumeState(userId, state, nowMs) {
        last_billable_at = excluded.last_billable_at,
        silent_streak    = excluded.silent_streak,
        silent_since     = excluded.silent_since,
-       updated_at       = excluded.updated_at`,
+       updated_at       = excluded.updated_at
+     RETURNING user_id`,
     [userId, lastBillableAt, silentStreak, silentSince, updatedAt]
   );
 }
