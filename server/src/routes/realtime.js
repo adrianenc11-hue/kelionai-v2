@@ -128,6 +128,7 @@ Tools you can use (Stage 4):
 - ui_notify(text, variant?) — paint a short visible note on the stage so the user SEES what you just did ("am deschis harta", "am salvat conversația", "searching Wikipedia…"). Use this whenever you complete a real action (a tool call succeeded, a monitor render finished, memory was saved). Variant is one of 'info' | 'success' | 'warning' | 'error' (default 'info'). Keep the note ≤ 80 characters and match the user's language. This is how you prove to the user that an action actually happened — speaking alone is not enough.
 - ui_navigate(route) — move the user to another page of the app. Allowed routes: '/' (main stage with the avatar), '/studio' (Python / Node Dev Studio), '/contact'. Call this when the user asks to "deschide Studio", "take me to the studio", "go back to the main page", "open the contact page". If the user asks for a page you don't recognise, say so — do NOT guess a route.
 - plan_task(goal, context_hint?, max_steps?) — THINK BEFORE YOU ACT. Call this FIRST on any user request that needs 3+ real actions, any compound request ("find X, then open it on the monitor, then email me the link"), any ambiguous goal, and any time you're not already certain which single tool solves the ask. A dedicated planner (Gemini Flash) returns a numbered action plan referencing Kelion's own tools. Tell the user the plan in 1–2 natural sentences ("iau asta în trei pași: caut, confirm, execut"), then run the steps one by one. If the planner reports the goal is under-specified, ASK the clarifying question it returned — do NOT guess. Skip plan_task only for single-shot obvious asks (e.g. "what's the weather in Cluj", "set a timer"). When in doubt, plan first.
+- get_action_history(limit?, session_id?) — CHECK YOUR OWN MEMORY before repeating an action. Call this whenever the user says "did you already…?", "ai trimis emailul?", "ce ai căutat adineauri?", "fă din nou ce ai făcut înainte", or any time you're about to do something that might have just happened this session (same email, same monitor page, same search). Returns a short list of your recent tool calls with their results. If it returns 0 rows, say so honestly — never invent a prior action. For guests it returns { signed_in:false }: tell them you only remember actions once they sign in.
 
 HARD rule for all tools above: if the user question clearly needs one of them, YOU MUST call it. Saying "I'll check that for you" or "let me see" without calling the tool counts as a lie. If no tool fits, say honestly "I don't know" — never guess.
 
@@ -318,6 +319,15 @@ const KELION_TOOLS = [
       max_steps:    { type: 'integer', description: 'Upper bound on plan length. 1–10; default 6.' },
     },
     required: ['goal'],
+  },
+  {
+    name: 'get_action_history',
+    description: "Look up your OWN recent tool calls for the signed-in user before deciding whether to re-run one. Call this whenever the user asks 'did you already …?' / 'ai făcut deja …?', whenever you're about to repeat an action that might have just happened (send the same email twice, re-open the same page on the monitor, re-run a search you already did this session), or at the start of a follow-up ask like 'fă din nou ce ai făcut înainte'. Returns an ordered list of previous tool invocations with short result summaries. Guests get { ok:false, signed_in:false } — in that case tell the user you can only remember actions once they sign in. Never invent a history: if this tool returns 0 rows, say honestly 'I haven't done anything like that yet'.",
+    properties: {
+      limit:      { type: 'integer', description: 'How many recent actions to fetch. 1–40; default 10.' },
+      session_id: { type: 'string',  description: "Optional filter — restrict to actions from a specific session. Omit to see actions across the whole account." },
+    },
+    required: [],
   },
   {
     name: 'calculate',

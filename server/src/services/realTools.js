@@ -2480,8 +2480,44 @@ async function executeRealTool(name, args, ctx) {
     case 'generate_image':    return toolGenerateImage(a);
     // ── PR 7/N — Planner Brain (Gemini Flash) ──
     case 'plan_task':         return toolPlanTask(a);
+    // ── PR 8/N — Memory of Actions (read-only self-reflection) ──
+    case 'get_action_history': return toolGetActionHistory(a, ctx);
     default:                  return null; // signal "not handled here"
   }
+}
+
+// PR #8/N — Memory of Actions. Self-reflection tool: lets Kelion read
+// back its own recent tool calls for the signed-in user so it can
+// decide whether to re-run something or reference a prior result.
+// Reads only action_history rows; never writes. Gracefully returns
+// `{ ok:false, signed_in:false }` for guests so the voice model can
+// say "I only track your actions once you sign in" instead of guessing.
+async function toolGetActionHistory(args, ctx) {
+  const userId = ctx?.user?.id;
+  if (!userId) {
+    return { ok: false, signed_in: false, error: 'Action history is only available when you are signed in.' };
+  }
+  const limitRaw = Number.parseInt(args?.limit, 10);
+  const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(40, limitRaw)) : 10;
+  const sessionId = typeof args?.session_id === 'string' && args.session_id.trim()
+    ? args.session_id.trim().slice(0, 80)
+    : null;
+  // Lazy require matches the other DB-touching tools (toolGetMyCredits,
+  // toolGetMyUsage, …) — the db module has start-up side effects on
+  // older Node paths, and the existing style here keeps that opt-in.
+  const db = require('../db');
+  const rows = await db.listRecentActions(userId, { limit, sessionId });
+  const actions = rows.map((r) => ({
+    id: r.id,
+    tool: r.tool_name,
+    ok: !!r.ok,
+    args: r.args_summary || null,
+    result: r.result_summary || null,
+    duration_ms: r.duration_ms,
+    at: r.created_at,
+    session_id: r.session_id || null,
+  }));
+  return { ok: true, count: actions.length, actions };
 }
 
 // Full list of tool names handled by this module — keeps catalogs honest.
@@ -2521,6 +2557,11 @@ const REAL_TOOL_NAMES = [
   // asks. Requires GEMINI_API_KEY; returns { ok:false, unavailable:true }
   // when the key is missing so the voice model can degrade gracefully.
   'plan_task',
+  // PR 8/N — Memory of Actions. Read-only self-reflection: returns the
+  // caller's own recent tool invocations (from action_history) so
+  // Kelion can check "did I already email that?" before re-running.
+  // Returns `{ ok:false, signed_in:false }` for guests.
+  'get_action_history',
 ];
 
 module.exports = {
@@ -2589,4 +2630,6 @@ module.exports = {
   toolGenerateImage,
   // PR 7/N — Planner Brain
   toolPlanTask,
+  // PR 8/N — Memory of Actions
+  toolGetActionHistory,
 };

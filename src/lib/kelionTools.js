@@ -63,6 +63,11 @@ const REAL_TOOL_NAMES = new Set([
   // starts executing real tools. Server returns a clean JSON plan;
   // summarizeRealTool shapes it for the voice model below.
   'plan_task',
+  // PR 8/N — Memory of Actions. Kelion reads back its own recent tool
+  // invocations for the signed-in user so it knows what it has already
+  // done this session. Server returns a compact JSON list; the
+  // summariser below renders it as numbered bullet points.
+  'get_action_history',
   // F11 — `generate_image` is handled specially in the runTool switch
   // below so we can side-effect the monitor; it isn't in this set.
 ])
@@ -150,6 +155,22 @@ function summarizeRealTool(name, j) {
     // Groq completions are already structured; keep them mostly intact but
     // cap so we don't blow past the voice model's context on the read-back.
     return String(j.result).slice(0, 4000)
+  }
+  if (name === 'get_action_history' && Array.isArray(j.actions)) {
+    // Kelion is reading its own history. We keep each row on one line
+    // so the voice model can scan it and decide quickly whether to
+    // re-run a tool. Guest case (`signed_in === false`) is handled
+    // by the generic `ok === false` branch at the top.
+    if (!j.actions.length) {
+      return "No recent actions recorded yet — I haven't run anything like that this session."
+    }
+    const rows = j.actions.slice(0, 20).map((a, i) => {
+      const status = a.ok === false ? 'FAILED' : 'ok'
+      const args = a.args ? ` (${a.args})` : ''
+      const result = a.result ? ` → ${a.result}` : ''
+      return `${i + 1}. ${a.tool} [${status}]${args}${result}`
+    }).join('\n')
+    return `Recent actions (${j.count} total):\n${rows}`.slice(0, 4000)
   }
   if (name === 'plan_task' && Array.isArray(j.steps)) {
     // Condense the planner's structured JSON into a compact speakable form
