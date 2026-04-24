@@ -13,7 +13,7 @@
 // is swallowed so a failing analytics insert can never delay or break a
 // page load.
 
-const { recordVisitorEvent, getUserByEmail } = require('../db');
+const { recordVisitorEvent } = require('../db');
 const jwt = require('jsonwebtoken');
 const config = require('../config');
 
