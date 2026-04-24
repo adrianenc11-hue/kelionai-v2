@@ -480,20 +480,20 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
       const geoQuery = (coords && Number.isFinite(coords.lat) && Number.isFinite(coords.lon))
         ? `&lat=${coords.lat.toFixed(6)}&lon=${coords.lon.toFixed(6)}&acc=${Math.round(coords.accuracy || 0)}`
         : ''
-      // Backend selector: `?liveBackend=vertex` URL param or
-      // `localStorage.kelion_live_backend = 'vertex'` routes the session
-      // through our same-origin Vertex AI proxy
-      // (`/api/realtime/vertex-live-ws`). Default remains the legacy
-      // AI Studio ephemeral-token path until we flip the default in a
-      // follow-up PR.
-      let liveBackend = 'aistudio'
+      // Backend selector. Default is `vertex` — GA `gemini-live-2.5-flash-
+      // native-audio` on Vertex AI via the same-origin proxy at
+      // `/api/realtime/vertex-live-ws`. `?liveBackend=aistudio` (or
+      // `localStorage.kelion_live_backend = 'aistudio'`) forces the legacy
+      // preview AI Studio ephemeral-token path — kept as an operator-only
+      // escape hatch in case the Vertex proxy is unreachable.
+      let liveBackend = 'vertex'
       try {
         const fromUrl = new URL(window.location.href).searchParams.get('liveBackend')
         const fromStorage = window.localStorage?.getItem('kelion_live_backend')
         const raw = (fromUrl || fromStorage || '').toString().toLowerCase()
-        if (raw === 'vertex') liveBackend = 'vertex'
+        if (raw === 'aistudio') liveBackend = 'aistudio'
       } catch (_) { /* window/localStorage missing in SSR — default stays */ }
-      const backendQuery = liveBackend === 'vertex' ? '&backend=vertex' : ''
+      const backendQuery = liveBackend === 'aistudio' ? '&backend=aistudio' : '&backend=vertex'
       const tokenUrl = `/api/realtime/gemini-token?lang=${encodeURIComponent(langHint)}${geoQuery}${backendQuery}`
       const tokenRes = priorTurns.length
         ? await fetch(tokenUrl, {
