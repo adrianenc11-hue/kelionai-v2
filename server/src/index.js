@@ -23,17 +23,33 @@ const realtimeRouter   = require('./routes/realtime');
 const passkeyRouter    = require('./routes/passkey');
 const memoryRouter     = require('./routes/memory');
 const conversationsRouter = require('./routes/conversations');
+const studioRouter     = require('./routes/studio');
 const toolsRouter      = require('./routes/tools');
 const pushRouter       = require('./routes/push');
 const creditsRouter    = require('./routes/credits');
 const diagRouter       = require('./routes/diag');
 const youtubeRouter    = require('./routes/youtube');
+const generatedImagesRouter = require('./routes/generatedImages');
 const voiceCloneRouter = require('./routes/voiceClone');
 const proactive        = require('./services/proactive');
 const { bootstrapAdmin } = require('./services/adminBootstrap');
+const { installProcessHandlers } = require('./util/processHandlers');
+
+// Audit H3: install global safety net before anything else can throw.
+// - `unhandledRejection` is logged and swallowed — one missing `.catch()`
+//   shouldn't take down every other user's live voice session.
+// - `uncaughtException` is logged and followed by a clean exit(1) so
+//   Railway can spin a replacement with known-good state. Skipped under
+//   Jest so a single failing test never kills the runner.
+const processHandlerStats = installProcessHandlers(process, {
+  exitOnException: process.env.NODE_ENV !== 'test',
+}).stats;
 
 const app = express();
 app.disable('x-powered-by');
+// Expose process-handler counters on `app.locals` so /api/diag can
+// surface them without importing this module back.
+app.locals.processHandlerStats = processHandlerStats;
 
 // Initialize database, then seed admin if ADMIN_BOOTSTRAP_PASSWORD is set.
 // Seeding is idempotent — running every boot lets Adrian rotate the admin
@@ -240,37 +256,20 @@ app.post('/api/referral/use', requireAuth, async (req, res) => {
   }
 });
 
-// Free trial token (no auth, rate limited per IP - 1 per day)
-const trialTokens = new Map(); // ip -> timestamp
-app.get('/api/realtime/trial-token', async (req, res) => {
-  const ip = req.ip || req.connection.remoteAddress;
-  const now = Date.now();
-  const last = trialTokens.get(ip);
-  if (last && (now - last) < 24 * 60 * 60 * 1000) {
-    return res.status(429).json({ error: 'Free trial: one session per day' });
-  }
-
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return res.status(503).json({ error: 'Not configured' });
-
-  try {
-    const voice = process.env.OPENAI_VOICE_KELION || 'ash';
-    const r = await fetch('https://api.openai.com/v1/realtime/sessions', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: process.env.OPENAI_REALTIME_MODEL || 'gpt-4o-realtime-preview',
-        voice,
-      }),
-    });
-    if (!r.ok) return res.status(500).json({ error: 'Failed to create session' });
-    const data = await r.json();
-    trialTokens.set(ip, now);
-    res.json({ token: data.client_secret.value, expiresAt: data.client_secret.expires_at, trial: true, voice });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to create session' });
-  }
-});
+// Audit M2 — the legacy /api/realtime/trial-token endpoint (mounted
+// here directly on `app`, _before_ the realtime router) has been
+// removed. It was:
+//   - bypassing the shared 15-min/day trial window enforced by
+//     /api/trial/status + /api/chat + /api/tts, so a guest could mint
+//     a new OpenAI Realtime session every 24 h _on top of_ their
+//     text-chat quota — effectively doubling free minutes.
+//   - storing a per-IP last-issued timestamp in a Map that was never
+//     garbage-collected (same leak shape as H2 `consumeStateByUser`).
+//   - duplicating the mint logic of the canonical /api/realtime/token
+//     handler (in ./routes/realtime.js), which already applies
+//     chatLimiter + admin-project routing.
+// Guests reach voice via the regular /api/realtime/token flow, gated
+// by the shared trial window. Removing the shadow closes the bypass.
 
 // API routes (auth required)
 app.use('/api/users', requireAuth, usersRouter);
@@ -328,6 +327,10 @@ app.use('/api/diag', diagRouter);
 app.use('/api/auth/passkey', chatLimiter, passkeyRouter);
 app.use('/api/memory', requireAuth, memoryRouter);
 app.use('/api/conversations', requireAuth, conversationsRouter);
+// Dev Studio (DS-1) — per-user Python project workspaces. All routes
+// require a signed-in user; ownership is enforced again inside every
+// DB helper (listStudioWorkspaces, getStudioWorkspace, …).
+app.use('/api/studio', requireAuth, studioRouter);
 
 // Stage 4 — M19 (browser use) + M20 (web search status) + M21 (MCP stubs).
 // Router is PUBLIC by design: Gemini Live tool-call flow has no login gate,
@@ -341,6 +344,11 @@ app.use('/api/tools', chatLimiter, toolsRouter);
 // is not configured; the client then falls back to the external
 // search card shipped in PR #160.
 app.use('/api/youtube', chatLimiter, youtubeRouter);
+
+// F11 — short-lived PNG serving for `generate_image` tool. The route
+// lives outside chatLimiter because it's a pure GET by opaque UUID;
+// rate-limiting the tool call itself happens on /api/tools/execute.
+app.use('/api/generated-images', generatedImagesRouter);
 
 // Stage 5 — M23 push + M24/M25 proactive scheduler. Requires passkey auth,
 // except /public-key which the browser needs to fetch BEFORE authenticating.

@@ -140,7 +140,36 @@ export default function VoiceCloneModal({ open, onClose, userEmail, userName }) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
-  useEffect(() => () => resetRecording(), [resetRecording])
+  // Unmount cleanup ONLY — release microphone + timer, do NOT touch React
+  // state. Previously this was `useEffect(() => () => resetRecording(),
+  // [resetRecording])`, which re-fired every time `sampleUrl` changed
+  // (because `resetRecording` is `useCallback(…, [sampleUrl])`). That
+  // meant when the MediaRecorder's `onstop` set the sample blob and
+  // URL, the effect cleanup would immediately run the *previous*
+  // `resetRecording` — wiping `sampleBlob`, `sampleUrl`, and `elapsed`
+  // back to empty. From the user's point of view, the 180 s recording
+  // "disappeared" and the modal snapped back to the Ready state,
+  // forcing them to start over (the "loop" Adrian reported).
+  useEffect(() => {
+    return () => {
+      try {
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+          mediaRecorderRef.current.stop()
+        }
+      } catch (_) { /* ignore */ }
+      try {
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach((t) => t.stop())
+        }
+      } catch (_) { /* ignore */ }
+      streamRef.current = null
+      mediaRecorderRef.current = null
+      if (timerRef.current) {
+        clearInterval(timerRef.current)
+        timerRef.current = null
+      }
+    }
+  }, [])
 
   // ESC to close (only when nothing is recording/uploading).
   useEffect(() => {
