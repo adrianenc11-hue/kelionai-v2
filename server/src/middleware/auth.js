@@ -2,7 +2,7 @@
 
 const jwt = require('jsonwebtoken');
 const config = require('../config');
-const { getUserByGoogleId, findById } = require('../db');
+const { getUserByGoogleId, findById, findByEmail, getUserByEmail, createUser } = require('../db');
 
 /**
  * Middleware pentru verificarea autentificării.
@@ -34,15 +34,130 @@ async function requireAuth(req, res, next) {
         // break every authenticated test.
         const rawSub = decoded.sub;
         const USE_POSTGRES = !!process.env.DATABASE_URL;
+        let effectiveSub = rawSub;
         if (USE_POSTGRES) {
           const numericSub = Number.parseInt(rawSub, 10);
-          if (!Number.isFinite(numericSub) || String(numericSub) !== String(rawSub)) {
-            res.clearCookie('kelion.token', { path: '/' });
-            return res.status(401).json({ error: 'Stale token — please sign in again.' });
+          const isNumeric = Number.isFinite(numericSub) && String(numericSub) === String(rawSub);
+          if (!isNumeric) {
+            // Legacy token (pre-migration Google OAuth UUID sub, or stale
+            // string id). Instead of locking the user out with "Stale
+            // token — please sign in again.", transparently migrate the
+            // session: look them up by the email claim in the same JWT,
+            // re-issue a fresh token carrying the numeric user.id, and
+            // overwrite the cookie. The request proceeds normally so
+            // actions like POST /api/credits/checkout don't fail.
+            let migratedUser = null;
+            let migrationTrace = { triedEmail: null, emailErr: null, triedGoogleId: null, googleErr: null };
+            if (decoded.email) {
+              migrationTrace.triedEmail = String(decoded.email).toLowerCase();
+              try {
+                migratedUser = await findByEmail(decoded.email);
+              } catch (e) {
+                migrationTrace.emailErr = e && e.message;
+                migratedUser = null;
+              }
+              // Case-insensitive fallback — some legacy tokens carry the
+              // email in the original case from Google while the DB row
+              // was lowercased at insert time (or vice-versa).
+              if (!migratedUser) {
+                try {
+                  migratedUser = await findByEmail(String(decoded.email).toLowerCase());
+                } catch (_) {}
+              }
+            }
+            if (!migratedUser) {
+              // Fallback: the non-numeric sub may BE the Google OAuth UUID
+              // for this user (pre-Postgres sign-ins stored Google `sub`
+              // directly). Look them up by google_id.
+              migrationTrace.triedGoogleId = String(rawSub);
+              try {
+                migratedUser = await getUserByGoogleId(String(rawSub));
+              } catch (e) {
+                migrationTrace.googleErr = e && e.message;
+              }
+            }
+            if (!migratedUser && decoded.email) {
+              // Last resort: the JWT signature is valid (verified above
+              // with our secret), so we trust its email+name claims.
+              // This user DID have a DB row once; it was wiped by a
+              // purge or schema reset. Re-create a shell row so the
+              // request can proceed — without this path, a legitimately
+              // signed-in user whose row was purged is permanently
+              // locked out even though their JWT is cryptographically
+              // valid and not expired.
+              migrationTrace.autoCreate = { email: String(decoded.email).toLowerCase() };
+              try {
+                const created = await createUser({
+                  google_id: String(rawSub),
+                  email: String(decoded.email).toLowerCase(),
+                  name: decoded.name || String(decoded.email).split('@')[0],
+                  picture: null,
+                });
+                if (created && created.id) {
+                  migratedUser = created;
+                  migrationTrace.autoCreate.id = created.id;
+                }
+              } catch (e) {
+                migrationTrace.autoCreateErr = e && e.message;
+                // Unique-email race: another concurrent request may have
+                // just created the row. Re-read and reuse.
+                if (/UNIQUE|duplicate/i.test(e && e.message || '')) {
+                  try {
+                    migratedUser = await findByEmail(String(decoded.email).toLowerCase());
+                  } catch (_) {}
+                }
+              }
+            }
+            if (!migratedUser || !migratedUser.id) {
+              // Log ONCE per failure so Railway logs expose WHY migration
+              // failed for this session. Zero PII beyond the email claim
+              // (which the user already typed themselves at sign-in).
+              try {
+                console.warn('[auth] JWT migration failed', JSON.stringify({
+                  rawSub: String(rawSub).slice(0, 40),
+                  hasEmail: !!decoded.email,
+                  trace: migrationTrace,
+                }));
+              } catch (_) {}
+              res.clearCookie('kelion.token', { path: '/' });
+              return res.status(401).json({
+                error: 'Stale token — please sign in again.',
+                code: 'stale_token',
+                hint: 'Sign out, close the tab, open a new tab and sign in again with email + password.',
+              });
+            }
+            const freshToken = jwt.sign(
+              {
+                sub: migratedUser.id,
+                email: migratedUser.email,
+                name: migratedUser.name,
+                role: migratedUser.role || decoded.role || 'user',
+              },
+              config.jwt.secret,
+              { expiresIn: config.jwt.expiresIn }
+            );
+            try {
+              res.cookie('kelion.token', freshToken, {
+                httpOnly: true,
+                secure: !!config.isProduction,
+                sameSite: 'lax',
+                maxAge: 7 * 24 * 60 * 60 * 1000,
+                path: '/',
+              });
+            } catch (_) { /* cookie setting is best-effort */ }
+            // Also expose the fresh token in a response header so the
+            // SPA can stash it as its Bearer fallback immediately — the
+            // next authenticated fetch will use the new token without
+            // waiting for a page reload.
+            try { res.setHeader('X-Kelion-Refreshed-Token', freshToken); } catch (_) {}
+            effectiveSub = migratedUser.id;
+            decoded.email = migratedUser.email;
+            decoded.name = migratedUser.name;
+            decoded.role = migratedUser.role || decoded.role || 'user';
           }
         }
         req.user = {
-          id: rawSub,
+          id: effectiveSub,
           email: decoded.email,
           name: decoded.name,
           role: decoded.role || 'user',

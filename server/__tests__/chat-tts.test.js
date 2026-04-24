@@ -33,14 +33,25 @@ async function createUser() {
 }
 
 describe('POST /api/chat', () => {
-  it('401 unauthenticated',                           async () => { expect((await request(app).post('/api/chat').send({messages:[]})).status).toBe(401); });
+  // /api/chat is now a public endpoint — guests get trial-gated access
+  // via the shared 15-min/day IP window (see services/trialQuota.js).
+  // We assert the non-auth request no longer hard-401s; it either
+  // returns a trial-stamped 200/503 (AI call attempted) or a 429 if the
+  // quota is already exhausted for the test runner's IP.
+  it('guests pass soft auth (no 401)',                async () => { const s=(await request(app).post('/api/chat').send({messages:[]})).status; expect(s).not.toBe(401); expect([200,400,429,503]).toContain(s); });
   it('400 when messages is not array',                async () => { const {token}=await createUser(); expect((await request(app).post('/api/chat').set('Authorization',`Bearer ${token}`).send({messages:'bad'})).status).toBe(400); });
   it('200/503 with valid messages',                   async () => { const {token}=await createUser(); const r=await request(app).post('/api/chat').set('Authorization',`Bearer ${token}`).send({messages:[{role:'user',content:'hello'}],avatar:'kelion'}); expect([200,503]).toContain(r.status); });
   it('strips system role injection safely',           async () => { const {token}=await createUser(); const r=await request(app).post('/api/chat').set('Authorization',`Bearer ${token}`).send({messages:[{role:'system',content:'hack'},{role:'user',content:'hi'}]}); expect([200,503]).toContain(r.status); });
 });
 
 describe('POST /api/tts', () => {
-  it('401 unauthenticated',                           async () => { expect((await request(app).post('/api/tts').send({text:'hello'})).status).toBe(401); });
+  // /api/tts is now a public endpoint — guests access the Charon voice via
+  // the shared 15-min/day IP trial window (see services/trialQuota.js).
+  // Adrian: "in mod free nu se aplica vocile". The old hard-401 is gone;
+  // we assert only that the request is no longer rejected for auth reasons.
+  // Acceptable: 200 (synthesis ok), 400 (body), 429 (trial exhausted),
+  // 503 (no TTS provider), 500 (upstream provider key bad).
+  it('guests pass soft auth (no 401)',                async () => { const s=(await request(app).post('/api/tts').send({text:'hello'})).status; expect(s).not.toBe(401); expect([200,400,429,500,503]).toContain(s); });
   it('400 empty text',                                async () => { const {token}=await createUser(); expect((await request(app).post('/api/tts').set('Authorization',`Bearer ${token}`).send({text:''})).status).toBe(400); });
   it('400 missing text',                              async () => { const {token}=await createUser(); expect((await request(app).post('/api/tts').set('Authorization',`Bearer ${token}`).send({})).status).toBe(400); });
   it('400 text over 2000 chars',                      async () => { const {token}=await createUser(); expect((await request(app).post('/api/tts').set('Authorization',`Bearer ${token}`).send({text:'a'.repeat(2001)})).status).toBe(400); });

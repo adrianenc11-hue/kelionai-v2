@@ -10,6 +10,9 @@
 const { Router } = require('express');
 const jwt = require('jsonwebtoken');
 const config = require('../config');
+const { executeRealTool, REAL_TOOL_NAMES } = require('../services/realTools');
+const { logAction } = require('../db');
+const { summarizeResultForHistory } = require('../services/actionHistorySummarizer');
 
 const router = Router();
 
@@ -200,6 +203,65 @@ router.post('/mcp/files', async (req, res) => {
   }
   if (!process.env.MCP_ENABLED) return res.status(200).json(mcpUnavailable('your files'));
   return res.status(200).json({ ok: false, error: 'MCP files not configured yet.' });
+});
+
+// ─── Real-tool proxy (shared server-side executor) ────────────────
+// Voice sessions (Gemini Live + OpenAI Realtime) emit tool calls on the
+// client; src/lib/kelionTools.js runTool() proxies unknown names here so
+// they run inside our trust boundary with the same executor the text
+// chat route already uses. Rate-limited per IP to stop a runaway session
+// from burning free-tier quotas on Open-Meteo / Nominatim / etc.
+router.post('/execute', async (req, res) => {
+  const ip = req.ip || 'anon';
+  if (!rateOk(`real:${ip}`, 120, 60_000)) {
+    return res.status(429).json({ ok: false, error: 'Slow down — too many tool calls in the last minute.' });
+  }
+  const name = typeof req.body?.name === 'string' ? req.body.name : '';
+  const args = req.body?.args && typeof req.body.args === 'object' ? req.body.args : {};
+  if (!name) return res.status(400).json({ ok: false, error: 'missing tool name' });
+  if (!REAL_TOOL_NAMES.includes(name)) {
+    return res.status(200).json({ ok: false, unavailable: true, error: `Tool "${name}" is not available on this build.` });
+  }
+  try {
+    // PR C adds user-intern tools (`get_my_credits`, `get_my_usage`,
+    // `get_my_profile`) that need the caller identity. They return a
+    // "sign in first" message when the ctx is absent, so this peek
+    // never fails the request — it only enriches it.
+    const user = await peekUser(req);
+    const ctx = user ? { user } : undefined;
+    const startedAt = Date.now();
+    const result = await executeRealTool(name, args, ctx);
+    const durationMs = Date.now() - startedAt;
+    if (result == null) {
+      return res.status(200).json({ ok: false, unavailable: true, error: `Tool "${name}" has no executor.` });
+    }
+    // PR #8/N — Memory of Actions. Record the tool call for signed-in
+    // users so Kelion's `get_action_history` can answer "did you
+    // already do X?" without re-running the tool. The summarizer only
+    // sees the OUTPUT; args sanitisation lives inside logAction().
+    // Writes are best-effort and the helper already swallows errors —
+    // but we also await a fire-and-forget wrapper here so an unexpected
+    // synchronous throw can never bubble up and 500 the live request.
+    if (user?.id) {
+      const sessionId = typeof req.body?.session_id === 'string' ? req.body.session_id : null;
+      const resultSummary = summarizeResultForHistory(name, result);
+      Promise.resolve()
+        .then(() => logAction({
+          userId: user.id,
+          sessionId,
+          toolName: name,
+          args,
+          resultSummary,
+          ok: result?.ok !== false,
+          durationMs,
+        }))
+        .catch(() => { /* logAction already logs internally when NODE_ENV != 'test' */ });
+    }
+    return res.status(200).json(result);
+  } catch (err) {
+    console.error('[tools/execute]', name, err?.message);
+    return res.status(200).json({ ok: false, error: 'Tool execution failed.' });
+  }
 });
 
 // Introspection — which tools are actually usable on this instance.

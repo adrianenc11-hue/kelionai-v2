@@ -175,5 +175,7 @@ function getPlans() {
 module.exports = {
   checkSubscription,
   getPlans,
+  isAdminEmail,
+  getAdminEmails,
   SUBSCRIPTION_PLANS,
 };

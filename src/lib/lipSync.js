@@ -177,3 +177,135 @@ export function useLipSync(audioRef) {
 
   return mouthOpen
 }
+
+// Lip-sync driver for an HTMLAudioElement playing an arbitrary blob/URL
+// (used by the text-chat TTS path, where the reply is fetched from /api/tts
+// as an `audio/mpeg` blob and played through `new Audio(blobUrl)`). The
+// realtime-voice `useLipSync` above wires a MediaStream through
+// `createMediaStreamSource`, but that path doesn't exist for <audio> fed
+// from a blob — we need `createMediaElementSource` instead.
+//
+// Returns `{ mouthOpen, attach(audioEl), reset() }`:
+//   * `mouthOpen` is the smoothed 0..1 envelope, same shape as useLipSync
+//     so the same jaw/morph scaling in KelionStage reads correctly.
+//   * `attach(audioEl)` hooks a fresh <audio> into the analyzer once it
+//     starts playing. Call on `audio.onplay`. Each element can only be
+//     attached once per AudioContext — we cache the source node per
+//     element to avoid the InvalidStateError from a second createSource
+//     on the same element.
+//   * `reset()` zeroes the envelope (call on pause/ended/error so the
+//     mouth snaps shut cleanly).
+//
+// Falls back to a silent envelope (`mouthOpen` stays 0) if the AudioContext
+// can't be created (Safari autoplay policy, older browsers) — the caller
+// is expected to apply its own cosine fallback in that case. We intentionally
+// don't animate a fake cosine here because the whole point of this hook is
+// to avoid the 4 Hz "lip-flap" that doesn't track consonants or pauses.
+export function useAudioElementLipSync() {
+  const [mouthOpen, setMouthOpen] = useState(0)
+  const ctxRef = useRef(null)
+  const analyzerRef = useRef(null)
+  const animationRef = useRef(null)
+  const envelopeRef = useRef(0)
+  const peakRef = useRef(PEAK_FLOOR)
+  // createMediaElementSource throws InvalidStateError if called twice on
+  // the same element in the same context. Cache per-element so re-attach
+  // (e.g. user clicks replay) reuses the existing source node.
+  const sourceCacheRef = useRef(new WeakMap())
+
+  const stopLoop = useCallback(() => {
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current)
+      animationRef.current = null
+    }
+  }, [])
+
+  const reset = useCallback(() => {
+    stopLoop()
+    envelopeRef.current = 0
+    setMouthOpen(0)
+  }, [stopLoop])
+
+  const attach = useCallback((audioEl) => {
+    if (!audioEl) return
+    // Lazy-create the shared context on the first attach (same pattern as
+    // useLipSync — user gesture has already happened by now because the
+    // message was typed & submitted).
+    if (!ctxRef.current) {
+      try {
+        ctxRef.current = new (window.AudioContext || window.webkitAudioContext)()
+      } catch {
+        return // no analyzer possible; envelope stays at 0
+      }
+    }
+    const ctx = ctxRef.current
+    if (ctx.state === 'suspended') {
+      try { ctx.resume() } catch { /* ignore — will retry on next attach */ }
+    }
+
+    let source = sourceCacheRef.current.get(audioEl)
+    if (!source) {
+      try {
+        source = ctx.createMediaElementSource(audioEl)
+      } catch {
+        return // element already bound to another context; skip analyser
+      }
+      sourceCacheRef.current.set(audioEl, source)
+    }
+    const analyzer = ctx.createAnalyser()
+    analyzer.fftSize = 1024
+    analyzer.smoothingTimeConstant = 0.15
+    analyzerRef.current = analyzer
+    try {
+      source.connect(analyzer)
+      // MUST also connect the source to destination, otherwise
+      // createMediaElementSource swallows the audio and nothing plays.
+      source.connect(ctx.destination)
+    } catch {
+      return
+    }
+
+    const binHz = ctx.sampleRate / analyzer.fftSize
+    const loBin = Math.max(1, Math.floor(SPEECH_LO_HZ / binHz))
+    const hiBin = Math.min(analyzer.frequencyBinCount - 1, Math.ceil(SPEECH_HI_HZ / binHz))
+    const data = new Uint8Array(analyzer.frequencyBinCount)
+
+    stopLoop()
+    const update = () => {
+      if (!analyzerRef.current) return
+      analyzerRef.current.getByteFrequencyData(data)
+
+      const formantW = TUNING.lipFormantWeight
+      let sum = 0
+      let weight = 0
+      for (let i = loBin; i <= hiBin; i++) {
+        const hz = i * binHz
+        const w = hz >= FORMANT_LO_HZ && hz <= FORMANT_HI_HZ ? formantW : 1
+        sum += data[i] * w
+        weight += w
+      }
+      const avg = weight > 0 ? sum / weight : 0
+
+      peakRef.current = Math.max(peakRef.current * TUNING.lipPeakDecay, avg, PEAK_FLOOR)
+      const raw = Math.min(1, avg / peakRef.current)
+
+      const prev = envelopeRef.current
+      const k = raw > prev ? TUNING.lipAttack : TUNING.lipRelease
+      const env = prev + (raw - prev) * k
+      envelopeRef.current = env
+      setMouthOpen(env)
+      animationRef.current = requestAnimationFrame(update)
+    }
+    update()
+  }, [stopLoop])
+
+  useEffect(() => () => {
+    stopLoop()
+    analyzerRef.current = null
+    // We intentionally leave the AudioContext alive — it's shared across
+    // every text-chat TTS turn and closing/reopening per message would add
+    // latency and risk exceeding the browser's max-open-contexts limit.
+  }, [stopLoop])
+
+  return { mouthOpen, attach, reset }
+}
