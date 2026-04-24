@@ -28,7 +28,11 @@ const state = {
 // Maps/Wikipedia/LoremFlickr embeds which don't serve CORP. So we render
 // these hosts as an external "Open in new tab" card instead of a broken
 // iframe. The host list is a small allowlist updated as we learn.
-const EXTERNAL_ONLY_HOSTS = new Set([
+// Exported so the renderer (`externalCardCopy` in KelionStage.jsx) can pick
+// the cross-origin-isolation card copy for the same hosts we route through
+// the external card. Keeping the list in one place avoids a silent drift
+// between routing and display when a new WebVM-style host is added.
+export const EXTERNAL_ONLY_HOSTS = new Set([
   // Require cross-origin isolation (SAB)
   'webvm.io',
   'www.webvm.io',
