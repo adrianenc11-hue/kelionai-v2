@@ -26,10 +26,23 @@ const {
   createClonedVoice,
   deleteClonedVoice,
   VoiceCloneError,
+  MAX_SAMPLE_BYTES,
 } = require('../services/voiceClone');
 const ipGeo = require('../services/ipGeo');
 
 const router = Router();
+
+// Audit M5 — hard cap on the base64 payload BEFORE we allocate a
+// Buffer. ElevenLabs Instant Voice Cloning caps at ~10 MB of decoded
+// audio; 4 base64 chars encode 3 bytes, so the decoded length is at
+// most ceil(len/4) * 3. We floor the allowed base64 length at the
+// value that maps to 10 MB of audio, plus a small slack for `data:`
+// URI prefix overhead. Without this check a tampered client could
+// ship ~15 MB of base64 (allowed by the express JSON body limit) and
+// we would decode it into a Buffer before ever validating the size,
+// briefly doubling peak memory for no reason. Refusing the string
+// here keeps peak RSS flat for pathological callers.
+const MAX_AUDIO_BASE64_CHARS = Math.ceil(MAX_SAMPLE_BYTES / 3) * 4 + 64;
 
 // Bump this string any time the consent copy in the UI materially
 // changes (adds a new use, changes retention, etc). Stored on every
@@ -52,6 +65,15 @@ function decodeAudio(body) {
       400
     );
   }
+  // Audit M5 — refuse oversized payloads BEFORE decoding. This
+  // short-circuits the expensive Buffer.from call and prevents a
+  // transient allocation spike on tampered clients.
+  if (audioBase64.length > MAX_AUDIO_BASE64_CHARS) {
+    throw new VoiceCloneError(
+      `Audio payload too large (${audioBase64.length} base64 chars). Max ${MAX_AUDIO_BASE64_CHARS}.`,
+      413
+    );
+  }
   // Accept both raw base64 and `data:audio/webm;base64,...` URIs.
   let b64 = audioBase64;
   let mt = mimeType || null;
@@ -65,6 +87,17 @@ function decodeAudio(body) {
     buffer = Buffer.from(b64, 'base64');
   } catch (_) {
     throw new VoiceCloneError('Invalid base64 audio payload.', 400);
+  }
+  // Audit M5 — second line of defence: even if the base64 was short
+  // enough to pass the char cap, the decoded buffer MUST respect the
+  // service-level MAX_SAMPLE_BYTES (the ElevenLabs ceiling). Without
+  // this the subsequent `validateSample` in services/voiceClone.js
+  // only runs once the buffer is already live in memory.
+  if (buffer.length > MAX_SAMPLE_BYTES) {
+    throw new VoiceCloneError(
+      `Audio sample too large (${buffer.length} bytes). Max ${MAX_SAMPLE_BYTES}.`,
+      413
+    );
   }
   return { buffer, mimeType: mt || 'audio/webm' };
 }
@@ -261,3 +294,7 @@ router.patch('/', async (req, res) => {
 
 module.exports = router;
 module.exports.CONSENT_VERSION = CONSENT_VERSION;
+// Audit M5 — exported for direct unit coverage of the byte caps.
+module.exports.decodeAudio = decodeAudio;
+module.exports.MAX_AUDIO_BASE64_CHARS = MAX_AUDIO_BASE64_CHARS;
+module.exports.MAX_SAMPLE_BYTES = MAX_SAMPLE_BYTES;
