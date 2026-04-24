@@ -96,6 +96,11 @@ const EXPECTED_TOOL_NAMES = [
   // F11 — AI image generation (OpenAI gpt-image-1). Graceful fallback when
   // OPENAI_API_KEY is absent.
   'generate_image',
+  // PR #7/N — Planner Brain. Routes a user goal to Gemini 2.5 Flash and
+  // returns a short JSON action plan so Kelion thinks before it acts on
+  // compound / multi-step requests. Degrades gracefully when
+  // GEMINI_API_KEY is absent (returns { ok:false, unavailable:true }).
+  'plan_task',
 ];
 
 describe('Kelion tool catalog', () => {

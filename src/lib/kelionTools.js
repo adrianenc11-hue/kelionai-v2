@@ -58,6 +58,11 @@ const REAL_TOOL_NAMES = new Set([
   // Groq-powered (opt-in). The server returns a graceful "not configured"
   // message when GROQ_API_KEY is absent, so the voice UX never breaks.
   'solve_problem', 'code_review', 'explain_code',
+  // PR 7/N — Planner Brain. Kelion calls this on compound/multi-step
+  // asks to get a short numbered plan from Gemini Flash before it
+  // starts executing real tools. Server returns a clean JSON plan;
+  // summarizeRealTool shapes it for the voice model below.
+  'plan_task',
   // F11 — `generate_image` is handled specially in the runTool switch
   // below so we can side-effect the monitor; it isn't in this set.
 ])
@@ -145,6 +150,23 @@ function summarizeRealTool(name, j) {
     // Groq completions are already structured; keep them mostly intact but
     // cap so we don't blow past the voice model's context on the read-back.
     return String(j.result).slice(0, 4000)
+  }
+  if (name === 'plan_task' && Array.isArray(j.steps)) {
+    // Condense the planner's structured JSON into a compact speakable form
+    // the voice model can read and then walk through. We keep tool_hint
+    // inline so the model knows which tool each step should call. A final
+    // "Cautions" line surfaces anything the planner flagged as requiring
+    // user confirmation (spending, messaging, destructive actions).
+    const header = j.summary ? `Plan: ${j.summary}` : 'Plan:'
+    const body = j.steps.map((s) => {
+      const hint = s.tool_hint ? ` [${s.tool_hint}]` : ''
+      const why = s.why ? ` — ${s.why}` : ''
+      return `${s.n}. ${s.action}${hint}${why}`
+    }).join('\n')
+    const cautions = Array.isArray(j.cautions) && j.cautions.length
+      ? `\nCautions: ${j.cautions.join('; ')}`
+      : ''
+    return `${header}\n${body}${cautions}`.slice(0, 4000)
   }
   // Generic fallback — stringify but cap so the model never chokes.
   try {
