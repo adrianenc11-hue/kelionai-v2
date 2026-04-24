@@ -73,6 +73,20 @@ function serializeRejection(reason) {
 }
 
 /**
+ * PR #182 follow-up — true when an `ErrorEvent` carries at least one
+ * piece of location detail (filename, lineno, colno). Used by the
+ * `onError` filter to let rare-but-actionable "Script error." events
+ * through while still dropping the opaque cross-origin shape.
+ */
+function hasLocationDetail(ev) {
+  if (!ev) return false;
+  const hasFile = typeof ev.filename === 'string' && ev.filename.trim() !== '';
+  const hasLine = Number.isFinite(ev.lineno) && ev.lineno > 0;
+  const hasCol = Number.isFinite(ev.colno) && ev.colno > 0;
+  return hasFile || hasLine || hasCol;
+}
+
+/**
  * Builds a body from an `ErrorEvent` (window.onerror).
  */
 function serializeErrorEvent(ev) {
@@ -133,7 +147,14 @@ export function installErrorReporter(opts = {}) {
   const rateLimit = Number.isFinite(opts.rateLimit) && opts.rateLimit >= 0
     ? opts.rateLimit
     : DEFAULT_RATE_LIMIT;
-  const rateWindowMs = Number.isFinite(opts.rateWindowMs) && opts.rateWindowMs >= 0
+  // PR #182 follow-up — a sliding-window limiter requires a STRICTLY
+  // positive window: `rateWindowMs: 0` would make the cleanup loop
+  // (recent[0] <= t - 0 === recent[0] <= t) evict every prior
+  // timestamp on each call, silently disabling rate limiting. Only
+  // `rateLimit: 0` should be the intentional block-all kill-switch;
+  // `rateWindowMs: 0` is a mis-configuration and falls back to the
+  // default (same treatment as NaN / Infinity / negative).
+  const rateWindowMs = Number.isFinite(opts.rateWindowMs) && opts.rateWindowMs > 0
     ? opts.rateWindowMs
     : DEFAULT_RATE_WINDOW_MS;
   const dedupMs = opts.dedupMs != null ? opts.dedupMs : DEFAULT_DEDUP_MS;
@@ -241,12 +262,19 @@ export function installErrorReporter(opts = {}) {
     // with a missing .error and no message. Cross-origin script errors
     // surface as ev.message === 'Script error.' with ev.error == null
     // and no filename/line/column (the browser strips the detail for
-    // same-origin-policy reasons) — neither shape is actionable, so
-    // skip both. See PR #180 Devin Review follow-up.
+    // same-origin-policy reasons) — neither shape is actionable.
+    //
+    // PR #182 follow-up — only drop "Script error." when it is the
+    // opaque cross-origin shape (no filename / lineno / colno). A few
+    // browsers / extensions occasionally deliver `ev.message === 'Script
+    // error.'` with location detail populated; those are rare but
+    // actionable, so don't over-filter.
     if (!ev) return;
     if (ev.error == null && !ev.message) return;
-    if (ev.error == null && typeof ev.message === 'string'
-        && /^script error\.?$/i.test(ev.message)) return;
+    if (ev.error == null
+        && typeof ev.message === 'string'
+        && /^script error\.?$/i.test(ev.message)
+        && !hasLocationDetail(ev)) return;
     maybeReport('error', serializeErrorEvent(ev));
   };
 
