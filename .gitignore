@@ -43,6 +43,11 @@ data/
 *.env.backup.*
 server/.env.backup.*
 
+# Electron desktop builds
+desktop/node_modules/
+desktop/release/
+desktop/dist/
+
 # Capacitor / native builds
 android/app/build/
 android/build/

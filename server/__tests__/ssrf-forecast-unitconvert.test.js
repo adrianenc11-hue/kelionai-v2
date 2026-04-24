@@ -1,0 +1,205 @@
+'use strict';
+
+/**
+ * Tests for the follow-up to PRs #134 / #135 Devin Review findings:
+ *  - fetch_url / rss_read no longer allow http:// or private-IP SSRF
+ *  - get_forecast actually returns up to 16 days (not silently 7)
+ *  - unit_convert accepts degF/degC/degK and GB/MB aliases
+ *
+ * We stub globalThis.fetch so no real network call happens.
+ */
+
+const realTools = require('../src/services/realTools');
+
+const FETCH_CALLS = [];
+
+beforeEach(() => {
+  FETCH_CALLS.length = 0;
+  global.fetch = jest.fn(async (url) => {
+    FETCH_CALLS.push(String(url));
+    return {
+      ok: true,
+      status: 200,
+      headers: { get: () => 'application/json' },
+      text: async () => '{}',
+      json: async () => ({
+        daily: { time: Array.from({ length: 16 }, (_, i) => `d${i}`) },
+        current_units: {},
+        daily_units: {},
+      }),
+    };
+  });
+});
+
+afterEach(() => {
+  delete global.fetch;
+});
+
+describe('SSRF guard on fetch_url', () => {
+  test('rejects http:// even if the host is public', async () => {
+    const r = await realTools.toolFetchUrl({ url: 'http://example.com/' });
+    expect(r.ok).toBe(false);
+    expect(String(r.error)).toMatch(/https/);
+    expect(FETCH_CALLS).toHaveLength(0);
+  });
+
+  test('rejects cloud metadata IP', async () => {
+    const r = await realTools.toolFetchUrl({ url: 'https://169.254.169.254/latest/meta-data/' });
+    expect(r.ok).toBe(false);
+    expect(String(r.error)).toMatch(/private IP/);
+    expect(FETCH_CALLS).toHaveLength(0);
+  });
+
+  test('rejects loopback', async () => {
+    const r = await realTools.toolFetchUrl({ url: 'https://127.0.0.1:8080/admin' });
+    expect(r.ok).toBe(false);
+    expect(String(r.error)).toMatch(/private IP/);
+    expect(FETCH_CALLS).toHaveLength(0);
+  });
+
+  test('rejects 10/8', async () => {
+    const r = await realTools.toolFetchUrl({ url: 'https://10.0.0.5/' });
+    expect(r.ok).toBe(false);
+    expect(String(r.error)).toMatch(/private IP/);
+  });
+
+  test('rejects 192.168/16', async () => {
+    const r = await realTools.toolFetchUrl({ url: 'https://192.168.1.1/' });
+    expect(r.ok).toBe(false);
+  });
+
+  test('rejects 172.16/12', async () => {
+    const r = await realTools.toolFetchUrl({ url: 'https://172.20.10.5/' });
+    expect(r.ok).toBe(false);
+  });
+
+  test('rejects localhost hostname', async () => {
+    const r = await realTools.toolFetchUrl({ url: 'https://localhost/' });
+    expect(r.ok).toBe(false);
+    expect(String(r.error)).toMatch(/private host/);
+  });
+
+  test('rejects metadata.google.internal', async () => {
+    const r = await realTools.toolFetchUrl({ url: 'https://metadata.google.internal/computeMetadata/v1/' });
+    expect(r.ok).toBe(false);
+    expect(String(r.error)).toMatch(/private host/);
+  });
+
+  test('rejects IPv6 loopback', async () => {
+    const r = await realTools.toolFetchUrl({ url: 'https://[::1]/' });
+    expect(r.ok).toBe(false);
+  });
+
+  test('rejects IPv4-mapped IPv6 pointing at private range', async () => {
+    // Node's URL parser normalises ::ffff:127.0.0.1 to ::ffff:7f00:1.
+    // The guard must convert the hex pair back to a dotted quad and
+    // recognise 127.0.0.1 as private.
+    const r = await realTools.toolFetchUrl({ url: 'https://[::ffff:127.0.0.1]/' });
+    expect(r.ok).toBe(false);
+    expect(FETCH_CALLS).toHaveLength(0);
+  });
+
+  test('rejects fe80::/10 link-local across fe80-febf (not only fe80)', async () => {
+    // Regression guard: the original `startsWith('fe80')` check only caught
+    // fe80:: but missed fea0::, fe91::, febf::, all of which are in the
+    // same /10 link-local block. An attacker could have used e.g.
+    // https://[fea0::1]/ to reach link-local hosts.
+    for (const host of ['fe80::1', 'fe91::1', 'fea0::1', 'febf::1']) {
+      const r = await realTools.toolFetchUrl({ url: `https://[${host}]/` });
+      expect(r.ok).toBe(false);
+      expect(String(r.error)).toMatch(/private IP/);
+    }
+    expect(FETCH_CALLS).toHaveLength(0);
+  });
+
+  test('rejects IPv6 multicast ff00::/8 and deprecated site-local fec0::/10 (defense-in-depth)', async () => {
+    // Not reachable via HTTP in practice (multicast is UDP-only, site-local
+    // is deprecated), but blocking them closes the classification gap so
+    // the SSRF guard has explicit coverage of every non-global IPv6 range.
+    for (const host of ['ff02::1', 'ff05::1:3', 'fec0::1', 'fedf::1']) {
+      const r = await realTools.toolFetchUrl({ url: `https://[${host}]/` });
+      expect(r.ok).toBe(false);
+      expect(String(r.error)).toMatch(/private IP/);
+    }
+    expect(FETCH_CALLS).toHaveLength(0);
+  });
+
+  test('allows IPv4-mapped IPv6 pointing at a public address', async () => {
+    // Regression guard for the Devin Review finding: before the fix
+    // isPrivateIPv6 blanket-blocked every ::ffff:* host because
+    // isPrivateIPv4 was called with a hex pair instead of dotted quad.
+    const r = await realTools.toolFetchUrl({ url: 'https://[::ffff:8.8.8.8]/' });
+    // We don't care about the fetch outcome here (the stub returns ok),
+    // only that the SSRF guard didn't reject before the network call.
+    expect(r.ok).toBe(true);
+    expect(FETCH_CALLS.length).toBeGreaterThan(0);
+  });
+});
+
+describe('SSRF guard on rss_read', () => {
+  test('rejects http:// feeds', async () => {
+    const r = await realTools.toolRssRead({ url: 'http://example.com/feed.xml' });
+    expect(r.ok).toBe(false);
+    expect(FETCH_CALLS).toHaveLength(0);
+  });
+
+  test('rejects private-IP feeds', async () => {
+    const r = await realTools.toolRssRead({ url: 'https://127.0.0.1/feed' });
+    expect(r.ok).toBe(false);
+  });
+});
+
+describe('get_forecast respects the 16-day ceiling', () => {
+  test('passes forecast_days=14 through to Open-Meteo when days=14', async () => {
+    await realTools.toolGetForecast({ lat: 46.77, lon: 23.6, days: 14 });
+    expect(FETCH_CALLS.length).toBeGreaterThan(0);
+    const last = FETCH_CALLS[FETCH_CALLS.length - 1];
+    expect(last).toMatch(/forecast_days=14/);
+  });
+
+  test('caps at 16 when caller asks for more', async () => {
+    await realTools.toolGetForecast({ lat: 46.77, lon: 23.6, days: 25 });
+    const last = FETCH_CALLS[FETCH_CALLS.length - 1];
+    expect(last).toMatch(/forecast_days=16/);
+  });
+
+  test('get_weather still clamps to 7 by default (unchanged contract)', async () => {
+    await realTools.toolGetWeather({ lat: 46.77, lon: 23.6, days: 14 });
+    const last = FETCH_CALLS[FETCH_CALLS.length - 1];
+    expect(last).toMatch(/forecast_days=7/);
+  });
+});
+
+describe('unit_convert aliases', () => {
+  test('degF → degC works (was: unknown unit "degf")', () => {
+    const r = realTools.toolUnitConvert({ value: 100, from: 'degF', to: 'degC' });
+    expect(r.ok).toBe(true);
+    expect(r.category).toBe('temperature');
+    expect(Math.round(r.result)).toBe(38);
+  });
+
+  test('degC → K works', () => {
+    const r = realTools.toolUnitConvert({ value: 0, from: 'degC', to: 'K' });
+    expect(r.ok).toBe(true);
+    expect(Math.round(r.result)).toBe(273);
+  });
+
+  test('GB → MB works (was: unknown unit "gb")', () => {
+    const r = realTools.toolUnitConvert({ value: 2, from: 'GB', to: 'MB' });
+    expect(r.ok).toBe(true);
+    expect(r.category).toBe('data');
+    expect(r.result).toBe(2000);
+  });
+
+  test('GiB → MiB works (binary)', () => {
+    const r = realTools.toolUnitConvert({ value: 1, from: 'GiB', to: 'MiB' });
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe(1024);
+  });
+
+  test('°F still works (degree symbol)', () => {
+    const r = realTools.toolUnitConvert({ value: 32, from: '°F', to: '°C' });
+    expect(r.ok).toBe(true);
+    expect(Math.round(r.result)).toBe(0);
+  });
+});

@@ -85,8 +85,17 @@ module.exports = {
     apiKey:       optional('GEMINI_API_KEY'),
     chatModel:    optional('GEMINI_CHAT_MODEL', 'gemini-3-flash-preview'),
     // Keep this default in sync with server/src/routes/realtime.js — both
-    // read GEMINI_LIVE_MODEL directly, so the fallbacks must match. See
-    // that file for the current list of valid Google Live model names.
+    // read GEMINI_LIVE_MODEL directly, so the fallbacks must match.
+    //
+    // We tried `gemini-2.0-flash-live-001` in #112 to escape the preview
+    // protocol drift, but Google's v1main bidiGenerateContent rejected it
+    // with 1008 "models/gemini-2.0-flash-live-001 is not found for API
+    // version v1main, or is not supported for bidiGenerateContent" — that
+    // exact model id does not exist on v1main Live. Reverting to the
+    // preview that at least opens the session (`gemini-3.1-flash-live-
+    // preview`) so admin can talk to Kelion again while we swap the
+    // transport to OpenAI Realtime (plan C) for real stability.
+    // Override via Railway env GEMINI_LIVE_MODEL.
     liveModel:    optional('GEMINI_LIVE_MODEL', 'gemini-3.1-flash-live-preview'),
     ttsModel:     optional('GEMINI_TTS_MODEL', 'gemini-3.1-flash-tts-preview'),
     ttsVoiceKelion: optional('GEMINI_TTS_VOICE_KELION', 'Kore'),

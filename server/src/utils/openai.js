@@ -2,14 +2,22 @@
 
 /**
  * Singleton AI client.
- * Prefers Gemini when GEMINI_API_KEY is present, otherwise falls back to OpenAI.
- * Gemini exposes an OpenAI-compatible chat/completions endpoint, so the same
- * `openai` SDK is reused against Gemini's base URL.
+ *
+ * Priority: prefer OpenAI when OPENAI_API_KEY is present, fall back to Gemini.
+ * Rationale: the voice path (OpenAI Realtime) is always OpenAI, so when the
+ * text path also runs on OpenAI the two transports share the same persona,
+ * the same tool-calling semantics (Gemini-via-OpenAI-compat silently drops
+ * `tool_calls` chunks on streaming completions, which made "show me the
+ * map" return an empty `[DONE]`), and the user hears a single consistent
+ * Kelion instead of two different voices / writing styles.
+ *
+ * To force Gemini explicitly (e.g. on a pure-Gemini deployment), set
+ * `AI_PROVIDER=gemini`.
  *
  * Env (priority order):
- *   GEMINI_API_KEY    → use Gemini via OpenAI-compat endpoint
- *   OPENAI_API_KEY    → use OpenAI
- *   AI_API_KEY        → generic fallback for either, behaves like OpenAI
+ *   AI_PROVIDER=openai|gemini  → hard override
+ *   OPENAI_API_KEY / AI_API_KEY → use OpenAI (default when both keys exist)
+ *   GEMINI_API_KEY             → use Gemini via OpenAI-compat endpoint
  */
 let _client = null;
 let _provider = null;
@@ -23,9 +31,12 @@ function getAI() {
 
   const geminiKey = process.env.GEMINI_API_KEY;
   const openaiKey = process.env.OPENAI_API_KEY || process.env.AI_API_KEY;
+  const override  = (process.env.AI_PROVIDER || '').toLowerCase();
 
   const OpenAI = require('openai');
-  if (geminiKey) {
+
+  const preferGemini = override === 'gemini' || (!openaiKey && geminiKey);
+  if (preferGemini && geminiKey) {
     _client = new OpenAI({ apiKey: geminiKey, baseURL: GEMINI_BASE_URL });
     _provider = 'gemini';
     return _client;
@@ -33,6 +44,11 @@ function getAI() {
   if (openaiKey) {
     _client = new OpenAI({ apiKey: openaiKey });
     _provider = 'openai';
+    return _client;
+  }
+  if (geminiKey) {
+    _client = new OpenAI({ apiKey: geminiKey, baseURL: GEMINI_BASE_URL });
+    _provider = 'gemini';
     return _client;
   }
   return null;

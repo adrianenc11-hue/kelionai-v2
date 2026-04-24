@@ -1,18 +1,25 @@
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { useGLTF, Environment, ContactShadows, Float, Html } from '@react-three/drei'
+import { useGLTF, Environment, ContactShadows, Float } from '@react-three/drei'
 import { Suspense, useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import * as THREE from 'three'
-import { useLipSync } from '../lib/lipSync'
-import { subscribeMonitor } from '../lib/monitorStore'
+import { useLipSync, useAudioElementLipSync } from '../lib/lipSync'
+import { subscribeMonitor, handleShowOnMonitor, setMonitorGeoProvider } from '../lib/monitorStore'
+import { setClientGeoProvider } from '../lib/clientGeoProvider'
+import { setUIActionController } from '../lib/uiActionStore'
+import UIActionToast from '../components/UIActionToast'
 import { STATUS_COLORS, STATUS_PULSE_HZ } from '../lib/kelionStatus'
 import { useGeminiLive } from '../lib/geminiLive'
+import { useOpenAIRealtime } from '../lib/openaiRealtime'
+import { decideHandoff } from '../lib/handoffGuard'
 import { useWakeWord } from '../lib/useWakeWord'
 import { useTrial } from '../lib/useTrial'
 import { useClientGeo } from '../lib/useClientGeo'
 import { TUNING, isTuningEnabled } from '../lib/tuning'
 import TuningPanel from '../components/TuningPanel'
 import SignInModal from '../components/SignInModal'
+import VoiceCloneModal from '../components/VoiceCloneModal'
+import { getCsrfToken } from '../lib/api'
 import {
   supportsPasskey,
   registerPasskey,
@@ -25,6 +32,17 @@ import {
   extractAndStore,
   forgetAllMemory,
 } from '../lib/memoryClient'
+import {
+  configureConversationStore,
+  resetSessionExpiredLatch,
+  appendMessage as appendConversationMessage,
+  listConversations as listConversationsApi,
+  loadConversation as loadConversationApi,
+  deleteConversation as deleteConversationApi,
+  startNewConversation,
+  getActiveConversationId,
+  setActiveConversationId,
+} from '../lib/conversationStore'
 import {
   pushSupported,
   getPushStatus,
@@ -46,7 +64,7 @@ async function setVoiceStyle(style) {
     const r = await fetch('/api/realtime/voice-style', {
       method: 'POST',
       credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
       body: JSON.stringify({ style }),
     })
     const j = await r.json().catch(() => ({}))
@@ -459,78 +477,335 @@ function useNYCSkylineTexture() {
   }, [])
 }
 
-// StageMonitorContent — renders whatever `monitorStore` currently holds onto
-// the inner-screen plane of the presentation monitor. drei's <Html transform>
-// projects a real DOM subtree onto the 3D plane with correct perspective, so
-// users see an actual live iframe / image from the AI's vantage. Kelion calls
-// the `show_on_monitor` Gemini tool → monitorStore updates → this component
-// re-renders with the new URL.
-function StageMonitorContent() {
-  // Idle default — identical shape to what monitorStore keeps internally.
-  // We import only `subscribeMonitor` (not `getMonitorState`) and rely on
-  // the store invoking the listener immediately on subscribe to catch any
-  // state that was set before this component mounted. Keeps the surface
-  // minimal and avoids cross-chunk reads at render time.
-  const [m, setM] = useState({ kind: null, src: null, title: null, embedType: 'iframe', updatedAt: 0 })
-  useEffect(() => subscribeMonitor((s) => setM({ ...s })), [])
+// Pick the right copy for the external "Open in new tab" card based on
+// what the monitor is trying to show. Before this helper existed every
+// external fallback (video, blocked-by-XFO hosts, linux-in-browser)
+// rendered the WebVM-specific "This Linux-in-the-browser requires
+// cross-origin isolation" message — users saw that line on a Mr. Bean
+// YouTube card and (rightly) asked what it had to do with anything.
+// Four distinct cases:
+//   - kind='video'                      → YouTube/search card
+//   - WebVM / CheerpX / JSLinux hosts   → cross-origin-isolation card
+//   - kind='web' | everything else that  → generic "site blocks embed"
+//     hits `embedType: 'external'`         card
+export function externalCardCopy(m) {
+  const title = (m && m.title) || 'External app'
+  const src = (m && m.src) || ''
+  let host = ''
+  try { host = new URL(src).hostname.toLowerCase() } catch { /* ignore */ }
 
-  // Idle: faint grid + watermark, matches the previous static monitor look.
-  if (!m.src) {
-    return (
-      <>
-        {Array.from({ length: 6 }).map((_, i) => (
-          <mesh key={`mh-${i}`} position={[0, -0.75 + i * 0.3, 0.001]}>
-            <planeGeometry args={[2.9, 0.004]} />
-            <meshBasicMaterial color={'#1f1b3a'} toneMapped={false} opacity={0.4} transparent />
-          </mesh>
-        ))}
-        <mesh position={[0, 0, 0.002]}>
-          <circleGeometry args={[0.07, 32]} />
-          <meshBasicMaterial color={'#7c3aed'} toneMapped={false} opacity={0.55} transparent />
-        </mesh>
-      </>
-    )
+  // kind='video' never hits the WebVM hosts — it's always YouTube (or
+  // another video host we don't have a bespoke embed for yet). Phrase it
+  // as "open search results" because that's what the URL actually is on
+  // the free-text path (YouTube search page).
+  if (m && m.kind === 'video') {
+    return {
+      icon: '▶',
+      headline: title,
+      body: 'YouTube blocks the search embed, so the video can\'t play inline. Open the results page in a new tab to watch.',
+      ctaLabel: 'Open search results in new tab',
+    }
   }
 
-  // Active: project a DOM iframe / image onto the screen plane. We downscale
-  // the DOM with `distanceFactor` so 3.0 x 1.9 world units ≈ 960 x 600 px.
-  const isImage = m.embedType === 'image'
+  // WebVM / CheerpX / JSLinux / v86 — these *legitimately* need cross-
+  // origin isolation and we cannot render them in-app. Keep the specific
+  // explanation so the user knows this is a browser-platform limit.
+  const WEBVM_HOSTS = [
+    'webvm.io', 'www.webvm.io',
+    'copy.sh', 'www.copy.sh',
+    'bellard.org', 'www.bellard.org',
+  ]
+  if (WEBVM_HOSTS.includes(host)) {
+    return {
+      icon: '🖥️',
+      headline: `${title} needs its own tab`,
+      body: 'This Linux-in-the-browser requires cross-origin isolation that the embedded frame cannot provide. Open it in a new tab — files persist in your browser.',
+      ctaLabel: `Open ${title} in new tab`,
+    }
+  }
+
+  // Everything else that landed on the external card — usually sites
+  // that send `X-Frame-Options: DENY` (Google/Facebook/etc.) and would
+  // otherwise paint an empty gray box.
+  const hostLabel = host.replace(/^www\./, '') || title
+  return {
+    icon: '🔗',
+    headline: title,
+    body: `${hostLabel} blocks being embedded in another page, so it can\'t render here. Open it in a new tab to use it.`,
+    ctaLabel: `Open ${hostLabel} in new tab`,
+  }
+}
+
+// MonitorOverlay — half-page 2D panel that renders whatever `monitorStore`
+// currently holds. Anchored to the left 50vw of the viewport on desktop, or
+// as a bottom sheet (100vw × 55vh) on narrow screens so the avatar — which
+// sits on the right half of the stage — always stays visible and can keep
+// talking / listening while the content is on screen. Hidden entirely when
+// there is nothing to display.
+// Below this viewport width we flip the overlay to a bottom-sheet
+// layout. Previously this was 900px which flipped plenty of desktop
+// windows (split-screen, devtools docked) into the mobile layout
+// and the sheet could end up behind the chat composer. 640px keeps
+// the side-by-side layout on every realistic desktop workflow and
+// only drops to the bottom sheet on narrow phones / tablets.
+const MONITOR_NARROW_BREAKPOINT = 640
+
+// Iframe wrapper that detects silent CSP/X-Frame-Options blocks. If
+// `onload` never fires within `MONITOR_LOAD_TIMEOUT_MS`, we assume the
+// target refused the frame and call `onBlocked` so the parent can swap
+// in a fallback card. Also forwards real `onerror` events.
+const MONITOR_LOAD_TIMEOUT_MS = 6000
+
+function IframeWithFallback({ src, title, onBlocked }) {
+  const loadedRef = useRef(false)
+  useEffect(() => {
+    loadedRef.current = false
+    const timer = setTimeout(() => {
+      if (!loadedRef.current) {
+        try { onBlocked && onBlocked() } catch (_) {}
+      }
+    }, MONITOR_LOAD_TIMEOUT_MS)
+    return () => clearTimeout(timer)
+  }, [src, onBlocked])
   return (
-    <Html
-      transform
-      occlude={false}
-      position={[0, 0, 0.01]}
-      distanceFactor={1.2}
-      zIndexRange={[10, 0]}
-      pointerEvents="none"
+    <iframe
+      src={src}
+      title={title}
+      referrerPolicy="no-referrer"
+      sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation"
+      allow="fullscreen; geolocation; autoplay; encrypted-media"
+      onLoad={() => { loadedRef.current = true }}
+      onError={() => { try { onBlocked && onBlocked() } catch (_) {} }}
+      style={{ width: '100%', height: '100%', border: 'none', background: '#0d0b1d', display: 'block' }}
+    />
+  )
+}
+
+function MonitorOverlay() {
+  const [m, setM] = useState({ kind: null, src: null, title: null, embedType: 'iframe', updatedAt: 0 })
+  const [isNarrow, setIsNarrow] = useState(() => (
+    typeof window !== 'undefined' && window.innerWidth < MONITOR_NARROW_BREAKPOINT
+  ))
+  // Audit #5: iframes can be silently refused by the target's CSP /
+  // X-Frame-Options without firing onError. We start a load timer
+  // whenever `m.src` changes and, if `onLoad` hasn't fired within the
+  // budget, flip into a fallback card with "Open in new tab". Also
+  // shows the fallback if the iframe throws (rare, but some hosts
+  // emit `onError` for network-level blocks).
+  const [iframeBlocked, setIframeBlocked] = useState(false)
+
+  useEffect(() => subscribeMonitor((s) => setM({ ...s })), [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+    const onResize = () => setIsNarrow(window.innerWidth < MONITOR_NARROW_BREAKPOINT)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
+  // Reset the "blocked" flag every time the monitor payload changes.
+  useEffect(() => { setIframeBlocked(false) }, [m.src, m.updatedAt])
+
+  if (!m.src) return null
+
+  const isImage = m.embedType === 'image'
+  const isExternal = m.embedType === 'external'
+  const externalCopy = isExternal ? externalCardCopy(m) : null
+  const onClose = (e) => {
+    e.stopPropagation()
+    handleShowOnMonitor({ kind: 'clear' })
+  }
+
+  const desktopStyle = {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    width: '50vw',
+    height: '100vh',
+  }
+  // Mobile: top-sheet rather than bottom-sheet. The chat composer sits
+  // fixed at the bottom of the viewport, so a 55vh bottom-sheet used to
+  // overlap the composer — users couldn't type or send while a map /
+  // video was on screen (audit #5). Anchoring to the top keeps the
+  // composer area clear and matches how Google Maps / YouTube handle
+  // split-view on mobile.
+  const mobileStyle = {
+    position: 'fixed',
+    left: 0,
+    right: 0,
+    top: 0,
+    width: '100vw',
+    height: '55vh',
+  }
+
+  return (
+    <div
+      onClick={(e) => e.stopPropagation()}
       style={{
-        width: 960,
-        height: 600,
-        border: 'none',
-        overflow: 'hidden',
-        background: '#0d0b1d',
-        borderRadius: 4,
-        boxShadow: '0 0 40px rgba(124, 58, 237, 0.35) inset',
+        ...(isNarrow ? mobileStyle : desktopStyle),
+        zIndex: 40,
+        display: 'flex',
+        flexDirection: 'column',
+        background: 'rgba(10, 8, 20, 0.96)',
+        backdropFilter: 'blur(14px)',
+        borderRight: isNarrow ? 'none' : '1px solid rgba(167, 139, 250, 0.28)',
+        borderBottom: isNarrow ? '1px solid rgba(167, 139, 250, 0.28)' : 'none',
+        boxShadow: '0 0 40px rgba(0,0,0,0.55)',
+        color: '#ede9fe',
+        fontFamily: 'system-ui, -apple-system, sans-serif',
       }}
     >
-      {isImage ? (
-        <img
-          src={m.src}
-          alt={m.title || 'Monitor content'}
-          referrerPolicy="no-referrer"
-          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-        />
-      ) : (
-        <iframe
-          src={m.src}
-          title={m.title || 'Kelion monitor'}
-          referrerPolicy="no-referrer"
-          sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation"
-          allow="fullscreen; geolocation; autoplay; encrypted-media"
-          style={{ width: '100%', height: '100%', border: 'none', background: '#0d0b1d' }}
-        />
-      )}
-    </Html>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '10px 14px',
+          borderBottom: '1px solid rgba(167, 139, 250, 0.18)',
+          background: 'rgba(17, 12, 38, 0.7)',
+          flex: '0 0 auto',
+        }}
+      >
+        <div style={{
+          fontSize: 13,
+          fontWeight: 600,
+          letterSpacing: 0.3,
+          color: '#c4b5fd',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}>
+          {m.title || 'Monitor'}
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close monitor"
+          style={{
+            appearance: 'none',
+            border: '1px solid rgba(167, 139, 250, 0.35)',
+            background: 'rgba(124, 58, 237, 0.18)',
+            color: '#ede9fe',
+            width: 32,
+            height: 32,
+            borderRadius: 999,
+            cursor: 'pointer',
+            fontSize: 16,
+            lineHeight: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          ×
+        </button>
+      </div>
+      <div style={{ flex: '1 1 auto', minHeight: 0, background: '#0d0b1d' }}>
+        {isImage ? (
+          <img
+            src={m.src}
+            alt={m.title || 'Monitor content'}
+            referrerPolicy="no-referrer"
+            style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', background: '#0d0b1d' }}
+          />
+        ) : isExternal ? (
+          <div
+            style={{
+              width: '100%',
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 18,
+              padding: 24,
+              textAlign: 'center',
+              color: '#ede9fe',
+              background: 'radial-gradient(ellipse at center, #1a1230 0%, #0d0b1d 70%)',
+            }}
+          >
+            <div style={{ fontSize: 40, lineHeight: 1 }}>{externalCopy.icon}</div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: '#c4b5fd', maxWidth: 360 }}>
+              {externalCopy.headline}
+            </div>
+            <div style={{ fontSize: 13, opacity: 0.75, maxWidth: 360, lineHeight: 1.5 }}>
+              {externalCopy.body}
+            </div>
+            <a
+              href={m.src}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                appearance: 'none',
+                textDecoration: 'none',
+                border: '1px solid rgba(167, 139, 250, 0.55)',
+                background: 'rgba(124, 58, 237, 0.28)',
+                color: '#ede9fe',
+                padding: '10px 20px',
+                borderRadius: 8,
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: 'pointer',
+                letterSpacing: 0.2,
+              }}
+            >
+              {externalCopy.ctaLabel} ↗
+            </a>
+          </div>
+        ) : iframeBlocked ? (
+          <div
+            style={{
+              width: '100%',
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 14,
+              padding: 24,
+              textAlign: 'center',
+              color: '#ede9fe',
+              background: 'radial-gradient(ellipse at center, #1a1230 0%, #0d0b1d 70%)',
+            }}
+          >
+            <div style={{ fontSize: 36, lineHeight: 1 }}>🔒</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: '#c4b5fd', maxWidth: 360 }}>
+              This site refused to embed
+            </div>
+            <div style={{ fontSize: 12, opacity: 0.7, maxWidth: 340, lineHeight: 1.5 }}>
+              Its Content-Security-Policy (X-Frame-Options) blocks iframes. Open it in a new tab instead.
+            </div>
+            <a
+              href={m.src}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                textDecoration: 'none',
+                border: '1px solid rgba(167, 139, 250, 0.55)',
+                background: 'rgba(124, 58, 237, 0.28)',
+                color: '#ede9fe',
+                padding: '9px 18px',
+                borderRadius: 8,
+                fontSize: 13,
+                fontWeight: 600,
+                letterSpacing: 0.2,
+              }}
+            >
+              Open in new tab ↗
+            </a>
+          </div>
+        ) : (
+          <IframeWithFallback
+            src={m.src}
+            title={m.title || 'Kelion monitor'}
+            onBlocked={() => {
+              try { console.warn('[monitor] iframe never loaded — likely CSP/XFO block', m.src) } catch (_) {}
+              setIframeBlocked(true)
+            }}
+          />
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -581,46 +856,12 @@ function StudioDecor() {
         <meshBasicMaterial color={'#60a5fa'} toneMapped={false} />
       </mesh>
 
-      {/* Side wall slats were removed — Adrian found them distracting. The
-          left half of the stage now holds the presentation monitor; the
-          right half remains clean so the avatar is the focus. */}
-
-      {/* ───── Presentation monitor ─────
-          Positioned adjacent to the avatar as a presenter + screen pair.
-          Adrian: "monitor mai spre el" — moved closer to center (-1.1 from
-          -1.7) and slightly forward (-0.35 from -0.8) so the monitor reads
-          as the avatar's screen, not a separate fixture on the wall.
-          Adrian 2026-04-20: "muta monitorul un pic mai sus acopera chatul"
-          — raised Y from 0.35 → 0.95 so the bezel's bottom edge clears
-          the "Type to Kelion…" composer and any error banner sitting
-          above it at 1080p/desktop framing.
-          Adrian 2026-04-20 (follow-up): "monitorul un pic mai la dreapta
-          si mai jos sa fie incadrat la stanga si stanga sus" — after
-          the raise, the top-left corner of the bezel fell outside the
-          camera frustum at standard framing. Nudged X from -1.1 → -0.8
-          (closer to centre) and Y from 0.95 → 0.65 (lower) so the
-          top edge is visible and the left edge sits cleanly inside
-          the viewport.
-          When Gemini Live calls the `show_on_monitor` tool, <StageMonitor/>
-          renders an iframe / image on the inner plane via drei <Html transform>. */}
-      <group position={[-0.8, 0.65, -0.35]} rotation={[0, Math.PI / 9, 0]}>
-        {/* Bezel / outer frame */}
-        <mesh position={[0, 0, -0.03]}>
-          <planeGeometry args={[3.2, 2.1]} />
-          <meshStandardMaterial color={'#0a0b14'} metalness={0.75} roughness={0.35} />
-        </mesh>
-        {/* Inner screen (idle state: dark purple with faint grid). */}
-        <mesh position={[0, 0, 0]}>
-          <planeGeometry args={[3.0, 1.9]} />
-          <meshBasicMaterial color={'#0d0b1d'} toneMapped={false} />
-        </mesh>
-        <StageMonitorContent />
-        {/* Stand leg */}
-        <mesh position={[0, -1.3, -0.02]}>
-          <planeGeometry args={[0.12, 0.7]} />
-          <meshStandardMaterial color={'#0a0b14'} metalness={0.8} roughness={0.3} />
-        </mesh>
-      </group>
+      {/* The in-scene 3D presentation monitor was removed so that the stage
+          stays clean when no content is loaded. All monitor payloads now
+          render exclusively in the half-page <MonitorOverlay/> (left 50vw
+          on desktop, bottom 55vh on mobile). An empty dark bezel sitting
+          next to the avatar at all times was confusing — users expected it
+          to be the promised half-page screen. */}
 
       {/* Reflective floor */}
       <mesh position={[0, -1.65, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
@@ -750,6 +991,17 @@ export default function KelionStage() {
   // 2026-04-20: "cind esti logat si folosesti butonul back, te
   // intorci in pagina anterioara, dar logat".
   const navigate = useNavigate()
+  // PR #200 — register the ui_navigate controller so the voice model's
+  // ui_navigate tool (kelionTools.js) can actually move the user
+  // between SPA routes instead of just narrating that it did. The
+  // allowlist lives inside uiActionStore; this effect only wires the
+  // imperative handler, it doesn't widen the allowlist.
+  useEffect(() => {
+    setUIActionController({
+      navigate: (route) => navigate(route),
+    })
+    return () => setUIActionController(null)
+  }, [navigate])
   const audioRef = useRef(null)
   // Real client GPS (falls back to null → server uses IP-geo instead).
   // The hook fires once on mount; if the browser remembers a previous
@@ -760,6 +1012,34 @@ export default function KelionStage() {
   // Alias to the names already used elsewhere in this file (clientGeo /
   // geoPermission / requestGeo).
   const { coords: clientGeo, permission: geoPermission, requestNow: requestGeo } = useClientGeo()
+  // Register a geo provider so monitorStore can fall back to the user's
+  // current coords when the model calls show_on_monitor({kind:'map'}) without
+  // a query (e.g. "arată-mi harta" / "show me a map" without a place name).
+  const clientGeoRef = useRef(null)
+  const geoPermissionRef = useRef('unknown')
+  const requestGeoRef = useRef(null)
+  useEffect(() => { clientGeoRef.current = clientGeo }, [clientGeo])
+  useEffect(() => { geoPermissionRef.current = geoPermission }, [geoPermission])
+  useEffect(() => { requestGeoRef.current = requestGeo }, [requestGeo])
+  useEffect(() => {
+    setMonitorGeoProvider(() => clientGeoRef.current)
+    return () => setMonitorGeoProvider(null)
+  }, [])
+  // Also publish the geo state to clientGeoProvider so the voice-side
+  // `get_my_location` tool handler (in src/lib/kelionTools.js) can read
+  // coords / permission / request-on-gesture without reaching into the
+  // React tree. Tool handlers run outside React so they need a module-
+  // level registry just like monitorGeoProvider above.
+  useEffect(() => {
+    setClientGeoProvider({
+      getCoords:     () => clientGeoRef.current,
+      getPermission: () => geoPermissionRef.current,
+      requestNow:    () => {
+        if (typeof requestGeoRef.current === 'function') requestGeoRef.current()
+      },
+    })
+    return () => setClientGeoProvider(null)
+  }, [])
   const [voiceLevel, setVoiceLevel] = useState(0)
   const [transcriptOpen, setTranscriptOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -802,6 +1082,11 @@ export default function KelionStage() {
   const [creditsCards, setCreditsCards] = useState([])
   const [creditsLoading, setCreditsLoading] = useState(false)
   const [creditsError, setCreditsError] = useState(null)
+  // PR E2 — auto-topup configuration snapshot returned alongside the
+  // provider cards (threshold, amount, last-run history). Drives the
+  // info strip at the top of the AI tab so the admin can see at a
+  // glance whether auto-refill is armed and when it last fired.
+  const [autoTopupStatus, setAutoTopupStatus] = useState(null)
   // Revenue-split snapshot (50/50 by default between AI provider spend
   // and owner net). Loaded from /api/admin/revenue-split in parallel
   // with the raw provider cards so the overlay can show both without
@@ -856,15 +1141,30 @@ export default function KelionStage() {
     }
     setGrantBusy(true)
     setGrantMessage(null)
+    // Per-submission idempotency key — a double-click or retry uses
+    // the same key, and the server's UNIQUE index collapses it into
+    // a no-op (audit #7). The key includes email+minutes+timestamp+
+    // random so two *different* intentional grants to the same user
+    // stay distinct. Use crypto.randomUUID when available, fall back
+    // to Date.now + Math.random for older iOS Safari.
+    const rand = (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+    const idempotencyKey = `ui:${email}:${Math.trunc(minutes)}:${rand}`
     try {
       const r = await fetch('/api/admin/credits/grant', {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': idempotencyKey,
+          'X-CSRF-Token': getCsrfToken(),
+        },
         body: JSON.stringify({
           email,
           minutes: Math.trunc(minutes),
           note: grantNote.trim() || undefined,
+          idempotencyKey,
         }),
       })
       const j = await r.json().catch(() => ({}))
@@ -873,7 +1173,9 @@ export default function KelionStage() {
       }
       setGrantMessage({
         ok: true,
-        text: `Granted ${j.deltaMinutes} min to ${j.email}. New balance: ${j.balanceMinutes} min.`,
+        text: j.duplicate
+          ? `Already granted (duplicate). Balance: ${j.balanceMinutes} min.`
+          : `Granted ${j.deltaMinutes} min to ${j.email}. New balance: ${j.balanceMinutes} min.`,
       })
       setGrantEmail('')
       setGrantMinutes('')
@@ -894,7 +1196,10 @@ export default function KelionStage() {
     setLedgerLoading(true)
     const cardsPromise = fetch('/api/admin/credits', { credentials: 'include' })
       .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
-      .then((j) => setCreditsCards(Array.isArray(j.cards) ? j.cards : []))
+      .then((j) => {
+        setCreditsCards(Array.isArray(j.cards) ? j.cards : [])
+        setAutoTopupStatus(j.autoTopup || null)
+      })
       .catch((err) => setCreditsError(err.message || 'Could not load AI credits'))
       .finally(() => setCreditsLoading(false))
     const splitPromise = fetch('/api/admin/revenue-split?days=30', { credentials: 'include' })
@@ -921,15 +1226,25 @@ export default function KelionStage() {
   const [visitorsOpen, setVisitorsOpen] = useState(false)
   const [visitorsRows, setVisitorsRows] = useState([])
   const [visitorsStats, setVisitorsStats] = useState(null)
+  // PR E4 — advanced analytics: 30-day chart, country list, device mix,
+  // login→topup→usage funnel. Fetched alongside the raw rows.
+  const [visitorsAnalytics, setVisitorsAnalytics] = useState(null)
   const [visitorsLoading, setVisitorsLoading] = useState(false)
   const [visitorsError, setVisitorsError] = useState(null)
   const refreshVisitors = useCallback(async () => {
     try {
-      const r = await fetch('/api/admin/visitors?limit=200&windowHours=24', { credentials: 'include' })
-      if (!r.ok) throw new Error(`HTTP ${r.status}`)
-      const j = await r.json()
+      const [rRaw, rStats] = await Promise.all([
+        fetch('/api/admin/visitors?limit=200&windowHours=24', { credentials: 'include' }),
+        fetch('/api/admin/visitors/analytics?days=30', { credentials: 'include' }),
+      ])
+      if (!rRaw.ok) throw new Error(`HTTP ${rRaw.status}`)
+      const j = await rRaw.json()
       setVisitorsRows(Array.isArray(j.visits) ? j.visits : [])
       setVisitorsStats(j.stats || null)
+      if (rStats.ok) {
+        const s = await rStats.json()
+        setVisitorsAnalytics(s)
+      }
       setVisitorsError(null)
     } catch (err) {
       setVisitorsError(err.message || 'Could not load visitors')
@@ -986,7 +1301,7 @@ export default function KelionStage() {
       const r = await fetch('/api/credits/checkout', {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
         body: JSON.stringify({ packageId: pkgId }),
       })
       const j = await r.json().catch(() => ({}))
@@ -1044,7 +1359,10 @@ export default function KelionStage() {
   // Global ESC handler — closes any open overlay / drawer so the user is
   // never stuck with a side panel they cannot dismiss. Also closes the ⋯
   // menu. The Buy-credits modal has its own backdrop so it also closes
-  // on click-outside; this just adds keyboard parity.
+  // on click-outside; this just adds keyboard parity. Covers every
+  // admin-shell drawer (Business / AI / Visitors / Users / Payouts) so
+  // the new tabs from PR #141 share the same keyboard affordance as
+  // the older ones.
   useEffect(() => {
     const onKey = (e) => {
       if (e.key !== 'Escape') return
@@ -1053,6 +1371,9 @@ export default function KelionStage() {
       setMemoryOpen(false)
       setCreditsOpen(false)
       setBusinessOpen(false)
+      setVisitorsOpen(false)
+      setUsersOpen(false)
+      setPayoutsOpen(false)
       setBuyOpen(false)
       setRememberPromptOpen(false)
     }
@@ -1080,6 +1401,163 @@ export default function KelionStage() {
     }
   }, [])
 
+  // PR E1 — unified admin shell. Two new tab panels (Users, Payouts)
+  // replace the scattered overflow-menu entries; Business / AI / Visitors
+  // keep their existing open*() data fetchers but now share a tab bar at
+  // the top. switchAdminTab is the single entry point the top-bar
+  // "Admin · ∞" button and the tab bar both call — it closes whichever
+  // tab is currently visible and opens the target one, re-using the
+  // existing fetcher so the data is always fresh.
+  const [usersOpen, setUsersOpen] = useState(false)
+  const [payoutsOpen, setPayoutsOpen] = useState(false)
+
+  // F3 — Adrian 2026-04-22: audit found adrianenc11@gmail.com split across
+  // two user rows (id=5 Google + id=6 local signup) and the admin panel
+  // had no way to collapse them. `dupGroups` holds whatever
+  // /api/admin/users/duplicates returned; the card in the Users drawer
+  // renders one row per group with a "Merge" button per peer. We keep
+  // the group list lazy — it only loads on demand when the Users tab
+  // is opened, and re-loads after each successful merge.
+  const [dupGroups, setDupGroups] = useState([])
+  const [dupLoading, setDupLoading] = useState(false)
+  const [dupError, setDupError] = useState(null)
+  const [dupBusyKey, setDupBusyKey] = useState(null)
+  const [dupResult, setDupResult] = useState(null)
+  const refreshDuplicateUsers = useCallback(async () => {
+    setDupLoading(true)
+    setDupError(null)
+    try {
+      const h = { Accept: 'application/json' }
+      if (authTokenRef.current) h['Authorization'] = `Bearer ${authTokenRef.current}`
+      const r = await fetch('/api/admin/users/duplicates', { credentials: 'include', headers: h })
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      const j = await r.json().catch(() => null)
+      setDupGroups(Array.isArray(j && j.groups) ? j.groups : [])
+    } catch (err) {
+      setDupError(err && err.message ? err.message : 'Nu am putut încărca conturile duplicate')
+    } finally {
+      setDupLoading(false)
+    }
+  }, [])
+  const mergeDuplicateUsers = useCallback(async (sourceId, targetId, email) => {
+    if (sourceId == null || targetId == null) return
+    const confirmMsg =
+      `Merge user ${sourceId} → ${targetId} (${email})?\n\n` +
+      'Toate conversațiile, creditele și istoricul sursei se vor muta pe țintă.\n' +
+      'Sursa va fi ștearsă. Acțiune ireversibilă.'
+    if (typeof window !== 'undefined' && !window.confirm(confirmMsg)) return
+    const key = `${sourceId}->${targetId}`
+    setDupBusyKey(key)
+    setDupResult(null)
+    try {
+      const h = { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() }
+      if (authTokenRef.current) h['Authorization'] = `Bearer ${authTokenRef.current}`
+      const r = await fetch('/api/admin/users/merge', {
+        method: 'POST',
+        credentials: 'include',
+        headers: h,
+        body: JSON.stringify({ sourceId, targetId }),
+      })
+      const j = await r.json().catch(() => null)
+      if (!r.ok) throw new Error((j && j.error) || `HTTP ${r.status}`)
+      setDupResult({ ok: true, sourceId, targetId, email, moved: (j && j.moved) || {} })
+      await refreshDuplicateUsers()
+    } catch (err) {
+      setDupResult({
+        ok: false,
+        sourceId,
+        targetId,
+        email,
+        error: err && err.message ? err.message : 'Merge eșuat',
+      })
+    } finally {
+      setDupBusyKey(null)
+    }
+  }, [refreshDuplicateUsers])
+
+  // PR E3 — Payouts drawer pulls a live snapshot from Stripe (balance,
+  // linked external account, next-payout schedule, last ~10 payouts)
+  // plus the 50/50 AI-vs-profit split over the last 30 days. The
+  // snapshot aggregator on the server never throws; partial failures
+  // land in `payoutsData.errors` and the UI renders whatever did load.
+  const [payoutsData, setPayoutsData] = useState(null)
+  const [payoutsLoading, setPayoutsLoading] = useState(false)
+  const [payoutsError, setPayoutsError] = useState(null)
+  const [payoutBusy, setPayoutBusy] = useState(false)
+  const [payoutResult, setPayoutResult] = useState(null)
+  // `refreshPayoutsData` pulls a fresh snapshot without touching
+  // `payoutResult`; that way the "OK — 50.00 EUR · status in_transit"
+  // banner survives the refresh triggered right after a successful
+  // instant payout. `openPayouts` wraps it and additionally clears the
+  // previous result so opening the drawer from scratch feels clean.
+  const refreshPayoutsData = useCallback(async () => {
+    setPayoutsLoading(true)
+    setPayoutsError(null)
+    try {
+      const r = await fetch('/api/admin/payouts?days=30', { credentials: 'include' })
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      setPayoutsData(await r.json())
+    } catch (err) {
+      setPayoutsError(err.message || 'Could not load payouts dashboard')
+    } finally {
+      setPayoutsLoading(false)
+    }
+  }, [])
+  const openPayouts = useCallback(async () => {
+    setPayoutsOpen(true)
+    setPayoutResult(null)
+    await refreshPayoutsData()
+  }, [refreshPayoutsData])
+  const triggerInstantPayout = useCallback(async () => {
+    if (payoutBusy) return
+    // A confirm() keeps this honest — an instant payout cannot be
+    // undone, and the Stripe fee (~1% + €0.25) is real money.
+    if (!window.confirm('Instant payout: transferă soldul disponibil pe cardul legat acum. Taxa Stripe ~1% + 0.25 EUR. Continuăm?')) {
+      return
+    }
+    setPayoutBusy(true)
+    setPayoutResult(null)
+    try {
+      const r = await fetch('/api/admin/payouts/instant', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+        // Empty body → Stripe pays out the full instant-available balance.
+        body: JSON.stringify({}),
+      })
+      const body = await r.json().catch(() => ({}))
+      if (!r.ok) {
+        throw new Error((body && body.error) || `HTTP ${r.status}`)
+      }
+      setPayoutResult({ ok: true, ...body })
+      // Refresh the snapshot so the new payout shows up in recent list.
+      // Must use `refreshPayoutsData` (not `openPayouts`) so the success
+      // banner we just set isn't immediately wiped.
+      refreshPayoutsData()
+    } catch (err) {
+      setPayoutResult({ ok: false, error: err.message || 'Instant payout failed' })
+    } finally {
+      setPayoutBusy(false)
+    }
+  }, [payoutBusy, refreshPayoutsData])
+
+  const switchAdminTab = useCallback((tab) => {
+    // Close non-target tabs first so only one panel is on screen at a
+    // time. Each open*() call on the target flips its own state to true.
+    if (tab !== 'business') setBusinessOpen(false)
+    if (tab !== 'ai')       setCreditsOpen(false)
+    if (tab !== 'visitors') setVisitorsOpen(false)
+    if (tab !== 'users')    setUsersOpen(false)
+    if (tab !== 'payouts')  setPayoutsOpen(false)
+    if (tab === 'business') { openBusiness() }
+    else if (tab === 'ai')       { openCredits() }
+    else if (tab === 'visitors') { openVisitors() }
+    else if (tab === 'users')    { setUsersOpen(true); refreshDuplicateUsers() }
+    else if (tab === 'payouts')  { openPayouts() }
+  }, [openBusiness, openCredits, openVisitors, openPayouts, refreshDuplicateUsers])
+
+
+
   // Stage 6 — emotion mirroring + voice style
   const emotion = useEmotion()
   const [voiceStyle, setVoiceStyleState] = useState(() => readVoiceStyleCookie())
@@ -1096,6 +1574,17 @@ export default function KelionStage() {
   const [chatMessages, setChatMessages] = useState([]) // [{ role, content }]
   const [chatBusy, setChatBusy] = useState(false)
   const [chatError, setChatError] = useState(null)
+  // Conversation history — user-requested ("sa aiba optiune de save").
+  // Signed-in users get server persistence via /api/conversations; guests
+  // fall back to localStorage. See src/lib/conversationStore.js.
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [voiceCloneOpen, setVoiceCloneOpen] = useState(false)
+  const [historyItems, setHistoryItems] = useState([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyError, setHistoryError] = useState(null)
+  // Track how many messages we've already persisted so the save-effect
+  // only appends deltas (not the whole transcript on every turn).
+  const savedUpToRef = useRef(0)
   // F2 — "+" attach. Adrian: "lipseste + de introdus date". Accepts
   // images, PDFs and text files. For MVP we only surface the filename to
   // the model (as a bracketed note) and preview-pill it in the composer
@@ -1119,7 +1608,7 @@ export default function KelionStage() {
     if (fileInputRef.current) fileInputRef.current.value = ''
     setChatBusy(true)
     try {
-      const chatHeaders = { 'Content-Type': 'application/json' }
+      const chatHeaders = { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() }
       if (authTokenRef.current) {
         chatHeaders['Authorization'] = `Bearer ${authTokenRef.current}`
       }
@@ -1230,6 +1719,14 @@ export default function KelionStage() {
                 copy[copy.length - 1] = { role: 'assistant', content: assistant }
                 return copy
               })
+            } else if (obj.tool === 'show_on_monitor' && obj.arguments) {
+              // Server streamed a tool-call frame — the model decided to
+              // open something on the monitor. Invoke the same handler
+              // the voice path uses; a natural-language confirmation
+              // ("Here's Cluj-Napoca on the monitor.") streams next.
+              try { handleShowOnMonitor(obj.arguments) } catch (e) {
+                console.warn('[chat] show_on_monitor failed', e && e.message)
+              }
             } else if (obj.error) {
               throw new Error(obj.error)
             }
@@ -1257,14 +1754,26 @@ export default function KelionStage() {
   // We now POST the assistant's reply to /api/tts — the server synthesizes
   // with ElevenLabs (Adam — male, multilingual) or Gemini "Charon" (male)
   // and returns an audio/mpeg or audio/wav blob. We play it via an offscreen
-  // <audio> element; a cosine envelope drives the mouth while it plays so
-  // the avatar lip-flaps along (no real-time analyser on CORS-restricted
-  // HTMLMediaElement is needed for coarse correlation).
-  const [ttsMouthOpen, setTtsMouthOpen] = useState(0)
+  // <audio> element and drive the mouth from the *actual* audio amplitude
+  // via `useAudioElementLipSync` (MediaElementSource → analyzer), so the
+  // avatar opens its mouth on vowels and closes it on pauses/consonants —
+  // same envelope shape as the realtime-voice `useLipSync` path. If the
+  // AudioContext can't be created (autoplay policy, older browsers) we
+  // fall back to the legacy 4 Hz cosine so the avatar still lip-flaps.
+  const {
+    mouthOpen: ttsMouthOpen,
+    attach: attachTtsLipSync,
+    reset: resetTtsLipSync,
+  } = useAudioElementLipSync()
+  const [ttsCosineMouth, setTtsCosineMouth] = useState(0)
   const lastSpokenRef = useRef('')
   const ttsRafRef = useRef(null)
   const ttsAudioRef = useRef(null)
   const ttsAbortRef = useRef(null)
+  // Mirror the hook's envelope into a ref so the analyzer-vs-cosine guard
+  // can read the current value without waiting for a React re-render.
+  const ttsMouthOpenRef = useRef(0)
+  useEffect(() => { ttsMouthOpenRef.current = ttsMouthOpen }, [ttsMouthOpen])
   useEffect(() => {
     if (chatBusy) return
     const last = chatMessages[chatMessages.length - 1]
@@ -1280,19 +1789,22 @@ export default function KelionStage() {
     const controller = new AbortController()
     ttsAbortRef.current = controller
 
-    const drive = () => {
-      // 4 Hz cosine envelope, 0..0.9, approximates jaw motion during speech.
+    // Cosine envelope used ONLY as a fallback when the analyzer can't
+    // attach (blocked autoplay, old browser). 4 Hz, 0..0.9, approximates
+    // average jaw motion during speech.
+    const driveCosine = () => {
       const t = performance.now() / 1000
       const v = 0.45 + 0.45 * Math.abs(Math.sin(t * 4 * Math.PI))
-      setTtsMouthOpen(v)
-      ttsRafRef.current = requestAnimationFrame(drive)
+      setTtsCosineMouth(v)
+      ttsRafRef.current = requestAnimationFrame(driveCosine)
     }
     const stopDrive = () => {
       if (ttsRafRef.current) { cancelAnimationFrame(ttsRafRef.current); ttsRafRef.current = null }
-      setTtsMouthOpen(0)
+      setTtsCosineMouth(0)
+      try { resetTtsLipSync() } catch (_) { /* hook already reset */ }
     }
 
-    const ttsHeaders = { 'Content-Type': 'application/json' }
+    const ttsHeaders = { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() }
     if (authTokenRef.current) ttsHeaders['Authorization'] = `Bearer ${authTokenRef.current}`
 
     // Browser locale is a highly reliable signal for which language the user
@@ -1318,7 +1830,30 @@ export default function KelionStage() {
         ttsAudioRef.current = audio
         audio.onplay = () => {
           if (ttsRafRef.current) cancelAnimationFrame(ttsRafRef.current)
-          drive()
+          // Try the real-audio analyzer first; the hook returns silently
+          // (envelope stays 0) if createMediaElementSource throws or the
+          // context can't resume. We detect that by checking the hook's
+          // envelope a couple of frames later — if it's still 0 while
+          // audio is playing, something's wrong, so we lip-flap via
+          // cosine to avoid the avatar standing still with a closed mouth.
+          try { attachTtsLipSync(audio) } catch (_) { /* fall through to cosine */ }
+          let cosineStarted = false
+          const guardStart = performance.now()
+          const guard = () => {
+            if (!ttsAudioRef.current || ttsAudioRef.current !== audio) return
+            // 250 ms grace period for the analyser — fast enough that any
+            // delay is imperceptible, slow enough to avoid false positives
+            // during the first few quiet frames after decoder warm-up.
+            if (performance.now() - guardStart < 250) {
+              ttsRafRef.current = requestAnimationFrame(guard)
+              return
+            }
+            if (ttsMouthOpenRef.current < 0.02 && !audio.paused && !cosineStarted) {
+              cosineStarted = true
+              driveCosine()
+            }
+          }
+          ttsRafRef.current = requestAnimationFrame(guard)
         }
         const cleanup = () => {
           stopDrive()
@@ -1348,7 +1883,7 @@ export default function KelionStage() {
                 || voices.find((v) => /male|daniel|alex|george|david|mark/i.test(v.name))
               if (pref) utt.voice = pref
             } catch (_) { /* best-effort */ }
-            utt.onstart = () => { if (ttsRafRef.current) cancelAnimationFrame(ttsRafRef.current); drive() }
+            utt.onstart = () => { if (ttsRafRef.current) cancelAnimationFrame(ttsRafRef.current); driveCosine() }
             utt.onend = stopDrive
             utt.onerror = stopDrive
             window.speechSynthesis.speak(utt)
@@ -1362,10 +1897,19 @@ export default function KelionStage() {
       if (ttsAudioRef.current) { try { ttsAudioRef.current.pause() } catch (_) {} ttsAudioRef.current = null }
       stopDrive()
     }
-  }, [chatMessages, chatBusy])
+  }, [chatMessages, chatBusy, attachTtsLipSync, resetTtsLipSync])
 
-  // Max of voice-chat lipsync and text-chat TTS envelope feeds the avatar.
-  const mouthOpen = Math.max(micMouthOpen || 0, ttsMouthOpen || 0)
+  // Max of voice-chat lipsync, real-audio text-chat envelope, and cosine
+  // fallback feeds the avatar. When the analyser is attached, ttsMouthOpen
+  // carries the real amplitude and ttsCosineMouth stays 0; when we fall
+  // back on autoplay-blocked browsers, ttsCosineMouth drives the jaw and
+  // ttsMouthOpen stays 0 — taking the max means we always render whichever
+  // source is active without double-counting.
+  const mouthOpen = Math.max(
+    micMouthOpen || 0,
+    ttsMouthOpen || 0,
+    ttsCosineMouth || 0,
+  )
 
   // Chat bubble auto-hide — Adrian: "chatul trebuie sa dispara dupa ce s-a
   // spus ramine doar in istoric, se afiseaza doar curent ce scrie user sau
@@ -1384,6 +1928,50 @@ export default function KelionStage() {
     return () => { if (bubbleHideTimerRef.current) clearTimeout(bubbleHideTimerRef.current) }
   }, [chatMessages, chatBusy])
 
+  // Plan C — provider switch. Two stable transports are mounted in
+  // parallel (both hooks allocate refs/state only; neither opens a
+  // network connection until the user taps mic), and the HUD routes
+  // start/stop to whichever is currently selected. Default is the
+  // OpenAI Realtime GA transport — it does not depend on the Gemini
+  // Live preview keep-alive that Google closes at ~2 min on our key.
+  //
+  // Selection precedence (highest wins):
+  //   1. ?provider=openai | gemini query param (useful for A/B testing)
+  //   2. localStorage.kelion_live_provider (persisted user choice)
+  //   3. 'openai'                           (Plan C default)
+  const [liveProvider, setLiveProvider] = useState(() => {
+    try {
+      const q = new URL(window.location.href).searchParams.get('provider')
+      if (q === 'openai' || q === 'gemini') return q
+      const saved = window.localStorage.getItem('kelion_live_provider')
+      if (saved === 'openai' || saved === 'gemini') return saved
+    } catch (_) { /* no window in SSR / sandboxed iframes — fall through */ }
+    return 'openai'
+  })
+  useEffect(() => {
+    try { window.localStorage.setItem('kelion_live_provider', liveProvider) }
+    catch (_) { /* storage disabled — best-effort */ }
+  }, [liveProvider])
+
+  const geminiHook = useGeminiLive({
+    audioRef,
+    coords: clientGeo,
+    // Live HUD: every successful consume response carries the
+    // post-deduction balance. Pipe it straight into the top-right
+    // "Credits · N" chip so users see the credit tick down per minute
+    // without a page refresh. Admins get `null` (exempt) and the
+    // hook skips the update — chip stays on whatever /balance loaded.
+    onBalanceUpdate: (minutes) => setBalance(minutes),
+  })
+  const openaiHook = useOpenAIRealtime({
+    audioRef,
+    coords: clientGeo,
+    onBalanceUpdate: (minutes) => setBalance(minutes),
+  })
+  // Active transport — rest of the component destructures from this.
+  // Both hooks return the same shape (see lib/openaiRealtime.js
+  // "Public signature matches useGeminiLive exactly").
+  const liveHook = liveProvider === 'openai' ? openaiHook : geminiHook
   const {
     status,
     error,
@@ -1399,21 +1987,161 @@ export default function KelionStage() {
     stopCamera,
     startScreen,
     stopScreen,
-    // Voice-chat trial countdown returned by the Gemini Live token mint.
-    // We no longer drive the HUD off this — the HUD pulls from the
-    // shared /api/trial/status endpoint so the timer also ticks for
-    // text-chat-only guests who never touch the mic.
+    // Voice-chat trial countdown returned by the active transport's
+    // token mint. We no longer drive the HUD off this — the HUD
+    // pulls from the shared /api/trial/status endpoint so the timer
+    // also ticks for text-chat-only guests who never touch the mic.
     trial: voiceTrial,
-  } = useGeminiLive({
-    audioRef,
-    coords: clientGeo,
-    // Live HUD: every successful consume response carries the
-    // post-deduction balance. Pipe it straight into the top-right
-    // "Credits · N" chip so users see the credit tick down per minute
-    // without a page refresh. Admins get `null` (exempt) and the
-    // hook skips the update — chip stays on whatever /balance loaded.
-    onBalanceUpdate: (minutes) => setBalance(minutes),
-  })
+  } = liveHook
+  // Hook refs — both useOpenAIRealtime and useGeminiLive return plain
+  // object literals without useMemo (geminiLive.js ~l.971, openaiRealtime.js
+  // ~l.575), so their identity changes every render. Holding them in refs
+  // and reading inside effects keeps the effects from re-firing on every
+  // keystroke and was the other half of why the #117 setTimeout-cleanup
+  // bug bit (Devin Review Info on #118, comment id 3116094529 also notes
+  // the prevProviderRef effect below shares this wart — same refs now).
+  const openaiHookRef = useRef(openaiHook)
+  const geminiHookRef = useRef(geminiHook)
+  openaiHookRef.current = openaiHook
+  geminiHookRef.current = geminiHook
+
+  // Flip providers cleanly: stop whatever's live on the old provider
+  // before the next tap spins up the new one. No-op when the switched-
+  // away provider is idle.
+  const prevProviderRef = useRef(liveProvider)
+  useEffect(() => {
+    if (prevProviderRef.current === liveProvider) return
+    const outgoing = prevProviderRef.current === 'openai' ? openaiHookRef.current : geminiHookRef.current
+    try { outgoing.stop() } catch (_) { /* hooks unmount-safe */ }
+    prevProviderRef.current = liveProvider
+  }, [liveProvider])
+
+  // Auto-fallback — silent provider swap on terminal transport error.
+  //
+  // Original #117 nested `start()` inside a setTimeout whose cleanup
+  // lived on the same effect that flipped `liveProvider`. `liveProvider`
+  // was a dep, so setLiveProvider immediately re-ran the effect; cleanup
+  // clear()ed the timer before the 120 ms budget elapsed and start()
+  // never fired. Codex / Copilot / Devin Review all flagged it P1.
+  //
+  // Fix (PR #118, refined here): split into two effects, no setTimeout.
+  //   1. On transport-level status='error', set pendingFallbackRef and
+  //      flip liveProvider.
+  //   2. A separate effect on [liveProvider] sees the flag and calls
+  //      .start() on the now-active hook. Because React runs effects
+  //      in declaration order within one component, the prevProviderRef
+  //      effect (declared just above) has already stopped the outgoing
+  //      transport on the same commit — no timer race.
+  //
+  // Latch: the one-shot `autoFallbackTriedRef` is intentionally reset
+  // ONLY on 'listening'. PR #118 also reset it on 'requesting' — but
+  // both transport hooks flip status to 'requesting' synchronously
+  // inside their own start() (openaiRealtime.js:290, geminiLive.js:411),
+  // which means the fallback's own start() call in effect (2) would
+  // clear the latch before the second provider's outcome is known.
+  // If that second attempt also errored, the error effect would see
+  // latch=false and flip providers again — infinite ping-pong between
+  // OpenAI and Gemini when both are genuinely down (Codex P1 +
+  // Devin Review P1 on #118). If a user is stuck after a double-failure,
+  // refreshing the page recreates the ref fresh (ref state doesn't
+  // survive unmount), so localStorage's last-persisted provider still
+  // gets one fresh fallback attempt on the next load.
+  //
+  // Account-level errors (credits / trial / auth) bypass fallback —
+  // swapping providers can't help those and doing so would race the
+  // Buy Credits modal / reauth redirect. The match list is aligned with
+  // setError(...) strings in src/lib/geminiLive.js + openaiRealtime.js;
+  // Devin Review (Info) flagged substring matching as fragile — a
+  // structured error code on the hook would be cleaner, but that's a
+  // cross-cutting refactor of both transport libs and out of scope.
+  const autoFallbackTriedRef = useRef(false)
+  const pendingFallbackRef = useRef(false)
+  // F4 — snapshot of the outgoing provider's transcript at the moment we
+  // flip. Effect 2 passes it to the new hook's start({ priorTurns }) so
+  // Kelion picks up the conversation instead of re-greeting.
+  const pendingFallbackTurnsRef = useRef([])
+  useEffect(() => {
+    if (status === 'listening') autoFallbackTriedRef.current = false
+  }, [status])
+  useEffect(() => {
+    if (status !== 'error' || !error) return
+    if (autoFallbackTriedRef.current) return
+    const msg = typeof error === 'string' ? error.toLowerCase() : String(error || '').toLowerCase()
+    // Account-level failures — not something another provider can fix.
+    // Keep this list aligned with the user-facing strings in
+    // src/lib/geminiLive.js + src/lib/openaiRealtime.js.
+    if (
+      msg.includes('no credits') ||
+      msg.includes('buy a package') ||
+      msg.includes('buy credits') ||
+      msg.includes('buy more') ||
+      msg.includes('free trial') ||
+      msg.includes('trial has ended') ||
+      msg.includes('session expired') ||
+      msg.includes('sign in again')
+    ) {
+      return
+    }
+    autoFallbackTriedRef.current = true
+    pendingFallbackRef.current = true
+    // F4 — snapshot the outgoing provider's accumulated turns BEFORE we
+    // flip. After setLiveProvider runs, the destructured `turns` rebinds
+    // to the (empty) state of the incoming hook. We keep only finalised
+    // turns with real text, strip anything else so the persona block on
+    // the server stays compact, and cap to the last 20 so long sessions
+    // don't blow the instruction budget.
+    try {
+      const snapshot = Array.isArray(turns)
+        ? turns
+            .filter((t) => t && typeof t.text === 'string' && t.text.trim().length > 0)
+            .slice(-20)
+            .map((t) => ({
+              role: t.role === 'assistant' ? 'assistant' : 'user',
+              text: t.text,
+            }))
+        : []
+      pendingFallbackTurnsRef.current = snapshot
+    } catch (_) {
+      pendingFallbackTurnsRef.current = []
+    }
+    const nextProvider = liveProvider === 'openai' ? 'gemini' : 'openai'
+    console.warn('[kelionStage] live provider', liveProvider, 'terminal — switching to', nextProvider, '·', msg, '· carrying', pendingFallbackTurnsRef.current.length, 'turns')
+    setLiveProvider(nextProvider)
+  }, [status, error, liveProvider, turns])
+  useEffect(() => {
+    if (!pendingFallbackRef.current) return
+    pendingFallbackRef.current = false
+    // prevProviderRef effect (declared earlier) already stop()-ed the
+    // outgoing transport on this same commit; it's safe to start the
+    // new one synchronously now. Effect declaration order is the
+    // coordination mechanism here — if this block is ever moved above
+    // prevProviderRef, the invariant breaks silently (Devin Review Info
+    // on #118). Keep this block below that effect.
+    try {
+      const active = liveProvider === 'openai' ? openaiHookRef.current : geminiHookRef.current
+      const priorTurns = pendingFallbackTurnsRef.current
+      pendingFallbackTurnsRef.current = []
+      // Audit M6 — ask the incoming hook whether it is already busy
+      // (user tapped / wake-word fired between the two effects). If so,
+      // skip the handoff entirely: calling start() now would either be
+      // rejected by the in-flight lock (priorTurns silently lost) or,
+      // worse, close the user's fresh ws mid-connect. See
+      // lib/handoffGuard.js for the full reasoning.
+      const hookBusy = typeof active?.isBusy === 'function' ? active.isBusy() : false
+      const decision = decideHandoff({
+        pending: true,
+        hookBusy,
+        priorTurnCount: Array.isArray(priorTurns) ? priorTurns.length : 0,
+      })
+      if (decision.action !== 'start') {
+        console.warn('[kelionStage] auto-fallback skipped —', decision.reason)
+        return
+      }
+      active.start({ priorTurns })
+    } catch (e) {
+      console.warn('[kelionStage] auto-fallback start() threw', e)
+    }
+  }, [liveProvider])
 
   // Unified trial HUD source of truth. Applies to both voice AND text
   // chat via the shared 15-min/day IP window on the server. Collapses
@@ -1501,7 +2229,10 @@ export default function KelionStage() {
     const tryOnce = () => {
       if (calledOnce) return
       calledOnce = true
-      try { startCamera() } catch (_) { /* banner surfaces the error */ }
+      // startCamera is async and now rejects on getUserMedia failure — use
+      // .catch() so an unhandled rejection doesn't crash the page. The
+      // visionError banner already surfaces the human-readable reason.
+      try { const p = startCamera(); if (p && typeof p.catch === 'function') p.catch(() => {}) } catch (_) { /* sync guard — same banner */ }
     }
     const onGesture = () => {
       tryOnce()
@@ -1572,6 +2303,154 @@ export default function KelionStage() {
     if (!cancelled) setAuthState({ signedIn: false, user: null })
     return () => { cancelled = true }
   }, [])
+
+  // Wire conversation-history store to live auth state. authTokenRef is
+  // a ref so passing it lazily avoids re-wiring on every render. The
+  // store picks server vs localStorage based on `signedIn`; this
+  // effect is intentionally a one-time configuration, the getters stay
+  // live across auth transitions.
+  useEffect(() => {
+    // Fresh auth cycle (either newly signed-in or back to signed-out)
+    // re-arms the "session expired" one-shot so a future 401 triggers
+    // the modal again.
+    if (authState.signedIn) {
+      try { resetSessionExpiredLatch() } catch (_) {}
+    }
+    configureConversationStore({
+      getAuthToken: () => authTokenRef.current,
+      getIsSignedIn: () => !!authState.signedIn,
+      onSessionExpired: () => {
+        // Audit #3: when the JWT expires mid-session, /api/conversations
+        // starts returning 401. Without a prompt, the user's turns leak
+        // into a hidden `g-*` guest thread and the real server thread
+        // silently stops receiving messages — from their POV the
+        // history "vanishes" on next reload. Tell them explicitly and
+        // reopen the sign-in modal so they can restore the session.
+        try { setAuthState({ signedIn: false, user: null }) } catch (_) {}
+        try { setSignInModalOpen(true) } catch (_) {}
+        try {
+          window.alert(
+            'Session expired — please sign in again to keep saving your chat history.'
+          )
+        } catch (_) { /* alert blocked (iframe sandbox) */ }
+      },
+    })
+  }, [authState.signedIn])
+
+  // Auto-save new chat messages to the conversation history backend.
+  // `savedUpToRef` tracks the prefix of `chatMessages` that has already
+  // been persisted so we only POST the delta.
+  //
+  // Two subtleties this effect MUST handle correctly, both of which
+  // the previous implementation got wrong (zero setItem calls on prod
+  // during streaming):
+  //
+  //   1. While `chatBusy` is true the last assistant message is a
+  //      half-streamed chunk (e.g. "Par" before "Paris"). Persisting
+  //      it now would save garbage and advance the cursor past the
+  //      final content — so we hold off on the tail until streaming
+  //      finishes (chatBusy flips back to false, which re-runs this
+  //      effect via the dep array).
+  //
+  //   2. SSE chunks fire many setChatMessages calls per second. Each
+  //      one triggers this effect and cancels the previous run's
+  //      closure. If we only advance `savedUpToRef` at the end of the
+  //      loop, rapid cancellations mean the ref never advances and
+  //      work repeats. We advance it incrementally, inside the loop,
+  //      the moment each message is actually persisted — cancellation
+  //      then just halts future iterations, it doesn't roll back
+  //      progress already made.
+  useEffect(() => {
+    const total = chatMessages.length
+    const start = savedUpToRef.current
+    if (total <= start) {
+      if (total < start) savedUpToRef.current = total // transcript was cleared
+      return
+    }
+    let cancelled = false
+    ;(async () => {
+      for (let i = start; i < chatMessages.length; i++) {
+        if (cancelled) return
+        const m = chatMessages[i]
+        if (!m || !m.content || !String(m.content).trim()) break
+        const isLast = i === chatMessages.length - 1
+        // Hold off on the still-streaming assistant tail — we'll pick
+        // it up once chatBusy flips back to false.
+        if (isLast && chatBusy && (m.role || 'user') === 'assistant') break
+        try {
+          await appendConversationMessage({ role: m.role || 'user', content: m.content })
+          // IMPORTANT: advance the cursor even when the effect got
+          // cancelled mid-await. The SSE streaming path flips
+          // `chatMessages` ~30×/s, so every chunk triggers a cleanup
+          // that sets `cancelled=true` on the in-flight save. Gating
+          // the cursor update on `!cancelled` meant a message that
+          // was *successfully* persisted could still be re-sent on
+          // the next effect run — which is how the same user turn
+          // ended up in the DB 2–3 times (audit #1, orphan threads).
+          // The save is idempotent from our side: once the POST
+          // resolves, the row exists, so cursor++ is correct
+          // regardless of whether we continue iterating.
+          savedUpToRef.current = i + 1
+        } catch { /* next change will retry from the unchanged cursor */ }
+      }
+    })()
+    return () => { cancelled = true }
+  }, [chatMessages, chatBusy])
+
+  // Load history list whenever the panel opens.
+  const refreshHistory = useCallback(async () => {
+    setHistoryLoading(true)
+    setHistoryError(null)
+    try {
+      const items = await listConversationsApi()
+      setHistoryItems(Array.isArray(items) ? items : [])
+    } catch (err) {
+      setHistoryError(err.message || 'Could not load history')
+    } finally {
+      setHistoryLoading(false)
+    }
+  }, [])
+  useEffect(() => {
+    if (!historyOpen) return
+    refreshHistory()
+  }, [historyOpen, refreshHistory, authState.signedIn])
+
+  // Actions invoked from the history panel.
+  const handleNewChat = useCallback(() => {
+    startNewConversation()
+    savedUpToRef.current = 0
+    setChatMessages([])
+    setChatError(null)
+    setHistoryOpen(false)
+  }, [])
+  const handleLoadHistory = useCallback(async (id) => {
+    setHistoryError(null)
+    try {
+      const conv = await loadConversationApi(id)
+      if (!conv) { setHistoryError('Conversation not found'); return }
+      const msgs = Array.isArray(conv.messages) ? conv.messages : []
+      setActiveConversationId(id)
+      // Mark the full loaded transcript as "already saved" so the
+      // auto-save effect doesn't re-append it as new turns.
+      savedUpToRef.current = msgs.length
+      setChatMessages(msgs.map((m) => ({ role: m.role, content: m.content })))
+      setHistoryOpen(false)
+    } catch (err) {
+      setHistoryError(err.message || 'Could not load conversation')
+    }
+  }, [])
+  const handleDeleteHistory = useCallback(async (id) => {
+    try {
+      await deleteConversationApi(id)
+    } finally {
+      if (getActiveConversationId() === id) {
+        setActiveConversationId(null)
+        savedUpToRef.current = 0
+        setChatMessages([])
+      }
+      refreshHistory()
+    }
+  }, [refreshHistory])
 
   // Stage 3 — after enough user turns, if not signed in, gently open the
   // "Remember me?" prompt ONCE. Dismissed permanently per-session on close.
@@ -1659,6 +2538,14 @@ export default function KelionStage() {
     setAuthState({ signedIn: false, user: null })
     setMemoryItems([])
     setMemoryOpen(false)
+    // Don't leak the previous user's server conversation into the
+    // now-signed-out guest session. Clear the active id, on-screen
+    // transcript, loaded history list, and the autosave cursor.
+    try { startNewConversation() } catch { /* ignore */ }
+    setChatMessages([])
+    setHistoryItems([])
+    setHistoryOpen(false)
+    savedUpToRef.current = 0
   }, [])
 
   const handleForgetAll = useCallback(async () => {
@@ -1769,10 +2656,16 @@ export default function KelionStage() {
   // click. The hook is a no-op on browsers without the Web Speech API
   // (Safari iOS, Firefox), so the manual tap flow stays untouched for
   // those users.
+  // Wake-word is armed ONLY on 'idle' — not on 'error'. After a
+  // protocol failure (1007/1008/1011) the user must tap the stage to
+  // explicitly retry. Auto-retrying from 'error' re-opens a WS against
+  // the same failing token / quota / model and loops the same error,
+  // which is exactly the "crapa dupa 2 min de funtionare 1007" Adrian
+  // reported on 2026-04-20.
   useWakeWord({
-    enabled: status === 'idle' || status === 'error',
+    enabled: status === 'idle',
     onDetect: () => {
-      if (status === 'idle' || status === 'error') {
+      if (status === 'idle') {
         try { start() } catch (_) { /* banner surfaces failure */ }
         if (!authState.signedIn) {
           if (trialRefreshTimerRef.current) clearTimeout(trialRefreshTimerRef.current)
@@ -1800,6 +2693,10 @@ export default function KelionStage() {
       {/* Debug-only Leva tuning drawer. Renders null unless the URL
           carries ?debug=1 or ?tune=1; zero cost for real users. */}
       {isTuningEnabled() && <TuningPanel />}
+      {/* PR #200 — toast overlay driven by uiActionStore. Fires when
+          Kelion calls ui_notify. Renders null when the queue is empty
+          so idle cost is zero. */}
+      <UIActionToast />
       <Canvas
         /* THREE 0.183 deprecated PCFSoftShadowMap (the r3f default when
            `shadows` is passed bare). Switch to VSMShadowMap — softer
@@ -1840,6 +2737,14 @@ export default function KelionStage() {
           <ContactShadows position={[1.6, -1.65, 0]} opacity={0.55} scale={5} blur={2.6} far={2.5} />
         </Suspense>
       </Canvas>
+
+      {/* Half-page monitor overlay — when Kelion calls show_on_monitor (map /
+          video / image / wiki / web), the content is rendered here as a 2D
+          panel covering the LEFT half of the viewport on desktop (bottom
+          sheet on mobile). Adrian: "inlocuirea monitorului cu jumate de
+          pagina … avatarul pe dreapta". The small 3D monitor in the scene
+          stays as decor. */}
+      <MonitorOverlay />
 
       <audio ref={audioRef} autoPlay playsInline />
 
@@ -2072,7 +2977,33 @@ export default function KelionStage() {
           // this event, so both paths work.
           onPaste={(e) => {
             try {
-              const text = (e.clipboardData || window.clipboardData)?.getData('text')
+              const cd = e.clipboardData || window.clipboardData
+              if (!cd) return
+
+              // Image paste: if the clipboard carries a binary image
+              // (screenshot, copied-from-browser image, drag-and-drop
+              // preview), convert the first one into a File and wire it
+              // through the same attachment pipeline as the paperclip.
+              // This fires before the text branch so a screenshot never
+              // gets silently dropped.
+              const items = cd.items ? Array.from(cd.items) : []
+              const imgItem = items.find((it) => it && it.kind === 'file' && typeof it.type === 'string' && it.type.startsWith('image/'))
+              if (imgItem) {
+                const blob = imgItem.getAsFile()
+                if (blob) {
+                  e.preventDefault()
+                  const ext = (blob.type.split('/')[1] || 'png').split(';')[0]
+                  const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+                  const named = (typeof File !== 'undefined')
+                    ? new File([blob], `pasted-${stamp}.${ext}`, { type: blob.type })
+                    : blob
+                  setAttachedFile(named)
+                  if (fileInputRef.current) { try { fileInputRef.current.value = '' } catch (_) {} }
+                  return
+                }
+              }
+
+              const text = cd.getData ? cd.getData('text') : ''
               if (text == null || text === '') return
               e.preventDefault()
               const el = e.currentTarget
@@ -2218,6 +3149,16 @@ export default function KelionStage() {
           display: 'flex', alignItems: 'center', gap: 8,
         }}
       >
+        {/* Plan C — voice-transport selection. Previously surfaced as a
+            "🎙️ GPT / Gem" pill next to the Credits chip so the active
+            provider could be flipped without DevTools. Adrian's feedback
+            ("de ce am 2 butoane de mic ... poate face functia asta dar
+            in spate automat, fara user sa vada, el vede doar butonul de
+            jos, de mic") asked for a single visible mic — the provider
+            swap is now done automatically on terminal failure (see the
+            auto-fallback effect where `liveProvider` is declared) and
+            persisted in localStorage so the next session starts on the
+            provider that last worked. Keyboard-quiet. */}
         {/* Credits pill — hidden for admins (they have unlimited access and
             no billing; showing "0 min" confused Adrian in testing). For
             regular signed-in users we still show balance + open the Stripe
@@ -2250,7 +3191,7 @@ export default function KelionStage() {
             metrics overlay, same as the overflow menu entry. */}
         {authState.signedIn && isAdmin && (
           <button
-            onClick={() => openBusiness()}
+            onClick={() => switchAdminTab('business')}
             style={{
               height: 36, padding: '0 12px', borderRadius: 999,
               background: 'linear-gradient(135deg, rgba(250, 204, 21, 0.18), rgba(167, 139, 250, 0.18))',
@@ -2260,8 +3201,8 @@ export default function KelionStage() {
               display: 'flex', alignItems: 'center', gap: 6,
               fontWeight: 600,
             }}
-            title="Admin — unlimited access"
-            aria-label="Admin — unlimited access"
+            title="Admin dashboard — Business, AI credits, Visitors, Users, Payouts"
+            aria-label="Open admin dashboard"
           >
             <span style={{ fontSize: 14 }}>🛡️</span>
             <span>Admin · ∞</span>
@@ -2336,7 +3277,11 @@ export default function KelionStage() {
           >
             Tools
           </div>
-          <MenuItem onClick={() => { cameraStream ? stopCamera() : startCamera(); setMenuOpen(false) }}>
+          <MenuItem onClick={() => {
+            if (cameraStream) { stopCamera() }
+            else { startCamera().catch(() => { /* banner surfaces the error */ }) }
+            setMenuOpen(false)
+          }}>
             {cameraStream ? '📹 Turn camera off' : '📹 Turn camera on'}
           </MenuItem>
           <MenuItem onClick={() => { screenStream ? stopScreen() : startScreen(); setMenuOpen(false) }}>
@@ -2379,11 +3324,27 @@ export default function KelionStage() {
             </MenuItem>
           ))}
           <div style={{ height: 6 }} />
+          {/* Conversation history — works for guests (localStorage)
+              and signed-in users (server). Above the auth gate so guests
+              can find their saved threads too. */}
+          <MenuItem onClick={() => { setHistoryOpen(true); setMenuOpen(false) }}>
+            Conversation history
+          </MenuItem>
+          <MenuItem onClick={() => { handleNewChat(); setMenuOpen(false) }}>
+            New chat
+          </MenuItem>
+          <div style={{ height: 6 }} />
           {/* Stage 3 — memory + passkey */}
           {authState.signedIn ? (
             <>
               <MenuItem onClick={() => { openMemory(); setMenuOpen(false) }}>
                 What do you know about me?
+              </MenuItem>
+              {/* Consensual voice clone — opens the multi-step modal
+                  (consent + record + manage). Signed-in only; the
+                  backend route is gated by requireAuth. */}
+              <MenuItem onClick={() => { setVoiceCloneOpen(true); setMenuOpen(false) }}>
+                Clone my voice
               </MenuItem>
               {/* Stage 5 — proactive pings */}
               {pushState.supported && (
@@ -2420,26 +3381,15 @@ export default function KelionStage() {
                   Install Kelion on this device
                 </MenuItem>
               )}
-              {/* Admin-only — AI credits dashboard (one button per AI we
-                  spend on + Stripe revenue card + top-up links + email
-                  alerts to contact@kelionai.app). */}
+              {/* Admin-only — unified dashboard. One entry that opens the
+                  admin shell with tabs for Business, AI credits, Visitors,
+                  Users, and Payouts. Replaces the three separate menu
+                  entries that used to live here (2026-04-20 Adrian:
+                  "management de admin integrat intr-un singur buton"). */}
               {isAdmin && (
-                <>
-                  <MenuItem onClick={() => { openCredits(); setMenuOpen(false) }}>
-                    AI credits (admin)
-                  </MenuItem>
-                  <MenuItem onClick={() => { openBusiness(); setMenuOpen(false) }}>
-                    Business metrics (admin)
-                  </MenuItem>
-                  {/* Visitor analytics — Adrian 2026-04-20: "nu vad buton
-                      vizite reale cine a vizitat situl, ip tara restul
-                      datelor lor". One row per SPA page load with IP,
-                      country, user-agent, referer, and (if signed in)
-                      email. */}
-                  <MenuItem onClick={() => { openVisitors(); setMenuOpen(false) }}>
-                    Visitors (admin)
-                  </MenuItem>
-                </>
+                <MenuItem onClick={() => { switchAdminTab('business'); setMenuOpen(false) }}>
+                  Admin dashboard
+                </MenuItem>
               )}
               {/* Sign out moved to the top-right action bar. */}
             </>
@@ -2636,6 +3586,13 @@ export default function KelionStage() {
         }}
       />
 
+      <VoiceCloneModal
+        open={voiceCloneOpen}
+        onClose={() => setVoiceCloneOpen(false)}
+        userEmail={authState.user && authState.user.email}
+        userName={authState.user && (authState.user.name || authState.user.displayName)}
+      />
+
       {/* Stage 3 — "Remember me" soft prompt */}
       {rememberPromptOpen && (
         <div
@@ -2810,6 +3767,151 @@ export default function KelionStage() {
         </div>
       )}
 
+      {/* Conversation history drawer — lists saved threads for both
+          guests (localStorage) and signed-in users (server). Clicking a
+          row replays that transcript into the chat log. */}
+      {historyOpen && (
+        <div
+          onClick={() => setHistoryOpen(false)}
+          style={{
+            position: 'absolute', inset: 0,
+            background: 'rgba(3, 4, 10, 0.35)',
+            zIndex: 23,
+          }}
+        />
+      )}
+      {historyOpen && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: 'absolute', top: 0, right: 0, bottom: 0,
+            width: 'min(460px, 94vw)',
+            background: 'rgba(10, 8, 20, 0.82)',
+            backdropFilter: 'blur(22px)',
+            borderLeft: '1px solid rgba(167, 139, 250, 0.2)',
+            padding: '70px 20px 20px 20px',
+            overflowY: 'auto',
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+            zIndex: 24,
+            color: '#ede9fe',
+          }}
+        >
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            marginBottom: 14,
+          }}>
+            <div style={{ fontSize: 11, opacity: 0.6, letterSpacing: '0.15em' }}>
+              CONVERSATION HISTORY
+            </div>
+            <button
+              onClick={() => setHistoryOpen(false)}
+              style={{
+                background: 'transparent', border: 'none', color: '#ede9fe',
+                fontSize: 20, cursor: 'pointer', opacity: 0.7,
+              }}
+              aria-label="Close"
+            >✕</button>
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+            <button
+              onClick={handleNewChat}
+              style={{
+                padding: '8px 12px', borderRadius: 10,
+                background: 'rgba(167, 139, 250, 0.18)',
+                border: '1px solid rgba(167, 139, 250, 0.35)',
+                color: '#ede9fe', cursor: 'pointer', fontSize: 13,
+              }}
+            >+ New chat</button>
+            <button
+              onClick={refreshHistory}
+              style={{
+                padding: '8px 12px', borderRadius: 10,
+                background: 'transparent',
+                border: '1px solid rgba(167, 139, 250, 0.25)',
+                color: '#ede9fe', cursor: 'pointer', fontSize: 13, opacity: 0.85,
+              }}
+            >Refresh</button>
+          </div>
+
+          {!authState.signedIn && (
+            <div style={{
+              marginBottom: 12, padding: '8px 12px', borderRadius: 10,
+              background: 'rgba(250, 204, 21, 0.08)',
+              border: '1px solid rgba(250, 204, 21, 0.25)',
+              fontSize: 12, lineHeight: 1.5, opacity: 0.9,
+            }}>
+              Signed-out — history is saved locally on this browser only. Sign in
+              to keep it across devices.
+            </div>
+          )}
+
+          {historyLoading && (
+            <div style={{ opacity: 0.5, fontSize: 14 }}>Loading…</div>
+          )}
+          {historyError && (
+            <div style={{
+              marginBottom: 10, padding: '8px 12px', borderRadius: 10,
+              background: 'rgba(239, 68, 68, 0.1)',
+              border: '1px solid rgba(239, 68, 68, 0.3)',
+              color: '#fecaca', fontSize: 13,
+            }}>{historyError}</div>
+          )}
+          {!historyLoading && historyItems.length === 0 && !historyError && (
+            <div style={{ opacity: 0.55, fontSize: 14, lineHeight: 1.5 }}>
+              No saved conversations yet. Your chat will be saved here
+              automatically as you talk.
+            </div>
+          )}
+          {historyItems.map((c) => {
+            const ts = c.updated_at ? new Date(c.updated_at) : null
+            const tsLabel = ts && !Number.isNaN(ts.getTime())
+              ? ts.toLocaleString()
+              : ''
+            return (
+              <div
+                key={c.id}
+                style={{
+                  marginBottom: 10, padding: '10px 12px',
+                  borderRadius: 10,
+                  background: 'rgba(167, 139, 250, 0.08)',
+                  borderLeft: '2px solid #a78bfa',
+                  fontSize: 14, lineHeight: 1.45,
+                  display: 'flex', alignItems: 'flex-start', gap: 10,
+                }}
+              >
+                <button
+                  onClick={() => handleLoadHistory(c.id)}
+                  style={{
+                    flex: 1, textAlign: 'left', background: 'transparent',
+                    border: 'none', color: '#ede9fe', cursor: 'pointer',
+                    padding: 0,
+                  }}
+                >
+                  <div style={{ fontWeight: 500, marginBottom: 2 }}>
+                    {c.title || '(untitled)'}
+                  </div>
+                  <div style={{ fontSize: 11, opacity: 0.55 }}>
+                    {c.message_count} {c.message_count === 1 ? 'message' : 'messages'}
+                    {tsLabel ? ` · ${tsLabel}` : ''}
+                  </div>
+                </button>
+                <button
+                  onClick={() => handleDeleteHistory(c.id)}
+                  style={{
+                    background: 'transparent',
+                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                    color: '#fecaca', cursor: 'pointer', fontSize: 12,
+                    padding: '4px 8px', borderRadius: 8,
+                  }}
+                  aria-label="Delete conversation"
+                >Delete</button>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
       {/* User-facing Buy-credits modal — centered overlay with the
           three standard packages (starter / standard / pro). Clicking
           a package creates a Stripe Checkout session and redirects to
@@ -2979,10 +4081,10 @@ export default function KelionStage() {
         >
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            marginBottom: 18,
+            marginBottom: 12,
           }}>
             <div style={{ fontSize: 11, opacity: 0.6, letterSpacing: '0.15em' }}>
-              BUSINESS — LAST 30 DAYS
+              ADMIN · BUSINESS — LAST 30 DAYS
             </div>
             <button
               onClick={() => setBusinessOpen(false)}
@@ -2993,6 +4095,7 @@ export default function KelionStage() {
               aria-label="Close"
             >✕</button>
           </div>
+          <AdminTabBar active="business" onSelect={switchAdminTab} />
 
           {businessLoading && (
             <div style={{ opacity: 0.55, fontSize: 14 }}>Crunching numbers…</div>
@@ -3103,10 +4206,10 @@ export default function KelionStage() {
         >
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            marginBottom: 18,
+            marginBottom: 12,
           }}>
             <div style={{ fontSize: 11, opacity: 0.6, letterSpacing: '0.15em' }}>
-              AI CREDITS — ADMIN
+              ADMIN · AI CREDITS
             </div>
             <button
               onClick={() => setCreditsOpen(false)}
@@ -3117,6 +4220,7 @@ export default function KelionStage() {
               aria-label="Close"
             >✕</button>
           </div>
+          <AdminTabBar active="ai" onSelect={switchAdminTab} />
 
           {creditsLoading && (
             <div style={{ opacity: 0.55, fontSize: 14 }}>Fetching provider balances…</div>
@@ -3484,13 +4588,90 @@ export default function KelionStage() {
             })()}
           </div>
 
+          {/* PR E2 — auto-topup info strip. Shows the admin at a glance
+              whether the saved card is wired, what threshold triggers
+              a refill, and when we last ran. Sits above the provider
+              cards so the friendly copy on each card is consistent
+              with the refill policy. */}
+          {!creditsLoading && autoTopupStatus && (() => {
+            const s = autoTopupStatus
+            const armed = s.configured && s.enabled
+            const tone = armed
+              ? { bg: 'rgba(34, 197, 94, 0.08)', border: 'rgba(34, 197, 94, 0.35)', text: '#bbf7d0' }
+              : { bg: 'rgba(245, 158, 11, 0.08)', border: 'rgba(245, 158, 11, 0.35)', text: '#fde68a' }
+            const thresholdPct = Math.round((s.threshold || 0.2) * 100)
+            const lastRunLabel = (() => {
+              const hist = s.history || {}
+              const entries = Object.entries(hist)
+              if (entries.length === 0) return null
+              const latest = entries.reduce((a, b) => ((a[1]?.ts || 0) > (b[1]?.ts || 0) ? a : b))
+              const [id, e] = latest
+              if (!e || !e.ts) return null
+              const when = new Date(e.ts).toLocaleString()
+              if (e.status === 'ok') {
+                return `Ultima reîncărcare: ${id} · ${e.amountEur} ${String(e.currency || 'eur').toUpperCase()} · ${when}`
+              }
+              return `Ultima încercare: ${id} · eșuată (${e.error || 'eroare necunoscută'}) · ${when}`
+            })()
+            return (
+              <div style={{
+                marginBottom: 14, padding: '12px 14px',
+                borderRadius: 12,
+                background: tone.bg,
+                border: `1px solid ${tone.border}`,
+                color: tone.text,
+                fontSize: 13, lineHeight: 1.5,
+              }}>
+                <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                  {armed
+                    ? `Auto-topup armat — sub ${thresholdPct}% cardul tău Stripe e taxat cu ${s.amountEur} ${String(s.currency || 'eur').toUpperCase()}.`
+                    : 'Auto-topup inactiv — leagă un card salvat în Stripe ca să activezi.'}
+                </div>
+                <div style={{ fontSize: 12, opacity: 0.85 }}>
+                  {armed
+                    ? `Verificăm la fiecare deschidere a panoului. Cooldown ${s.cooldownHours || 24}h ca să nu se încarce de două ori. Primim email de confirmare sau eroare.`
+                    : 'Setează OWNER_STRIPE_CUSTOMER_ID + OWNER_STRIPE_PAYMENT_METHOD_ID în Railway, apoi refresh. Cardul îl salvezi o dată în Stripe.'}
+                </div>
+                {lastRunLabel && (
+                  <div style={{ fontSize: 11, opacity: 0.75, marginTop: 6 }}>
+                    {lastRunLabel}
+                  </div>
+                )}
+                {!armed && (
+                  <a
+                    href={s.setupUrl || 'https://dashboard.stripe.com/customers'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: 'inline-block', marginTop: 8,
+                      fontSize: 12, color: '#fde68a',
+                      textDecoration: 'underline',
+                    }}
+                  >Deschide Stripe — Customers →</a>
+                )}
+              </div>
+            )
+          })()}
+
           {!creditsLoading && creditsCards.map((c) => {
-            const badge = {
+            const badge = ({
               ok: { bg: 'rgba(34, 197, 94, 0.12)', border: 'rgba(34, 197, 94, 0.55)', text: '#bbf7d0', label: 'OK' },
               low: { bg: 'rgba(245, 158, 11, 0.12)', border: 'rgba(245, 158, 11, 0.55)', text: '#fde68a', label: 'LOW' },
               error: { bg: 'rgba(239, 68, 68, 0.12)', border: 'rgba(239, 68, 68, 0.55)', text: '#fecaca', label: 'ERROR' },
+              // `unconfigured` = opt-in provider (Groq) intentionally left unset.
+              // Muted slate styling (not red) so the admin sees the state
+              // at-a-glance without thinking something is broken.
+              unconfigured: { bg: 'rgba(148, 163, 184, 0.12)', border: 'rgba(148, 163, 184, 0.5)', text: '#e2e8f0', label: 'NOT SET' },
               unknown: { bg: 'rgba(148, 163, 184, 0.1)', border: 'rgba(148, 163, 184, 0.4)', text: '#cbd5e1', label: '—' },
-            }[c.status || 'unknown']
+            })[c.status] || { bg: 'rgba(148, 163, 184, 0.1)', border: 'rgba(148, 163, 184, 0.4)', text: '#cbd5e1', label: '—' }
+            // PR E2 — friendly headline sits above the raw balance so
+            // admins scanning the grid read "credit suficient" /
+            // "credit aproape terminat" / "cheie lipsă" instead of
+            // parsing `123,456 / 500,000 chars` every time.
+            const friendly = friendlyCreditStatus(c)
+            const headlineColor = ({
+              ok: '#bbf7d0', warn: '#fde68a', error: '#fecaca', muted: '#e2e8f0',
+            })[friendly.tone] || '#ede9fe'
             return (
               <a
                 key={c.id}
@@ -3522,14 +4703,30 @@ export default function KelionStage() {
                     background: badge.bg, color: badge.text, border: `1px solid ${badge.border}`,
                   }}>{badge.label}</span>
                 </div>
-                {c.subtitle && (
-                  <div style={{ fontSize: 12, opacity: 0.55, marginBottom: 8 }}>{c.subtitle}</div>
-                )}
-                <div style={{ fontSize: 14, marginBottom: 4 }}>
-                  {c.balanceDisplay || '—'}
+                <div style={{
+                  fontSize: 14, fontWeight: 600,
+                  color: headlineColor, marginBottom: friendly.sub ? 2 : 6,
+                }}>
+                  {friendly.headline}
                 </div>
-                {c.message && (
-                  <div style={{ fontSize: 11, opacity: 0.6, marginTop: 4 }}>
+                {friendly.sub && (
+                  <div style={{ fontSize: 11, opacity: 0.7, marginBottom: 6 }}>
+                    {friendly.sub}
+                  </div>
+                )}
+                {c.subtitle && (
+                  <div style={{ fontSize: 11, opacity: 0.5, marginBottom: 6 }}>{c.subtitle}</div>
+                )}
+                {/* Raw numbers kept small so the admin can cross-check
+                    against the provider dashboard without drowning the
+                    friendly headline. */}
+                {c.balanceDisplay && c.balanceDisplay !== '—' && (
+                  <div style={{ fontSize: 11, opacity: 0.6 }}>
+                    {c.balanceDisplay}
+                  </div>
+                )}
+                {c.message && c.status !== 'ok' && (
+                  <div style={{ fontSize: 10, opacity: 0.55, marginTop: 4 }}>
                     {c.message}
                   </div>
                 )}
@@ -3582,10 +4779,10 @@ export default function KelionStage() {
         >
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            marginBottom: 14,
+            marginBottom: 12,
           }}>
             <div style={{ fontSize: 11, opacity: 0.6, letterSpacing: '0.15em' }}>
-              VISITORS — ADMIN
+              ADMIN · VISITORS
             </div>
             <button
               onClick={() => setVisitorsOpen(false)}
@@ -3596,55 +4793,13 @@ export default function KelionStage() {
               aria-label="Close"
             >✕</button>
           </div>
+          <AdminTabBar active="visitors" onSelect={switchAdminTab} />
 
-          {/* Stats header — last 24h summary. */}
-          {visitorsStats && (
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3, 1fr)',
-              gap: 8,
-              marginBottom: 16,
-            }}>
-              <div style={{
-                padding: '10px 12px', borderRadius: 10,
-                background: 'rgba(167, 139, 250, 0.06)',
-                border: '1px solid rgba(167, 139, 250, 0.2)',
-              }}>
-                <div style={{ fontSize: 10, opacity: 0.6, letterSpacing: '0.1em' }}>
-                  VISITS ({visitorsStats.windowHours}H)
-                </div>
-                <div style={{ fontSize: 22, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
-                  {visitorsStats.totalVisits}
-                </div>
-              </div>
-              <div style={{
-                padding: '10px 12px', borderRadius: 10,
-                background: 'rgba(167, 139, 250, 0.06)',
-                border: '1px solid rgba(167, 139, 250, 0.2)',
-              }}>
-                <div style={{ fontSize: 10, opacity: 0.6, letterSpacing: '0.1em' }}>
-                  UNIQUE IPS
-                </div>
-                <div style={{ fontSize: 22, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
-                  {visitorsStats.uniqueIps}
-                </div>
-              </div>
-              <div style={{
-                padding: '10px 12px', borderRadius: 10,
-                background: 'rgba(167, 139, 250, 0.06)',
-                border: '1px solid rgba(167, 139, 250, 0.2)',
-              }}>
-                <div style={{ fontSize: 10, opacity: 0.6, letterSpacing: '0.1em' }}>
-                  TOP COUNTRIES
-                </div>
-                <div style={{ fontSize: 13, marginTop: 4 }}>
-                  {Array.isArray(visitorsStats.topCountries) && visitorsStats.topCountries.length > 0
-                    ? visitorsStats.topCountries.map((c) => `${c.country} (${c.n})`).join(', ')
-                    : <span style={{ opacity: 0.55 }}>—</span>}
-                </div>
-              </div>
-            </div>
-          )}
+          {/* PR E4 — advanced analytics block (replaces the old 3-card
+              24h header). Chart + country list + device mix + funnel.
+              Renders only when the new endpoint returned data; the old
+              rows table below is unchanged. */}
+          <VisitorsAnalyticsPanel data={visitorsAnalytics} />
 
           {visitorsLoading && (
             <div style={{ opacity: 0.55, fontSize: 14 }}>Loading visitors…</div>
@@ -3735,6 +4890,406 @@ export default function KelionStage() {
         </div>
       )}
 
+      {/* Admin — Users tab. Placeholder panel for now; the unified shell
+          gives the tab a permanent home so it doesn't drift around the
+          overflow menu, and a future PR will wire up /api/admin/users
+          (list, search by email, grant credits, ban, reset password,
+          view ledger). Adrian 2026-04-20: "Users list, search email,
+          grant credits, ban, reset password, view history". Marked
+          "nu acum" for the mutating actions — they land in PR E5. */}
+      {usersOpen && (
+        <div
+          onClick={() => setUsersOpen(false)}
+          style={{
+            position: 'absolute', inset: 0,
+            background: 'rgba(3, 4, 10, 0.35)',
+            zIndex: 25,
+          }}
+        />
+      )}
+      {usersOpen && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: 'absolute', top: 0, right: 0, bottom: 0,
+            width: 'min(560px, 98vw)',
+            background: 'rgba(10, 8, 20, 0.92)',
+            backdropFilter: 'blur(22px)',
+            borderLeft: '1px solid rgba(167, 139, 250, 0.2)',
+            padding: '70px 20px 24px 20px',
+            overflowY: 'auto',
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+            zIndex: 26,
+            color: '#ede9fe',
+          }}
+        >
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            marginBottom: 12,
+          }}>
+            <div style={{ fontSize: 11, opacity: 0.6, letterSpacing: '0.15em' }}>
+              ADMIN · USERS
+            </div>
+            <button
+              onClick={() => setUsersOpen(false)}
+              style={{
+                background: 'transparent', border: 'none', color: '#ede9fe',
+                fontSize: 20, cursor: 'pointer', opacity: 0.7,
+              }}
+              aria-label="Close"
+            >✕</button>
+          </div>
+          <AdminTabBar active="users" onSelect={switchAdminTab} />
+
+          {/* F3 — Duplicate accounts card. Lists every email that has
+              more than one user row and offers a "Merge" button per
+              peer. Merging moves conversations, credits, memory, etc.
+              from the chosen source row into the target and deletes
+              the source. The API refuses a merge across different
+              emails; the UI also asks for confirmation before firing
+              since the action is irreversible. */}
+          <div style={{
+            padding: '16px',
+            background: 'rgba(250, 204, 21, 0.05)',
+            border: '1px solid rgba(250, 204, 21, 0.2)',
+            borderRadius: 12,
+            fontSize: 14,
+            lineHeight: 1.5,
+            marginBottom: 14,
+          }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              marginBottom: 10,
+            }}>
+              <div style={{ fontWeight: 600, fontSize: 15 }}>
+                Conturi duplicate
+              </div>
+              <button
+                onClick={refreshDuplicateUsers}
+                disabled={dupLoading}
+                style={{
+                  padding: '5px 10px',
+                  background: 'rgba(250, 204, 21, 0.12)',
+                  border: '1px solid rgba(250, 204, 21, 0.3)',
+                  borderRadius: 6,
+                  color: '#fef3c7',
+                  fontSize: 11,
+                  cursor: dupLoading ? 'wait' : 'pointer',
+                  opacity: dupLoading ? 0.6 : 1,
+                }}
+              >
+                {dupLoading ? 'Se verifică…' : 'Reîncarcă'}
+              </button>
+            </div>
+            {dupError && (
+              <div style={{
+                padding: '8px 10px', marginBottom: 8,
+                background: 'rgba(239, 68, 68, 0.1)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                borderRadius: 6, fontSize: 12, color: '#fecaca',
+              }}>
+                {dupError}
+              </div>
+            )}
+            {dupResult && (
+              <div style={{
+                padding: '8px 10px', marginBottom: 8,
+                background: dupResult.ok
+                  ? 'rgba(34, 197, 94, 0.1)'
+                  : 'rgba(239, 68, 68, 0.1)',
+                border: `1px solid ${dupResult.ok
+                  ? 'rgba(34, 197, 94, 0.3)'
+                  : 'rgba(239, 68, 68, 0.3)'}`,
+                borderRadius: 6, fontSize: 12,
+                color: dupResult.ok ? '#bbf7d0' : '#fecaca',
+              }}>
+                {dupResult.ok ? (
+                  <>
+                    Merge reușit: user {dupResult.sourceId} → {dupResult.targetId}
+                    {dupResult.email ? ` (${dupResult.email})` : ''}.
+                    {Object.keys(dupResult.moved).length > 0 && (
+                      <> Mutate: {Object.entries(dupResult.moved)
+                        .filter(([, n]) => n > 0)
+                        .map(([k, n]) => `${k}=${n}`)
+                        .join(', ') || '—'}.</>
+                    )}
+                  </>
+                ) : (
+                  <>Merge eșuat ({dupResult.sourceId} → {dupResult.targetId}): {dupResult.error}</>
+                )}
+              </div>
+            )}
+            {!dupLoading && !dupError && dupGroups.length === 0 && (
+              <div style={{ opacity: 0.75, fontSize: 13 }}>
+                Niciun email nu are conturi multiple — totul e curat.
+              </div>
+            )}
+            {dupGroups.map((g) => {
+              const canonical = (g.users && g.users[0]) || null
+              return (
+                <div
+                  key={g.email}
+                  style={{
+                    padding: '10px 12px',
+                    marginBottom: 10,
+                    background: 'rgba(10, 8, 20, 0.35)',
+                    border: '1px solid rgba(167, 139, 250, 0.2)',
+                    borderRadius: 8,
+                  }}
+                >
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+                    {g.email}
+                    <span style={{ opacity: 0.55, fontWeight: 400, marginLeft: 6 }}>
+                      · {g.count} conturi
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 8 }}>
+                    Păstrăm contul cel mai vechi (primul din listă) ca țintă.
+                    Butonul "Merge → {canonical ? `#${canonical.id}` : '…'}"
+                    mută totul de pe peer pe el și șterge peer-ul.
+                  </div>
+                  {(g.users || []).map((u, idx) => {
+                    const isCanonical = canonical && u.id === canonical.id
+                    const key = `${u.id}->${canonical && canonical.id}`
+                    const busy = dupBusyKey === key
+                    return (
+                      <div
+                        key={u.id}
+                        style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                          padding: '6px 8px', marginBottom: 4,
+                          background: isCanonical
+                            ? 'rgba(34, 197, 94, 0.06)'
+                            : 'rgba(255, 255, 255, 0.02)',
+                          border: `1px solid ${isCanonical
+                            ? 'rgba(34, 197, 94, 0.25)'
+                            : 'rgba(167, 139, 250, 0.12)'}`,
+                          borderRadius: 6,
+                          fontSize: 12,
+                        }}
+                      >
+                        <div style={{ minWidth: 0, flex: 1, marginRight: 8 }}>
+                          <div style={{ fontWeight: 600, marginBottom: 2 }}>
+                            #{u.id} {u.name ? `· ${u.name}` : ''}
+                            {isCanonical && (
+                              <span style={{
+                                marginLeft: 6, fontSize: 10, fontWeight: 400,
+                                color: '#bbf7d0',
+                              }}>
+                                ← țintă (se păstrează)
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ opacity: 0.6, fontSize: 11 }}>
+                            {u.google_id ? 'Google · ' : ''}
+                            {u.password_hash ? 'parolă · ' : ''}
+                            {u.stripe_customer_id ? 'Stripe · ' : ''}
+                            creat {u.created_at ? new Date(u.created_at).toLocaleDateString() : '?'}
+                          </div>
+                        </div>
+                        {!isCanonical && canonical && (
+                          <button
+                            onClick={() => mergeDuplicateUsers(u.id, canonical.id, g.email)}
+                            disabled={busy}
+                            style={{
+                              padding: '5px 10px',
+                              background: busy
+                                ? 'rgba(167, 139, 250, 0.1)'
+                                : 'rgba(167, 139, 250, 0.18)',
+                              border: '1px solid rgba(167, 139, 250, 0.45)',
+                              borderRadius: 6,
+                              color: '#ede9fe',
+                              fontSize: 11,
+                              cursor: busy ? 'wait' : 'pointer',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {busy ? 'Merge…' : `Merge → #${canonical.id}`}
+                          </button>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })}
+          </div>
+
+          <div style={{
+            padding: '18px 16px',
+            background: 'rgba(167, 139, 250, 0.06)',
+            border: '1px solid rgba(167, 139, 250, 0.2)',
+            borderRadius: 12,
+            fontSize: 14,
+            lineHeight: 1.55,
+          }}>
+            <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 15 }}>
+              User management — în construcție
+            </div>
+            <div style={{ opacity: 0.75, marginBottom: 10 }}>
+              Tab-ul este rezervat; panoul complet se activează în următorul
+              PR al seriei admin. Funcții planificate:
+            </div>
+            <ul style={{ paddingLeft: 18, margin: 0, opacity: 0.82 }}>
+              <li>Listă useri cu email, dată înregistrare, ultimă activitate.</li>
+              <li>Căutare după email sau ID.</li>
+              <li>Grant credits manual (pentru refund sau goodwill).</li>
+              <li>Resetare parolă (trimite email de reset).</li>
+              <li>Ban / unban (blochează login și API).</li>
+              <li>Istoric top-ups și consum per user.</li>
+            </ul>
+            <div style={{
+              marginTop: 14, padding: '10px 12px',
+              background: 'rgba(250, 204, 21, 0.08)',
+              border: '1px solid rgba(250, 204, 21, 0.25)',
+              borderRadius: 8,
+              fontSize: 12, opacity: 0.85,
+            }}>
+              Până atunci, /api/admin/credits/ledger din tab-ul Business
+              arată deja fiecare top-up și consum cu user-ul asociat.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin — Payouts tab. Shows where the owner's half of each
+          top-up ends up. Stripe already runs the automatic payout
+          schedule (set once in the Stripe Dashboard); this panel is a
+          read-only view into what Stripe is about to pay + a link to
+          the dashboard. Future iteration (PR E3) will add the 50/50
+          ledger split view and an on-demand "Instant payout" button.
+          Adrian 2026-04-20: "A pot da cardul unde sa se faca payouut?"
+          — answered via the "Set up payout destination" link, which
+          deep-links to Stripe's external-account settings. */}
+      {payoutsOpen && (
+        <div
+          onClick={() => setPayoutsOpen(false)}
+          style={{
+            position: 'absolute', inset: 0,
+            background: 'rgba(3, 4, 10, 0.35)',
+            zIndex: 25,
+          }}
+        />
+      )}
+      {payoutsOpen && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: 'absolute', top: 0, right: 0, bottom: 0,
+            width: 'min(560px, 98vw)',
+            background: 'rgba(10, 8, 20, 0.92)',
+            backdropFilter: 'blur(22px)',
+            borderLeft: '1px solid rgba(167, 139, 250, 0.2)',
+            padding: '70px 20px 24px 20px',
+            overflowY: 'auto',
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+            zIndex: 26,
+            color: '#ede9fe',
+          }}
+        >
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            marginBottom: 12,
+          }}>
+            <div style={{ fontSize: 11, opacity: 0.6, letterSpacing: '0.15em' }}>
+              ADMIN · PAYOUTS
+            </div>
+            <button
+              onClick={() => setPayoutsOpen(false)}
+              style={{
+                background: 'transparent', border: 'none', color: '#ede9fe',
+                fontSize: 20, cursor: 'pointer', opacity: 0.7,
+              }}
+              aria-label="Close"
+            >✕</button>
+          </div>
+          <AdminTabBar active="payouts" onSelect={switchAdminTab} />
+
+          <div style={{
+            padding: '14px 16px',
+            background: 'rgba(96, 165, 250, 0.06)',
+            border: '1px solid rgba(96, 165, 250, 0.25)',
+            borderRadius: 12,
+            fontSize: 13, lineHeight: 1.55,
+            marginBottom: 14,
+          }}>
+            <div style={{ fontWeight: 600, marginBottom: 6, fontSize: 14 }}>
+              Cum ajung banii la tine
+            </div>
+            <div style={{ opacity: 0.82 }}>
+              Stripe varsă automat soldul în contul/ cardul pe care l-ai
+              conectat ca "external account". Nu trebuie să inițiezi tu
+              nimic — odată configurat, fiecare top-up al unui user trece
+              prin: Stripe Checkout → Stripe balance → payout automat (zilnic
+              sau săptămânal, după setarea ta). Jumătate din fiecare top-up
+              e deja rezervată intern pentru costurile AI (OpenAI, Groq,
+              ElevenLabs), cealaltă jumătate e profitul net.
+            </div>
+          </div>
+
+          <a
+            href="https://dashboard.stripe.com/settings/payouts"
+            target="_blank" rel="noopener noreferrer"
+            style={{
+              display: 'block',
+              padding: '12px 14px',
+              marginBottom: 10,
+              background: 'rgba(167, 139, 250, 0.12)',
+              border: '1px solid rgba(167, 139, 250, 0.35)',
+              borderRadius: 12,
+              color: '#ede9fe',
+              textDecoration: 'none',
+              fontSize: 14,
+              fontWeight: 500,
+              cursor: 'pointer',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Setează destinația payout-urilor</span>
+              <span style={{ fontSize: 12, opacity: 0.6 }}>Stripe ↗</span>
+            </div>
+            <div style={{ fontSize: 11, opacity: 0.65, marginTop: 4 }}>
+              Adaugi un IBAN sau un card de debit o singură dată. Recomandat:
+              Visa/Mastercard Debit (Revolut, Wise, Starling) pentru plăți
+              instant în 30 min.
+            </div>
+          </a>
+
+          <a
+            href="https://dashboard.stripe.com/payouts"
+            target="_blank" rel="noopener noreferrer"
+            style={{
+              display: 'block',
+              padding: '12px 14px',
+              marginBottom: 10,
+              background: 'rgba(167, 139, 250, 0.06)',
+              border: '1px solid rgba(167, 139, 250, 0.15)',
+              borderRadius: 12,
+              color: '#ede9fe',
+              textDecoration: 'none',
+              fontSize: 14,
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Istoric payout-uri</span>
+              <span style={{ fontSize: 12, opacity: 0.6 }}>Stripe ↗</span>
+            </div>
+            <div style={{ fontSize: 11, opacity: 0.65, marginTop: 4 }}>
+              Fiecare plată către banca/cardul tău, cu data și suma.
+            </div>
+          </a>
+
+          <PayoutsPanel
+            data={payoutsData}
+            loading={payoutsLoading}
+            error={payoutsError}
+            onInstantPayout={triggerInstantPayout}
+            busy={payoutBusy}
+            result={payoutResult}
+          />
+        </div>
+      )}
+
       <style>{`
         @keyframes pulse {
           0%, 100% { opacity: 1; transform: scale(1); }
@@ -3776,6 +5331,494 @@ function TopBarIconButton({ children, onClick, disabled, active, title, ariaLabe
       }}
     >{children}</button>
   )
+}
+
+// Admin shell — single entry point behaves like a dashboard with tabs.
+// Each tab maps 1:1 to an existing modal drawer (Business / AI / Visitors)
+// or a new placeholder panel (Users / Payouts). The parent component owns
+// one open state per tab; this bar only issues `onSelect(key)` and lets
+// the parent do the routing so the existing open*() data-fetch helpers
+// are reused without duplication.
+//
+// 2026-04-20 Adrian: "gindeste o structura informationala de admin adevarata,
+// un management integrat intru-un singur buton acolo cu subutoane".
+const ADMIN_TABS = [
+  { key: 'business', label: 'Business', emoji: '💼' },
+  { key: 'ai',       label: 'AI',       emoji: '🧠' },
+  { key: 'visitors', label: 'Visitors', emoji: '👥' },
+  { key: 'users',    label: 'Users',    emoji: '🧑‍🤝‍🧑' },
+  { key: 'payouts',  label: 'Payouts',  emoji: '💸' },
+];
+
+function AdminTabBar({ active, onSelect }) {
+  return (
+    <div
+      style={{
+        display: 'flex', gap: 4, flexWrap: 'wrap',
+        marginBottom: 14, paddingBottom: 10,
+        borderBottom: '1px solid rgba(167, 139, 250, 0.15)',
+      }}
+    >
+      {ADMIN_TABS.map((t) => {
+        const isActive = t.key === active;
+        return (
+          <button
+            key={t.key}
+            onClick={() => onSelect(t.key)}
+            style={{
+              padding: '6px 11px',
+              fontSize: 12,
+              background: isActive
+                ? 'rgba(167, 139, 250, 0.25)'
+                : 'rgba(167, 139, 250, 0.06)',
+              border: isActive
+                ? '1px solid rgba(167, 139, 250, 0.55)'
+                : '1px solid rgba(167, 139, 250, 0.12)',
+              color: isActive ? '#fff' : 'rgba(237, 233, 254, 0.72)',
+              borderRadius: 999,
+              cursor: 'pointer',
+              fontWeight: isActive ? 600 : 400,
+              display: 'flex', alignItems: 'center', gap: 5,
+              transition: 'background 0.12s, border-color 0.12s',
+            }}
+            aria-pressed={isActive}
+            aria-label={`Admin tab: ${t.label}`}
+          >
+            <span aria-hidden="true">{t.emoji}</span>
+            <span>{t.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// PR E4 — Visitors analytics. Replaces the old "super rudimentar"
+// top-5 country tally with a 30-day chart, full country list, device
+// mix, and login→topup→usage funnel. Renders whatever fields the
+// server returned; missing pieces degrade silently instead of
+// blanking the whole block.
+function flagEmoji(code) {
+  // Two-letter ISO country code → Unicode flag emoji. We don't ship a
+  // country-code table just to render flags: the emoji is assembled
+  // from the two regional-indicator code points.
+  if (!code || typeof code !== 'string' || code.length < 2) return ''
+  const cc = code.trim().toUpperCase()
+  if (!/^[A-Z]{2}$/.test(cc)) return ''
+  const base = 0x1f1e6 - 65
+  return String.fromCodePoint(base + cc.charCodeAt(0), base + cc.charCodeAt(1))
+}
+
+function VisitorsAnalyticsPanel({ data }) {
+  if (!data) return null
+  const totals = data.totals || { visits: 0, signedInVisits: 0, uniqueUsers: 0 }
+  const byCountry = Array.isArray(data.byCountry) ? data.byCountry : []
+  const byDevice = data.byDevice || {}
+  const byDay = Array.isArray(data.byDay) ? data.byDay : []
+  const funnel = data.funnel || {}
+
+  // Sparkline path for the 30-day visitors chart. Inline SVG keeps us
+  // from pulling a charting dep for one line + a filled area.
+  const w = 600, h = 90, pad = 4
+  const maxDay = Math.max(1, ...byDay.map((d) => d.count))
+  const pts = byDay.map((d, i) => {
+    const x = pad + (byDay.length > 1 ? (i / (byDay.length - 1)) * (w - 2 * pad) : w / 2)
+    const y = h - pad - ((d.count / maxDay) * (h - 2 * pad))
+    return [x, y]
+  })
+  const linePath = pts.map((p, i) => (i === 0 ? `M${p[0]},${p[1]}` : `L${p[0]},${p[1]}`)).join(' ')
+  const areaPath = pts.length
+    ? `${linePath} L${pts[pts.length - 1][0]},${h - pad} L${pts[0][0]},${h - pad} Z`
+    : ''
+
+  const deviceOrder = [
+    ['desktop', 'Desktop', '#818cf8'],
+    ['mobile', 'Mobil', '#f472b6'],
+    ['tablet', 'Tabletă', '#34d399'],
+    ['bot', 'Bot', '#fbbf24'],
+    ['unknown', 'Necunoscut', '#64748b'],
+  ]
+  const deviceTotal = deviceOrder.reduce((a, [k]) => a + (byDevice[k] || 0), 0) || 1
+
+  const funnelSteps = [
+    { label: 'Vizite', count: funnel.visits || 0 },
+    { label: 'Vizite cu cont logat', count: funnel.signedInVisits || 0 },
+    { label: 'Utilizatori unici logați', count: funnel.uniqueSignedInUsers || 0 },
+    { label: 'Au făcut top-up', count: funnel.usersWithTopup || 0 },
+    { label: 'Au consumat credite', count: funnel.usersWithConsumption || 0 },
+  ]
+  const funnelMax = Math.max(1, ...funnelSteps.map((s) => s.count))
+
+  const maxCountry = byCountry[0] ? byCountry[0].count : 1
+  const topCountries = byCountry.slice(0, 10)
+
+  const card = {
+    padding: '12px 14px', borderRadius: 10,
+    background: 'rgba(167, 139, 250, 0.06)',
+    border: '1px solid rgba(167, 139, 250, 0.2)',
+  }
+  const label = { fontSize: 10, opacity: 0.6, letterSpacing: '0.1em' }
+  const value = { fontSize: 22, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
+      {/* KPI row — last 30 days totals. */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+        <div style={card}>
+          <div style={label}>VIZITE 30Z</div>
+          <div style={value}>{totals.visits}</div>
+        </div>
+        <div style={card}>
+          <div style={label}>LOGAȚI</div>
+          <div style={value}>{totals.uniqueUsers}</div>
+        </div>
+        <div style={card}>
+          <div style={label}>% LOGAT</div>
+          <div style={value}>
+            {totals.visits > 0 ? Math.round((totals.signedInVisits * 100) / totals.visits) : 0}%
+          </div>
+        </div>
+      </div>
+
+      {/* 30-day chart */}
+      <div style={card}>
+        <div style={{ ...label, marginBottom: 4 }}>TRAFIC / ZI · ULTIMELE 30 ZILE</div>
+        <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ width: '100%', height: 90 }}>
+          {areaPath && <path d={areaPath} fill="rgba(167, 139, 250, 0.25)" />}
+          {linePath && <path d={linePath} fill="none" stroke="#a78bfa" strokeWidth="1.5" />}
+        </svg>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, opacity: 0.5 }}>
+          <span>{byDay[0] ? byDay[0].day : ''}</span>
+          <span>azi</span>
+        </div>
+      </div>
+
+      {/* Geografie — full country list (replaces old top-5) */}
+      <div style={card}>
+        <div style={{ ...label, marginBottom: 6 }}>
+          GEOGRAFIE · {byCountry.length} țări
+        </div>
+        {topCountries.length === 0 ? (
+          <div style={{ fontSize: 12, opacity: 0.55 }}>
+            Niciun country header primit. Pe Railway nu e CDN geo-header
+            (cf-ipcountry); vezi middleware/visitorLog.js.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {topCountries.map((c) => (
+              <div key={c.country} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                <span style={{ width: 24, fontSize: 16 }}>{flagEmoji(c.country)}</span>
+                <span style={{ width: 40, fontFamily: 'ui-monospace, monospace' }}>{c.country}</span>
+                <div style={{ flex: 1, height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 3 }}>
+                  <div style={{
+                    height: '100%', width: `${(c.count / maxCountry) * 100}%`,
+                    background: '#a78bfa', borderRadius: 3,
+                  }} />
+                </div>
+                <span style={{ width: 40, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                  {c.count}
+                </span>
+              </div>
+            ))}
+            {byCountry.length > topCountries.length && (
+              <div style={{ fontSize: 11, opacity: 0.5, marginTop: 4 }}>
+                + încă {byCountry.length - topCountries.length} țări
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Device mix */}
+      <div style={card}>
+        <div style={{ ...label, marginBottom: 6 }}>DISPOZITIVE</div>
+        <div style={{ display: 'flex', height: 10, borderRadius: 5, overflow: 'hidden', background: 'rgba(255,255,255,0.05)' }}>
+          {deviceOrder.map(([k, , color]) => {
+            const n = byDevice[k] || 0
+            if (!n) return null
+            return (
+              <div key={k} style={{ width: `${(n * 100) / deviceTotal}%`, background: color }} />
+            )
+          })}
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 8, fontSize: 12 }}>
+          {deviceOrder.map(([k, lbl, color]) => (
+            <span key={k} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ width: 8, height: 8, background: color, borderRadius: 2, display: 'inline-block' }} />
+              {lbl}: <b style={{ fontVariantNumeric: 'tabular-nums' }}>{byDevice[k] || 0}</b>
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Funnel */}
+      <div style={card}>
+        <div style={{ ...label, marginBottom: 6 }}>CONVERSIE (VIZITĂ → CLIENT)</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {funnelSteps.map((s) => (
+            <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+              <span style={{ flex: '0 0 180px', opacity: 0.8 }}>{s.label}</span>
+              <div style={{ flex: 1, height: 8, background: 'rgba(255,255,255,0.05)', borderRadius: 4 }}>
+                <div style={{
+                  height: '100%',
+                  width: `${(s.count / funnelMax) * 100}%`,
+                  background: 'linear-gradient(90deg,#a78bfa,#f472b6)',
+                  borderRadius: 4,
+                }} />
+              </div>
+              <span style={{ width: 48, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                {s.count}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// PR E3 — Payouts panel. Live Stripe balance + destination + recent
+// payouts + 50/50 split over the last 30 days. The server aggregator
+// never throws; partial failures come back in `data.errors` and we
+// render whatever did load.
+function PayoutsPanel({ data, loading, error, onInstantPayout, busy, result }) {
+  if (loading && !data) {
+    return <div style={{ fontSize: 13, opacity: 0.7, padding: '14px 4px' }}>Se încarcă…</div>
+  }
+  if (error) {
+    return (
+      <div style={{
+        marginTop: 14, padding: '12px 14px',
+        background: 'rgba(248, 113, 113, 0.08)',
+        border: '1px solid rgba(248, 113, 113, 0.35)',
+        borderRadius: 12, fontSize: 13, lineHeight: 1.5,
+      }}>
+        <div style={{ fontWeight: 600, marginBottom: 4 }}>Nu pot încărca payout-urile</div>
+        <div style={{ opacity: 0.85 }}>{error}</div>
+      </div>
+    )
+  }
+  if (!data) return null
+  if (!data.configured) {
+    return (
+      <div style={{
+        marginTop: 14, padding: '12px 14px',
+        background: 'rgba(250, 204, 21, 0.08)',
+        border: '1px solid rgba(250, 204, 21, 0.35)',
+        borderRadius: 12, fontSize: 13, lineHeight: 1.55,
+      }}>
+        <div style={{ fontWeight: 600, marginBottom: 4 }}>Stripe nu e încă legat</div>
+        <div style={{ opacity: 0.85 }}>
+          Setează STRIPE_SECRET_KEY pe server ca să vezi soldul real aici.
+        </div>
+      </div>
+    )
+  }
+
+  const fmt = (bucket) => (bucket && bucket.display) || '—'
+  // `buildRevenueSplit` returns { window, fraction, revenue, allocation, ... };
+  // the earlier draft guessed the shape and the 50/50 card silently rendered
+  // three "—" values on prod. Pull the fields from their real paths.
+  const split = data.split || {}
+  const days = (split.window && split.window.days) || 30
+  const gross = split.revenue && split.revenue.grossDisplay
+  const reserved = split.allocation && split.allocation.display
+  const profit = split.allocation && split.allocation.ownerDisplay
+  const recent = Array.isArray(data.recentPayouts) ? data.recentPayouts : []
+  const destination = data.destination
+  const canInstant = Boolean(data.instantEligible) && (data.balance && data.balance.instantAvailable && data.balance.instantAvailable.amount > 0)
+
+  return (
+    <div>
+      {/* Live balance */}
+      <div style={{
+        marginTop: 4, padding: '14px 16px',
+        background: 'rgba(16, 185, 129, 0.08)',
+        border: '1px solid rgba(16, 185, 129, 0.25)',
+        borderRadius: 12, fontSize: 13, lineHeight: 1.55,
+      }}>
+        <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 14 }}>Sold Stripe</div>
+        <PayoutsRow label="Disponibil acum" value={fmt(data.balance && data.balance.available)} />
+        <PayoutsRow label="În tranzit (pending)" value={fmt(data.balance && data.balance.pending)} />
+        <PayoutsRow label="Eligibil pentru instant" value={fmt(data.balance && data.balance.instantAvailable)} />
+      </div>
+
+      {/* Destination + schedule */}
+      {destination && (
+        <div style={{
+          marginTop: 10, padding: '12px 14px',
+          background: 'rgba(96, 165, 250, 0.06)',
+          border: '1px solid rgba(96, 165, 250, 0.22)',
+          borderRadius: 12, fontSize: 13, lineHeight: 1.55,
+        }}>
+          <div style={{ fontWeight: 600, marginBottom: 6 }}>Destinație payout</div>
+          <PayoutsRow
+            label="Tip"
+            value={
+              destination.type === 'card'
+                ? `Card ${destination.brand || ''} •••• ${destination.last4 || '????'}`
+                : destination.type === 'bank_account'
+                  ? `IBAN •••• ${destination.last4 || '????'} (${destination.country || ''})`
+                  : destination.type || 'nesetat'
+            }
+          />
+          <PayoutsRow label="Program" value={formatSchedule(data.schedule)} />
+        </div>
+      )}
+
+      {/* 50/50 split */}
+      <div style={{
+        marginTop: 10, padding: '12px 14px',
+        background: 'rgba(167, 139, 250, 0.06)',
+        border: '1px solid rgba(167, 139, 250, 0.22)',
+        borderRadius: 12, fontSize: 13, lineHeight: 1.55,
+      }}>
+        <div style={{ fontWeight: 600, marginBottom: 6 }}>Split 50/50 · ultimele {days} zile</div>
+        <PayoutsRow label="Venit brut" value={gross || '—'} />
+        <PayoutsRow label="Rezervat pentru AI" value={reserved || '—'} />
+        <PayoutsRow label="Profit net (al tău)" value={profit || '—'} bold />
+      </div>
+
+      {/* Instant payout CTA */}
+      <button
+        onClick={onInstantPayout}
+        disabled={busy || !canInstant}
+        style={{
+          marginTop: 10, width: '100%',
+          padding: '12px 14px',
+          background: canInstant
+            ? 'linear-gradient(180deg, rgba(167, 139, 250, 0.32), rgba(139, 92, 246, 0.22))'
+            : 'rgba(167, 139, 250, 0.08)',
+          color: canInstant ? '#fff' : 'rgba(237, 233, 254, 0.5)',
+          border: '1px solid rgba(167, 139, 250, 0.35)',
+          borderRadius: 12,
+          fontSize: 14, fontWeight: 600,
+          cursor: canInstant && !busy ? 'pointer' : 'not-allowed',
+        }}
+      >
+        {busy ? 'Trimit…' : canInstant ? 'Instant payout pe card (~30 min, taxa ~1% + 0.25 EUR)' : 'Instant payout indisponibil (nimic eligibil acum)'}
+      </button>
+
+      {/* Result of the last trigger */}
+      {result && (
+        <div style={{
+          marginTop: 10, padding: '10px 14px',
+          background: result.ok ? 'rgba(16, 185, 129, 0.08)' : 'rgba(248, 113, 113, 0.08)',
+          border: result.ok ? '1px solid rgba(16, 185, 129, 0.35)' : '1px solid rgba(248, 113, 113, 0.35)',
+          borderRadius: 10, fontSize: 12, lineHeight: 1.5,
+        }}>
+          {result.ok
+            ? `OK — ${result.display} · status ${result.status}${result.arrivalDateMs ? ' · ETA ' + new Date(result.arrivalDateMs).toLocaleString() : ''}`
+            : `Eroare: ${result.error}`}
+        </div>
+      )}
+
+      {/* Recent payouts */}
+      {recent.length > 0 && (
+        <div style={{
+          marginTop: 10, padding: '12px 14px',
+          background: 'rgba(255, 255, 255, 0.03)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          borderRadius: 12, fontSize: 12, lineHeight: 1.5,
+        }}>
+          <div style={{ fontWeight: 600, marginBottom: 6, fontSize: 13 }}>Ultimele payout-uri</div>
+          {recent.slice(0, 10).map((p) => (
+            <div key={p.id} style={{
+              display: 'flex', justifyContent: 'space-between',
+              padding: '5px 0', borderTop: '1px solid rgba(255,255,255,0.04)',
+              gap: 8,
+            }}>
+              <span style={{ opacity: 0.72 }}>
+                {p.createdMs ? new Date(p.createdMs).toLocaleDateString() : '—'} · {p.method || 'standard'}
+              </span>
+              <span style={{ textAlign: 'right' }}>
+                {p.display || '—'} <span style={{ opacity: 0.55 }}>· {p.status}</span>
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Partial-failure hints (balance loaded but account failed, etc) */}
+      {Array.isArray(data.errors) && data.errors.length > 0 && (
+        <div style={{
+          marginTop: 10, padding: '10px 14px',
+          background: 'rgba(250, 204, 21, 0.06)',
+          border: '1px solid rgba(250, 204, 21, 0.2)',
+          borderRadius: 10, fontSize: 11, lineHeight: 1.5, opacity: 0.85,
+        }}>
+          <div style={{ fontWeight: 600, marginBottom: 3 }}>Avertismente Stripe</div>
+          {data.errors.map((e, i) => (
+            <div key={i} style={{ opacity: 0.8 }}>{e.source}: {e.message}</div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function PayoutsRow({ label, value, bold }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0' }}>
+      <span style={{ opacity: 0.7 }}>{label}</span>
+      <span style={{ fontWeight: bold ? 700 : 500 }}>{value}</span>
+    </div>
+  )
+}
+
+function formatSchedule(schedule) {
+  if (!schedule || !schedule.interval) return '—'
+  const { interval, delayDays, monthlyAnchor, weeklyAnchor } = schedule
+  if (interval === 'manual') return 'Manual (doar instant)'
+  if (interval === 'daily') return `Zilnic (T+${delayDays ?? '?'} zile)`
+  if (interval === 'weekly') return `Săptămânal${weeklyAnchor ? ' · ' + weeklyAnchor : ''}`
+  if (interval === 'monthly') return `Lunar${monthlyAnchor ? ' · ziua ' + monthlyAnchor : ''}`
+  return interval
+}
+
+// PR E2 — translate raw provider card state into human-friendly copy
+// the admin actually wants to read ("credit suficient ✓" / "credit
+// scăzut — reîncarcă aici →" / "cheie lipsă"). The technical message
+// and balance string stay as a small secondary line for when the admin
+// needs to debug, but the big headline is always in plain Romanian.
+//
+// Adrian 2026-04-20: "poti schimba stilul de comunicare, la ai ex
+// credit suficient, atentie la ai .. x.. trebuie credit".
+function friendlyCreditStatus(card) {
+  if (!card) return { headline: '—', tone: 'muted', sub: null };
+  const isRevenue = card.kind === 'revenue';
+  switch (card.status) {
+    case 'ok':
+      return {
+        headline: isRevenue ? 'Venit — în cont' : 'Credit suficient ✓',
+        tone: 'ok',
+        sub: isRevenue ? 'Banii așteaptă payout-ul automat.' : null,
+      };
+    case 'low':
+      return {
+        headline: 'Credit aproape terminat — reîncarcă aici →',
+        tone: 'warn',
+        sub: 'Atingi cardul ca să deschizi pagina de top-up a providerului.',
+      };
+    case 'error':
+      return {
+        headline: 'Problemă cu cheia — deschide providerul →',
+        tone: 'error',
+        sub: 'Cheia nu răspunde; verifică-o sau rotește-o din dashboard-ul providerului.',
+      };
+    case 'unconfigured':
+      return {
+        headline: 'Opțional — nesetat',
+        tone: 'muted',
+        sub: 'Providerul nu-i obligatoriu; adaugă cheia dacă vrei să-l activezi.',
+      };
+    default:
+      return {
+        headline: card.balanceDisplay || 'Stare necunoscută',
+        tone: 'muted',
+        sub: null,
+      };
+  }
 }
 
 function MenuItem({ children, onClick, disabled }) {
