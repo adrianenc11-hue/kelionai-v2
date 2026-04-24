@@ -2433,42 +2433,50 @@ export default function KelionStage() {
   // `savedUpToRef` tracks the prefix of `chatMessages` that has already
   // been persisted so we only POST the delta.
   //
-  // Two subtleties this effect MUST handle correctly, both of which
-  // the previous implementation got wrong (zero setItem calls on prod
-  // during streaming):
+  // The old implementation saved user turns incrementally while
+  // `chatBusy` was true, and held back only the streaming assistant
+  // tail. On a 4xx/5xx (session expired, 402 no-credits, 429 trial
+  // exhausted, upstream model failure) the `/api/chat` call threw
+  // before any assistant chunk arrived — but the user turn had already
+  // been POSTed and a fresh `conversations` row was already created.
+  // The error banner appeared, the empty assistant placeholder got
+  // popped in the catch handler (see sendTextMessage), and the DB was
+  // left with a "user asked X, no reply" orphan that appeared in the
+  // admin audit as 3 of 5 threads missing an assistant reply.
   //
-  //   1. While `chatBusy` is true the last assistant message is a
-  //      half-streamed chunk (e.g. "Par" before "Paris"). Persisting
-  //      it now would save garbage and advance the cursor past the
-  //      final content — so we hold off on the tail until streaming
-  //      finishes (chatBusy flips back to false, which re-runs this
-  //      effect via the dep array).
-  //
-  //   2. SSE chunks fire many setChatMessages calls per second. Each
-  //      one triggers this effect and cancels the previous run's
-  //      closure. If we only advance `savedUpToRef` at the end of the
-  //      loop, rapid cancellations mean the ref never advances and
-  //      work repeats. We advance it incrementally, inside the loop,
-  //      the moment each message is actually persisted — cancellation
-  //      then just halts future iterations, it doesn't roll back
-  //      progress already made.
+  // New contract: never persist anything while chatBusy=true, and
+  // never persist a trailing user turn (the one whose reply never
+  // landed). A pair is only written after streaming completes and the
+  // last message in the transcript is an assistant turn with content.
+  // Retries by the user append a fresh user turn onto the unsaved
+  // one — both get persisted in order once a reply finally lands, so
+  // the conversation history stays faithful without producing orphans.
   useEffect(() => {
+    // Defer until the streaming turn finishes — otherwise we'd race
+    // the SSE loop and possibly write partial assistant content.
+    if (chatBusy) return
     const total = chatMessages.length
     const start = savedUpToRef.current
     if (total <= start) {
       if (total < start) savedUpToRef.current = total // transcript was cleared
       return
     }
+    // Trailing user turn with no assistant reply = error path. The
+    // sendTextMessage catch block drops the empty assistant
+    // placeholder, so the last slot is a user turn. Hold off on
+    // persisting anything past the previously saved cursor until the
+    // exchange completes successfully (or the user edits their input
+    // and resends, pushing a new user turn plus a real assistant
+    // reply). Skipping here prevents orphan conversations.
+    const last = chatMessages[total - 1]
+    if (!last || (last.role || 'user') === 'user') return
+    if (!last.content || !String(last.content).trim()) return
     let cancelled = false
     ;(async () => {
       for (let i = start; i < chatMessages.length; i++) {
         if (cancelled) return
         const m = chatMessages[i]
         if (!m || !m.content || !String(m.content).trim()) break
-        const isLast = i === chatMessages.length - 1
-        // Hold off on the still-streaming assistant tail — we'll pick
-        // it up once chatBusy flips back to false.
-        if (isLast && chatBusy && (m.role || 'user') === 'assistant') break
         try {
           await appendConversationMessage({ role: m.role || 'user', content: m.content })
           // IMPORTANT: advance the cursor even when the effect got
