@@ -834,29 +834,35 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
       // Without a deviceId the browser may default to the ultrawide lens
       // on phones with multiple rear cameras, which ruins the "see at
       // distance" use case (license plate at 5m reads as a blur).
+      //
+      // PR 5/N — high-quality live vision: ask for up to 4K first so the
+      // camera opens at the best resolution the device advertises (the
+      // previous 640×480 ceiling capped the downsample budget no matter
+      // how high MAX_W was set in the snapshot loop). Fall through a
+      // ladder so devices that only produce 720p, or webcams that reject
+      // explicit resolutions entirely, still succeed on a later rung.
       const deviceId = opts.deviceId || null
-      const videoConstraints = deviceId
-        ? { deviceId: { exact: deviceId }, width: { ideal: 3840 }, height: { ideal: 2160 } }
-        : { width: { ideal: 3840 }, height: { ideal: 2160 }, facingMode }
-      let stream
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints, audio: false })
-      } catch (e) {
-        // Constraint ladder fallback — some cameras reject 4K with
-        // OverconstrainedError. Retry at 1080p, then 720p, then defaults.
-        const ladder = [
-          { ...(deviceId ? { deviceId: { exact: deviceId } } : { facingMode }), width: { ideal: 1920 }, height: { ideal: 1080 } },
-          { ...(deviceId ? { deviceId: { exact: deviceId } } : { facingMode }), width: { ideal: 1280 }, height: { ideal: 720 } },
-          deviceId ? { deviceId: { exact: deviceId } } : { facingMode },
-          true,
-        ]
-        let recovered = null
-        for (const video of ladder) {
-          try { recovered = await navigator.mediaDevices.getUserMedia({ video, audio: false }); break }
-          catch { /* try next rung */ }
+      const selector = deviceId ? { deviceId: { exact: deviceId } } : { facingMode }
+      const constraintLadder = [
+        { video: { ...selector, width: { ideal: 3840 }, height: { ideal: 2160 } }, audio: false },
+        { video: { ...selector, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false },
+        { video: { ...selector, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
+        { video: { ...selector }, audio: false },
+        { video: { width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
+        { video: true, audio: false },
+      ]
+      let stream = null
+      let lastErr = null
+      for (const constraints of constraintLadder) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia(constraints)
+          break
+        } catch (e) {
+          lastErr = e
         }
-        if (!recovered) throw e
-        stream = recovered
+      }
+      if (!stream) {
+        throw (lastErr instanceof Error) ? lastErr : new Error('Camera request rejected.')
       }
       setCameraStream(stream)
       setVisionError(null)
@@ -880,15 +886,25 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
       try { await video.play() } catch (_) { /* play failures fall through to grab loop */ }
 
       const canvas = cameraCanvasRef.current
-      // Bumped from 480 → 1024 so details like license plates survive
-      // the downsample when captured at 4K by the rear camera. Gemini
-      // Vision accepts up to ~3072px but charges per tile — 1024 is the
-      // sweet spot for detail vs. bandwidth.
-      const MAX_W = 1024
-      const JPEG_Q = 0.75
+      // High-quality snapshot pipeline (PR 5/N). Adrian 2026-04-20:
+      // "fiind o aplicație profesională, camerele trebuie să trimită
+      // către avatar imagini live de foarte bună calitate". These
+      // frames feed the OpenAI + Gemini hybrid vision tool, so
+      // legibility on distant license plates / small labels matters
+      // more than wire cost. 1 snapshot/sec keeps the bandwidth
+      // budget reasonable even at 1600 px + q=0.88. When camera_on /
+      // switch_camera opened the camera at 4K on a modern rear lens,
+      // this ceiling ensures we downsample to a sweet spot — not
+      // upscale a weaker lens's native frame.
+      const MAX_W = 1600
+      const JPEG_Q = 0.88
 
       const grab = () => {
         if (!video.videoWidth || !video.videoHeight) return
+        // Prefer the native track resolution when it's smaller than
+        // our ceiling — upscaling from 720p to 1600 px just adds
+        // pixels without adding information. `Math.min(1, …)` still
+        // caps the scale at 1× so we never grow the frame.
         const scale = Math.min(1, MAX_W / video.videoWidth)
         canvas.width = Math.floor(video.videoWidth * scale)
         canvas.height = Math.floor(video.videoHeight * scale)
