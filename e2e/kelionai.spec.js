@@ -106,8 +106,26 @@ test.describe('Kelion Studio API (DS-1 / DS-3) wiring', () => {
 });
 
 test.describe('Gemini Live token endpoint (Stage 1 precondition)', () => {
-  test('503 when GEMINI_API_KEY is not configured, JSON body, no crash', async ({ request }) => {
+  test('Vertex default (CI) returns 200 with token=null and a setup block', async ({ request }) => {
+    // The default backend is now Vertex AI (see server/src/routes/realtime.js).
+    // Vertex authenticates server-side via a GCP service account in the WS
+    // proxy; the token endpoint intentionally returns `token: null` because
+    // the browser does not need an ephemeral credential. CI doesn't have
+    // the GCP service account wired, but the handler doesn't validate SA
+    // presence at token-mint time — connectivity is enforced later by the
+    // proxy. So on CI the default path returns 200 with a null token and
+    // a backend='vertex' marker.
     const res = await request.get(`${BASE}/api/realtime/gemini-token?lang=en-US`);
+    expect(res.status()).toBe(200);
+    const body = await res.json();
+    expect(body.backend).toBe('vertex');
+    expect(body.token).toBeNull();
+    expect(body.setup).toBeTruthy();
+    expect(typeof body.setup.systemInstruction.parts[0].text).toBe('string');
+  });
+
+  test('Forcing ?backend=aistudio exercises the AI Studio ephemeral-token path', async ({ request }) => {
+    const res = await request.get(`${BASE}/api/realtime/gemini-token?lang=en-US&backend=aistudio`);
     // On CI GEMINI_API_KEY is unset → 503 is the honest, documented response.
     // If a future CI configuration sets the key we accept a 200 with a token.
     if (res.status() === 503) {
@@ -116,6 +134,7 @@ test.describe('Gemini Live token endpoint (Stage 1 precondition)', () => {
     } else {
       expect(res.status()).toBe(200);
       const body = await res.json();
+      expect(body.backend).toBe('aistudio');
       expect(typeof body.token).toBe('string');
       expect(body.token.length).toBeGreaterThan(0);
     }
