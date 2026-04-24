@@ -1027,8 +1027,10 @@ export default function KelionStage() {
   // one-time permission dialog. Coords are cached in localStorage so
   // refreshes don't re-ping the OS.
   // useClientGeo v2 exposes { coords, permission, lastError, requestNow }.
-  // Alias to the names already used elsewhere in this file (clientGeo /
-  // geoPermission / requestGeo).
+  // We forward `coords` to the Gemini Live hook (the pipeline only needs
+  // lat/lon), and the top-level stage wires `requestNow` to the first
+  // user gesture so iOS Safari actually shows the permission prompt —
+  // see handling in onStageClick below.
   const { coords: clientGeo, permission: geoPermission, requestNow: requestGeo } = useClientGeo()
   // Register a geo provider so monitorStore can fall back to the user's
   // current coords when the model calls show_on_monitor({kind:'map'}) without
