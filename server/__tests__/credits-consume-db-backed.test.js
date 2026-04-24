@@ -67,21 +67,35 @@ function reset() {
   dbMock.gcConsumeStateRows.mockReset();
 }
 
-describe('loadConsumeState — cache vs DB', () => {
+describe('loadConsumeState — DB is authoritative, cache is fallback', () => {
   beforeEach(reset);
 
-  it('returns the cached entry without touching the DB', async () => {
-    const uid = 'uid-cache-hit';
-    const state = { lastBillableAt: 1000, silentStreak: 1, silentSince: 0 };
-    cache.set(uid, state);
+  // Audit M7 follow-up (Copilot P2 on #186): the DB MUST be the
+  // source of truth across instances, so a populated cache can NOT
+  // short-circuit the DB read. The cache only serves as a warm
+  // fallback when the DB is unreachable.
+  it('reads the DB even when the cache is populated (refresh semantics)', async () => {
+    const uid = 'uid-dbauth';
+    // Stale value in cache — e.g. another instance has since
+    // advanced the streak.
+    cache.set(uid, { lastBillableAt: 0, silentStreak: 0, silentSince: 0 });
+    // DB returns the fresh value written by the other instance.
+    dbMock.getConsumeState.mockResolvedValueOnce({
+      lastBillableAt: 9000,
+      silentStreak: 2,
+      silentSince: 8000,
+      updatedAt: 9001,
+    });
 
     const got = await loadConsumeState(uid);
-    expect(got).toBe(state);
-    expect(dbMock.getConsumeState).not.toHaveBeenCalled();
+    expect(got).toEqual({ lastBillableAt: 9000, silentStreak: 2, silentSince: 8000 });
+    expect(dbMock.getConsumeState).toHaveBeenCalledTimes(1);
+    // And the cache has been refreshed to match the DB.
+    expect(cache.get(uid)).toEqual({ lastBillableAt: 9000, silentStreak: 2, silentSince: 8000 });
   });
 
-  it('falls back to DB on cache miss + primes the cache', async () => {
-    const uid = 'uid-cache-miss';
+  it('reads DB on cold cache and primes the L1 cache with the DB value', async () => {
+    const uid = 'uid-cold';
     dbMock.getConsumeState.mockResolvedValueOnce({
       lastBillableAt: 5000,
       silentStreak: 2,
@@ -92,26 +106,47 @@ describe('loadConsumeState — cache vs DB', () => {
     const first = await loadConsumeState(uid);
     expect(first).toEqual({ lastBillableAt: 5000, silentStreak: 2, silentSince: 4000 });
     expect(dbMock.getConsumeState).toHaveBeenCalledTimes(1);
-    expect(dbMock.getConsumeState).toHaveBeenCalledWith(uid);
+    expect(cache.get(uid)).toEqual({ lastBillableAt: 5000, silentStreak: 2, silentSince: 4000 });
 
-    // Second call must use the primed cache, not hit the DB again.
+    // Subsequent reads still hit the DB (authoritative). This costs
+    // one extra round-trip per heartbeat (60s apart, so negligible)
+    // and guarantees cross-instance consistency.
+    dbMock.getConsumeState.mockResolvedValueOnce({
+      lastBillableAt: 6000,
+      silentStreak: 3,
+      silentSince: 5000,
+      updatedAt: 5999,
+    });
     const second = await loadConsumeState(uid);
-    expect(second).toEqual({ lastBillableAt: 5000, silentStreak: 2, silentSince: 4000 });
-    expect(dbMock.getConsumeState).toHaveBeenCalledTimes(1);
+    expect(second).toEqual({ lastBillableAt: 6000, silentStreak: 3, silentSince: 5000 });
+    expect(dbMock.getConsumeState).toHaveBeenCalledTimes(2);
   });
 
-  it('returns {} when the DB has no row for this user', async () => {
+  it('returns {} when the DB has no row and clears any cached stale entry', async () => {
     const uid = 'uid-fresh';
+    cache.set(uid, { lastBillableAt: 42, silentStreak: 0, silentSince: 0 });
     dbMock.getConsumeState.mockResolvedValueOnce(null);
     const got = await loadConsumeState(uid);
     expect(got).toEqual({});
-    // Must NOT poison the cache — next call should try the DB again.
+    // Stale cache entry must be evicted so the next persist writes a
+    // canonical row without merging with the ghost state.
     expect(cache.has(uid)).toBe(false);
   });
 
-  it('swallows DB errors and returns an empty state (never throws)', async () => {
+  it('falls back to the cache when the DB throws (never propagates the error)', async () => {
     const uid = 'uid-db-flaky';
+    const warm = { lastBillableAt: 1234, silentStreak: 1, silentSince: 0 };
+    cache.set(uid, warm);
     dbMock.getConsumeState.mockRejectedValueOnce(new Error('connect ECONNREFUSED'));
+    const got = await loadConsumeState(uid);
+    // Warm cache preserved — cap still holds on same-instance flow
+    // while the DB is down.
+    expect(got).toBe(warm);
+  });
+
+  it('returns {} when BOTH the DB throws and the cache is cold', async () => {
+    const uid = 'uid-cold-and-flaky';
+    dbMock.getConsumeState.mockRejectedValueOnce(new Error('db down'));
     const got = await loadConsumeState(uid);
     expect(got).toEqual({});
   });
