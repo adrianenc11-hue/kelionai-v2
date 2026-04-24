@@ -12,6 +12,7 @@ import { STATUS_COLORS, STATUS_PULSE_HZ } from '../lib/kelionStatus'
 import { useGeminiLive } from '../lib/geminiLive'
 import { useOpenAIRealtime } from '../lib/openaiRealtime'
 import { decideHandoff } from '../lib/handoffGuard'
+import { selectPriorTurns } from '../lib/priorTurnsSelector'
 import { useWakeWord } from '../lib/useWakeWord'
 import { useTrial } from '../lib/useTrial'
 import { useClientGeo } from '../lib/useClientGeo'
@@ -2229,11 +2230,19 @@ export default function KelionStage() {
     // without a page refresh. Admins get `null` (exempt) and the
     // hook skips the update — chip stays on whatever /balance loaded.
     onBalanceUpdate: (minutes) => setBalance(minutes),
+    // Only the active transport registers the verbal camera
+    // controller (see hook internals for why). Without this gate,
+    // both hooks claim the single controller slot in cameraControl.js
+    // and whichever committed last silently won, so camera voice
+    // commands ("pornește camera", "schimbă camera", "zoom") routed
+    // to the wrong transport whenever it wasn't the selected one.
+    active: liveProvider === 'gemini',
   })
   const openaiHook = useOpenAIRealtime({
     audioRef,
     coords: clientGeo,
     onBalanceUpdate: (minutes) => setBalance(minutes),
+    active: liveProvider === 'openai',
   })
   // Active transport — rest of the component destructures from this.
   // Both hooks return the same shape (see lib/openaiRealtime.js
@@ -2742,22 +2751,78 @@ export default function KelionStage() {
     }
   }, [userTurnCount, authState.signedIn, rememberPromptOpen])
 
-  // Stage 3 — when the user ends a session, extract facts (if signed in).
+  // Stage 3 — when the user ends a session, extract facts (if signed in)
+  // AND seed the text-chat transcript with the voice turns so a user
+  // who swaps from voice to text doesn't lose context.
+  // Previously the user complained that "memoria intre AI-uri nu merge":
+  // the voice hook's `turns` are a separate state from `chatMessages`, so
+  // typing a new question after a voice chat sent the model zero context.
+  // Seeding chatMessages on session end lets the next /api/chat POST
+  // ship the voice history as part of `messages` (capped at 12 there).
   const turnsRef = useRef(turns)
   useEffect(() => { turnsRef.current = turns }, [turns])
+  const chatMessagesRef = useRef(chatMessages)
+  useEffect(() => { chatMessagesRef.current = chatMessages }, [chatMessages])
   const prevStatusRef = useRef(status)
   useEffect(() => {
     const prev = prevStatusRef.current
     prevStatusRef.current = status
     const justEnded = (prev && prev !== 'idle' && prev !== 'error') && (status === 'idle' || status === 'error')
     if (!justEnded) return
-    if (!authState.signedIn) return
     const snapshot = turnsRef.current.filter((t) => t && t.role && t.text && t.text.trim())
     if (snapshot.length < 2) return
+    // Seed chatMessages with the voice conversation — the two UIs share a
+    // single logical thread so the user's follow-up typed question lands
+    // with the voice context still in scope.
+    if (chatMessagesRef.current.length === 0) {
+      const seeded = snapshot.slice(-12).map((t) => ({
+        role: t.role === 'assistant' ? 'assistant' : 'user',
+        content: t.text,
+      }))
+      if (seeded.length > 0) {
+        // savedUpToRef marks how many entries are already persisted to the
+        // conversation history backend; voice turns are saved separately
+        // by the voice transport, so treat them as already-saved here to
+        // avoid a duplicate POST from the text-chat autosave effect.
+        savedUpToRef.current = seeded.length
+        setChatMessages(seeded)
+      }
+    }
+    if (!authState.signedIn) return
     extractAndStore(snapshot).catch((err) => {
       console.warn('[memory extract]', err.message)
     })
   }, [status, authState.signedIn])
+
+  // Long-term memory extraction for text chat. Previously extractAndStore
+  // only fired on voice session end — a user who only typed never built
+  // any long-term memory, so every text chat started cold even when
+  // signed in. Trigger the same extractor once the streaming reply
+  // finishes (chatBusy true→false) and the last message is a finalised
+  // assistant turn. Debounced implicitly by chatBusy — further keystrokes
+  // flip it true again and reset.
+  const prevChatBusyRef = useRef(chatBusy)
+  useEffect(() => {
+    const prev = prevChatBusyRef.current
+    prevChatBusyRef.current = chatBusy
+    if (!prev || chatBusy) return // only on true → false
+    if (!authState.signedIn) return
+    const msgs = chatMessagesRef.current
+    const last = msgs[msgs.length - 1]
+    if (!last || last.role !== 'assistant' || !last.content || !String(last.content).trim()) return
+    // Convert {role, content} → {role, text} for the extractor API.
+    const snapshot = msgs
+      .filter((m) => m && m.role && m.content && String(m.content).trim())
+      .slice(-12)
+      .map((m) => ({
+        role: m.role === 'assistant' ? 'assistant' : 'user',
+        text: String(m.content),
+      }))
+    if (snapshot.length < 2) return
+    extractAndStore(snapshot).catch((err) => {
+      console.warn('[memory extract text]', err.message)
+    })
+  }, [chatBusy, authState.signedIn])
 
   const openMemory = useCallback(async () => {
     setMemoryOpen(true)
@@ -2889,6 +2954,23 @@ export default function KelionStage() {
     error:      error || 'Error',
   }[status] || 'Kelion'
 
+  // Shared entry point — tap-to-talk + wake-word both start a voice
+  // session from idle. Carry any existing text/voice transcript as
+  // `priorTurns` so Kelion continues the conversation instead of
+  // re-greeting. chatMessages is preferred because it is the cross-mode
+  // transcript (voice-end seeds it from `turns`, and any text the user
+  // typed afterward appends). When chatMessages is empty we fall back
+  // to the hook's raw `turns` so repeat taps on pure-voice users still
+  // pick up context.
+  const startVoiceWithPriorTurns = useCallback(() => {
+    const priorTurns = selectPriorTurns(
+      chatMessagesRef.current,
+      turnsRef.current,
+    )
+    try { start(priorTurns.length > 0 ? { priorTurns } : undefined) }
+    catch (_) { /* banner surfaces failure */ }
+  }, [start])
+
   const onStageClick = useCallback(() => {
     if (menuOpen) return setMenuOpen(false)
     // First user gesture → kick the geolocation permission prompt.
@@ -2902,7 +2984,7 @@ export default function KelionStage() {
       try { requestGeo() } catch { /* ignore — hook logs internally */ }
     }
     if (status === 'idle' || status === 'error') {
-      start()
+      startVoiceWithPriorTurns()
       // Tap-to-talk is a gated guest action — refresh the trial HUD so
       // the top-right countdown starts ticking immediately once the
       // token mint stamps the 15-min window server-side. No-op for
@@ -2921,7 +3003,7 @@ export default function KelionStage() {
         }, 600)
       }
     }
-  }, [menuOpen, status, start, geoPermission, requestGeo, authState.signedIn, trialHud])
+  }, [menuOpen, status, startVoiceWithPriorTurns, geoPermission, requestGeo, authState.signedIn, trialHud])
 
   // ───── Wake-word "Kelion" ─────
   // Adrian: "cind zic kelion se auto porneste butonul de chat".
@@ -2941,7 +3023,7 @@ export default function KelionStage() {
     enabled: status === 'idle',
     onDetect: () => {
       if (status === 'idle') {
-        try { start() } catch (_) { /* banner surfaces failure */ }
+        startVoiceWithPriorTurns()
         if (!authState.signedIn) {
           if (trialRefreshTimerRef.current) clearTimeout(trialRefreshTimerRef.current)
           trialRefreshTimerRef.current = setTimeout(() => {

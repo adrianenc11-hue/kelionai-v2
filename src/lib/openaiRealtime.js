@@ -52,7 +52,7 @@ import { getCsrfToken } from './api'
 // as a function_call_output. Result: OpenAI owns voice + reasoning,
 // Gemini owns vision, camera stays silent until the user asks.
 // Screen sharing remains a no-op stub (future work).
-export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = null }) {
+export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = null, active = true }) {
   const onBalanceUpdateRef = useRef(onBalanceUpdate)
   onBalanceUpdateRef.current = onBalanceUpdate
 
@@ -1040,11 +1040,18 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
     }
   }, [])
 
-  // Register the camera controller so the `switch_camera` tool handler
-  // in kelionTools.js can flip front/back without reaching into this
-  // hook directly. We re-register whenever startCamera's identity
-  // changes (useCallback stable deps → once per mount in practice).
+  // Register the camera controller so the `switch_camera` / camera_on /
+  // camera_off / zoom_camera voice tools can drive this hook. Only the
+  // ACTIVE transport registers — without the `active` gate both the
+  // Gemini and OpenAI hooks commit a setCameraController in the same
+  // render pass (KelionStage always mounts both), and whichever ran
+  // last silently won. When Gemini was selected but OpenAI's effect
+  // committed last, verbal camera commands ended up opening the camera
+  // on the *inactive* OpenAI hook and the UI (which reads the camera
+  // stream off the ACTIVE hook via liveHook.cameraStream) stayed dark.
+  // User-visible symptom: "camera nu merge corect" when switching AIs.
   useEffect(() => {
+    if (!active) return undefined
     setCameraController({
       start: (opts) => startCamera(opts),
       stop: () => stopCamera(),
@@ -1066,7 +1073,7 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
       captureHighResSnapshot,
     })
     return () => setCameraController(null)
-  }, [startCamera, stopCamera, applyZoom, captureHighResSnapshot])
+  }, [active, startCamera, stopCamera, applyZoom, captureHighResSnapshot])
 
   // Audit M6 — see lib/handoffGuard.js. True while `start()` is in
   // flight OR while the live RTCPeerConnection is anything other

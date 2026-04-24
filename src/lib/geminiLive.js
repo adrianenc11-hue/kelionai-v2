@@ -38,7 +38,7 @@ function bytesFromBase64(b64) {
   return out
 }
 
-export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null }) {
+export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null, active = true }) {
   // Kept in a ref so the parent can pass a fresh closure (e.g. a useState
   // setter wrapped in useCallback) without tearing down the WS or the
   // credits heartbeat every render.
@@ -1106,8 +1106,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
 
   useEffect(() => () => { stop() }, [stop])
 
-  // Apply a live zoom level to the active video track. See
-  // openaiRealtime.js for the full capability rationale — on Android
+  // Apply a live zoom level to the active video track. On Android
   // Chrome this maps to hardware zoom on supported sensors; iOS Safari
   // does not expose the `zoom` capability so we return a speakable
   // error instead of silently no-op'ing.
@@ -1168,12 +1167,18 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
     }
   }, [])
 
-  // Register the camera controller so the `switch_camera` tool handler
-  // in kelionTools.js can flip front/back without reaching into this
-  // hook directly. Keeps the coupling one-way: the tool dispatches via
-  // cameraControl.js and whichever voice transport is mounted picks up
-  // the restart call.
+  // Register the camera controller so the `switch_camera` / camera_on /
+  // camera_off / zoom_camera voice tools can drive this hook. Only the
+  // ACTIVE transport registers — KelionStage always mounts both the
+  // Gemini and OpenAI hooks and without the `active` gate both commit
+  // setCameraController in the same render pass, with whichever ran
+  // last silently winning. That caused verbal camera commands to land
+  // on the wrong transport whenever the user picked the "losing"
+  // provider (user-visible symptom: "camera nu merge corect" because
+  // the stream opened on the inactive hook and the UI reads
+  // liveHook.cameraStream from the active one).
   useEffect(() => {
+    if (!active) return undefined
     setCameraController({
       start: (opts) => startCamera(opts),
       stop: () => stopCamera(),
@@ -1197,7 +1202,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
       captureHighResSnapshot,
     })
     return () => setCameraController(null)
-  }, [startCamera, stopCamera, applyZoom, captureHighResSnapshot])
+  }, [active, startCamera, stopCamera, applyZoom, captureHighResSnapshot])
 
   // Audit M6 — `isBusy()` lets KelionStage's auto-fallback effect
   // (2) detect whether the user already kicked off a manual
