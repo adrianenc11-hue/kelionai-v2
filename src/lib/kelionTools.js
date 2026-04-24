@@ -7,7 +7,7 @@
 // mutates the emotion store, which the avatar subscribes to.
 
 import { setEmotion } from './emotionStore'
-import { handleShowOnMonitor } from './monitorStore'
+import { handleShowOnMonitor, showImageOnMonitor } from './monitorStore'
 import { getLatestCameraFrame } from './cameraFrameBuffer'
 import { setNarrationMode } from './narrationMode'
 import {
@@ -21,6 +21,7 @@ import {
   requestCameraZoom,
   captureHighResSnapshot,
 } from './cameraControl'
+import { requestUINotify, requestUINavigate, listAllowedRoutes } from './uiActionStore'
 import { getCsrfToken } from './api'
 
 async function postJSON(url, body) {
@@ -62,6 +63,18 @@ const REAL_TOOL_NAMES = new Set([
   // Groq-powered (opt-in). The server returns a graceful "not configured"
   // message when GROQ_API_KEY is absent, so the voice UX never breaks.
   'solve_problem', 'code_review', 'explain_code',
+  // PR 7/N — Planner Brain. Kelion calls this on compound/multi-step
+  // asks to get a short numbered plan from Gemini Flash before it
+  // starts executing real tools. Server returns a clean JSON plan;
+  // summarizeRealTool shapes it for the voice model below.
+  'plan_task',
+  // PR 8/N — Memory of Actions. Kelion reads back its own recent tool
+  // invocations for the signed-in user so it knows what it has already
+  // done this session. Server returns a compact JSON list; the
+  // summariser below renders it as numbered bullet points.
+  'get_action_history',
+  // F11 — `generate_image` is handled specially in the runTool switch
+  // below so we can side-effect the monitor; it isn't in this set.
 ])
 
 // Compress a tool-result JSON into a short, speakable string for the voice
@@ -148,6 +161,39 @@ function summarizeRealTool(name, j) {
     // cap so we don't blow past the voice model's context on the read-back.
     return String(j.result).slice(0, 4000)
   }
+  if (name === 'get_action_history' && Array.isArray(j.actions)) {
+    // Kelion is reading its own history. We keep each row on one line
+    // so the voice model can scan it and decide quickly whether to
+    // re-run a tool. Guest case (`signed_in === false`) is handled
+    // by the generic `ok === false` branch at the top.
+    if (!j.actions.length) {
+      return "No recent actions recorded yet — I haven't run anything like that this session."
+    }
+    const rows = j.actions.slice(0, 20).map((a, i) => {
+      const status = a.ok === false ? 'FAILED' : 'ok'
+      const args = a.args ? ` (${a.args})` : ''
+      const result = a.result ? ` → ${a.result}` : ''
+      return `${i + 1}. ${a.tool} [${status}]${args}${result}`
+    }).join('\n')
+    return `Recent actions (${j.count} total):\n${rows}`.slice(0, 4000)
+  }
+  if (name === 'plan_task' && Array.isArray(j.steps)) {
+    // Condense the planner's structured JSON into a compact speakable form
+    // the voice model can read and then walk through. We keep tool_hint
+    // inline so the model knows which tool each step should call. A final
+    // "Cautions" line surfaces anything the planner flagged as requiring
+    // user confirmation (spending, messaging, destructive actions).
+    const header = j.summary ? `Plan: ${j.summary}` : 'Plan:'
+    const body = j.steps.map((s) => {
+      const hint = s.tool_hint ? ` [${s.tool_hint}]` : ''
+      const why = s.why ? ` — ${s.why}` : ''
+      return `${s.n}. ${s.action}${hint}${why}`
+    }).join('\n')
+    const cautions = Array.isArray(j.cautions) && j.cautions.length
+      ? `\nCautions: ${j.cautions.join('; ')}`
+      : ''
+    return `${header}\n${body}${cautions}`.slice(0, 4000)
+  }
   // Generic fallback — stringify but cap so the model never chokes.
   try {
     return JSON.stringify(j).slice(0, 2000)
@@ -197,6 +243,37 @@ export async function runTool(name, args) {
       // monitorStore resolves (kind, query) → iframe/image URL and notifies
       // the React tree via subscribeMonitor. No backend round-trip needed.
       return handleShowOnMonitor({ kind: args?.kind, query: args?.query })
+    }
+    case 'generate_image': {
+      // F11 — OpenAI gpt-image-1. The server generates the PNG, caches it
+      // for 10 min, and returns a short-lived URL. We then push it onto
+      // the stage monitor so the avatar literally shows the new image
+      // inline (no second "show_on_monitor" turn needed — cuts one
+      // round-trip of latency the user would otherwise hear).
+      const j = await postJSON('/api/tools/execute', {
+        name: 'generate_image',
+        args: {
+          prompt: args?.prompt,
+          size: args?.size,
+        },
+      })
+      if (!j?.ok) {
+        // Preserve the upstream error so Kelion can explain ("the safety
+        // system rejected that prompt", "image service isn't configured
+        // yet", …). The caller already surfaces this verbatim to the
+        // voice model via the transport's tool-response frame.
+        return j?.error || 'Image generation failed.'
+      }
+      if (j.url) {
+        showImageOnMonitor({
+          src: j.url,
+          title: j.title || args?.prompt || 'Generated image',
+        })
+      }
+      // The voice model reads this short ack back to the user. Keeping
+      // it under ~80 chars avoids filler latency on the TTS pass.
+      const label = (j.title || args?.prompt || '').toString().slice(0, 80)
+      return label ? `Generated: ${label}` : 'Image generated and displayed.'
     }
     case 'set_narration_mode': {
       // Accessibility mode. Flips a module-level flag that
@@ -358,16 +435,32 @@ export async function runTool(name, args) {
       if (!res.ok) return res.error || 'Zoom failed.'
       return `ok:zoom=${res.zoom}:range=${res.min}-${res.max}`
     }
-    case 'generate_image': {
-      // Prompt-driven image generation surfaced on the stage monitor.
-      // Internally this routes through handleShowOnMonitor('image', q)
-      // which now calls Pollinations.ai (free, no key, Stable-Diffusion
-      // family) — so the monitor finally shows a REAL generated image
-      // instead of the old LoremFlickr stock-photo stand-in that
-      // triggered Adrian's "nu genereaza imagini" report.
-      const prompt = (args?.prompt || args?.query || '').toString().trim()
-      if (!prompt) return 'Generate-image needs a prompt (describe what to draw).'
-      return handleShowOnMonitor({ kind: 'image', query: prompt })
+    case 'ui_notify': {
+      // Kelion paints a visible status note on the stage ("am deschis
+      // harta", "am salvat conversația"). Gives the avatar a visual
+      // channel for actions it just performed so the user can see
+      // them complete, instead of trusting spoken claims alone. First
+      // concrete agency primitive — "apasă butoane" starts here.
+      const res = await requestUINotify({
+        text: args?.text ?? args?.message,
+        variant: args?.variant,
+        ttl_s: args?.ttl_s,
+      })
+      if (!res.ok) return res.error || 'Notification failed.'
+      return `ok:ui_notify:id=${res.id}`
+    }
+    case 'ui_navigate': {
+      // Move the user between the small set of SPA routes Kelion
+      // knows about ("/", "/studio", "/contact"). Allowlisted inside
+      // uiActionStore so a hallucinated route can't silently
+      // navigate anywhere. When the route is unknown the tool
+      // returns a speakable error that includes the allowed set,
+      // so the model can correct itself.
+      const res = await requestUINavigate(args?.route)
+      if (!res.ok) {
+        return res.error || `Navigation failed. Allowed routes: ${listAllowedRoutes().join(', ')}.`
+      }
+      return `ok:ui_navigate:route=${res.route}`
     }
     default:
       // Real-API tools (calculate, get_weather, web_search, …) are proxied

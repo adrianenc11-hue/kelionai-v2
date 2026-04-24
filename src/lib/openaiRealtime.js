@@ -836,44 +836,43 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
       // when labels aren't available yet (pre-permission, single-camera
       // desktops). The switch_camera tool already passes a deviceId in
       // its opts after the second call; honour that when supplied.
+      //
+      // PR 5/N — high-quality live vision: ask for up to 1080p first so
+      // the camera opens at HD resolution (the previous 640×480 ceiling
+      // capped the downsample budget no matter how high MAX_W was set
+      // in the snapshot loop). Fall through a ladder so devices that
+      // only produce 720p, or webcams that reject explicit resolutions
+      // entirely, still succeed on a later rung.
       let deviceId = typeof opts.deviceId === 'string' ? opts.deviceId : null
       if (!deviceId && facingMode === 'environment') {
         deviceId = await pickBestRearCameraDeviceId().catch(() => null)
       }
-      // Bump the requested resolution — license plates and distant text
-      // were unreadable at 640×480. HD cameras on every phone from 2015
-      // onward support 1280×720 natively; the 1-Hz vision path still
-      // downscales to ~720 px for upload so we're not paying bandwidth
-      // for the passive frame buffer.
-      const videoConstraints = {
-        width:  { ideal: 1280 },
-        height: { ideal: 720  },
-      }
+      const constraintLadder = []
       if (deviceId) {
-        videoConstraints.deviceId = { exact: deviceId }
-      } else {
-        videoConstraints.facingMode = facingMode
+        constraintLadder.push(
+          { video: { width: { ideal: 1920 }, height: { ideal: 1080 }, deviceId: { exact: deviceId } }, audio: false },
+          { video: { width: { ideal: 1280 }, height: { ideal: 720 },  deviceId: { exact: deviceId } }, audio: false },
+        )
       }
-      let stream
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: videoConstraints,
-          audio: false,
-        })
-      } catch (firstErr) {
-        // Ladder: if the deviceId selection fails (device went away
-        // between enumerateDevices and getUserMedia, or the driver
-        // rejected the HD constraint), retry with plain facingMode so
-        // the user always ends up with *some* stream instead of an
-        // error toast.
-        if (deviceId || videoConstraints.width) {
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode },
-            audio: false,
-          })
-        } else {
-          throw firstErr
+      constraintLadder.push(
+        { video: { width: { ideal: 1920 }, height: { ideal: 1080 }, facingMode }, audio: false },
+        { video: { width: { ideal: 1280 }, height: { ideal: 720 },  facingMode }, audio: false },
+        { video: { width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
+        { video: { facingMode }, audio: false },
+        { video: true, audio: false },
+      )
+      let stream = null
+      let lastErr = null
+      for (const constraints of constraintLadder) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia(constraints)
+          break
+        } catch (e) {
+          lastErr = e
         }
+      }
+      if (!stream) {
+        throw (lastErr instanceof Error) ? lastErr : new Error('Camera request rejected.')
       }
       setCameraStream(stream)
       setVisionError(null)
@@ -897,11 +896,22 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
       try { await video.play() } catch (_) { /* play failures fall through to grab loop */ }
 
       const canvas = cameraCanvasRef.current
-      const MAX_W = 480
-      const JPEG_Q = 0.6
+      // High-quality snapshot pipeline (PR 5/N). Adrian 2026-04-20:
+      // "fiind o aplicație profesională, camerele trebuie să trimită
+      // către avatar imagini live de foarte bună calitate". These
+      // frames feed the OpenAI + Gemini hybrid vision tool, so
+      // legibility on distant license plates / small labels matters
+      // more than wire cost. 1 snapshot/sec keeps the bandwidth
+      // budget reasonable even at 1600 px + q=0.88.
+      const MAX_W = 1600
+      const JPEG_Q = 0.88
 
       const grab = () => {
         if (!video.videoWidth || !video.videoHeight) return
+        // Prefer the native track resolution when it's smaller than
+        // our ceiling — upscaling from 720p to 1600 px just adds
+        // pixels without adding information. `Math.min(1, …)` still
+        // caps the scale at 1× so we never grow the frame.
         const scale = Math.min(1, MAX_W / video.videoWidth)
         canvas.width = Math.floor(video.videoWidth * scale)
         canvas.height = Math.floor(video.videoHeight * scale)

@@ -160,6 +160,24 @@ CREATE TABLE IF NOT EXISTS voice_clone_events (
 );
 CREATE INDEX IF NOT EXISTS idx_voice_clone_events_user ON voice_clone_events(user_id, created_at DESC);
 
+-- PR #8/N — Memory of Actions. Mirrors the SQLite DDL in
+-- server/src/db/index.js so the get_action_history tool answers the
+-- same way on Postgres and SQLite. Rows are sanitised at write time
+-- in logAction() — only short, speakable summaries land here.
+CREATE TABLE IF NOT EXISTS action_history (
+  id             BIGSERIAL PRIMARY KEY,
+  user_id        BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  session_id     TEXT,
+  tool_name      TEXT NOT NULL,
+  ok             INTEGER NOT NULL DEFAULT 1,
+  args_summary   TEXT,
+  result_summary TEXT,
+  duration_ms    INTEGER,
+  created_at     TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_action_history_user    ON action_history(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_action_history_session ON action_history(user_id, session_id, created_at DESC);
+
 CREATE TABLE IF NOT EXISTS visitor_events (
   id          BIGSERIAL PRIMARY KEY,
   ts          TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
