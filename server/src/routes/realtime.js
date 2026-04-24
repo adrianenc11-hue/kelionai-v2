@@ -1045,6 +1045,30 @@ const geminiTokenHandler = async (req, res) => {
     || req.query.backend
     || '').toString().toLowerCase();
   const backend = rawBackend === 'aistudio' ? 'aistudio' : 'vertex';
+  // For Vertex we need a project id to build the fully-qualified
+  // `projects/<P>/locations/<L>/publishers/google/models/<M>` path
+  // that Vertex BidiGenerateContent reads from the first setup frame.
+  // If none is resolvable (neither GOOGLE_CLOUD_PROJECT env nor a
+  // parseable `project_id` in GCP_SERVICE_ACCOUNT_JSON), the browser
+  // would receive a 200 with a bare `models/<M>` path and then see a
+  // close code 1007 the instant the WS opens — a silent misconfig
+  // that looks to operators like "it worked". Reuse the exact same
+  // resolver the proxy uses so there is a single source of truth
+  // (Copilot + Devin Review flagged this P2 on PR #207).
+  let vertexResolved = { project: '', location: 'us-central1' };
+  if (backend === 'vertex') {
+    try {
+      vertexResolved = require('./vertexLiveProxy')._internals.resolveProjectAndLocation();
+    } catch (_) { /* resolver unavailable — fall through to 503 below */ }
+    if (!vertexResolved.project) {
+      return res.status(503).json({
+        error: 'Vertex backend is unconfigured on this deployment. '
+          + 'Set GOOGLE_CLOUD_PROJECT (or embed project_id in '
+          + 'GCP_SERVICE_ACCOUNT_JSON), or force the legacy backend '
+          + 'per-request with ?backend=aistudio.',
+      });
+    }
+  }
   // Admin key-override path: when `GEMINI_API_KEY_ADMIN` is set AND the
   // current caller is an admin, mint the ephemeral token against the
   // admin's own GCP project. Rationale: Gemini Live (v1alpha, preview)
@@ -1252,18 +1276,14 @@ const geminiTokenHandler = async (req, res) => {
     // endpoint.
     let setupModelPath = 'models/' + model;
     if (backend === 'vertex') {
-      const vxProject = process.env.GOOGLE_CLOUD_PROJECT
-        || process.env.GCP_PROJECT_ID
-        || process.env.VERTEX_PROJECT_ID
-        || '';
-      const vxLocation = process.env.GOOGLE_CLOUD_LOCATION
-        || process.env.VERTEX_LOCATION
-        || 'us-central1';
-      if (vxProject) {
-        setupModelPath = 'projects/' + vxProject
-          + '/locations/' + vxLocation
-          + '/publishers/google/models/' + model;
-      }
+      // `vertexResolved.project` is guaranteed non-empty here — the
+      // 503 guard above returns early when no project can be derived,
+      // so we always build the fully-qualified Vertex path and never
+      // fall back to the AI Studio `models/<M>` shape (which Vertex
+      // BidiGenerateContent rejects with close code 1007).
+      setupModelPath = 'projects/' + vertexResolved.project
+        + '/locations/' + vertexResolved.location
+        + '/publishers/google/models/' + model;
     }
     const fullSetup = {
       model: setupModelPath,

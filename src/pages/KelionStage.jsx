@@ -2203,14 +2203,31 @@ export default function KelionStage() {
   // only GA API that does voice + live video + tools in a single stream,
   // with a Google Cloud SLA. OpenAI Realtime remains in the codebase as
   // a dormant escape hatch (the hook is still allocated below with
-  // `active: false`) in case of an unforeseen Vertex incident; flipping
-  // `liveProvider` to `'openai'` via DevTools re-activates it. The
-  // previous auto-fallback + UI toggle + localStorage persistence have
-  // been removed — a single provider means a single mental model for
-  // users, and reconnect-on-1007/1008 (the actual failure modes we saw)
-  // is handled at the transport level in `geminiLive.js`, not by
-  // swapping to a different LLM.
+  // `active: false`) in case of an unforeseen Vertex incident; re-
+  // activating it requires editing this component's state via React
+  // DevTools — no supported runtime override/setter is exposed, which
+  // is intentional (users should never see a provider toggle), but it
+  // does mean an operator recovering from a Vertex outage must flip
+  // the value by hand. If that ever becomes a real-world recovery
+  // path we'd want a dedicated `?emergency=openai` URL param wired
+  // directly to useOpenAIRealtime's `active` flag. The previous auto-
+  // fallback + UI toggle + localStorage persistence have been removed
+  // — a single provider means a single mental model for users, and
+  // reconnect-on-1007/1008 (the actual failure modes we saw) is
+  // handled at the transport level in `geminiLive.js`, not by swapping
+  // to a different LLM.
   const [liveProvider /* setLiveProvider intentionally unused */] = useState('gemini')
+  // Clean up the localStorage key the old multi-provider code used to
+  // persist the user's choice. Left in place across releases it would
+  // read as "the user previously picked OpenAI" to any rollback or
+  // downstream reader, which is misleading now that the choice no
+  // longer exists. Best-effort; localStorage may be disabled (private
+  // mode, storage quota, Safari intelligent tracking prevention) —
+  // the key is already ignored either way, removal just tidies up.
+  useEffect(() => {
+    try { window.localStorage.removeItem('kelion_live_provider') }
+    catch (_) { /* storage disabled — harmless no-op */ }
+  }, [])
 
   const geminiHook = useGeminiLive({
     audioRef,
