@@ -159,17 +159,72 @@ async function initDb() {
   // about the user. We keep it simple (no embeddings yet — retrieval dumps
   // the most-recent-N facts into the system prompt, which fits within
   // Gemini Live's budget for typical user memory sizes).
+  //
+  // Audit M8 (tier / last_affirmed_at / archived_at) — the consolidator
+  // in services/memoryConsolidator.js reads these columns to detect
+  // duplicates, contradictions, and stale notes, then flips the tier
+  // or archives rows in place. See that file for the full rationale.
   await db.exec(`
     CREATE TABLE IF NOT EXISTS memory_items (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
       kind TEXT NOT NULL DEFAULT 'fact',
       fact TEXT NOT NULL,
+      tier TEXT NOT NULL DEFAULT 'recent',
+      last_affirmed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      archived_at DATETIME,
+      archived_reason TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     )
   `);
+  // Idempotent migrations for existing rows. On Postgres these are
+  // handled inside postgres-schema.js with `ADD COLUMN IF NOT EXISTS`;
+  // here we read PRAGMA table_info because the SQLite dialect does
+  // not support the IF NOT EXISTS suffix on ALTER TABLE.
+  const memCols = await db.all('PRAGMA table_info(memory_items)');
+  if (!memCols.find((c) => c.name === 'tier')) {
+    await db.exec("ALTER TABLE memory_items ADD COLUMN tier TEXT NOT NULL DEFAULT 'recent'");
+  }
+  if (!memCols.find((c) => c.name === 'last_affirmed_at')) {
+    await db.exec('ALTER TABLE memory_items ADD COLUMN last_affirmed_at DATETIME');
+    await db.exec('UPDATE memory_items SET last_affirmed_at = created_at WHERE last_affirmed_at IS NULL');
+  }
+  if (!memCols.find((c) => c.name === 'archived_at')) {
+    await db.exec('ALTER TABLE memory_items ADD COLUMN archived_at DATETIME');
+  }
+  if (!memCols.find((c) => c.name === 'archived_reason')) {
+    await db.exec('ALTER TABLE memory_items ADD COLUMN archived_reason TEXT');
+  }
+  // Audit M9 — memory subject tagging. Before this, every extracted
+  // fact was blindly attributed to the signed-in user, which caused
+  // the "memory mixing" bug: the extractor stored "Ioana is a vet
+  // tech" on Adrian's profile when Adrian mentioned his sister Ioana.
+  // Persona then introduced Adrian as a vet tech.
+  //
+  // The fix is structural: every row now carries
+  //   subject       — "self" when the fact is about the signed-in user,
+  //                   "other" when it's about a third party they
+  //                   mentioned. Default 'self' preserves behaviour
+  //                   for pre-migration rows.
+  //   subject_name  — name of the "other" person (NULL for self).
+  //                   Lets the retrieval layer group "facts about
+  //                   Ioana" separately from "facts about Adrian".
+  //   confidence    — 0.0 … 1.0 score emitted by the extractor.
+  //                   Low-confidence rows are stored but hidden from
+  //                   the persona until reinforced.
+  if (!memCols.find((c) => c.name === 'subject')) {
+    await db.exec("ALTER TABLE memory_items ADD COLUMN subject TEXT NOT NULL DEFAULT 'self'");
+  }
+  if (!memCols.find((c) => c.name === 'subject_name')) {
+    await db.exec('ALTER TABLE memory_items ADD COLUMN subject_name TEXT');
+  }
+  if (!memCols.find((c) => c.name === 'confidence')) {
+    await db.exec('ALTER TABLE memory_items ADD COLUMN confidence REAL NOT NULL DEFAULT 1.0');
+  }
   await db.exec('CREATE INDEX IF NOT EXISTS idx_memory_items_user ON memory_items(user_id, created_at DESC)');
+  await db.exec('CREATE INDEX IF NOT EXISTS idx_memory_items_user_live ON memory_items(user_id, archived_at, tier)');
+  await db.exec('CREATE INDEX IF NOT EXISTS idx_memory_items_user_subject ON memory_items(user_id, subject, archived_at)');
 
   // Stage 5 — M23: Web Push subscriptions. One row per device/browser; a
   // single user may have several (phone + laptop). endpoint is unique.
@@ -315,6 +370,55 @@ async function initDb() {
   `);
   await db.exec('CREATE INDEX IF NOT EXISTS idx_voice_clone_events_user ON voice_clone_events(user_id, created_at DESC)');
 
+  // PR #8/N — Memory of Actions. One row per real tool invocation so
+  // Kelion can (a) avoid redoing something it already did this session
+  // and (b) answer user questions like "did you email that yet?" or
+  // "what did you search for just now?". Feeds `get_action_history`
+  // which the voice model calls when it needs to check prior steps
+  // instead of re-running a tool blindly.
+  //
+  // `args_summary` and `result_summary` are short capped strings (not
+  // the raw JSON) so the table stays cheap to scan even after a heavy
+  // session. Both are sanitised at write time in `logAction` below —
+  // secrets, long URLs, passport numbers etc. never land here.
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS action_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      session_id TEXT,
+      tool_name TEXT NOT NULL,
+      ok INTEGER NOT NULL DEFAULT 1,
+      args_summary TEXT,
+      result_summary TEXT,
+      duration_ms INTEGER,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+  await db.exec('CREATE INDEX IF NOT EXISTS idx_action_history_user ON action_history(user_id, created_at DESC)');
+  await db.exec('CREATE INDEX IF NOT EXISTS idx_action_history_session ON action_history(user_id, session_id, created_at DESC)');
+
+  // Dev Studio (DS-1) — per-user Python project workspaces. Each row
+  // is one "project" Kelion can read/write into by voice. Files live
+  // inline as a JSON blob (path → {content,size,updated_at}) so the
+  // whole project round-trips in a single SELECT, keeping autosave
+  // cheap. Quotas (5 MB/file, 50 MB/project, 1 GB/user) are enforced
+  // in writeStudioFile below and mirrored in the Postgres DDL.
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS studio_workspaces (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      files TEXT NOT NULL DEFAULT '{}',
+      size_bytes INTEGER NOT NULL DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+  await db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_studio_workspaces_user_name ON studio_workspaces(user_id, name)');
+  await db.exec('CREATE INDEX IF NOT EXISTS idx_studio_workspaces_user ON studio_workspaces(user_id, updated_at DESC)');
+
   // Audit M7 — cross-instance consume state for the H1 silent-bypass
   // cap. The in-memory `consumeStateByUser` Map in routes/credits.js
   // is per-process — if Railway scales horizontally, a tampered
@@ -341,6 +445,34 @@ async function initDb() {
 }
 
 // Stage 3 — memory helpers
+//
+// Audit M8 note — every function here treats `archived_at IS NULL`
+// as the "live" set. Archived rows stay in the table so the user
+// can restore them from the admin panel; they just stop being
+// injected into Kelion's prompt. `addMemoryItems` now also re-
+// affirms (bumps last_affirmed_at) on an exact dup instead of
+// silently dropping it — that drives the consolidator's promotion
+// pass in services/memoryConsolidator.js.
+// Audit M9 — normalise the subject fields the extractor emits. Anything
+// not 'other' collapses to 'self' so a malformed extraction can never
+// poison the signed-in user's profile. subject_name is only kept for
+// 'other' rows — it's meaningless for self.
+function _normalizeSubject(raw) {
+  const kind = (raw && typeof raw.subject === 'string')
+    ? raw.subject.trim().toLowerCase()
+    : 'self';
+  const subject = kind === 'other' ? 'other' : 'self';
+  const name = (subject === 'other' && typeof raw?.subject_name === 'string')
+    ? raw.subject_name.trim().slice(0, 120) || null
+    : null;
+  // confidence clamps to [0, 1]; NaN / missing defaults to 1.0 so the
+  // legacy extractor (no confidence field) keeps promoting rows.
+  let conf = Number(raw?.confidence);
+  if (!Number.isFinite(conf)) conf = 1.0;
+  conf = Math.max(0, Math.min(1, conf));
+  return { subject, subject_name: name, confidence: conf };
+}
+
 async function addMemoryItems(userId, items) {
   if (!Array.isArray(items) || items.length === 0) return [];
   const inserted = [];
@@ -349,24 +481,75 @@ async function addMemoryItems(userId, items) {
     const fact = it.fact.trim().slice(0, 500);
     if (!fact) continue;
     const kind = (it.kind && typeof it.kind === 'string') ? it.kind.slice(0, 40) : 'fact';
-    // De-dupe: skip if identical fact already exists for this user
+    const { subject, subject_name, confidence } = _normalizeSubject(it);
+    // De-dupe: identical fact + same subject bumps last_affirmed_at.
+    // Scoping the dedupe to (user_id, fact, subject, subject_name)
+    // matters — "works as a vet" about the user AND about their
+    // sister Ioana are two legitimately distinct rows.
     const dup = await db.get(
-      'SELECT id FROM memory_items WHERE user_id = ? AND fact = ? LIMIT 1',
-      [userId, fact]
+      `SELECT id FROM memory_items
+         WHERE user_id = ? AND fact = ? AND subject = ?
+           AND COALESCE(subject_name,'') = COALESCE(?,'')
+           AND archived_at IS NULL
+         LIMIT 1`,
+      [userId, fact, subject, subject_name]
     );
-    if (dup) continue;
+    if (dup) {
+      await db.run(
+        'UPDATE memory_items SET last_affirmed_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?',
+        [dup.id, userId]
+      );
+      continue;
+    }
     const r = await db.run(
-      'INSERT INTO memory_items (user_id, kind, fact) VALUES (?, ?, ?)',
-      [userId, kind, fact]
+      `INSERT INTO memory_items (user_id, kind, fact, tier, subject, subject_name, confidence)
+       VALUES (?, ?, ?, 'recent', ?, ?, ?)`,
+      [userId, kind, fact, subject, subject_name, confidence]
     );
-    inserted.push({ id: r.lastID, user_id: userId, kind, fact });
+    inserted.push({ id: r.lastID, user_id: userId, kind, fact, subject, subject_name, confidence });
   }
   return inserted;
 }
 
-async function listMemoryItems(userId, limit = 100) {
+// Live items only, core-tier first so the persona prompt leads
+// with durable identity even if the newest rows are noisy one-off
+// context notes.
+//
+// Audit M9 — callers can now filter by subject. Default keeps the
+// pre-migration behaviour (return everything) so existing admin and
+// consolidator code paths don't change shape. The persona injection
+// uses the new `subject` option to keep "self" and "other" rows in
+// separate prompt sections.
+async function listMemoryItems(userId, limit = 100, opts = {}) {
+  const { subject = null } = opts || {};
+  const params = [userId];
+  let where = 'user_id = ? AND archived_at IS NULL';
+  if (subject === 'self' || subject === 'other') {
+    where += ' AND subject = ?';
+    params.push(subject);
+  }
+  params.push(limit);
   return db.all(
-    'SELECT id, kind, fact, created_at FROM memory_items WHERE user_id = ? ORDER BY created_at DESC LIMIT ?',
+    `SELECT id, kind, fact, tier, subject, subject_name, confidence,
+            last_affirmed_at, created_at
+       FROM memory_items
+      WHERE ${where}
+      ORDER BY CASE WHEN tier = 'core' THEN 0 ELSE 1 END,
+               created_at DESC
+      LIMIT ?`,
+    params
+  );
+}
+
+// Full row (live + archived) for admin panel / consolidation.
+async function listAllMemoryItems(userId, limit = 500) {
+  return db.all(
+    `SELECT id, kind, fact, tier, subject, subject_name, confidence,
+            last_affirmed_at, archived_at, archived_reason, created_at
+       FROM memory_items
+      WHERE user_id = ?
+      ORDER BY created_at DESC
+      LIMIT ?`,
     [userId, limit]
   );
 }
@@ -379,6 +562,43 @@ async function deleteMemoryItem(userId, id) {
 async function clearMemoryForUser(userId) {
   const r = await db.run('DELETE FROM memory_items WHERE user_id = ?', [userId]);
   return r.changes;
+}
+
+// Audit M8 — tier / archive helpers used by the consolidator.
+// All three are idempotent and scoped to (userId, id) so they
+// cannot accidentally touch another user's row.
+async function archiveMemoryItem(userId, id, reason) {
+  const r = await db.run(
+    `UPDATE memory_items
+        SET archived_at = CURRENT_TIMESTAMP,
+            archived_reason = ?
+      WHERE id = ? AND user_id = ? AND archived_at IS NULL`,
+    [reason ? String(reason).slice(0, 200) : null, id, userId]
+  );
+  return r.changes > 0;
+}
+
+async function restoreMemoryItem(userId, id) {
+  const r = await db.run(
+    `UPDATE memory_items
+        SET archived_at = NULL,
+            archived_reason = NULL,
+            last_affirmed_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND user_id = ? AND archived_at IS NOT NULL`,
+    [id, userId]
+  );
+  return r.changes > 0;
+}
+
+async function setMemoryItemTier(userId, id, tier) {
+  const safe = tier === 'core' || tier === 'recent' ? tier : 'recent';
+  const r = await db.run(
+    `UPDATE memory_items
+        SET tier = ?
+      WHERE id = ? AND user_id = ?`,
+    [safe, id, userId]
+  );
+  return r.changes > 0;
 }
 
 // ─── Voice clone helpers ──────────────────────────────────────────
@@ -469,6 +689,98 @@ async function listVoiceCloneEvents(userId, limit = 50) {
     `SELECT id, action, voice_id, consent_version, ip, user_agent, note, created_at
        FROM voice_clone_events WHERE user_id = ? ORDER BY id DESC LIMIT ?`,
     [userId, limit]
+  );
+}
+
+// PR #8/N — Memory of Actions helpers. Every real tool invocation the
+// voice / text model routes through `executeRealTool` lands here with a
+// short, sanitised summary so Kelion can later answer "did I already
+// do X this session?" without re-running the tool. Write path is
+// best-effort (swallows errors) because losing a history row must
+// never break the live action itself.
+//
+// Size caps:
+//   tool_name      ≤  60
+//   session_id     ≤  80
+//   args_summary   ≤ 300
+//   result_summary ≤ 500
+// Retention: unbounded; admin can prune manually with a DELETE. The
+// voice model only ever reads the most recent 40 rows via listRecentActions.
+async function logAction({ userId, sessionId, toolName, args, resultSummary, ok = true, durationMs = null }) {
+  if (!userId || !toolName) return null;
+  try {
+    const safeSession = sessionId ? String(sessionId).slice(0, 80) : null;
+    // Sanitise args down to a compact "k=v, k2=v2" string capped at
+    // 300 chars. We deliberately drop any field whose key hints at a
+    // secret (password, token, key, secret, auth, cookie) and never
+    // store raw base64 blobs or HTML/JSON payloads — only primitives
+    // and short strings survive. This mirrors the existing audit
+    // logging discipline from voice_clone_events / credit_transactions.
+    let argsSummary = null;
+    if (args && typeof args === 'object') {
+      const parts = [];
+      for (const [k, v] of Object.entries(args)) {
+        if (!k) continue;
+        if (/password|token|key|secret|auth|cookie|bearer|otp|pin/i.test(k)) continue;
+        let vs;
+        if (v == null) vs = '';
+        else if (typeof v === 'number' || typeof v === 'boolean') vs = String(v);
+        else if (typeof v === 'string') vs = v.length > 80 ? v.slice(0, 77) + '…' : v;
+        else continue; // skip objects / arrays / blobs — they'd blow the cap anyway
+        parts.push(`${k}=${vs}`);
+        if (parts.join(', ').length >= 260) break;
+      }
+      argsSummary = parts.join(', ').slice(0, 300) || null;
+    }
+    const safeResult = resultSummary
+      ? String(resultSummary).slice(0, 500)
+      : null;
+    const dur = Number.isFinite(durationMs) ? Math.max(0, Math.min(10 * 60_000, durationMs | 0)) : null;
+    const r = await db.run(
+      `INSERT INTO action_history
+         (user_id, session_id, tool_name, ok, args_summary, result_summary, duration_ms)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        userId,
+        safeSession,
+        String(toolName).slice(0, 60),
+        ok ? 1 : 0,
+        argsSummary,
+        safeResult,
+        dur,
+      ]
+    );
+    return { id: r.lastID };
+  } catch (err) {
+    // Never let an audit failure break the live action. Write path is
+    // intentionally lossy — the worst case is the voice model forgets
+    // it did something, which is survivable; a 500 on the tool call
+    // would be user-visible.
+    if (process.env.NODE_ENV !== 'test') {
+      console.error('[action_history] logAction failed:', err?.message);
+    }
+    return null;
+  }
+}
+
+async function listRecentActions(userId, { limit = 40, sessionId = null } = {}) {
+  if (!userId) return [];
+  const cappedLimit = Math.max(1, Math.min(200, Number(limit) || 40));
+  if (sessionId) {
+    return db.all(
+      `SELECT id, session_id, tool_name, ok, args_summary, result_summary, duration_ms, created_at
+         FROM action_history
+        WHERE user_id = ? AND session_id = ?
+        ORDER BY id DESC LIMIT ?`,
+      [userId, String(sessionId).slice(0, 80), cappedLimit]
+    );
+  }
+  return db.all(
+    `SELECT id, session_id, tool_name, ok, args_summary, result_summary, duration_ms, created_at
+       FROM action_history
+      WHERE user_id = ?
+      ORDER BY id DESC LIMIT ?`,
+    [userId, cappedLimit]
   );
 }
 
@@ -1083,6 +1395,49 @@ async function mergeUsers(sourceId, targetId) {
       const r = await db.run(`UPDATE ${t} SET user_id = ? WHERE user_id = ?`, [targetId, sourceId]);
       counts[t] = Number((r && (r.changes || r.rowCount)) || 0);
     }
+    // studio_workspaces carries a UNIQUE(user_id, name) index, so a
+    // plain UPDATE SET user_id would blow up if both users have a
+    // project with the same name. Rename any source workspace whose
+    // name already exists on the target before the bulk move. The
+    // ` (merged)` suffix is unique per attempt; if that's also taken,
+    // we fall back to ` (merged <sourceId>)` which cannot collide
+    // because sourceId is unique DB-wide. Merging is admin-triggered
+    // and rare, so we prioritise zero-data-loss over pretty names.
+    const tgtNameRows = await db.all(
+      'SELECT name FROM studio_workspaces WHERE user_id = ?',
+      [targetId]
+    );
+    const tgtNames = new Set(tgtNameRows.map((r) => String(r.name)));
+    const srcWs = await db.all(
+      'SELECT id, name FROM studio_workspaces WHERE user_id = ?',
+      [sourceId]
+    );
+    for (const row of srcWs) {
+      if (!tgtNames.has(String(row.name))) {
+        tgtNames.add(String(row.name));
+        continue;
+      }
+      // Collision. Pick a unique new name, keeping within
+      // MAX_STUDIO_NAME_LEN so the row still passes our own writers.
+      let candidate = `${row.name} (merged)`;
+      if (tgtNames.has(candidate)) candidate = `${row.name} (merged ${sourceId})`;
+      if (candidate.length > MAX_STUDIO_NAME_LEN) {
+        const suffix = ` (merged ${sourceId})`;
+        const base = String(row.name).slice(0, MAX_STUDIO_NAME_LEN - suffix.length);
+        candidate = `${base}${suffix}`;
+      }
+      await db.run(
+        'UPDATE studio_workspaces SET name = ? WHERE id = ?',
+        [candidate, row.id]
+      );
+      tgtNames.add(candidate);
+    }
+    const swMove = await db.run(
+      'UPDATE studio_workspaces SET user_id = ? WHERE user_id = ?',
+      [targetId, sourceId]
+    );
+    counts.studio_workspaces = Number((swMove && (swMove.changes || swMove.rowCount)) || 0);
+
     const refOwner = await db.run(
       'UPDATE referrals SET owner_id = ? WHERE owner_id = ?',
       [targetId, sourceId]
@@ -1232,6 +1587,371 @@ async function gcConsumeStateRows(cutoffMs) {
   return (r && typeof r.changes === 'number') ? r.changes : 0;
 }
 
+// ─── Dev Studio (DS-1) — per-user Python project workspaces ─────────
+//
+// Each row is one "project" Kelion can read/write into by voice. The
+// `files` column is a JSON object (path → {content,size,updated_at})
+// serialized as TEXT. The same schema works identically on SQLite and
+// Postgres because we never query into the blob — writeStudioFile
+// replaces the whole map atomically.
+//
+// Quotas (enforced below; writes past any cap return a structured
+// `RangeError` the route layer maps to 413):
+//   • MAX_STUDIO_FILE_BYTES      — 5 MB per file (post-UTF-8 encode)
+//   • MAX_STUDIO_WORKSPACE_BYTES — 50 MB per project
+//   • MAX_STUDIO_USER_BYTES      — 1 GB per user (sum of all projects)
+//   • MAX_STUDIO_FILES_PER_WS    — 500 files per project
+//   • MAX_STUDIO_NAME_LEN        — 120 chars, reasonable project name
+//   • MAX_STUDIO_PATH_LEN        — 512 chars, reasonable repo-style path
+
+const MAX_STUDIO_FILE_BYTES      = 5 * 1024 * 1024;
+const MAX_STUDIO_WORKSPACE_BYTES = 50 * 1024 * 1024;
+const MAX_STUDIO_USER_BYTES      = 1024 * 1024 * 1024;
+const MAX_STUDIO_FILES_PER_WS    = 500;
+const MAX_STUDIO_NAME_LEN        = 120;
+const MAX_STUDIO_PATH_LEN        = 512;
+
+// Only forward-slash repo-style paths are allowed. We explicitly reject:
+//   • absolute paths (leading /)
+//   • parent traversal (".." segment)
+//   • Windows drive letters or backslashes
+//   • NUL bytes and any other C0 control char
+//   • empty segments ("foo//bar") and trailing slashes
+function sanitizeStudioPath(raw) {
+  if (typeof raw !== 'string') return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  if (trimmed.length > MAX_STUDIO_PATH_LEN) return null;
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000-\u001f\\]/.test(trimmed)) return null;
+  if (trimmed.startsWith('/')) return null;
+  if (trimmed.endsWith('/')) return null;
+  const parts = trimmed.split('/');
+  for (const seg of parts) {
+    if (!seg || seg === '.' || seg === '..') return null;
+  }
+  return trimmed;
+}
+
+function sanitizeStudioName(raw) {
+  if (typeof raw !== 'string') return null;
+  // Reject control chars on the *raw* value — we check before trim()
+  // because trim() silently strips leading/trailing \n\t\r, which
+  // would mask a caller trying to smuggle newlines into a project
+  // name (chat-log spoofing, filesystem odd-paths, etc.).
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000-\u001f]/.test(raw)) return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  if (trimmed.length > MAX_STUDIO_NAME_LEN) return null;
+  return trimmed;
+}
+
+function parseStudioFiles(raw) {
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed;
+    }
+    return {};
+  } catch {
+    return {};
+  }
+}
+
+function studioBlobSize(files) {
+  let total = 0;
+  for (const key of Object.keys(files)) {
+    const entry = files[key];
+    const size = entry && typeof entry.size === 'number'
+      ? entry.size
+      : Buffer.byteLength(String(entry?.content ?? ''), 'utf8');
+    total += size;
+  }
+  return total;
+}
+
+function quotaError(code, message, extra = {}) {
+  const err = new RangeError(message);
+  err.studioQuota = code;
+  Object.assign(err, extra);
+  return err;
+}
+
+async function listStudioWorkspaces(userId, limit = 50) {
+  const safe = Math.max(1, Math.min(500, limit));
+  const rows = await db.all(
+    `SELECT id, name, size_bytes, created_at, updated_at
+     FROM studio_workspaces
+     WHERE user_id = ?
+     ORDER BY updated_at DESC
+     LIMIT ?`,
+    [userId, safe]
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    size_bytes: Number(r.size_bytes || 0),
+    created_at: r.created_at,
+    updated_at: r.updated_at,
+  }));
+}
+
+async function createStudioWorkspace(userId, name) {
+  const clean = sanitizeStudioName(name);
+  if (!clean) throw quotaError('NAME_INVALID', 'workspace name is invalid');
+  try {
+    const r = await db.run(
+      'INSERT INTO studio_workspaces (user_id, name, files, size_bytes) VALUES (?, ?, ?, ?)',
+      [userId, clean, '{}', 0]
+    );
+    return {
+      id: r.lastID,
+      user_id: userId,
+      name: clean,
+      files: {},
+      size_bytes: 0,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+  } catch (err) {
+    if (err && /UNIQUE/i.test(err.message || '')) {
+      throw quotaError('NAME_DUP', 'workspace name already exists');
+    }
+    throw err;
+  }
+}
+
+async function assertStudioOwner(userId, workspaceId) {
+  const row = await db.get(
+    'SELECT id, user_id FROM studio_workspaces WHERE id = ?',
+    [workspaceId]
+  );
+  if (!row) return null;
+  if (Number(row.user_id) !== Number(userId)) return null;
+  return row;
+}
+
+async function getStudioWorkspace(userId, workspaceId) {
+  const row = await db.get(
+    `SELECT id, user_id, name, files, size_bytes, created_at, updated_at
+     FROM studio_workspaces
+     WHERE id = ? AND user_id = ?`,
+    [workspaceId, userId]
+  );
+  if (!row) return null;
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    name: row.name,
+    files: parseStudioFiles(row.files),
+    size_bytes: Number(row.size_bytes || 0),
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+async function getStudioWorkspaceByName(userId, name) {
+  const clean = sanitizeStudioName(name);
+  if (!clean) return null;
+  const row = await db.get(
+    `SELECT id, user_id, name, files, size_bytes, created_at, updated_at
+     FROM studio_workspaces
+     WHERE user_id = ? AND name = ?`,
+    [userId, clean]
+  );
+  if (!row) return null;
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    name: row.name,
+    files: parseStudioFiles(row.files),
+    size_bytes: Number(row.size_bytes || 0),
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+async function renameStudioWorkspace(userId, workspaceId, newName) {
+  const clean = sanitizeStudioName(newName);
+  if (!clean) throw quotaError('NAME_INVALID', 'workspace name is invalid');
+  const own = await assertStudioOwner(userId, workspaceId);
+  if (!own) return false;
+  try {
+    const r = await db.run(
+      'UPDATE studio_workspaces SET name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [clean, workspaceId]
+    );
+    return r.changes > 0;
+  } catch (err) {
+    if (err && /UNIQUE/i.test(err.message || '')) {
+      throw quotaError('NAME_DUP', 'workspace name already exists');
+    }
+    throw err;
+  }
+}
+
+async function deleteStudioWorkspace(userId, workspaceId) {
+  const own = await assertStudioOwner(userId, workspaceId);
+  if (!own) return false;
+  const r = await db.run('DELETE FROM studio_workspaces WHERE id = ?', [workspaceId]);
+  return r.changes > 0;
+}
+
+async function getUserStudioUsage(userId) {
+  const row = await db.get(
+    `SELECT COUNT(*) AS workspaces,
+            COALESCE(SUM(size_bytes), 0) AS total_bytes
+     FROM studio_workspaces
+     WHERE user_id = ?`,
+    [userId]
+  );
+  return {
+    workspaces: Number(row?.workspaces || 0),
+    total_bytes: Number(row?.total_bytes || 0),
+    quota_bytes: MAX_STUDIO_USER_BYTES,
+  };
+}
+
+// Serialize concurrent writes per workspace so two autosaves in flight
+// can't race on the JSON blob (last-write-wins but one overwrite
+// clobbering the other's file is worse). Queue per-workspace keyed by id.
+//
+// The cleanup step compares against a SINGLE Promise object stored in
+// the Map — `next.catch(() => null)` creates a NEW promise each call
+// so we build `stored` once and reuse it for both the Map value and
+// the `finally` identity check. Without this, the `delete` never
+// fires and every workspace that receives a write keeps a permanent
+// Map entry (real leak, not just theoretical).
+const studioWriteQueues = new Map();
+function serializeStudioWrite(workspaceId, fn) {
+  const prev = studioWriteQueues.get(workspaceId) || Promise.resolve();
+  const next = prev.then(() => fn(), () => fn());
+  const stored = next.catch(() => null).finally(() => {
+    if (studioWriteQueues.get(workspaceId) === stored) {
+      studioWriteQueues.delete(workspaceId);
+    }
+  });
+  studioWriteQueues.set(workspaceId, stored);
+  return next;
+}
+
+// Test-only: inspect live queue size (used by studio-workspaces.test.js
+// to assert the leak-fix: Map size returns to 0 after the tail of a
+// write chain settles).
+function __getStudioWriteQueuesSizeForTests() {
+  return studioWriteQueues.size;
+}
+
+async function writeStudioFile(userId, workspaceId, filePath, content) {
+  const cleanPath = sanitizeStudioPath(filePath);
+  if (!cleanPath) throw quotaError('PATH_INVALID', 'file path is invalid');
+  if (typeof content !== 'string') {
+    throw quotaError('CONTENT_INVALID', 'file content must be a string');
+  }
+  const size = Buffer.byteLength(content, 'utf8');
+  if (size > MAX_STUDIO_FILE_BYTES) {
+    throw quotaError('FILE_TOO_BIG', 'file exceeds 5 MB cap', {
+      size, limit: MAX_STUDIO_FILE_BYTES,
+    });
+  }
+  return serializeStudioWrite(workspaceId, async () => {
+    const ws = await getStudioWorkspace(userId, workspaceId);
+    if (!ws) return null;
+    const prev = ws.files[cleanPath];
+    const prevSize = prev ? Number(prev.size || 0) : 0;
+    const newWsSize = Number(ws.size_bytes || 0) - prevSize + size;
+    if (newWsSize > MAX_STUDIO_WORKSPACE_BYTES) {
+      throw quotaError('WORKSPACE_FULL', 'workspace exceeds 50 MB cap', {
+        size: newWsSize, limit: MAX_STUDIO_WORKSPACE_BYTES,
+      });
+    }
+    const fileCount = Object.keys(ws.files).length + (prev ? 0 : 1);
+    if (fileCount > MAX_STUDIO_FILES_PER_WS) {
+      throw quotaError('TOO_MANY_FILES', 'workspace exceeds file-count cap', {
+        files: fileCount, limit: MAX_STUDIO_FILES_PER_WS,
+      });
+    }
+    // User-level soft cap — sum of ALL workspaces excluding this one's old size.
+    const usage = await getUserStudioUsage(userId);
+    const otherBytes = Number(usage.total_bytes || 0) - Number(ws.size_bytes || 0);
+    if (otherBytes + newWsSize > MAX_STUDIO_USER_BYTES) {
+      throw quotaError('USER_QUOTA', 'user storage quota exceeded', {
+        size: otherBytes + newWsSize, limit: MAX_STUDIO_USER_BYTES,
+      });
+    }
+    const updated = {
+      ...ws.files,
+      [cleanPath]: {
+        content,
+        size,
+        updated_at: new Date().toISOString(),
+      },
+    };
+    const r = await db.run(
+      `UPDATE studio_workspaces
+         SET files = ?, size_bytes = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND user_id = ?`,
+      [JSON.stringify(updated), newWsSize, workspaceId, userId]
+    );
+    if (r.changes === 0) return null;
+    return {
+      path: cleanPath,
+      size,
+      workspace_size_bytes: newWsSize,
+      updated_at: new Date().toISOString(),
+    };
+  });
+}
+
+async function deleteStudioFile(userId, workspaceId, filePath) {
+  const cleanPath = sanitizeStudioPath(filePath);
+  if (!cleanPath) throw quotaError('PATH_INVALID', 'file path is invalid');
+  return serializeStudioWrite(workspaceId, async () => {
+    const ws = await getStudioWorkspace(userId, workspaceId);
+    if (!ws) return null;
+    const prev = ws.files[cleanPath];
+    if (!prev) return { deleted: false, workspace_size_bytes: ws.size_bytes };
+    const prevSize = Number(prev.size || 0);
+    const updated = { ...ws.files };
+    delete updated[cleanPath];
+    const newWsSize = Math.max(0, Number(ws.size_bytes || 0) - prevSize);
+    const r = await db.run(
+      `UPDATE studio_workspaces
+         SET files = ?, size_bytes = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND user_id = ?`,
+      [JSON.stringify(updated), newWsSize, workspaceId, userId]
+    );
+    if (r.changes === 0) return null;
+    return { deleted: true, workspace_size_bytes: newWsSize };
+  });
+}
+
+async function readStudioFile(userId, workspaceId, filePath) {
+  const cleanPath = sanitizeStudioPath(filePath);
+  if (!cleanPath) return null;
+  const ws = await getStudioWorkspace(userId, workspaceId);
+  if (!ws) return null;
+  const entry = ws.files[cleanPath];
+  if (!entry) return null;
+  return {
+    path: cleanPath,
+    content: String(entry.content ?? ''),
+    size: Number(entry.size || 0),
+    updated_at: entry.updated_at || ws.updated_at,
+  };
+}
+
+function listStudioFiles(workspace) {
+  if (!workspace || !workspace.files) return [];
+  return Object.keys(workspace.files).sort().map((path) => ({
+    path,
+    size: Number(workspace.files[path].size || 0),
+    updated_at: workspace.files[path].updated_at || workspace.updated_at,
+  }));
+}
+
 module.exports = {
   initDb,
   getDb,
@@ -1265,8 +1985,13 @@ module.exports = {
   // Stage 3 — memory
   addMemoryItems,
   listMemoryItems,
+  listAllMemoryItems,
   deleteMemoryItem,
   clearMemoryForUser,
+  // Audit M8 — consolidator writes
+  archiveMemoryItem,
+  restoreMemoryItem,
+  setMemoryItemTier,
   // F8 — preferred language
   setPreferredLanguage,
   getPreferredLanguage,
@@ -1277,6 +2002,9 @@ module.exports = {
   getClonedVoice,
   logVoiceCloneEvent,
   listVoiceCloneEvents,
+  // PR #8/N — Memory of Actions
+  logAction,
+  listRecentActions,
   // Conversation history
   createConversation,
   appendConversationMessage,
@@ -1315,6 +2043,27 @@ module.exports = {
   recordVisitorEvent,
   listRecentVisitors,
   getVisitorStats,
+  // Dev Studio (DS-1) — per-user Python project workspaces
+  listStudioWorkspaces,
+  createStudioWorkspace,
+  getStudioWorkspace,
+  getStudioWorkspaceByName,
+  renameStudioWorkspace,
+  deleteStudioWorkspace,
+  getUserStudioUsage,
+  writeStudioFile,
+  deleteStudioFile,
+  readStudioFile,
+  listStudioFiles,
+  sanitizeStudioPath,
+  sanitizeStudioName,
+  MAX_STUDIO_FILE_BYTES,
+  MAX_STUDIO_WORKSPACE_BYTES,
+  MAX_STUDIO_USER_BYTES,
+  MAX_STUDIO_FILES_PER_WS,
+  MAX_STUDIO_NAME_LEN,
+  MAX_STUDIO_PATH_LEN,
+  __getStudioWriteQueuesSizeForTests,
 };
 
 // ─── Stage 5 helpers ────────────────────────────────────────────────

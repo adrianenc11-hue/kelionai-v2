@@ -38,6 +38,10 @@ console.warn = function filteredWarn(...args) {
 
 const KelionStage = lazy(() => import('./pages/KelionStage'))
 const ContactPage = lazy(() => import('./pages/ContactPage'))
+// Kelion Studio — voice-driven Python IDE (DS-2 lands the editor UI;
+// the backend lives under /api/studio/* from DS-1/DS-3). Lazy-loaded
+// so the ~4 MB Monaco bundle never ships with the landing page.
+const KelionStudio = lazy(() => import('./pages/KelionStudio'))
 
 function Loader() {
   return (
@@ -69,6 +73,12 @@ createRoot(document.getElementById('root')).render(
                 ContactPage component has always existed
                 (src/pages/ContactPage.jsx), it just wasn't wired in. */}
             <Route path="/contact" element={<ContactPage />} />
+            {/* Kelion Studio — open via /studio (the main stage will
+                link here once voice commands for "open studio" are
+                wired in DS-6). Requires an authenticated session;
+                KelionStudio will surface the auth error inline if
+                the user isn't signed in. */}
+            <Route path="/studio" element={<KelionStudio />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>

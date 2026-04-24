@@ -23,11 +23,13 @@ const realtimeRouter   = require('./routes/realtime');
 const passkeyRouter    = require('./routes/passkey');
 const memoryRouter     = require('./routes/memory');
 const conversationsRouter = require('./routes/conversations');
+const studioRouter     = require('./routes/studio');
 const toolsRouter      = require('./routes/tools');
 const pushRouter       = require('./routes/push');
 const creditsRouter    = require('./routes/credits');
 const diagRouter       = require('./routes/diag');
 const youtubeRouter    = require('./routes/youtube');
+const generatedImagesRouter = require('./routes/generatedImages');
 const voiceCloneRouter = require('./routes/voiceClone');
 const proactive        = require('./services/proactive');
 const { bootstrapAdmin } = require('./services/adminBootstrap');
@@ -325,6 +327,10 @@ app.use('/api/diag', diagRouter);
 app.use('/api/auth/passkey', chatLimiter, passkeyRouter);
 app.use('/api/memory', requireAuth, memoryRouter);
 app.use('/api/conversations', requireAuth, conversationsRouter);
+// Dev Studio (DS-1) — per-user Python project workspaces. All routes
+// require a signed-in user; ownership is enforced again inside every
+// DB helper (listStudioWorkspaces, getStudioWorkspace, …).
+app.use('/api/studio', requireAuth, studioRouter);
 
 // Stage 4 — M19 (browser use) + M20 (web search status) + M21 (MCP stubs).
 // Router is PUBLIC by design: Gemini Live tool-call flow has no login gate,
@@ -338,6 +344,11 @@ app.use('/api/tools', chatLimiter, toolsRouter);
 // is not configured; the client then falls back to the external
 // search card shipped in PR #160.
 app.use('/api/youtube', chatLimiter, youtubeRouter);
+
+// F11 — short-lived PNG serving for `generate_image` tool. The route
+// lives outside chatLimiter because it's a pure GET by opaque UUID;
+// rate-limiting the tool call itself happens on /api/tools/execute.
+app.use('/api/generated-images', generatedImagesRouter);
 
 // Stage 5 — M23 push + M24/M25 proactive scheduler. Requires passkey auth,
 // except /public-key which the browser needs to fetch BEFORE authenticating.
