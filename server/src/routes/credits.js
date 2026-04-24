@@ -329,35 +329,54 @@ function stopConsumeStateGc() {
 startConsumeStateGc();
 
 /**
- * Audit M7 — resolve the per-user consume state across the in-memory
- * L1 cache and the DB. If the cache has an entry we trust it (same
- * process just wrote it, nothing staler can live in the DB). Otherwise
- * we look in the DB and prime the cache; if the DB is unreachable
- * (transient outage / mock DB without the helper) we fall back to an
- * empty state rather than crashing — this is the same "start from
- * fresh" posture the pre-M7 code had on process restart.
+ * Audit M7 — resolve the per-user consume state across the DB (the
+ * authoritative source of truth across instances) and the in-memory
+ * L1 cache. Always read DB-first; on DB failure we fall back to the
+ * cache so /consume still works through transient DB hiccups. The
+ * cache never short-circuits a successful DB read — see the
+ * Copilot P2 note on #186 for why cache-first breaks the cross-
+ * instance bypass cap.
  *
  * Returns the resolved state object (fields default to 0).
  */
 async function loadConsumeState(userId) {
   if (userId === null || userId === undefined) return {};
-  const cached = consumeStateByUser.get(userId);
-  if (cached) return cached;
-  if (typeof _dbGetConsumeState !== 'function') return {};
-  try {
-    const row = await _dbGetConsumeState(userId);
-    if (!row) return {};
-    const state = {
-      lastBillableAt: Number(row.lastBillableAt) || 0,
-      silentStreak:   Number(row.silentStreak)   || 0,
-      silentSince:    Number(row.silentSince)    || 0,
-    };
-    consumeStateByUser.set(userId, state);
-    return state;
-  } catch (e) {
-    console.warn('[credits/consume] db load error', e && e.message);
-    return {};
+  // M7 follow-up (Copilot P2 on #186): the DB is authoritative across
+  // instances, so a cache hit alone is NOT sufficient — another
+  // instance may have advanced the streak or bumped lastBillableAt,
+  // and if we trusted a stale L1 we would (a) make the policy decision
+  // on old counters and (b) overwrite the fresh DB row on the next
+  // persist, reopening the cross-instance bypass M7 was written to
+  // close. We therefore always try the DB first and only fall back to
+  // the cache when the DB is unreachable. The cache still exists — it
+  // just now serves as a warm fallback for transient DB outages
+  // rather than an authoritative read path.
+  if (typeof _dbGetConsumeState === 'function') {
+    try {
+      const row = await _dbGetConsumeState(userId);
+      if (row) {
+        const state = {
+          lastBillableAt: Number(row.lastBillableAt) || 0,
+          silentStreak:   Number(row.silentStreak)   || 0,
+          silentSince:    Number(row.silentSince)    || 0,
+        };
+        consumeStateByUser.set(userId, state);
+        return state;
+      }
+      // Row missing in DB — treat as fresh state but keep the cache
+      // clear so the next persist writes a canonical row.
+      consumeStateByUser.delete(userId);
+      return {};
+    } catch (e) {
+      console.warn('[credits/consume] db load error', e && e.message);
+      // Fall through to the cache fallback below.
+    }
   }
+  // DB unreachable or not wired (legacy mock DB): best-effort cache.
+  // Better than crashing, and on the same instance the cache is
+  // still useful for the streak cap within the request stream.
+  const cached = consumeStateByUser.get(userId);
+  return cached || {};
 }
 
 /**
