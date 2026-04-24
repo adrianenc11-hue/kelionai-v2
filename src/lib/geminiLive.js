@@ -904,27 +904,6 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
     if (cameraStreamRef.current) return
     cameraFacingRef.current = nextFacing
     setCurrentFacingMode(nextFacing)
-    // Best-rear-camera selection: when the user asked for the back side,
-    // enumerate devices and pick the main/wide lens (iPhone Pro, Pixel 6+,
-    // Galaxy S-series). Labels are only populated after the first
-    // permission grant; the ladder below falls back to plain facingMode
-    // when labels are empty. Callers (cameraControl.requestCameraSwitch)
-    // may also inject a pre-chosen deviceId through opts.
-    let deviceId = typeof opts.deviceId === 'string' ? opts.deviceId : null
-    if (!deviceId && nextFacing === 'environment') {
-      deviceId = await pickBestRearCameraDeviceId().catch(() => null)
-    }
-    // Ladder of progressively looser constraints. The first rung is what
-    // we actually want (requested camera at HD 1280×720 — license plates
-    // and distant text were unreadable at 640×480); the fallbacks exist
-    // because Chromium on Windows/Edge throws NotReadableError with
-    // the unhelpful message "Could not start video source" when the
-    // *constraint set* is incompatible with the specific camera
-    // driver — e.g. a laptop with a shared front/back camera that
-    // doesn't advertise `facingMode`, or a virtual camera (OBS,
-    // NVIDIA Broadcast) that only honours default constraints. Trying
-    // `facingMode: 'user'` explicitly is a known offender on
-    // external webcams. Dropping constraints almost always recovers.
     // When the voice model picks a specific rear lens via camera_on /
     // switch_camera (non-ultrawide, non-tele) we forward the deviceId
     // so getUserMedia can lock to that lens instead of the default
@@ -936,7 +915,13 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
     // Every rung is wrapped in try/catch below, so a phone that can
     // only produce 720p still succeeds on a lower rung, and anything
     // that rejects explicit resolutions still falls back to the
-    // permissive `video: true`.
+    // permissive `video: true`. Ladder fallbacks also exist because
+    // Chromium on Windows/Edge throws NotReadableError ("Could not
+    // start video source") when the constraint set is incompatible
+    // with the specific camera driver (laptop with a shared front/back
+    // camera that doesn't advertise facingMode, or a virtual camera
+    // like OBS / NVIDIA Broadcast that only honours default
+    // constraints). Dropping constraints almost always recovers.
     const deviceId = opts.deviceId || null
     const baseSelector = deviceId
       ? { deviceId: { exact: deviceId } }

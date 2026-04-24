@@ -11,14 +11,6 @@
 //   - requestCameraZoom(level)  — "zoom pe număr", "focalizează"
 //
 // Additions (Apr-2026):
-//   - `pickBestRearCameraDeviceId()` — walks enumerateDevices() to find
-//     the most capable back-facing camera (the "Main" / "Wide" lens on
-//     phones with multiple rear lenses). Filters out lenses with
-//     "ultra", "wide-angle", "telephoto" in the label when the user
-//     asked for the plain back camera (ultra-wide distorts faces and
-//     numbers; telephoto can't focus at close range). Falls back to
-//     plain `facingMode: 'environment'` when device labels are empty
-//     (desktop / permission not yet granted) and lets the OS pick.
 //   - `requestCameraZoom(level)` — applies a live MediaStreamTrack
 //     constraint for the `zoom` capability (Android Chrome; iOS Safari
 //     does not expose zoom yet but this degrades gracefully with a
