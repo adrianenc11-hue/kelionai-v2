@@ -42,7 +42,12 @@ function logAndMigrateDbLocation() {
         console.warn(`[db] legacy migration failed (continuing fresh):`, err && err.message);
       }
     }
-    console.log(`[db] using SQLite at ${absPath} (exists=${fs.existsSync(absPath)})`);
+    const looksPersistent = /^\/(data|mnt|app\/server\/data)\b/.test(absPath);
+    console.log(`[db] using SQLite at ${absPath} (exists=${fs.existsSync(absPath)}, looksPersistent=${looksPersistent})`);
+    if (!looksPersistent) {
+      console.warn('[db] *** WARNING: SQLite path is NOT under a typical Railway volume mount.');
+      console.warn('[db] *** Data WILL be wiped on every redeploy. Attach a Railway Volume to /app/server/data, OR set DATABASE_URL to a managed Postgres and redeploy.');
+    }
   } catch (err) {
     console.warn('[db] startup location check failed:', err && err.message);
   }
@@ -99,6 +104,19 @@ async function initDb() {
   // but we want them to survive a single dev-server reload)
   if (!cols.find(c => c.name === 'current_webauthn_challenge')) {
     await db.exec("ALTER TABLE users ADD COLUMN current_webauthn_challenge TEXT");
+  }
+  // PR E5 — admin user management. `banned=1` blocks API + chat for
+  // the offender; `requireAuth` / `optionalAuth` check this flag with
+  // an in-process cache so a ban takes effect within ~60s without
+  // paying a DB round-trip on every authed request.
+  if (!cols.find(c => c.name === 'banned')) {
+    await db.exec('ALTER TABLE users ADD COLUMN banned INTEGER NOT NULL DEFAULT 0');
+  }
+  if (!cols.find(c => c.name === 'banned_reason')) {
+    await db.exec('ALTER TABLE users ADD COLUMN banned_reason TEXT');
+  }
+  if (!cols.find(c => c.name === 'banned_at')) {
+    await db.exec('ALTER TABLE users ADD COLUMN banned_at DATETIME');
   }
   // F8 — preferred language (BCP-47 short, e.g. 'ro', 'en', 'fr'). Captured
   // from the browser's Accept-Language on first login and kept in sync via

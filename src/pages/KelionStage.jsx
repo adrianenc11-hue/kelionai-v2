@@ -985,6 +985,20 @@ function CameraRig() {
   return null
 }
 
+// PR E5 — reusable pill-style action button for the user-management
+// drawer. Accepts a disabled flag and optional text/border colours so
+// destructive actions (ban) stand out from neutral ones (grant credits).
+function actionBtnStyle(disabled, color, borderColor) {
+  return {
+    padding: '7px 12px', borderRadius: 8,
+    background: 'rgba(167, 139, 250, 0.1)',
+    border: '1px solid ' + (borderColor || 'rgba(167, 139, 250, 0.3)'),
+    color: color || '#ede9fe',
+    fontSize: 12, cursor: disabled ? 'not-allowed' : 'pointer',
+    opacity: disabled ? 0.5 : 1,
+  }
+}
+
 // ───── Main page ─────
 export default function KelionStage() {
   // React-router navigator. Used for in-app route changes (e.g. the
@@ -1014,8 +1028,10 @@ export default function KelionStage() {
   // one-time permission dialog. Coords are cached in localStorage so
   // refreshes don't re-ping the OS.
   // useClientGeo v2 exposes { coords, permission, lastError, requestNow }.
-  // Alias to the names already used elsewhere in this file (clientGeo /
-  // geoPermission / requestGeo).
+  // We forward `coords` to the Gemini Live hook (the pipeline only needs
+  // lat/lon), and the top-level stage wires `requestNow` to the first
+  // user gesture so iOS Safari actually shows the permission prompt —
+  // see handling in onStageClick below.
   const { coords: clientGeo, permission: geoPermission, requestNow: requestGeo } = useClientGeo()
   // Register a geo provider so monitorStore can fall back to the user's
   // current coords when the model calls show_on_monitor({kind:'map'}) without
@@ -1416,6 +1432,167 @@ export default function KelionStage() {
   const [usersOpen, setUsersOpen] = useState(false)
   const [payoutsOpen, setPayoutsOpen] = useState(false)
 
+  // PR E5 — Users drawer state. `usersData` holds the last list
+  // response; `usersQuery`/`usersStatus` are the current filters;
+  // `selectedUserId` opens a detail sub-drawer with per-user actions
+  // (grant credits, ban/unban, reset password, ledger history). The
+  // list re-fetches every 15s while the drawer is open so fresh
+  // top-ups show up without a manual reload. All mutating calls hit
+  // existing admin endpoints gated by `requireAuth` + `requireAdmin`.
+  const [usersData, setUsersData] = useState(null)
+  const [usersLoading, setUsersLoading] = useState(false)
+  const [usersError, setUsersError] = useState(null)
+  const [usersQuery, setUsersQuery] = useState('')
+  const [usersStatus, setUsersStatus] = useState('all')
+  const [selectedUserId, setSelectedUserId] = useState(null)
+  const [selectedUser, setSelectedUser] = useState(null)
+  const [selectedHistory, setSelectedHistory] = useState(null)
+  const [selectedBusy, setSelectedBusy] = useState(false)
+  const [selectedResult, setSelectedResult] = useState(null)
+
+  const refreshUsersList = useCallback(async (q = usersQuery, status = usersStatus) => {
+    setUsersLoading(true)
+    setUsersError(null)
+    try {
+      const params = new URLSearchParams()
+      if (q && q.trim()) params.set('q', q.trim())
+      if (status && status !== 'all') params.set('status', status)
+      params.set('limit', '200')
+      const r = await fetch(`/api/admin/users?${params.toString()}`, { credentials: 'include' })
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      setUsersData(await r.json())
+    } catch (err) {
+      setUsersError(err.message || 'Nu am putut încărca lista de useri')
+    } finally {
+      setUsersLoading(false)
+    }
+  }, [usersQuery, usersStatus])
+
+  const openUsers = useCallback(async () => {
+    setUsersOpen(true)
+    setSelectedUserId(null)
+    setSelectedUser(null)
+    setSelectedHistory(null)
+    setSelectedResult(null)
+    await refreshUsersList('', 'all')
+  }, [refreshUsersList])
+
+  const loadUserDetail = useCallback(async (userId) => {
+    setSelectedUserId(userId)
+    setSelectedUser(null)
+    setSelectedHistory(null)
+    setSelectedResult(null)
+    try {
+      const [userRes, histRes] = await Promise.all([
+        fetch(`/api/admin/users/${encodeURIComponent(userId)}`, { credentials: 'include' }),
+        fetch(`/api/admin/users/${encodeURIComponent(userId)}/history?limit=50`, { credentials: 'include' }),
+      ])
+      if (userRes.ok) setSelectedUser(await userRes.json())
+      if (histRes.ok) setSelectedHistory(await histRes.json())
+    } catch (err) {
+      setSelectedResult({ ok: false, error: err.message || 'Nu am putut citi detaliile' })
+    }
+  }, [])
+
+  const closeUserDetail = useCallback(() => {
+    setSelectedUserId(null)
+    setSelectedUser(null)
+    setSelectedHistory(null)
+    setSelectedResult(null)
+  }, [])
+
+  const banSelectedUser = useCallback(async (banned) => {
+    if (!selectedUserId || selectedBusy) return
+    let reason = null
+    if (banned) {
+      reason = window.prompt('Motiv suspendare (opțional):', '') || ''
+    } else if (!window.confirm('Reactivezi contul?')) {
+      return
+    }
+    setSelectedBusy(true)
+    setSelectedResult(null)
+    try {
+      const r = await fetch(`/api/admin/users/${encodeURIComponent(selectedUserId)}/ban`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ banned, reason }),
+      })
+      const body = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`)
+      setSelectedResult({ ok: true, message: banned ? 'Cont suspendat' : 'Cont reactivat' })
+      await Promise.all([loadUserDetail(selectedUserId), refreshUsersList()])
+    } catch (err) {
+      setSelectedResult({ ok: false, error: err.message || 'Acțiunea a eșuat' })
+    } finally {
+      setSelectedBusy(false)
+    }
+  }, [selectedUserId, selectedBusy, loadUserDetail, refreshUsersList])
+
+  const grantCreditsToSelected = useCallback(async () => {
+    if (!selectedUserId || selectedBusy) return
+    const raw = window.prompt('Câte minute adaugi? (negativ = retragi)', '10')
+    if (raw == null) return
+    const minutes = Number(raw)
+    if (!Number.isFinite(minutes) || minutes === 0) {
+      setSelectedResult({ ok: false, error: 'Introduceți un număr diferit de 0' })
+      return
+    }
+    const note = window.prompt('Notă (opțional):', '') || ''
+    setSelectedBusy(true)
+    setSelectedResult(null)
+    try {
+      const r = await fetch(`/api/admin/users/${encodeURIComponent(selectedUserId)}/credits/grant`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ minutes: Math.trunc(minutes), note }),
+      })
+      const body = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`)
+      setSelectedResult({
+        ok: true,
+        message: `${minutes > 0 ? 'Adăugate' : 'Retrase'} ${Math.abs(Math.trunc(minutes))} minute · sold nou ${body.balance}`,
+      })
+      await Promise.all([loadUserDetail(selectedUserId), refreshUsersList()])
+    } catch (err) {
+      setSelectedResult({ ok: false, error: err.message || 'Acțiunea a eșuat' })
+    } finally {
+      setSelectedBusy(false)
+    }
+  }, [selectedUserId, selectedBusy, loadUserDetail, refreshUsersList])
+
+  const resetSelectedPassword = useCallback(async () => {
+    if (!selectedUserId || selectedBusy) return
+    if (!window.confirm('Șterg parola + passkey-ul? Userul va trebui să se reloghează cu Google sau passkey nou.')) {
+      return
+    }
+    setSelectedBusy(true)
+    setSelectedResult(null)
+    try {
+      const r = await fetch(`/api/admin/users/${encodeURIComponent(selectedUserId)}/reset-password`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+      })
+      const body = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`)
+      setSelectedResult({ ok: true, message: 'Parola + passkey șterse. Contactează userul.' })
+      await loadUserDetail(selectedUserId)
+    } catch (err) {
+      setSelectedResult({ ok: false, error: err.message || 'Acțiunea a eșuat' })
+    } finally {
+      setSelectedBusy(false)
+    }
+  }, [selectedUserId, selectedBusy, loadUserDetail])
+
+  // 15s live refresh of the users list while the drawer is open.
+  useEffect(() => {
+    if (!usersOpen) return undefined
+    const id = setInterval(() => { refreshUsersList() }, 15000)
+    return () => clearInterval(id)
+  }, [usersOpen, refreshUsersList])
+
   // F3 — Adrian 2026-04-22: audit found adrianenc11@gmail.com split across
   // two user rows (id=5 Google + id=6 local signup) and the admin panel
   // had no way to collapse them. `dupGroups` holds whatever
@@ -1557,11 +1734,9 @@ export default function KelionStage() {
     if (tab === 'business') { openBusiness() }
     else if (tab === 'ai')       { openCredits() }
     else if (tab === 'visitors') { openVisitors() }
-    else if (tab === 'users')    { setUsersOpen(true); refreshDuplicateUsers() }
+    else if (tab === 'users')    { openUsers(); refreshDuplicateUsers() }
     else if (tab === 'payouts')  { openPayouts() }
-  }, [openBusiness, openCredits, openVisitors, openPayouts, refreshDuplicateUsers])
-
-
+  }, [openBusiness, openCredits, openVisitors, openUsers, openPayouts, refreshDuplicateUsers])
 
   // Stage 6 — emotion mirroring + voice style
   const emotion = useEmotion()
@@ -5123,6 +5298,52 @@ export default function KelionStage() {
           </div>
           <AdminTabBar active="users" onSelect={switchAdminTab} />
 
+          {/* Search + status filter. Submit search on Enter or blur. */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+            <input
+              value={usersQuery}
+              onChange={(e) => setUsersQuery(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') refreshUsersList(usersQuery, usersStatus) }}
+              onBlur={() => refreshUsersList(usersQuery, usersStatus)}
+              placeholder="Caută după email, nume sau ID…"
+              style={{
+                flex: '1 1 180px', minWidth: 160,
+                padding: '8px 10px', borderRadius: 8,
+                background: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(167, 139, 250, 0.25)',
+                color: '#ede9fe', fontSize: 13, outline: 'none',
+              }}
+            />
+            <select
+              value={usersStatus}
+              onChange={(e) => { setUsersStatus(e.target.value); refreshUsersList(usersQuery, e.target.value) }}
+              style={{
+                padding: '8px 10px', borderRadius: 8,
+                background: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(167, 139, 250, 0.25)',
+                color: '#ede9fe', fontSize: 13, outline: 'none',
+              }}
+            >
+              <option value="all">Toți</option>
+              <option value="active">Activi</option>
+              <option value="banned">Suspendați</option>
+              <option value="admin">Admini</option>
+            </select>
+            <button
+              onClick={() => refreshUsersList(usersQuery, usersStatus)}
+              disabled={usersLoading}
+              style={{
+                padding: '8px 12px', borderRadius: 8,
+                background: 'rgba(167, 139, 250, 0.15)',
+                border: '1px solid rgba(167, 139, 250, 0.35)',
+                color: '#ede9fe', fontSize: 13, cursor: 'pointer',
+                opacity: usersLoading ? 0.5 : 1,
+              }}
+            >
+              {usersLoading ? 'Se încarcă…' : 'Reîncarcă'}
+            </button>
+          </div>
+
           {/* F3 — Duplicate accounts card. Lists every email that has
               more than one user row and offers a "Merge" button per
               peer. Merging moves conversations, credits, memory, etc.
@@ -5297,40 +5518,194 @@ export default function KelionStage() {
             })}
           </div>
 
-          <div style={{
-            padding: '18px 16px',
-            background: 'rgba(167, 139, 250, 0.06)',
-            border: '1px solid rgba(167, 139, 250, 0.2)',
-            borderRadius: 12,
-            fontSize: 14,
-            lineHeight: 1.55,
-          }}>
-            <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 15 }}>
-              User management — în construcție
-            </div>
-            <div style={{ opacity: 0.75, marginBottom: 10 }}>
-              Tab-ul este rezervat; panoul complet se activează în următorul
-              PR al seriei admin. Funcții planificate:
-            </div>
-            <ul style={{ paddingLeft: 18, margin: 0, opacity: 0.82 }}>
-              <li>Listă useri cu email, dată înregistrare, ultimă activitate.</li>
-              <li>Căutare după email sau ID.</li>
-              <li>Grant credits manual (pentru refund sau goodwill).</li>
-              <li>Resetare parolă (trimite email de reset).</li>
-              <li>Ban / unban (blochează login și API).</li>
-              <li>Istoric top-ups și consum per user.</li>
-            </ul>
+          {usersError && (
             <div style={{
-              marginTop: 14, padding: '10px 12px',
-              background: 'rgba(250, 204, 21, 0.08)',
-              border: '1px solid rgba(250, 204, 21, 0.25)',
-              borderRadius: 8,
-              fontSize: 12, opacity: 0.85,
+              marginBottom: 10, padding: '10px 12px',
+              background: 'rgba(239, 68, 68, 0.1)',
+              border: '1px solid rgba(239, 68, 68, 0.35)',
+              borderRadius: 8, fontSize: 13, color: '#fecaca',
             }}>
-              Până atunci, /api/admin/credits/ledger din tab-ul Business
-              arată deja fiecare top-up și consum cu user-ul asociat.
+              {usersError}
             </div>
+          )}
+
+          {usersData && (
+            <div style={{ fontSize: 12, opacity: 0.65, marginBottom: 8 }}>
+              {usersData.total} din {usersData.totalAll} useri
+              {usersData.query ? ` · filtrat după „${usersData.query}"` : ''}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {(usersData?.users || []).map((u) => {
+              const isBanned = Boolean(u.banned)
+              const isAdminRow = u.role === 'admin'
+              return (
+                <button
+                  key={u.id}
+                  onClick={() => loadUserDetail(u.id)}
+                  style={{
+                    textAlign: 'left', cursor: 'pointer',
+                    padding: '10px 12px', borderRadius: 10,
+                    background: selectedUserId === u.id
+                      ? 'rgba(167, 139, 250, 0.15)'
+                      : 'rgba(255,255,255,0.04)',
+                    border: '1px solid ' + (isBanned
+                      ? 'rgba(239, 68, 68, 0.35)'
+                      : 'rgba(167, 139, 250, 0.18)'),
+                    color: '#ede9fe', fontSize: 13,
+                    display: 'flex', flexDirection: 'column', gap: 3,
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                    <span style={{ fontWeight: 600 }}>{u.email || '(fără email)'}</span>
+                    <span style={{ fontSize: 11, opacity: 0.7 }}>
+                      {Number.isFinite(u.credits_balance_minutes)
+                        ? `${u.credits_balance_minutes} min`
+                        : '—'}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 11, opacity: 0.7, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <span>{u.name || '—'}</span>
+                    {isAdminRow && <span style={{ color: '#fde68a' }}>admin</span>}
+                    {isBanned && <span style={{ color: '#fca5a5' }}>suspendat</span>}
+                    {!isBanned && !isAdminRow && <span style={{ opacity: 0.75 }}>activ</span>}
+                    <span style={{ opacity: 0.55 }}>· id {String(u.id).slice(0, 10)}</span>
+                  </div>
+                </button>
+              )
+            })}
+            {usersData && (usersData.users || []).length === 0 && !usersLoading && (
+              <div style={{ opacity: 0.6, fontSize: 13, padding: '20px 0', textAlign: 'center' }}>
+                Niciun user pentru filtrul curent.
+              </div>
+            )}
           </div>
+
+          {/* User detail sub-drawer — overlays the list when a row is
+              clicked. Close via "← Înapoi la listă" or by picking
+              another row (loadUserDetail replaces state). */}
+          {selectedUserId && (
+            <div style={{
+              marginTop: 16, padding: '14px 14px',
+              background: 'rgba(10, 8, 20, 0.6)',
+              border: '1px solid rgba(167, 139, 250, 0.3)',
+              borderRadius: 12,
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+                <button
+                  onClick={closeUserDetail}
+                  style={{
+                    background: 'transparent', border: 'none',
+                    color: '#c4b5fd', cursor: 'pointer', fontSize: 12,
+                  }}
+                >← Înapoi la listă</button>
+                <span style={{ fontSize: 11, opacity: 0.6 }}>
+                  {selectedUser?.email || selectedUserId}
+                </span>
+              </div>
+
+              {!selectedUser && (
+                <div style={{ opacity: 0.6, fontSize: 13 }}>Se încarcă detaliile…</div>
+              )}
+
+              {selectedUser && (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, fontSize: 12, marginBottom: 12 }}>
+                    <div><span style={{ opacity: 0.6 }}>Email: </span>{selectedUser.email}</div>
+                    <div><span style={{ opacity: 0.6 }}>Rol: </span>{selectedUser.role}</div>
+                    <div><span style={{ opacity: 0.6 }}>Credite: </span>{selectedUser.credits_balance_minutes ?? 0} min</div>
+                    <div><span style={{ opacity: 0.6 }}>Status: </span>{selectedUser.banned ? 'Suspendat' : 'Activ'}</div>
+                    <div><span style={{ opacity: 0.6 }}>Creat: </span>{selectedUser.created_at?.slice(0, 10) || '—'}</div>
+                    <div><span style={{ opacity: 0.6 }}>Tier: </span>{selectedUser.subscription_tier || 'free'}</div>
+                  </div>
+
+                  {selectedUser.banned && selectedUser.banned_reason && (
+                    <div style={{
+                      fontSize: 12, padding: '8px 10px', marginBottom: 10,
+                      background: 'rgba(239, 68, 68, 0.08)',
+                      border: '1px solid rgba(239, 68, 68, 0.3)',
+                      borderRadius: 8, color: '#fecaca',
+                    }}>
+                      Motiv: {selectedUser.banned_reason}
+                    </div>
+                  )}
+
+                  {selectedResult && (
+                    <div style={{
+                      fontSize: 12, padding: '8px 10px', marginBottom: 10,
+                      background: selectedResult.ok
+                        ? 'rgba(34, 197, 94, 0.08)'
+                        : 'rgba(239, 68, 68, 0.08)',
+                      border: '1px solid ' + (selectedResult.ok
+                        ? 'rgba(34, 197, 94, 0.35)'
+                        : 'rgba(239, 68, 68, 0.35)'),
+                      borderRadius: 8,
+                      color: selectedResult.ok ? '#bbf7d0' : '#fecaca',
+                    }}>
+                      {selectedResult.ok ? selectedResult.message : selectedResult.error}
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+                    <button
+                      onClick={grantCreditsToSelected}
+                      disabled={selectedBusy}
+                      style={actionBtnStyle(selectedBusy)}
+                    >+/− Credite</button>
+                    {selectedUser.banned ? (
+                      <button
+                        onClick={() => banSelectedUser(false)}
+                        disabled={selectedBusy}
+                        style={actionBtnStyle(selectedBusy, '#bbf7d0', 'rgba(34,197,94,0.35)')}
+                      >Reactivează contul</button>
+                    ) : (
+                      <button
+                        onClick={() => banSelectedUser(true)}
+                        disabled={selectedBusy || selectedUser.role === 'admin'}
+                        style={actionBtnStyle(selectedBusy || selectedUser.role === 'admin', '#fecaca', 'rgba(239,68,68,0.35)')}
+                      >Suspendă contul</button>
+                    )}
+                    <button
+                      onClick={resetSelectedPassword}
+                      disabled={selectedBusy}
+                      style={actionBtnStyle(selectedBusy)}
+                    >Resetează parola</button>
+                  </div>
+
+                  {/* History panel */}
+                  <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 6, letterSpacing: '0.1em' }}>
+                    ISTORIC · ULTIMELE {selectedHistory?.rows?.length || 0} TRANZACȚII
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 240, overflowY: 'auto' }}>
+                    {(selectedHistory?.rows || []).map((row) => (
+                      <div key={row.id} style={{
+                        display: 'flex', justifyContent: 'space-between',
+                        padding: '6px 8px', borderRadius: 6,
+                        background: 'rgba(255,255,255,0.03)',
+                        fontSize: 11,
+                      }}>
+                        <span style={{ opacity: 0.75 }}>
+                          {row.kind} · {row.created_at?.slice(0, 16)?.replace('T', ' ')}
+                        </span>
+                        <span style={{
+                          color: row.delta_minutes >= 0 ? '#bbf7d0' : '#fca5a5',
+                          fontWeight: 600,
+                        }}>
+                          {row.delta_minutes >= 0 ? '+' : ''}{row.delta_minutes} min
+                        </span>
+                      </div>
+                    ))}
+                    {(!selectedHistory?.rows || selectedHistory.rows.length === 0) && (
+                      <div style={{ opacity: 0.5, fontSize: 12, textAlign: 'center', padding: 10 }}>
+                        Fără tranzacții.
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
       )}
 
