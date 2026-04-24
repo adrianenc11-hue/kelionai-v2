@@ -1,6 +1,8 @@
 // Stage 5 — M23/M25: browser-side push registration.
 // Menu action "Enable pings" calls enablePush(); "Disable pings" calls disablePush().
 
+import { getCsrfToken } from './api'
+
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
@@ -54,7 +56,7 @@ export async function enablePush() {
   const subscription = sub.toJSON()
   const res = await fetch('/api/push/subscribe', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
     credentials: 'include',
     body: JSON.stringify({ subscription }),
   })
@@ -74,7 +76,7 @@ export async function disablePush() {
   try {
     await fetch('/api/push/unsubscribe', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
       credentials: 'include',
       body: JSON.stringify({ endpoint: sub.endpoint }),
     })
@@ -86,7 +88,7 @@ export async function disablePush() {
 export async function sendTestPing(body) {
   const res = await fetch('/api/push/test', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
     credentials: 'include',
     body: JSON.stringify({ body: body || null }),
   })

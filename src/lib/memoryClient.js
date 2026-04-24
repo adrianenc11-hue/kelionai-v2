@@ -1,5 +1,7 @@
 // Stage 3 — memory client.
 
+import { getCsrfToken } from './api'
+
 export async function fetchMemory(limit = 200) {
   const r = await fetch(`/api/memory?limit=${encodeURIComponent(limit)}`, {
     credentials: 'include',
@@ -12,7 +14,7 @@ export async function extractAndStore(turns) {
   const r = await fetch('/api/memory/extract-and-store', {
     method: 'POST',
     credentials: 'include',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
     body: JSON.stringify({ turns }),
   });
   if (!r.ok) throw new Error(`extract failed (${r.status})`);
@@ -23,6 +25,7 @@ export async function forgetMemoryItem(id) {
   const r = await fetch(`/api/memory/${id}`, {
     method: 'DELETE',
     credentials: 'include',
+    headers: { 'X-CSRF-Token': getCsrfToken() },
   });
   if (!r.ok) throw new Error(`forget ${id} failed (${r.status})`);
   return r.json();
@@ -32,6 +35,7 @@ export async function forgetAllMemory() {
   const r = await fetch('/api/memory', {
     method: 'DELETE',
     credentials: 'include',
+    headers: { 'X-CSRF-Token': getCsrfToken() },
   });
   if (!r.ok) throw new Error(`clear failed (${r.status})`);
   return r.json();
