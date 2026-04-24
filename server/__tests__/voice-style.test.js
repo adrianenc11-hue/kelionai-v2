@@ -48,4 +48,45 @@ describe('buildKelionPersona — Stage 6 voice style', () => {
     const prompt = buildKelionPersona({});
     expect(prompt).toMatch(/current mode: warm/);
   });
+
+  // Honesty hardening — pins the anti-hallucination addendum so future edits
+  // cannot silently water it down. Every bullet here maps to a fabricating
+  // behaviour we observed in prod (invented dates, made-up family facts,
+  // "forwarding to the team"). Removing any line reopens that failure mode.
+  describe('Honesty hardening', () => {
+    const prompt = buildKelionPersona({});
+
+    it('forbids invented actions', () => {
+      expect(prompt).toMatch(/NEVER claim you did something you did not do/);
+    });
+
+    it('licences "I do not know" explicitly', () => {
+      expect(prompt).toMatch(/I don't know/);
+      expect(prompt).toMatch(/nu știu/);
+    });
+
+    it('licences "let me check / mă verific" as the uncertainty hedge', () => {
+      expect(prompt).toMatch(/let me check|mă verific/);
+    });
+
+    it('forbids filling gaps with plausible guesses', () => {
+      expect(prompt).toMatch(/Never fill the gap|plausible-sounding guess|polished fabrication/i);
+    });
+
+    it('tells Kelion to say so when a tool returns empty', () => {
+      expect(prompt).toMatch(/search didn't find anything|n-a găsit nimic/);
+    });
+
+    it('blocks inventing biography when memory is empty', () => {
+      expect(prompt).toMatch(/no relevant memory|nothing saved|nimic salvat/);
+    });
+
+    it('treats unknown named people as NEW (no training-data facts)', () => {
+      expect(prompt).toMatch(/someone NEW|treat that person|sora mea|unfamiliar with that name/i);
+    });
+
+    it('lists topics that always require a tool call', () => {
+      expect(prompt).toMatch(/ALWAYS require a tool call/);
+    });
+  });
 });
