@@ -7,7 +7,7 @@ const { isAdminEmail } = require('../middleware/subscription');
 const ipGeo = require('../services/ipGeo');
 const { trialStatus, stampTrialIfFresh } = require('../services/trialQuota');
 const { executeRealTool, pickForcedTool } = require('../services/realTools');
-const { buildKelionToolsChatCompletions } = require('./realtime');
+const { buildKelionToolsChatCompletions, formatMemoryBlocks } = require('./realtime');
 
 const router = Router();
 
@@ -186,15 +186,15 @@ router.post('/', async (req, res) => {
   // would forget the user's name, preferences, and ongoing projects the
   // instant they switched from voice to typing. Guests have no memory
   // row; we silently skip the lookup.
+  // Audit M9 — share the self/other partitioning with the voice path
+  // via formatMemoryBlocks. See server/src/routes/realtime.js for the
+  // rationale; the short version is "don't let facts about Ioana land
+  // on Adrian's profile section".
   let memorySection = '';
   if (req.user && (Number.isFinite(req.user.id) || typeof req.user.id === 'string')) {
     try {
       const memoryItems = await listMemoryItems(req.user.id, 60);
-      if (Array.isArray(memoryItems) && memoryItems.length) {
-        memorySection =
-          '\n\nKnown facts about the user (most recent first):\n' +
-          memoryItems.map((m) => `- [${m.kind}] ${m.fact}`).join('\n');
-      }
+      memorySection = formatMemoryBlocks(memoryItems);
     } catch (err) {
       console.warn('[chat] memory load failed', err && err.message);
     }
