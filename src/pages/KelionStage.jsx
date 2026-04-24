@@ -4,7 +4,7 @@ import { Suspense, useState, useRef, useEffect, useLayoutEffect, useMemo, useCal
 import { useNavigate } from 'react-router-dom'
 import * as THREE from 'three'
 import { useLipSync, useAudioElementLipSync } from '../lib/lipSync'
-import { subscribeMonitor, handleShowOnMonitor, setMonitorGeoProvider } from '../lib/monitorStore'
+import { subscribeMonitor, handleShowOnMonitor, setMonitorGeoProvider, EXTERNAL_ONLY_HOSTS } from '../lib/monitorStore'
 import { setClientGeoProvider } from '../lib/clientGeoProvider'
 import { setUIActionController } from '../lib/uiActionStore'
 import UIActionToast from '../components/UIActionToast'
@@ -483,11 +483,17 @@ function useNYCSkylineTexture() {
 // rendered the WebVM-specific "This Linux-in-the-browser requires
 // cross-origin isolation" message — users saw that line on a Mr. Bean
 // YouTube card and (rightly) asked what it had to do with anything.
-// Four distinct cases:
+// Three distinct cases:
 //   - kind='video'                      → YouTube/search card
 //   - WebVM / CheerpX / JSLinux hosts   → cross-origin-isolation card
-//   - kind='web' | everything else that  → generic "site blocks embed"
-//     hits `embedType: 'external'`         card
+//   - kind='web' | everything else that → generic "site blocks embed"
+//     hits `embedType: 'external'`        card
+// NB: the video branch is currently YouTube-specific because
+// monitorStore.js is the only path that generates
+// `kind:'video' + embedType:'external'` and it always builds a YouTube
+// search URL. If another video provider is ever added we should
+// generalize the copy here — leaving it explicit for now so the user
+// sees an accurate reason rather than a vague one.
 export function externalCardCopy(m) {
   const title = (m && m.title) || 'External app'
   const src = (m && m.src) || ''
@@ -510,12 +516,10 @@ export function externalCardCopy(m) {
   // WebVM / CheerpX / JSLinux / v86 — these *legitimately* need cross-
   // origin isolation and we cannot render them in-app. Keep the specific
   // explanation so the user knows this is a browser-platform limit.
-  const WEBVM_HOSTS = [
-    'webvm.io', 'www.webvm.io',
-    'copy.sh', 'www.copy.sh',
-    'bellard.org', 'www.bellard.org',
-  ]
-  if (WEBVM_HOSTS.includes(host)) {
+  // Host list comes from monitorStore.EXTERNAL_ONLY_HOSTS so routing
+  // (which hosts get `embedType:'external'`) and display (which hosts
+  // get this cross-origin card copy) stay in sync automatically.
+  if (EXTERNAL_ONLY_HOSTS.has(host)) {
     return {
       icon: '🖥️',
       headline: `${title} needs its own tab`,
@@ -1597,10 +1601,93 @@ export default function KelionStage() {
     if (!text && !attachedFile) return
     if (chatBusy) return
     setChatError(null)
-    const attachNote = attachedFile
-      ? `\n\n[attached file: ${attachedFile.name}${attachedFile.size ? ` (${Math.round(attachedFile.size / 1024)} KB)` : ''}]`
-      : ''
-    const combined = (text + attachNote).trim()
+    // F2 — the paperclip attachment previously only mentioned the
+    // filename + size in a bracketed note (e.g. "[attached file:
+    // passport.jpg (2 KB)]"); the actual bytes never left the browser
+    // so the model replied "I received the image" but couldn't
+    // describe it (audit 2026-04-22, conversations #4/#5). Now we
+    // read the file client-side and turn it into something the chat
+    // route already knows how to handle — without touching chat.js:
+    //   • image/* → base64 data URL, sent as `frame` (chat.js already
+    //     wires that into the vision image_url part of the last user
+    //     message, line 201-212);
+    //   • application/pdf → POST to /api/tools/read_pdf (existing
+    //     endpoint, ships in PR #147) and inline the extracted text;
+    //   • text/plain / md / csv / json / log / yaml / ini → inline
+    //     the first ~32 KB directly into the user message;
+    //   • anything else → legacy bracketed note so the user at least
+    //     knows the file was noticed.
+    let attachedFrame = null
+    let attachedTextInline = ''
+    let attachNote = ''
+    if (attachedFile) {
+      try {
+        const t = (attachedFile.type || '').toLowerCase()
+        const name = attachedFile.name || 'file'
+        if (t.startsWith('image/')) {
+          if (attachedFile.size > 4 * 1024 * 1024) {
+            attachNote = `\n\n[attached image "${name}" is ${Math.round(attachedFile.size / 1024)} KB — too large to send, please paste or resize under 4 MB]`
+          } else {
+            attachedFrame = await new Promise((resolve, reject) => {
+              const r = new FileReader()
+              r.onload = () => resolve(String(r.result || ''))
+              r.onerror = () => reject(r.error || new Error('read failed'))
+              r.readAsDataURL(attachedFile)
+            })
+          }
+        } else if (t === 'application/pdf' || /\.pdf$/i.test(name)) {
+          if (attachedFile.size > 8 * 1024 * 1024) {
+            attachNote = `\n\n[attached PDF "${name}" is ${Math.round(attachedFile.size / 1024)} KB — too large, please send under 8 MB]`
+          } else {
+            const b64 = await new Promise((resolve, reject) => {
+              const r = new FileReader()
+              r.onload = () => {
+                const s = String(r.result || '')
+                const comma = s.indexOf(',')
+                resolve(comma >= 0 ? s.slice(comma + 1) : s)
+              }
+              r.onerror = () => reject(r.error || new Error('read failed'))
+              r.readAsDataURL(attachedFile)
+            })
+            try {
+              const pdfHeaders = { 'Content-Type': 'application/json' }
+              if (authTokenRef.current) pdfHeaders['Authorization'] = `Bearer ${authTokenRef.current}`
+              const rr = await fetch('/api/tools/execute', {
+                method: 'POST',
+                credentials: 'include',
+                headers: pdfHeaders,
+                body: JSON.stringify({
+                  name: 'read_pdf',
+                  args: { base64: b64, max_chars: 32 * 1024 },
+                }),
+              })
+              const j = await rr.json().catch(() => null)
+              const txt = j && j.ok && typeof j.text === 'string' ? j.text : ''
+              if (txt) {
+                attachedTextInline = `\n\n[attached PDF: ${name}]\n\`\`\`\n${txt}\n\`\`\``
+              } else {
+                attachNote = `\n\n[attached PDF "${name}" — could not extract text${j && j.error ? ` (${j.error})` : ''}]`
+              }
+            } catch (e) {
+              attachNote = `\n\n[attached PDF "${name}" — read failed: ${e && e.message ? e.message : 'network error'}]`
+            }
+          }
+        } else if (
+          t.startsWith('text/') ||
+          /\.(txt|md|csv|json|log|ya?ml|ini|conf)$/i.test(name)
+        ) {
+          const raw = await attachedFile.text()
+          const clipped = raw.length > 32 * 1024 ? raw.slice(0, 32 * 1024) + '\n...[truncated]' : raw
+          attachedTextInline = `\n\n[attached file: ${name}]\n\`\`\`\n${clipped}\n\`\`\``
+        } else {
+          attachNote = `\n\n[attached file: ${name}${attachedFile.size ? ` (${Math.round(attachedFile.size / 1024)} KB)` : ''} — unsupported type, please paste text or a supported image/PDF]`
+        }
+      } catch (err) {
+        console.warn('[kelionStage] attachment read failed', err)
+        attachNote = `\n\n[attached file "${attachedFile.name || 'file'}" could not be read]`
+      }
+    }
+    const combined = (text + attachedTextInline + attachNote).trim()
     const next = [...chatMessages, { role: 'user', content: combined }].slice(-12)
     setChatMessages(next)
     setChatInput('')
@@ -1646,6 +1733,11 @@ export default function KelionStage() {
           }
         }
       } catch (_) { frame = null }
+      // If the user attached an image via the paperclip, use that as
+      // the vision payload — it takes priority over a live camera
+      // frame (the user explicitly picked this image, they're not
+      // asking about what the webcam happens to see right now).
+      const visionFrame = attachedFrame || frame || null
       const r = await fetch('/api/chat', {
         method: 'POST',
         credentials: 'include',
@@ -1654,7 +1746,7 @@ export default function KelionStage() {
           messages: next,
           datetime: new Date().toISOString(),
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          ...(frame ? { frame } : {}),
+          ...(visionFrame ? { frame: visionFrame } : {}),
         }),
       })
       if (r.status === 401) {
