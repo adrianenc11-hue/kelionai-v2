@@ -1628,6 +1628,143 @@ async function toolExplainCode(args) {
 }
 
 // ──────────────────────────────────────────────────────────────────
+// PR 7/N — plan_task (Planner Brain).
+//
+// Adrian 2026-04-20: "ma asteptam sa fie ai de soft, sa stie sa decida,
+// sa fie ca un creier. sa gestioneze tot … un creier care ia decizii,
+// apasa butoane, e clar, stie ce face".
+//
+// The live voice model (OpenAI Realtime / Gemini Live) is great at
+// turn-by-turn replies but tends to "just start doing things" on
+// multi-step asks — it skips steps, loops, or hallucinates an order
+// that breaks the first tool call. plan_task gives it an optional
+// pre-flight hop: it sends the user goal to Gemini 2.5 Flash (cheap,
+// fast, strong at structured output) and gets back a short numbered
+// plan that references Kelion's actual tool catalog. The voice model
+// can then read the plan out loud AND execute it step by step.
+//
+// This tool is ADDITIVE and UNCONDITIONAL: if it's never called the
+// existing chat/voice behaviour is unchanged. Persona nudges the
+// model to call it on complex requests; the persona change is in
+// realtime.js alongside the KELION_TOOLS entry.
+
+const PLAN_TASK_SYSTEM = [
+  'You are the planner of a voice-first AI assistant called Kelion.',
+  '',
+  'You receive a user goal plus an optional context hint and produce a',
+  'short, concrete action plan that Kelion can execute step by step.',
+  '',
+  'Kelion has these tool categories (examples, not exhaustive):',
+  '  • Browse / search: web_search, fetch_url, wikipedia_search, search_github, search_academic, search_stackoverflow, rss_read.',
+  '  • Information lookup: get_weather, get_forecast, get_news, get_crypto_price, get_stock_price, get_forex, currency_convert, get_air_quality, get_sun_times, get_moon_phase, get_earthquakes, dictionary, translate.',
+  '  • Geo: geocode, reverse_geocode, get_route, nearby_places, get_elevation, get_timezone, get_my_location.',
+  '  • Math / sandbox: calculate, unit_convert, run_regex, run_code.',
+  '  • Documents: read_pdf, read_docx, ocr_image, ocr_passport.',
+  '  • Communication: send_email, send_sms, create_calendar_ics, zapier_trigger.',
+  '  • Code helpers: solve_problem, code_review, explain_code.',
+  '  • Stage UI: show_on_monitor, ui_notify, ui_navigate, generate_image.',
+  '  • Camera: switch_camera, what_do_you_see, set_narration_mode.',
+  '',
+  'Rules:',
+  '  1. Output STRICT JSON, no prose, no markdown fence.',
+  '  2. Keep plans short: ≤ max_steps steps (default 6). Merge trivial sub-steps.',
+  '  3. Each step names an action in plain language AND an optional tool_hint',
+  '     (one of the tools above, or null if the step is "ask the user" /',
+  '     "synthesize answer"). NEVER invent a tool name that is not listed above.',
+  '  4. If the goal is impossible, under-specified, or requires info the user must',
+  '     provide (e.g. missing passwords, unknown addresses) — return a plan whose',
+  '     first step is `ask_user` with a concrete clarifying question. Do not guess.',
+  '  5. Populate `cautions` with anything Kelion should explicitly confirm before',
+  '     doing (spending money, sending messages, deleting data, long actions).',
+  '',
+  'Return shape:',
+  '{',
+  '  "summary": "one-sentence restatement of the goal in the user\'s language",',
+  '  "steps": [',
+  '    { "n": 1, "action": "...", "why": "...", "tool_hint": "web_search" | null },',
+  '    ...',
+  '  ],',
+  '  "cautions": ["..."]',
+  '}',
+].join('\n');
+
+async function toolPlanTask(args) {
+  const goal = String(args?.goal || '').trim().slice(0, 2000);
+  if (!goal) return { ok: false, error: 'missing goal' };
+  const contextHint = String(args?.context_hint || '').trim().slice(0, 2000);
+  const maxStepsRaw = Number.parseInt(args?.max_steps, 10);
+  const maxSteps = Number.isFinite(maxStepsRaw) ? Math.max(1, Math.min(10, maxStepsRaw)) : 6;
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    return { ok: false, unavailable: true, error: 'Planner not configured (GEMINI_API_KEY missing).' };
+  }
+
+  const model = process.env.KELION_PLANNER_MODEL || 'gemini-2.5-flash';
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const userMsg = [
+    `Goal: ${goal}`,
+    contextHint ? `Context: ${contextHint}` : null,
+    `Constraints: at most ${maxSteps} steps.`,
+  ].filter(Boolean).join('\n');
+
+  try {
+    const r = await fetchWithTimeout(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ role: 'user', parts: [{ text: userMsg }] }],
+        systemInstruction: { parts: [{ text: PLAN_TASK_SYSTEM }] },
+        generationConfig: {
+          temperature: 0.2,
+          maxOutputTokens: 1200,
+          responseMimeType: 'application/json',
+          // gemini-2.5-flash thinks by default and the thinking budget
+          // eats into maxOutputTokens; disable so the whole budget is
+          // spent on the JSON plan itself.
+          thinkingConfig: { thinkingBudget: 0 },
+        },
+      }),
+    }, 15_000);
+    if (!r.ok) {
+      const txt = await r.text().catch(() => '');
+      return { ok: false, error: `planner upstream ${r.status}`, detail: txt.slice(0, 200) };
+    }
+    const data = await r.json().catch(() => null);
+    const text = data?.candidates?.[0]?.content?.parts?.map((p) => p.text).filter(Boolean).join('').trim();
+    if (!text) return { ok: false, error: 'empty planner response' };
+    let plan = null;
+    try {
+      plan = JSON.parse(text);
+    } catch {
+      // Sometimes the model still wraps the JSON in ```json fences despite
+      // responseMimeType. Strip the fences and retry once.
+      const stripped = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+      try { plan = JSON.parse(stripped); } catch { /* fall through */ }
+    }
+    if (!plan || typeof plan !== 'object') {
+      return { ok: false, error: 'planner returned non-JSON', raw: text.slice(0, 300) };
+    }
+    const summary = String(plan.summary || '').trim().slice(0, 400);
+    const rawSteps = Array.isArray(plan.steps) ? plan.steps.slice(0, maxSteps) : [];
+    const steps = rawSteps
+      .map((s, i) => ({
+        n: Number.isFinite(Number(s?.n)) ? Number(s.n) : i + 1,
+        action: String(s?.action || '').trim().slice(0, 400),
+        why: String(s?.why || '').trim().slice(0, 400),
+        tool_hint: s?.tool_hint ? String(s.tool_hint).trim().slice(0, 60) : null,
+      }))
+      .filter((s) => s.action);
+    const cautions = Array.isArray(plan.cautions)
+      ? plan.cautions.map((c) => String(c || '').trim().slice(0, 200)).filter(Boolean).slice(0, 6)
+      : [];
+    return { ok: true, summary, steps, cautions, model };
+  } catch (err) {
+    return { ok: false, error: `planner call failed: ${err?.message || err}` };
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────
 // PR C — sandboxed code runner, regex tester, and user-intern tools.
 //
 // Tools whose name starts with `get_my_*` need a signed-in user and
@@ -2258,6 +2395,17 @@ async function toolPypiPackageInfo(args) {
 // ──────────────────────────────────────────────────────────────────
 // Dispatch
 
+// F11 — OpenAI image generation. Returns a short-lived URL pointing at
+// the in-process cache served by routes/generatedImages.js — the voice
+// model's read-back stays tiny while the client gets a real PNG URL to
+// embed on the avatar's stage monitor.
+const { generateImage } = require('./imageGen');
+async function toolGenerateImage(args) {
+  const prompt = typeof args?.prompt === 'string' ? args.prompt : '';
+  const size = typeof args?.size === 'string' ? args.size : undefined;
+  return generateImage({ prompt, size });
+}
+
 async function executeRealTool(name, args, ctx) {
   // Strip any leading-underscore keys from caller-supplied args. These are
   // reserved for internal wrappers (e.g. toolGetForecast passes `_maxDays`
@@ -2328,8 +2476,48 @@ async function executeRealTool(name, args, ctx) {
     case 'get_my_credits':    return toolGetMyCredits(a, ctx);
     case 'get_my_usage':      return toolGetMyUsage(a, ctx);
     case 'get_my_profile':    return toolGetMyProfile(a, ctx);
+    // ── F11 — image generation (gpt-image-1) ──
+    case 'generate_image':    return toolGenerateImage(a);
+    // ── PR 7/N — Planner Brain (Gemini Flash) ──
+    case 'plan_task':         return toolPlanTask(a);
+    // ── PR 8/N — Memory of Actions (read-only self-reflection) ──
+    case 'get_action_history': return toolGetActionHistory(a, ctx);
     default:                  return null; // signal "not handled here"
   }
+}
+
+// PR #8/N — Memory of Actions. Self-reflection tool: lets Kelion read
+// back its own recent tool calls for the signed-in user so it can
+// decide whether to re-run something or reference a prior result.
+// Reads only action_history rows; never writes. Gracefully returns
+// `{ ok:false, signed_in:false }` for guests so the voice model can
+// say "I only track your actions once you sign in" instead of guessing.
+async function toolGetActionHistory(args, ctx) {
+  const userId = ctx?.user?.id;
+  if (!userId) {
+    return { ok: false, signed_in: false, error: 'Action history is only available when you are signed in.' };
+  }
+  const limitRaw = Number.parseInt(args?.limit, 10);
+  const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(40, limitRaw)) : 10;
+  const sessionId = typeof args?.session_id === 'string' && args.session_id.trim()
+    ? args.session_id.trim().slice(0, 80)
+    : null;
+  // Lazy require matches the other DB-touching tools (toolGetMyCredits,
+  // toolGetMyUsage, …) — the db module has start-up side effects on
+  // older Node paths, and the existing style here keeps that opt-in.
+  const db = require('../db');
+  const rows = await db.listRecentActions(userId, { limit, sessionId });
+  const actions = rows.map((r) => ({
+    id: r.id,
+    tool: r.tool_name,
+    ok: !!r.ok,
+    args: r.args_summary || null,
+    result: r.result_summary || null,
+    duration_ms: r.duration_ms,
+    at: r.created_at,
+    session_id: r.session_id || null,
+  }));
+  return { ok: true, count: actions.length, actions };
 }
 
 // Full list of tool names handled by this module — keeps catalogs honest.
@@ -2360,6 +2548,20 @@ const REAL_TOOL_NAMES = [
   // (GITHUB_TOKEN, if set, just raises the unauth rate limit).
   'send_email', 'send_sms', 'create_calendar_ics', 'zapier_trigger',
   'github_repo_info', 'npm_package_info', 'pypi_package_info',
+  // F11 — AI image generation (OpenAI gpt-image-1). Returns a short-lived
+  // URL that the client hands off to the avatar's stage monitor so the
+  // freshly-generated PNG shows up inline instead of via a link.
+  'generate_image',
+  // PR 7/N — Planner Brain. Gemini 2.5 Flash turns a user goal into a
+  // short JSON plan. Kelion can call this as a pre-flight on multi-step
+  // asks. Requires GEMINI_API_KEY; returns { ok:false, unavailable:true }
+  // when the key is missing so the voice model can degrade gracefully.
+  'plan_task',
+  // PR 8/N — Memory of Actions. Read-only self-reflection: returns the
+  // caller's own recent tool invocations (from action_history) so
+  // Kelion can check "did I already email that?" before re-running.
+  // Returns `{ ok:false, signed_in:false }` for guests.
+  'get_action_history',
 ];
 
 module.exports = {
@@ -2424,4 +2626,10 @@ module.exports = {
   toolGithubRepoInfo,
   toolNpmPackageInfo,
   toolPypiPackageInfo,
+  // F11 — image generation
+  toolGenerateImage,
+  // PR 7/N — Planner Brain
+  toolPlanTask,
+  // PR 8/N — Memory of Actions
+  toolGetActionHistory,
 };

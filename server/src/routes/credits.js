@@ -37,6 +37,12 @@ const {
   addCreditsTransaction,
   getCreditTopupByPaymentIntent,
   listCreditTransactions,
+  // Audit M7 — DB-backed consume state. Optional on the mock DB used
+  // by some legacy tests; fall back gracefully if any of these are
+  // missing (`_dbGet/_dbSave/_dbGc` helpers below handle that).
+  getConsumeState: _dbGetConsumeState,
+  saveConsumeState: _dbSaveConsumeState,
+  gcConsumeStateRows: _dbGcConsumeStateRows,
 } = require('../db');
 
 const router = Router();
@@ -281,9 +287,24 @@ function startConsumeStateGc() {
   if (process.env.NODE_ENV === 'test') return null;
   consumeStateGcHandle = setInterval(() => {
     try {
-      const n = gcConsumeState(consumeStateByUser, Date.now());
+      const now = Date.now();
+      const n = gcConsumeState(consumeStateByUser, now);
       if (n > 0) {
-        console.log('[credits/consume] gc evicted stale state', { entries: n, remaining: consumeStateByUser.size });
+        console.log('[credits/consume] gc evicted stale cache', { entries: n, remaining: consumeStateByUser.size });
+      }
+      // Audit M7 — also sweep the DB. Same TTL: a row is stale when
+      // its `updated_at` hasn't moved in > TTL, which matches the
+      // in-memory policy byte-for-byte.
+      if (typeof _dbGcConsumeStateRows === 'function') {
+        Promise.resolve(_dbGcConsumeStateRows(now - CONSUME_STATE_TTL_MS))
+          .then((rows) => {
+            if (typeof rows === 'number' && rows > 0) {
+              console.log('[credits/consume] gc evicted stale DB rows', { rows });
+            }
+          })
+          .catch((e) => {
+            console.warn('[credits/consume] gc db error', e && e.message);
+          });
       }
     } catch (e) {
       console.warn('[credits/consume] gc error', e && e.message);
@@ -307,6 +328,57 @@ function stopConsumeStateGc() {
 // leak. No-op under NODE_ENV=test.
 startConsumeStateGc();
 
+/**
+ * Audit M7 — resolve the per-user consume state across the in-memory
+ * L1 cache and the DB. If the cache has an entry we trust it (same
+ * process just wrote it, nothing staler can live in the DB). Otherwise
+ * we look in the DB and prime the cache; if the DB is unreachable
+ * (transient outage / mock DB without the helper) we fall back to an
+ * empty state rather than crashing — this is the same "start from
+ * fresh" posture the pre-M7 code had on process restart.
+ *
+ * Returns the resolved state object (fields default to 0).
+ */
+async function loadConsumeState(userId) {
+  if (userId === null || userId === undefined) return {};
+  const cached = consumeStateByUser.get(userId);
+  if (cached) return cached;
+  if (typeof _dbGetConsumeState !== 'function') return {};
+  try {
+    const row = await _dbGetConsumeState(userId);
+    if (!row) return {};
+    const state = {
+      lastBillableAt: Number(row.lastBillableAt) || 0,
+      silentStreak:   Number(row.silentStreak)   || 0,
+      silentSince:    Number(row.silentSince)    || 0,
+    };
+    consumeStateByUser.set(userId, state);
+    return state;
+  } catch (e) {
+    console.warn('[credits/consume] db load error', e && e.message);
+    return {};
+  }
+}
+
+/**
+ * Audit M7 — persist the post-decision state to both the in-memory
+ * cache (L1, zero-cost read on the next heartbeat from the same
+ * process) AND the DB (authoritative, visible to other instances).
+ * DB write is awaited so a caller that explicitly wants the "every
+ * instance sees this" guarantee gets it, but errors are swallowed +
+ * logged: a transient DB error must not take down /consume.
+ */
+async function persistConsumeState(userId, nextState, nowMs) {
+  if (userId === null || userId === undefined) return;
+  consumeStateByUser.set(userId, nextState);
+  if (typeof _dbSaveConsumeState !== 'function') return;
+  try {
+    await _dbSaveConsumeState(userId, nextState, nowMs);
+  } catch (e) {
+    console.warn('[credits/consume] db save error', e && e.message);
+  }
+}
+
 router.post('/consume', requireAuth, async (req, res) => {
   try {
     const { isAdminEmail } = require('../middleware/subscription');
@@ -323,11 +395,14 @@ router.post('/consume', requireAuth, async (req, res) => {
 
     const silent = !!(req.body && req.body.silent === true);
     const now = Date.now();
-    const prevState = consumeStateByUser.get(req.user.id) || {};
+    // Audit M7 — read-through: load from DB on cache miss so the silent
+    // streak is honoured even when the heartbeat hits a different
+    // instance than the one that saw the previous tick.
+    const prevState = await loadConsumeState(req.user.id);
     const decision = evaluateConsumeDecision(prevState, now, silent);
 
     if (decision.action === 'silent') {
-      consumeStateByUser.set(req.user.id, decision.nextState);
+      await persistConsumeState(req.user.id, decision.nextState, now);
       const bal = await getCreditsBalance(req.user.id).catch(() => null);
       return res.json({
         balance_minutes: typeof bal === 'number' ? bal : null,
@@ -337,6 +412,8 @@ router.post('/consume', requireAuth, async (req, res) => {
     }
 
     if (decision.action === 'throttle') {
+      // Throttle intentionally leaves `nextState` equal to the previous
+      // state (see evaluateConsumeDecision) — no need to persist.
       const bal = await getCreditsBalance(req.user.id).catch(() => null);
       return res.json({
         balance_minutes: typeof bal === 'number' ? bal : null,
@@ -384,7 +461,7 @@ router.post('/consume', requireAuth, async (req, res) => {
         ? 'Gemini Live session (forced — silent streak capped)'
         : 'Gemini Live session',
     });
-    consumeStateByUser.set(req.user.id, decision.nextState);
+    await persistConsumeState(req.user.id, decision.nextState, now);
     return res.json({
       balance_minutes: result.balance,
       deducted: take,
@@ -734,3 +811,7 @@ module.exports.startConsumeStateGc = startConsumeStateGc;
 module.exports.stopConsumeStateGc = stopConsumeStateGc;
 module.exports.CONSUME_STATE_TTL_MS = CONSUME_STATE_TTL_MS;
 module.exports.CONSUME_STATE_GC_INTERVAL_MS = CONSUME_STATE_GC_INTERVAL_MS;
+// Audit M7 — exported for direct unit coverage of the DB-backed layer.
+module.exports.loadConsumeState = loadConsumeState;
+module.exports.persistConsumeState = persistConsumeState;
+module.exports._consumeStateByUser = consumeStateByUser;

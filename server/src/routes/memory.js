@@ -11,10 +11,14 @@ const { Router } = require('express');
 const {
   addMemoryItems,
   listMemoryItems,
+  listAllMemoryItems,
   deleteMemoryItem,
   clearMemoryForUser,
+  archiveMemoryItem,
+  setMemoryItemTier,
 } = require('../db');
 const { extractFacts } = require('../services/factExtractor');
+const { planConsolidation } = require('../services/memoryConsolidator');
 
 const router = Router();
 
@@ -70,6 +74,63 @@ router.delete('/', async (req, res) => {
   } catch (err) {
     console.error('[memory/clear]', err);
     res.status(500).json({ error: 'Clear failed' });
+  }
+});
+
+// Audit M8 — POST /api/memory/consolidate
+// Runs the pure consolidator in services/memoryConsolidator.js against
+// the caller's own memory and optionally applies the plan in-place.
+// Query params:
+//   ?dry=1           — preview only; no DB writes.
+//   ?limit=<n>       — cap the full-set snapshot fed to the planner
+//                      (default 500, hard max 1000).
+// Response:
+//   {
+//     dryRun: boolean,
+//     considered: number,
+//     plan: [{ id, action, reason }],
+//     applied: { archived, promoted, demoted } | null
+//   }
+router.post('/consolidate', async (req, res) => {
+  try {
+    const dryRun = String(req.query.dry || '').trim() === '1'
+      || req.body?.dryRun === true;
+    const rawLimit = parseInt(req.query.limit || req.body?.limit || '500', 10);
+    const limit = Math.max(1, Math.min(1000, Number.isFinite(rawLimit) ? rawLimit : 500));
+
+    const items = await listAllMemoryItems(req.user.id, limit);
+    const plan = planConsolidation(items);
+
+    let applied = null;
+    if (!dryRun && plan.length > 0) {
+      let archived = 0;
+      let promoted = 0;
+      let demoted  = 0;
+      for (const step of plan) {
+        if (!step || step.id == null) continue;
+        if (step.action === 'archive') {
+          const ok = await archiveMemoryItem(req.user.id, step.id, step.reason);
+          if (ok) archived += 1;
+        } else if (step.action === 'promote') {
+          const ok = await setMemoryItemTier(req.user.id, step.id, 'core');
+          if (ok) promoted += 1;
+        } else if (step.action === 'demote') {
+          const ok = await setMemoryItemTier(req.user.id, step.id, 'recent');
+          if (ok) demoted += 1;
+        }
+      }
+      applied = { archived, promoted, demoted };
+    }
+
+    res.json({
+      dryRun,
+      considered: items.length,
+      plan,
+      applied,
+    });
+  } catch (err) {
+    console.error('[memory/consolidate]', err);
+    res.status(500).json({ error: 'Consolidation failed' });
   }
 });
 
