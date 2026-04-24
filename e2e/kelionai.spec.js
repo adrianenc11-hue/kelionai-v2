@@ -106,22 +106,39 @@ test.describe('Kelion Studio API (DS-1 / DS-3) wiring', () => {
 });
 
 test.describe('Gemini Live token endpoint (Stage 1 precondition)', () => {
-  test('Vertex default (CI) returns 200 with token=null and a setup block', async ({ request }) => {
-    // The default backend is now Vertex AI (see server/src/routes/realtime.js).
+  test('Vertex default returns either a valid setup (prod) or an honest 503 (unconfigured CI)', async ({ request }) => {
+    // The default backend is Vertex AI (see server/src/routes/realtime.js).
     // Vertex authenticates server-side via a GCP service account in the WS
     // proxy; the token endpoint intentionally returns `token: null` because
-    // the browser does not need an ephemeral credential. CI doesn't have
-    // the GCP service account wired, but the handler doesn't validate SA
-    // presence at token-mint time — connectivity is enforced later by the
-    // proxy. So on CI the default path returns 200 with a null token and
-    // a backend='vertex' marker.
+    // the browser does not need an ephemeral credential.
+    //
+    // Shape depends on deployment:
+    //   - Production (has GOOGLE_CLOUD_PROJECT or project_id in
+    //     GCP_SERVICE_ACCOUNT_JSON): 200 with backend='vertex', token=null,
+    //     and a setup block whose model is the fully-qualified
+    //     `projects/<P>/locations/<L>/publishers/google/models/<M>` path.
+    //   - CI / fresh dev box (neither env): 503 with a clear message
+    //     explaining that Vertex is unconfigured and how to escape-hatch
+    //     via `?backend=aistudio`. This is the new guard added alongside
+    //     the default flip — previously the handler would silently return
+    //     200 with a bare `models/<M>` path that Vertex then rejects with
+    //     close code 1007. Catching it here turns a silent misconfig into
+    //     a loud, actionable error.
     const res = await request.get(`${BASE}/api/realtime/gemini-token?lang=en-US`);
+    if (res.status() === 503) {
+      const body = await res.json();
+      expect(body.error).toMatch(/Vertex backend is unconfigured/i);
+      return;
+    }
     expect(res.status()).toBe(200);
     const body = await res.json();
     expect(body.backend).toBe('vertex');
     expect(body.token).toBeNull();
     expect(body.setup).toBeTruthy();
     expect(typeof body.setup.systemInstruction.parts[0].text).toBe('string');
+    expect(body.setup.model).toMatch(
+      /^projects\/[^/]+\/locations\/[^/]+\/publishers\/google\/models\/.+$/,
+    );
   });
 
   test('Forcing ?backend=aistudio exercises the AI Studio ephemeral-token path', async ({ request }) => {
