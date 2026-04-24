@@ -127,6 +127,7 @@ Tools you can use (Stage 4):
 - switch_camera(side) — flip the phone camera between front ('user' / selfie) and back ('environment' / rear). Call this whenever the user says "flip the camera", "show me the other side", "use the back camera", "schimbă camera", "arată-mi camera din spate". The camera must already be on; if it isn't, ask the user to tap the camera button first. Pass side='front' or side='back'; when the user just says "flip" / "switch" pass the opposite of the current side.
 - ui_notify(text, variant?) — paint a short visible note on the stage so the user SEES what you just did ("am deschis harta", "am salvat conversația", "searching Wikipedia…"). Use this whenever you complete a real action (a tool call succeeded, a monitor render finished, memory was saved). Variant is one of 'info' | 'success' | 'warning' | 'error' (default 'info'). Keep the note ≤ 80 characters and match the user's language. This is how you prove to the user that an action actually happened — speaking alone is not enough.
 - ui_navigate(route) — move the user to another page of the app. Allowed routes: '/' (main stage with the avatar), '/studio' (Python / Node Dev Studio), '/contact'. Call this when the user asks to "deschide Studio", "take me to the studio", "go back to the main page", "open the contact page". If the user asks for a page you don't recognise, say so — do NOT guess a route.
+- plan_task(goal, context_hint?, max_steps?) — THINK BEFORE YOU ACT. Call this FIRST on any user request that needs 3+ real actions, any compound request ("find X, then open it on the monitor, then email me the link"), any ambiguous goal, and any time you're not already certain which single tool solves the ask. A dedicated planner (Gemini Flash) returns a numbered action plan referencing Kelion's own tools. Tell the user the plan in 1–2 natural sentences ("iau asta în trei pași: caut, confirm, execut"), then run the steps one by one. If the planner reports the goal is under-specified, ASK the clarifying question it returned — do NOT guess. Skip plan_task only for single-shot obvious asks (e.g. "what's the weather in Cluj", "set a timer"). When in doubt, plan first.
 
 HARD rule for all tools above: if the user question clearly needs one of them, YOU MUST call it. Saying "I'll check that for you" or "let me see" without calling the tool counts as a lie. If no tool fits, say honestly "I don't know" — never guess.
 
@@ -307,6 +308,16 @@ const KELION_TOOLS = [
       },
     },
     required: ['route'],
+  },
+  {
+    name: 'plan_task',
+    description: "Produce a short, ordered action plan BEFORE you start executing a multi-step request. Call this at the TOP of any user ask that needs 3 or more real actions (research + then act, compare + then decide, collect data + open on monitor + email, etc.) — and for ANY request you are not already sure how to attack. A dedicated planner model (Gemini Flash) returns a numbered plan that names the tools you should call. Read the plan to the user in 1-2 sentences (natural language, not JSON), then execute steps one by one, narrating each action. If the planner says the goal is under-specified, ASK the user the clarifying question before touching any tool. Skip plan_task ONLY for single-shot requests where the right tool is obvious (e.g. 'what's the weather in Cluj'). When unsure, plan first.",
+    properties: {
+      goal:         { type: 'string',  description: "One-sentence restatement of the user's end goal, in the user's language." },
+      context_hint: { type: 'string',  description: "Optional short context the planner should know about (constraints, what's already been said, what failed in a previous attempt). Keep under 300 chars." },
+      max_steps:    { type: 'integer', description: 'Upper bound on plan length. 1–10; default 6.' },
+    },
+    required: ['goal'],
   },
   {
     name: 'calculate',
