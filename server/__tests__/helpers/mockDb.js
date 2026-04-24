@@ -97,6 +97,63 @@ function createMockDb() {
       if (!u) return 0;
       return Number.isFinite(u.credits_balance_minutes) ? u.credits_balance_minutes : 999;
     }),
+    // F3 — admin user de-duplication (mirrors real db/index.js semantics).
+    findDuplicateUsers:     jest.fn(() => {
+      const byEmail = new Map();
+      for (const u of users.values()) {
+        if (!u.email) continue;
+        const k = String(u.email).toLowerCase();
+        if (!byEmail.has(k)) byEmail.set(k, []);
+        byEmail.get(k).push(u);
+      }
+      const groups = [];
+      for (const [email, peers] of byEmail) {
+        if (peers.length > 1) {
+          groups.push({
+            email,
+            count: peers.length,
+            users: peers.map(u => {
+              const clean = { ...u };
+              delete clean.password_hash;
+              return clean;
+            }),
+          });
+        }
+      }
+      return groups;
+    }),
+    mergeUsers:             jest.fn((sourceId, targetId) => {
+      if (!sourceId || !targetId) throw new Error('sourceId and targetId are required');
+      if (String(sourceId) === String(targetId)) throw new Error('source and target must differ');
+      const src = users.get(sourceId);
+      const tgt = users.get(targetId);
+      if (!src) throw new Error(`source user ${sourceId} not found`);
+      if (!tgt) throw new Error(`target user ${targetId} not found`);
+      if (String(src.email || '').toLowerCase() !== String(tgt.email || '').toLowerCase()) {
+        throw new Error('refusing to merge users with different email addresses');
+      }
+      // Copy non-empty fields source → target.
+      if (!tgt.google_id && src.google_id) tgt.google_id = src.google_id;
+      if (!tgt.picture && src.picture) tgt.picture = src.picture;
+      if (!tgt.stripe_customer_id && src.stripe_customer_id) tgt.stripe_customer_id = src.stripe_customer_id;
+      if (!tgt.password_hash && src.password_hash) tgt.password_hash = src.password_hash;
+      if (src.credits_balance_minutes) {
+        tgt.credits_balance_minutes = Number(tgt.credits_balance_minutes || 0) + Number(src.credits_balance_minutes);
+      }
+      // Move usage counter.
+      if (usage.has(sourceId)) {
+        usage.set(targetId, (usage.get(targetId) || 0) + usage.get(sourceId));
+        usage.delete(sourceId);
+      }
+      users.delete(sourceId);
+      return {
+        sourceId,
+        targetId,
+        email: tgt.email,
+        moved: {},
+        target: { ...tgt, password_hash: undefined },
+      };
+    }),
     _users:    users,
     _referrals: referrals,
     _usage:    usage,

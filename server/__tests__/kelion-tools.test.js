@@ -69,6 +69,42 @@ const EXPECTED_TOOL_NAMES = [
   // (clientGeoProvider, cameraControl) rather than the server.
   'get_my_location',
   'switch_camera',
+  // PR #200 — first UI-agency primitives. Client-handled; 'ui_notify'
+  // paints a visible status on the stage (so actions the avatar just
+  // took are observable, not just spoken), 'ui_navigate' flips the
+  // SPA route via an allowlist ('/', '/studio', '/contact'). Later
+  // PRs layer ui_click / ui_recording_* on the same controller.
+  'ui_notify',
+  'ui_navigate',
+  // PR B — document readers + OCR (pdf-parse / mammoth / tesseract.js).
+  // Inputs accept either a public HTTPS URL or a base64 blob.
+  'read_pdf',
+  'read_docx',
+  'ocr_image',
+  'ocr_passport',
+  // PR C — regex tester + sandboxed code runner + user-intern tools.
+  // run_code needs E2B_API_KEY; get_my_* need a signed-in user passed
+  // through ctx. All degrade gracefully when the requirement is absent.
+  'run_regex',
+  'run_code',
+  'get_my_credits',
+  'get_my_usage',
+  'get_my_profile',
+  // PR D — communications + automations + package info.
+  'send_email', 'send_sms', 'create_calendar_ics', 'zapier_trigger',
+  'github_repo_info', 'npm_package_info', 'pypi_package_info',
+  // F11 — AI image generation (OpenAI gpt-image-1). Graceful fallback when
+  // OPENAI_API_KEY is absent.
+  'generate_image',
+  // PR #7/N — Planner Brain. Routes a user goal to Gemini 2.5 Flash and
+  // returns a short JSON action plan so Kelion thinks before it acts on
+  // compound / multi-step requests. Degrades gracefully when
+  // GEMINI_API_KEY is absent (returns { ok:false, unavailable:true }).
+  'plan_task',
+  // PR #8/N — Memory of Actions. Read-only self-reflection tool: the
+  // voice model queries action_history for the signed-in user before
+  // repeating a tool call. Guests receive { ok:false, signed_in:false }.
+  'get_action_history',
 ];
 
 describe('Kelion tool catalog', () => {
@@ -116,6 +152,40 @@ describe('buildKelionToolsGemini', () => {
     expect(fn.parameters.properties.state.enum).toEqual([
       'neutral','happy','sad','surprised','angry','tired','focused','confused','anxious',
     ]);
+  });
+
+  // Gemini BidiGenerateContent rejects the whole setup frame with
+  // "missing field" if any ARRAY property omits `items`, and closes the
+  // socket with code 1007 before setupComplete. Guard the adapter so new
+  // array-typed parameters can't regress voice for everyone on Gemini.
+  test('every ARRAY property carries an items schema', () => {
+    const walk = (schema, path) => {
+      if (!schema || typeof schema !== 'object') return;
+      if (schema.type === 'ARRAY') {
+        expect(schema.items).toBeDefined();
+        expect(schema.items.type).toMatch(/^(STRING|INTEGER|NUMBER|BOOLEAN|ARRAY|OBJECT)$/);
+        walk(schema.items, `${path}.items`);
+      }
+      if (schema.type === 'OBJECT') {
+        for (const [k, sub] of Object.entries(schema.properties || {})) {
+          walk(sub, `${path}.${k}`);
+        }
+      }
+    };
+    for (const fn of rendered[0].functionDeclarations) {
+      walk(fn.parameters, fn.name);
+    }
+  });
+
+  test('create_calendar_ics attendees is an array of {email, name?}', () => {
+    const fn = rendered[0].functionDeclarations.find((f) => f.name === 'create_calendar_ics');
+    const attendees = fn.parameters.properties.attendees;
+    expect(attendees.type).toBe('ARRAY');
+    expect(attendees.items).toBeDefined();
+    expect(attendees.items.type).toBe('OBJECT');
+    expect(attendees.items.properties).toHaveProperty('email');
+    expect(attendees.items.properties).toHaveProperty('name');
+    expect(attendees.items.required).toEqual(['email']);
   });
 });
 
