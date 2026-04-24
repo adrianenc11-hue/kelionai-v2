@@ -298,6 +298,42 @@ describe('installErrorReporter', () => {
     expect(fetchFn.calls[0].body.message).toMatch(/ReferenceError/);
   });
 
+  // PR #182 follow-up — the rare case where `ev.message === 'Script
+  // error.'` arrives WITH location detail (some extensions / mobile
+  // browsers). Those are actionable, so we must NOT drop them even
+  // though the message string matches the opaque cross-origin shape.
+  it('still reports "Script error." events that carry filename or lineno (rare, actionable)', () => {
+    // Disable dedup — the 3 fires below share the same message and
+    // would otherwise coalesce into one report, which isn't what this
+    // test is exercising.
+    const { stats } = installErrorReporter({ target, fetchFn, now, dedupMs: 0 });
+    fireError(target, {
+      message: 'Script error.',
+      error: null,
+      filename: 'https://kelion.app/ext.js',
+      lineno: 17,
+      colno: 3,
+    });
+    // filename-only variant (some browsers set lineno=0)
+    fireError(target, {
+      message: 'Script error.',
+      error: null,
+      filename: 'https://kelion.app/sw.js',
+      lineno: 0,
+      colno: 0,
+    });
+    // lineno-only variant
+    fireError(target, {
+      message: 'Script error.',
+      error: null,
+      filename: '',
+      lineno: 42,
+      colno: 0,
+    });
+    expect(stats.reported).toBe(3);
+    expect(fetchFn).toHaveBeenCalledTimes(3);
+  });
+
   it('reporter never re-enters on fetch rejection (swallows own errors)', () => {
     const brokenFetch = jest.fn(() => Promise.reject(new Error('network down')));
     const { stats, uninstall } = installErrorReporter({
@@ -389,6 +425,51 @@ describe('installErrorReporter', () => {
     // Default cap is 10 per window, so exactly 10 pass.
     expect(stats.reported).toBe(10);
     expect(stats.rateLimited).toBe(2);
+  });
+
+  // PR #182 follow-up — a sliding-window limiter needs a STRICTLY
+  // positive window; `rateWindowMs: 0` would silently disable rate
+  // limiting entirely (recent[0] <= t - 0 evicts every prior
+  // timestamp). Only `rateLimit: 0` is the intentional block-all
+  // kill-switch; `rateWindowMs: 0` must fall back to the default so
+  // a mis-wired caller doesn't unwittingly remove the rate limiter.
+  it('treats rateWindowMs: 0 as invalid and falls back to default', () => {
+    const { stats } = installErrorReporter({
+      target, fetchFn, now,
+      rateWindowMs: 0,
+      dedupMs: 0,
+    });
+    for (let i = 0; i < 12; i++) {
+      fireUnhandledRejection(target, new Error(`msg-${i}`));
+    }
+    // Default 10/60s cap must still apply — NOT effectively disabled.
+    expect(stats.reported).toBe(10);
+    expect(stats.rateLimited).toBe(2);
+  });
+
+  it('treats negative / non-finite rateWindowMs as invalid and falls back to default', () => {
+    const { stats: a } = installErrorReporter({
+      target, fetchFn, now,
+      rateWindowMs: -1000,
+      dedupMs: 0,
+    });
+    const { stats: b } = installErrorReporter({
+      target, fetchFn, now,
+      rateWindowMs: Number.NaN,
+      dedupMs: 0,
+    });
+    // Both use default window; each reporter's own rateLimit cap still
+    // applies. Fire enough to hit the cap through the combined targets.
+    for (let i = 0; i < 25; i++) {
+      fireUnhandledRejection(target, new Error(`msg-${i}`));
+    }
+    // Each reporter accepts up to 10, then rate-limits. Two reporters
+    // share one `target`, so every fire is delivered to both. They
+    // count independently.
+    expect(a.reported).toBe(10);
+    expect(a.rateLimited).toBe(15);
+    expect(b.reported).toBe(10);
+    expect(b.rateLimited).toBe(15);
   });
 
   it('returns no-op handle when target is absent (SSR / non-browser)', () => {
