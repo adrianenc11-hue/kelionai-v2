@@ -196,8 +196,35 @@ async function initDb() {
   if (!memCols.find((c) => c.name === 'archived_reason')) {
     await db.exec('ALTER TABLE memory_items ADD COLUMN archived_reason TEXT');
   }
+  // Audit M9 — memory subject tagging. Before this, every extracted
+  // fact was blindly attributed to the signed-in user, which caused
+  // the "memory mixing" bug: the extractor stored "Ioana is a vet
+  // tech" on Adrian's profile when Adrian mentioned his sister Ioana.
+  // Persona then introduced Adrian as a vet tech.
+  //
+  // The fix is structural: every row now carries
+  //   subject       — "self" when the fact is about the signed-in user,
+  //                   "other" when it's about a third party they
+  //                   mentioned. Default 'self' preserves behaviour
+  //                   for pre-migration rows.
+  //   subject_name  — name of the "other" person (NULL for self).
+  //                   Lets the retrieval layer group "facts about
+  //                   Ioana" separately from "facts about Adrian".
+  //   confidence    — 0.0 … 1.0 score emitted by the extractor.
+  //                   Low-confidence rows are stored but hidden from
+  //                   the persona until reinforced.
+  if (!memCols.find((c) => c.name === 'subject')) {
+    await db.exec("ALTER TABLE memory_items ADD COLUMN subject TEXT NOT NULL DEFAULT 'self'");
+  }
+  if (!memCols.find((c) => c.name === 'subject_name')) {
+    await db.exec('ALTER TABLE memory_items ADD COLUMN subject_name TEXT');
+  }
+  if (!memCols.find((c) => c.name === 'confidence')) {
+    await db.exec('ALTER TABLE memory_items ADD COLUMN confidence REAL NOT NULL DEFAULT 1.0');
+  }
   await db.exec('CREATE INDEX IF NOT EXISTS idx_memory_items_user ON memory_items(user_id, created_at DESC)');
   await db.exec('CREATE INDEX IF NOT EXISTS idx_memory_items_user_live ON memory_items(user_id, archived_at, tier)');
+  await db.exec('CREATE INDEX IF NOT EXISTS idx_memory_items_user_subject ON memory_items(user_id, subject, archived_at)');
 
   // Stage 5 — M23: Web Push subscriptions. One row per device/browser; a
   // single user may have several (phone + laptop). endpoint is unique.
@@ -426,6 +453,26 @@ async function initDb() {
 // affirms (bumps last_affirmed_at) on an exact dup instead of
 // silently dropping it — that drives the consolidator's promotion
 // pass in services/memoryConsolidator.js.
+// Audit M9 — normalise the subject fields the extractor emits. Anything
+// not 'other' collapses to 'self' so a malformed extraction can never
+// poison the signed-in user's profile. subject_name is only kept for
+// 'other' rows — it's meaningless for self.
+function _normalizeSubject(raw) {
+  const kind = (raw && typeof raw.subject === 'string')
+    ? raw.subject.trim().toLowerCase()
+    : 'self';
+  const subject = kind === 'other' ? 'other' : 'self';
+  const name = (subject === 'other' && typeof raw?.subject_name === 'string')
+    ? raw.subject_name.trim().slice(0, 120) || null
+    : null;
+  // confidence clamps to [0, 1]; NaN / missing defaults to 1.0 so the
+  // legacy extractor (no confidence field) keeps promoting rows.
+  let conf = Number(raw?.confidence);
+  if (!Number.isFinite(conf)) conf = 1.0;
+  conf = Math.max(0, Math.min(1, conf));
+  return { subject, subject_name: name, confidence: conf };
+}
+
 async function addMemoryItems(userId, items) {
   if (!Array.isArray(items) || items.length === 0) return [];
   const inserted = [];
@@ -434,13 +481,18 @@ async function addMemoryItems(userId, items) {
     const fact = it.fact.trim().slice(0, 500);
     if (!fact) continue;
     const kind = (it.kind && typeof it.kind === 'string') ? it.kind.slice(0, 40) : 'fact';
-    // De-dupe: if an identical fact already exists, bump its
-    // last_affirmed_at so the consolidator sees the re-mention.
-    // We ignore archived rows here — restoring an archived fact
-    // is an explicit admin action.
+    const { subject, subject_name, confidence } = _normalizeSubject(it);
+    // De-dupe: identical fact + same subject bumps last_affirmed_at.
+    // Scoping the dedupe to (user_id, fact, subject, subject_name)
+    // matters — "works as a vet" about the user AND about their
+    // sister Ioana are two legitimately distinct rows.
     const dup = await db.get(
-      'SELECT id FROM memory_items WHERE user_id = ? AND fact = ? AND archived_at IS NULL LIMIT 1',
-      [userId, fact]
+      `SELECT id FROM memory_items
+         WHERE user_id = ? AND fact = ? AND subject = ?
+           AND COALESCE(subject_name,'') = COALESCE(?,'')
+           AND archived_at IS NULL
+         LIMIT 1`,
+      [userId, fact, subject, subject_name]
     );
     if (dup) {
       await db.run(
@@ -450,10 +502,11 @@ async function addMemoryItems(userId, items) {
       continue;
     }
     const r = await db.run(
-      "INSERT INTO memory_items (user_id, kind, fact, tier) VALUES (?, ?, ?, 'recent')",
-      [userId, kind, fact]
+      `INSERT INTO memory_items (user_id, kind, fact, tier, subject, subject_name, confidence)
+       VALUES (?, ?, ?, 'recent', ?, ?, ?)`,
+      [userId, kind, fact, subject, subject_name, confidence]
     );
-    inserted.push({ id: r.lastID, user_id: userId, kind, fact });
+    inserted.push({ id: r.lastID, user_id: userId, kind, fact, subject, subject_name, confidence });
   }
   return inserted;
 }
@@ -461,23 +514,38 @@ async function addMemoryItems(userId, items) {
 // Live items only, core-tier first so the persona prompt leads
 // with durable identity even if the newest rows are noisy one-off
 // context notes.
-async function listMemoryItems(userId, limit = 100) {
+//
+// Audit M9 — callers can now filter by subject. Default keeps the
+// pre-migration behaviour (return everything) so existing admin and
+// consolidator code paths don't change shape. The persona injection
+// uses the new `subject` option to keep "self" and "other" rows in
+// separate prompt sections.
+async function listMemoryItems(userId, limit = 100, opts = {}) {
+  const { subject = null } = opts || {};
+  const params = [userId];
+  let where = 'user_id = ? AND archived_at IS NULL';
+  if (subject === 'self' || subject === 'other') {
+    where += ' AND subject = ?';
+    params.push(subject);
+  }
+  params.push(limit);
   return db.all(
-    `SELECT id, kind, fact, tier, last_affirmed_at, created_at
+    `SELECT id, kind, fact, tier, subject, subject_name, confidence,
+            last_affirmed_at, created_at
        FROM memory_items
-      WHERE user_id = ?
-        AND archived_at IS NULL
+      WHERE ${where}
       ORDER BY CASE WHEN tier = 'core' THEN 0 ELSE 1 END,
                created_at DESC
       LIMIT ?`,
-    [userId, limit]
+    params
   );
 }
 
 // Full row (live + archived) for admin panel / consolidation.
 async function listAllMemoryItems(userId, limit = 500) {
   return db.all(
-    `SELECT id, kind, fact, tier, last_affirmed_at, archived_at, archived_reason, created_at
+    `SELECT id, kind, fact, tier, subject, subject_name, confidence,
+            last_affirmed_at, archived_at, archived_reason, created_at
        FROM memory_items
       WHERE user_id = ?
       ORDER BY created_at DESC
@@ -998,6 +1066,27 @@ const UPDATE_USER_ALLOWED_COLUMNS = new Set([
   'cloned_voice_enabled',
 ]);
 
+// mergeUsers() runs its own UPDATE on the users row (outside updateUser)
+// so it can sum `credits_balance_minutes` instead of picking one side —
+// a ledger column deliberately excluded from UPDATE_USER_ALLOWED_COLUMNS.
+// The set below pins every column mergeUsers may write. Keys filled into
+// the merge patch that are NOT in this set are rejected before any SQL
+// is emitted, so a future contributor who forwards user-controlled keys
+// into `fillIfEmpty` can't accidentally open an identifier-injection
+// hole on the `users` table.
+const MERGE_USERS_FILL_ALLOWED_COLUMNS = new Set([
+  'google_id',
+  'picture',
+  'stripe_customer_id',
+  'password_hash',
+  'referral_code',
+  'cloned_voice_id',
+  'cloned_voice_consent_at',
+  'cloned_voice_consent_version',
+  'cloned_voice_enabled',
+  'credits_balance_minutes',
+]);
+
 async function updateUser(id, data) {
   if (!data || typeof data !== 'object') {
     throw new Error('updateUser: data must be an object');
@@ -1418,6 +1507,18 @@ async function mergeUsers(sourceId, targetId) {
       fillIfEmpty.credits_balance_minutes = tgtBalance + srcBalance;
     }
     if (Object.keys(fillIfEmpty).length > 0) {
+      // Defence in depth: refuse to interpolate any key that isn't on
+      // the merge-users allowlist. Every key written above is hard-coded,
+      // so this only fires if a future contributor forwards unsanitised
+      // input — the transaction rolls back cleanly via the outer catch.
+      const unknown = Object.keys(fillIfEmpty).filter(
+        (k) => !MERGE_USERS_FILL_ALLOWED_COLUMNS.has(k),
+      );
+      if (unknown.length) {
+        throw new Error(
+          `mergeUsers: unknown column(s) rejected: ${unknown.join(', ')}`,
+        );
+      }
       const fields = Object.keys(fillIfEmpty).map(k => `${k} = ?`).join(', ');
       const values = Object.values(fillIfEmpty);
       await db.run(
@@ -1486,6 +1587,16 @@ async function saveConsumeState(userId, state, nowMs) {
   // `INSERT ... ON CONFLICT DO UPDATE` is supported by sqlite ≥3.24
   // (packaged sqlite3@5 ships 3.40+) and by Postgres. One round-trip
   // whether the row exists or not, safe under race between instances.
+  //
+  // The explicit `RETURNING user_id` clause is load-bearing on
+  // Postgres: our pg-adapter auto-appends ` RETURNING id` to every
+  // INSERT that has no RETURNING of its own, and `credits_consume_state`
+  // has no `id` column (user_id IS the primary key). Without our own
+  // RETURNING clause the upsert would fail in production clusters
+  // (M7 fix effectively disabled — flagged P1 by Codex on #186). The
+  // clause is harmless on SQLite (ignored when lastID isn't read) and
+  // compiles identically on Postgres, so a single SQL string works
+  // across both dialects.
   await db.run(
     `INSERT INTO credits_consume_state
        (user_id, last_billable_at, silent_streak, silent_since, updated_at)
@@ -1494,7 +1605,8 @@ async function saveConsumeState(userId, state, nowMs) {
        last_billable_at = excluded.last_billable_at,
        silent_streak    = excluded.silent_streak,
        silent_since     = excluded.silent_since,
-       updated_at       = excluded.updated_at`,
+       updated_at       = excluded.updated_at
+     RETURNING user_id`,
     [userId, lastBillableAt, silentStreak, silentSince, updatedAt]
   );
 }
