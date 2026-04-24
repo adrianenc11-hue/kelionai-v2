@@ -33,7 +33,7 @@ describe('updateProfile / updateRole / updateSubscription', () => {
 
   it('updateProfile changes name',     () => { expect(db.updateProfile(user.id,{name:'New'}).name).toBe('New'); });
   it('updateRole changes role',        () => { expect(db.updateRole(user.id,'admin').role).toBe('admin'); });
-  it('updateSubscription changes tier',() => { expect(db.updateSubscription(user.id,{subscription_tier:'premium',subscription_status:'active',subscription_expires_at:null}).subscription_tier).toBe('premium'); });
+  it('updateSubscription changes tier',() => { expect(db.updateSubscription(user.id,{subscription_tier:'premium',subscription_status:'active'}).subscription_tier).toBe('premium'); });
 });
 
 describe('Usage tracking', () => {

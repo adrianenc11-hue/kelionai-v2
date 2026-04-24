@@ -11,18 +11,36 @@
 
 const config = require('../config');
 
-const EXTRACTION_SYSTEM = `You extract durable facts about a user from a conversation transcript.
+const EXTRACTION_SYSTEM = `You extract durable facts from a conversation transcript.
 Return ONLY a valid JSON array. No prose, no code fences.
 
-Each item: { "kind": "<category>", "fact": "<first-person statement about the user, ≤ 140 chars>" }
+Each item is one of TWO shapes:
+
+1. Fact about the USER (the person talking to Kelion):
+   { "kind": "<category>", "fact": "<short statement>", "subject": "self", "confidence": 0.0-1.0 }
+
+2. Fact about someone ELSE the user mentioned (family, friend, colleague, pet, boss, …):
+   { "kind": "<category>", "fact": "<short statement>", "subject": "other", "subject_name": "<the other person's name>", "confidence": 0.0-1.0 }
+
+CRITICAL — do not mix subjects. If the user says "I'm a vet and my sister Ioana is a dancer":
+  ✔ emit TWO items:
+      { "kind":"identity","fact":"works as a veterinarian","subject":"self","confidence":0.9 }
+      { "kind":"identity","fact":"works as a dancer","subject":"other","subject_name":"Ioana","confidence":0.85 }
+  ✘ NEVER emit "works as a dancer" as a self-fact.
 
 Allowed kinds (pick the closest): identity, preference, goal, routine, relationship, skill, context.
 
+confidence guidance:
+- 1.0 — user stated it about themselves in plain unambiguous terms ("I live in Cluj").
+- 0.8 — inferred from context ("bought my third bike — I ride a lot").
+- 0.5 — mentioned in passing or ambiguous ("might move to Madrid one day").
+- < 0.5 — do NOT emit; it's not durable.
+
 Rules:
-- Extract ONLY facts about the USER, never about Kelion or hypotheticals.
-- Durable only. Skip one-off mood notes ("I'm tired today"), small talk, and things the user retracted.
+- Durable only. Skip one-off mood notes ("I'm tired today"), small talk, retracted statements.
 - Be specific. "Adrian is learning Spanish" > "likes languages".
-- English, third-person if the user is named (e.g. "Adrian has two cats"); otherwise second-person ("You have two cats").
+- Fact text is SHORT (≤ 140 chars), third-person when a name is known, otherwise neutral ("lives in Cluj").
+- subject_name is REQUIRED for "other" and MUST be the actual name the user used (not "the sister", not "a friend") — skip the item if you don't know the name.
 - Max 8 items. Return [] if nothing durable.`;
 
 async function extractFacts(turns, options = {}) {
@@ -73,13 +91,34 @@ async function extractFacts(turns, options = {}) {
   try { parsed = JSON.parse(text); } catch { return []; }
   if (!Array.isArray(parsed)) return [];
 
+  // Audit M9 — propagate subject tagging. `_normalizeSubject` in db/index.js
+  // defensively re-clamps these on write, so a malformed "subject":"ioana"
+  // from the model cannot corrupt the self-profile — but we do a first pass
+  // here so downstream logging / inspection sees clean values.
   return parsed
     .filter((x) => x && typeof x.fact === 'string' && x.fact.trim())
     .slice(0, 8)
-    .map((x) => ({
-      kind: typeof x.kind === 'string' ? x.kind.toLowerCase().slice(0, 40) : 'fact',
-      fact: x.fact.trim().slice(0, 500),
-    }));
+    .map((x) => {
+      const rawSubject = typeof x.subject === 'string' ? x.subject.trim().toLowerCase() : 'self';
+      const subject = rawSubject === 'other' ? 'other' : 'self';
+      const subject_name = (subject === 'other' && typeof x.subject_name === 'string')
+        ? x.subject_name.trim().slice(0, 120) || null
+        : null;
+      let confidence = Number(x.confidence);
+      if (!Number.isFinite(confidence)) confidence = 1.0;
+      confidence = Math.max(0, Math.min(1, confidence));
+      return {
+        kind: typeof x.kind === 'string' ? x.kind.toLowerCase().slice(0, 40) : 'fact',
+        fact: x.fact.trim().slice(0, 500),
+        subject,
+        subject_name,
+        confidence,
+      };
+    })
+    // Drop "other" rows with no usable name — the persona can't surface
+    // "someone said dancer" meaningfully, and we don't want these landing
+    // on the signed-in user's profile either.
+    .filter((x) => x.subject !== 'other' || x.subject_name);
 }
 
 module.exports = { extractFacts };
