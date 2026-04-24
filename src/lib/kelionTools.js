@@ -16,6 +16,7 @@ import {
   tryRequestClientGeo,
 } from './clientGeoProvider'
 import { requestCameraSwitch, getCurrentFacingMode } from './cameraControl'
+import { requestUINotify, requestUINavigate, listAllowedRoutes } from './uiActionStore'
 import { getCsrfToken } from './api'
 
 async function postJSON(url, body) {
@@ -57,6 +58,16 @@ const REAL_TOOL_NAMES = new Set([
   // Groq-powered (opt-in). The server returns a graceful "not configured"
   // message when GROQ_API_KEY is absent, so the voice UX never breaks.
   'solve_problem', 'code_review', 'explain_code',
+  // PR 7/N — Planner Brain. Kelion calls this on compound/multi-step
+  // asks to get a short numbered plan from Gemini Flash before it
+  // starts executing real tools. Server returns a clean JSON plan;
+  // summarizeRealTool shapes it for the voice model below.
+  'plan_task',
+  // PR 8/N — Memory of Actions. Kelion reads back its own recent tool
+  // invocations for the signed-in user so it knows what it has already
+  // done this session. Server returns a compact JSON list; the
+  // summariser below renders it as numbered bullet points.
+  'get_action_history',
   // F11 — `generate_image` is handled specially in the runTool switch
   // below so we can side-effect the monitor; it isn't in this set.
 ])
@@ -144,6 +155,39 @@ function summarizeRealTool(name, j) {
     // Groq completions are already structured; keep them mostly intact but
     // cap so we don't blow past the voice model's context on the read-back.
     return String(j.result).slice(0, 4000)
+  }
+  if (name === 'get_action_history' && Array.isArray(j.actions)) {
+    // Kelion is reading its own history. We keep each row on one line
+    // so the voice model can scan it and decide quickly whether to
+    // re-run a tool. Guest case (`signed_in === false`) is handled
+    // by the generic `ok === false` branch at the top.
+    if (!j.actions.length) {
+      return "No recent actions recorded yet — I haven't run anything like that this session."
+    }
+    const rows = j.actions.slice(0, 20).map((a, i) => {
+      const status = a.ok === false ? 'FAILED' : 'ok'
+      const args = a.args ? ` (${a.args})` : ''
+      const result = a.result ? ` → ${a.result}` : ''
+      return `${i + 1}. ${a.tool} [${status}]${args}${result}`
+    }).join('\n')
+    return `Recent actions (${j.count} total):\n${rows}`.slice(0, 4000)
+  }
+  if (name === 'plan_task' && Array.isArray(j.steps)) {
+    // Condense the planner's structured JSON into a compact speakable form
+    // the voice model can read and then walk through. We keep tool_hint
+    // inline so the model knows which tool each step should call. A final
+    // "Cautions" line surfaces anything the planner flagged as requiring
+    // user confirmation (spending, messaging, destructive actions).
+    const header = j.summary ? `Plan: ${j.summary}` : 'Plan:'
+    const body = j.steps.map((s) => {
+      const hint = s.tool_hint ? ` [${s.tool_hint}]` : ''
+      const why = s.why ? ` — ${s.why}` : ''
+      return `${s.n}. ${s.action}${hint}${why}`
+    }).join('\n')
+    const cautions = Array.isArray(j.cautions) && j.cautions.length
+      ? `\nCautions: ${j.cautions.join('; ')}`
+      : ''
+    return `${header}\n${body}${cautions}`.slice(0, 4000)
   }
   // Generic fallback — stringify but cap so the model never chokes.
   try {
@@ -359,6 +403,33 @@ export async function runTool(name, args) {
       const res = await requestCameraSwitch(side)
       if (!res.ok) return res.error || 'Camera switch failed.'
       return `ok:facingMode=${res.facingMode}`
+    }
+    case 'ui_notify': {
+      // Kelion paints a visible status note on the stage ("am deschis
+      // harta", "am salvat conversația"). Gives the avatar a visual
+      // channel for actions it just performed so the user can see
+      // them complete, instead of trusting spoken claims alone. First
+      // concrete agency primitive — "apasă butoane" starts here.
+      const res = await requestUINotify({
+        text: args?.text ?? args?.message,
+        variant: args?.variant,
+        ttl_s: args?.ttl_s,
+      })
+      if (!res.ok) return res.error || 'Notification failed.'
+      return `ok:ui_notify:id=${res.id}`
+    }
+    case 'ui_navigate': {
+      // Move the user between the small set of SPA routes Kelion
+      // knows about ("/", "/studio", "/contact"). Allowlisted inside
+      // uiActionStore so a hallucinated route can't silently
+      // navigate anywhere. When the route is unknown the tool
+      // returns a speakable error that includes the allowed set,
+      // so the model can correct itself.
+      const res = await requestUINavigate(args?.route)
+      if (!res.ok) {
+        return res.error || `Navigation failed. Allowed routes: ${listAllowedRoutes().join(', ')}.`
+      }
+      return `ok:ui_navigate:route=${res.route}`
     }
     default:
       // Real-API tools (calculate, get_weather, web_search, …) are proxied

@@ -6,6 +6,8 @@ import * as THREE from 'three'
 import { useLipSync, useAudioElementLipSync } from '../lib/lipSync'
 import { subscribeMonitor, handleShowOnMonitor, setMonitorGeoProvider } from '../lib/monitorStore'
 import { setClientGeoProvider } from '../lib/clientGeoProvider'
+import { setUIActionController } from '../lib/uiActionStore'
+import UIActionToast from '../components/UIActionToast'
 import { STATUS_COLORS, STATUS_PULSE_HZ } from '../lib/kelionStatus'
 import { useGeminiLive } from '../lib/geminiLive'
 import { useOpenAIRealtime } from '../lib/openaiRealtime'
@@ -989,6 +991,17 @@ export default function KelionStage() {
   // 2026-04-20: "cind esti logat si folosesti butonul back, te
   // intorci in pagina anterioara, dar logat".
   const navigate = useNavigate()
+  // PR #200 — register the ui_navigate controller so the voice model's
+  // ui_navigate tool (kelionTools.js) can actually move the user
+  // between SPA routes instead of just narrating that it did. The
+  // allowlist lives inside uiActionStore; this effect only wires the
+  // imperative handler, it doesn't widen the allowlist.
+  useEffect(() => {
+    setUIActionController({
+      navigate: (route) => navigate(route),
+    })
+    return () => setUIActionController(null)
+  }, [navigate])
   const audioRef = useRef(null)
   // Real client GPS (falls back to null → server uses IP-geo instead).
   // The hook fires once on mount; if the browser remembers a previous
@@ -2680,6 +2693,10 @@ export default function KelionStage() {
       {/* Debug-only Leva tuning drawer. Renders null unless the URL
           carries ?debug=1 or ?tune=1; zero cost for real users. */}
       {isTuningEnabled() && <TuningPanel />}
+      {/* PR #200 — toast overlay driven by uiActionStore. Fires when
+          Kelion calls ui_notify. Renders null when the queue is empty
+          so idle cost is zero. */}
+      <UIActionToast />
       <Canvas
         /* THREE 0.183 deprecated PCFSoftShadowMap (the r3f default when
            `shadows` is passed bare). Switch to VSMShadowMap — softer
