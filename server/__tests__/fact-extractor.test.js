@@ -39,6 +39,15 @@ describe('factExtractor.looksThirdParty', () => {
     expect(looksThirdParty('Adrian is learning Spanish', 'Adrian')).toBe(false);
   });
 
+  test('accepts first-name facts when userName is multi-word (full name)', () => {
+    // Regression: looksThirdParty used to compare the fact's first
+    // word against the ENTIRE userName, so "Adrian is learning
+    // Spanish" was dropped when userName was "Adrian Enciulescu".
+    expect(looksThirdParty('Adrian is learning Spanish', 'Adrian Enciulescu')).toBe(false);
+    expect(looksThirdParty('Enciulescu works at a bank', 'Adrian Enciulescu')).toBe(false);
+    expect(looksThirdParty('Maria loves opera', 'Adrian Enciulescu')).toBe(true);
+  });
+
   test('rejects empty / null input', () => {
     expect(looksThirdParty('', 'Adrian')).toBe(true);
     expect(looksThirdParty(null, 'Adrian')).toBe(true);

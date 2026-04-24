@@ -85,13 +85,18 @@ function scoreRearCamera(label) {
   const isSelfie = /front|user|selfie|face/.test(L) && !isBack
   if (isSelfie) return -Infinity
   let s = isBack ? 0 : -1000  // unlabeled devices score low but not -Inf
+  // Detect ultra-wide first so the plain "wide" bonus below doesn't
+  // also fire on labels like "Back Ultra Wide Camera" / "Ultrawide",
+  // which would otherwise end up scoring higher than the main wide
+  // lens (bug: ultra-wide picked on phones with individual lenses).
+  const isUltraWide = /ultra[\s-]?wide|ultrawide/.test(L)
   if (/triple/.test(L)) s += 300
-  if (/dual\s*wide/.test(L)) s += 260
+  if (/dual\s*wide/.test(L) && !isUltraWide) s += 260
   if (/dual/.test(L)) s += 250
-  if (/wide(?!\s*angle)/.test(L)) s += 220  // "Wide" lens (main)
+  if (!isUltraWide && /wide(?!\s*angle)/.test(L)) s += 220  // "Wide" lens (main)
   if (/main/.test(L)) s += 210
   if (/telephoto|tele\b/.test(L)) s += 120   // good at distance but narrow FOV
-  if (/ultra[\s-]?wide|ultrawide/.test(L)) s += 80  // widest FOV, low detail
+  if (isUltraWide) s += 80  // widest FOV, low detail
   if (/depth|lidar|infrared|ir\b/.test(L)) s -= 500  // not a photo sensor
   // Android often suffixes with the hardware index "camera2 0 (back)";
   // lower index = main sensor on most devices.

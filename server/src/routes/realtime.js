@@ -136,7 +136,7 @@ Tools you can use (Stage 4):
 - browse_web(task) — send an autonomous web agent to perform a task in a real browser (open a page, fill a form, extract info). Use it when search alone is not enough.
 - read_calendar(range), read_email(query), search_files(query) — look into the user's connected accounts when they ask about their own stuff.
 - observe_user_emotion(state, intensity, cue) — SILENT tool. Call it whenever you read a clear emotional shift on the user's face (when the camera is on) or in their voice. Never narrate this call, never tell the user you are doing it. The client uses it to subtly adapt the avatar's expression and the halo color. Fire it at most once every 4-5 seconds and only when you are genuinely confident.
-- show_on_monitor(kind, query) — display something on the presentation monitor behind you in the scene. Use whenever the user asks to "show me", "open", or "display" a map, weather, a page, or a concept (in any language). Pick the right kind: "map" for geographic locations, "weather" for forecasts, "video" for YouTube clips, "image" for photos, "wiki" for Wikipedia, "web" for arbitrary HTTPS URLs, or "clear" to blank the monitor. query is the search term (e.g. "Cluj-Napoca", "New York weather", "https://en.wikipedia.org/wiki/Paris"). Narrate briefly while the monitor loads ("let me put that up"). Call it again with a new query to swap the content. Shortcut: when the user asks for "Linux", "a Linux shell", "a terminal", "deschide Linux", "arată-mi un terminal", or similar — call show_on_monitor with kind="web" and query="https://webvm.io" (Debian running in the browser via WebAssembly; no install needed).
+- show_on_monitor(kind, query) — display something on the presentation monitor behind you in the scene. Use whenever the user asks to "show me", "open", or "display" a map, weather, a page, or a concept (in any language). Pick the right kind: "map" for geographic locations, "weather" for forecasts, "video" for YouTube clips, "image" for AI-generated images from a prompt (Pollinations.ai Stable-Diffusion), "wiki" for Wikipedia, "web" for arbitrary HTTPS URLs, or "clear" to blank the monitor. Note: kind="image" no longer returns real stock photos — it renders a fresh AI image from the query. If the user explicitly wants a real/existing photo of a place or thing, use kind="web" with a relevant URL (or kind="wiki") instead. query is the search term (e.g. "Cluj-Napoca", "New York weather", "https://en.wikipedia.org/wiki/Paris"). Narrate briefly while the monitor loads ("let me put that up"). Call it again with a new query to swap the content. Shortcut: when the user asks for "Linux", "a Linux shell", "a terminal", "deschide Linux", "arată-mi un terminal", or similar — call show_on_monitor with kind="web" and query="https://webvm.io" (Debian running in the browser via WebAssembly; no install needed).
 - calculate(expression) — DETERMINISTIC math. Whenever the user asks you to compute anything beyond a trivial one-digit sum — arithmetic, percentages, algebra — call this tool. Do not do mental math; it hallucinates on long numbers.
 - get_weather(city or lat/lon, days) — REAL weather + forecast from Open-Meteo. Whenever the user asks about weather, temperature, rain, wind, or a forecast — call this tool. Never invent the weather.
 - web_search(query, limit) — live web search with URLs and snippets. Whenever the user asks about anything time-sensitive (news, prices, events, who-is) — call this tool. Never invent a URL, price, or fact.
@@ -315,7 +315,7 @@ const KELION_TOOLS = [
       kind: {
         type: 'string',
         enum: ['map', 'weather', 'video', 'image', 'wiki', 'web', 'clear'],
-        description: "Type of content: 'map' = Google Maps for a place; 'weather' = forecast for a city; 'video' = YouTube clip or search; 'image' = photo search; 'wiki' = Wikipedia article; 'web' = arbitrary URL (must start with https://); 'clear' = blank the monitor.",
+        description: "Type of content: 'map' = Google Maps for a place; 'weather' = forecast for a city; 'video' = YouTube clip or search; 'image' = AI-generated image from the query (Pollinations.ai / Stable-Diffusion — NOT a search for existing photos, so prefer 'web' or 'wiki' if the user explicitly wants a real photo); 'wiki' = Wikipedia article; 'web' = arbitrary URL (must start with https://); 'clear' = blank the monitor.",
       },
       query: { type: 'string', description: "Search term or URL. Examples: 'Cluj-Napoca', 'New York', 'sunset mountains', 'Paris', 'https://en.wikipedia.org/wiki/Artificial_intelligence'. For a Linux shell / terminal, pass kind='web' with query='https://webvm.io' (a Debian-in-browser that works without install). Required unless kind='clear'." },
     },
@@ -872,12 +872,13 @@ const KELION_TOOLS = [
     required: ['name'],
   },
   {
-    // F11 — AI image generation. The tool executor returns a short-lived
-    // URL (served by /api/generated-images/:id) that the client pipes
-    // onto the avatar's stage monitor via `showImageOnMonitor`. Use only
-    // when the user explicitly asks to *create/generate* an image — for
-    // "show me a picture of Paris" prefer `show_on_monitor('image', …)`
-    // which hits LoremFlickr and is free.
+    // F11 — AI image generation via OpenAI gpt-image-1. The tool
+    // executor returns a short-lived URL (served by
+    // /api/generated-images/:id) that the client pipes onto the
+    // avatar's stage monitor via `showImageOnMonitor`. Prefer this
+    // when the user wants a higher-quality / specific-style image;
+    // `show_on_monitor('image', …)` also generates an image but via
+    // the free Pollinations.ai path (no key needed, lower quality).
     name: 'generate_image',
     description: "Generate an original image with OpenAI gpt-image-1 from a natural-language prompt. The result is shown on the avatar's stage monitor. Use only when the user explicitly asks to create/generate/design/draw/paint an image (phrases like 'generate me a picture of…', 'fă-mi o imagine cu…', 'draw…'). Costs ~$0.04 per call — don't use for mere look-up of existing images.",
     properties: {

@@ -85,6 +85,14 @@ function looksThirdParty(fact, userName) {
   if (userName && typeof userName === 'string') {
     const uname = userName.trim().toLowerCase();
     if (uname) {
+      // Split multi-word names ("Adrian Enciulescu") so first-name
+      // abbreviations ("Adrian is learning Spanish") still count as
+      // the user. Without this, any user with more than one word in
+      // their display name loses every self-fact the LLM correctly
+      // generated with just their first name.
+      const unameParts = new Set(
+        uname.split(/\s+/).filter((p) => p && p.length > 0)
+      );
       // If the fact starts with a personal name that isn't the user's.
       const nameMatch = f.match(/^([a-z][a-z\-']+)\s+(is|are|has|have|had|likes|loves|prefers|wants|needs|works|lives|speaks|studies|plays|enjoys|owns|hates|knows|remembers|thinks|believes|feels|said|says|was|were|did|does)\b/);
       if (nameMatch) {
@@ -94,7 +102,7 @@ function looksThirdParty(fact, userName) {
           'the', 'you', 'your', 'user', 'this', 'that', 'they', 'their',
           'my', 'his', 'her', 'its', 'a', 'an', 'we', 'our', 'he', 'she',
         ]);
-        if (!reservedFirstWord.has(first) && first !== uname) {
+        if (!reservedFirstWord.has(first) && first !== uname && !unameParts.has(first)) {
           return true;
         }
       }
