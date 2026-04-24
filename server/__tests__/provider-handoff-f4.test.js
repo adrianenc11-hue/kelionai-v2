@@ -16,6 +16,12 @@
 
 process.env.OPENAI_API_KEY = process.env.OPENAI_API_KEY || 'test-openai';
 process.env.GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'test-gemini';
+// The /gemini-token endpoint defaults to Vertex and 503s unless a
+// project id is resolvable; this suite exercises the Vertex setup
+// block construction (no upstream calls), so a sentinel project is
+// enough to clear the guard.
+process.env.GOOGLE_CLOUD_PROJECT = process.env.GOOGLE_CLOUD_PROJECT || 'test-project';
+process.env.GOOGLE_CLOUD_LOCATION = process.env.GOOGLE_CLOUD_LOCATION || 'us-central1';
 
 const express = require('express');
 const cookieParser = require('cookie-parser');
