@@ -201,7 +201,7 @@ async function queueYouTubeUpgrade(query) {
     if (state.kind !== 'video') return;      // user opened something else
     setState({
       kind: 'video',
-      src: `https://www.youtube.com/embed/${data.videoId}?autoplay=1&mute=0`,
+      src: buildYouTubeEmbedUrl(data.videoId),
       title: data.title ? `Video — ${data.title}` : `Video`,
       embedType: 'iframe',
     });
@@ -209,6 +209,28 @@ async function queueYouTubeUpgrade(query) {
     /* Network hiccup / AbortError — external card stays, user still gets
        a playable fallback. Not worth surfacing an error. */
   }
+}
+
+// Build a YouTube /embed/<id> URL with the params needed for reliable
+// cross-browser inline autoplay. `autoplay=1` alone is silently blocked
+// by Chrome / Safari for cross-origin iframes without prior media
+// engagement on youtube.com — the player loads but sits on the thumbnail
+// with a manual play button, which was the user-reported "player defect
+// nu ruleaza youtube". Browsers DO allow autoplay when `mute=1` is
+// present, so we default to muted autoplay; the user taps the player
+// (or its unmute control) to bring sound on. `playsinline=1` keeps
+// mobile Safari from forcing fullscreen, `rel=0` and `modestbranding=1`
+// trim the end-screen clutter so the avatar's stage stays clean.
+function buildYouTubeEmbedUrl(videoId) {
+  const id = encodeURIComponent(String(videoId || ''));
+  const params = new URLSearchParams({
+    autoplay: '1',
+    mute: '1',
+    playsinline: '1',
+    rel: '0',
+    modestbranding: '1',
+  });
+  return `https://www.youtube.com/embed/${id}?${params.toString()}`;
 }
 
 function safeUrl(u) {
@@ -269,7 +291,7 @@ function resolveMonitor(kind, query) {
         const id = ytMatch[1];
         return {
           kind: 'video',
-          src: `https://www.youtube.com/embed/${id}?autoplay=1&mute=0`,
+          src: buildYouTubeEmbedUrl(id),
           title: `Video`,
           embedType: 'iframe',
         };
@@ -281,7 +303,10 @@ function resolveMonitor(kind, query) {
         const listId = plMatch[1];
         return {
           kind: 'video',
-          src: `https://www.youtube.com/embed/videoseries?list=${encodeURIComponent(listId)}&autoplay=1`,
+          // Playlists use the same autoplay-muted params — Chrome /
+          // Safari block unmuted cross-origin autoplay just like they
+          // do for single videos. User taps the player to unmute.
+          src: `https://www.youtube.com/embed/videoseries?list=${encodeURIComponent(listId)}&autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1`,
           title: `Playlist`,
           embedType: 'iframe',
         };
