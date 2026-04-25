@@ -132,6 +132,14 @@ const EXPECTED_TOOL_NAMES = [
   // then does the modal route through send_email (Resend). Nothing is
   // delivered without an explicit user click.
   'compose_email_draft',
+  // PR — schematics + BOM. Both renderer-only tools.
+  // generate_schematic: client renders Mermaid source as SVG inside the
+  // stage monitor (block diagrams, wiring graphs, state machines).
+  // generate_bom: client builds a UTF-8 CSV from a structured component
+  // list and triggers a download. Adrian: "nu stie sa genereze scheme
+  // electronice, cablaje, lista de componente".
+  'generate_schematic',
+  'generate_bom',
 ];
 
 describe('Kelion tool catalog', () => {

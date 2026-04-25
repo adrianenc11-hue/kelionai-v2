@@ -129,6 +129,15 @@ function savePersisted() {
       window.localStorage.removeItem(STORAGE_KEY);
       return;
     }
+    // Don't persist mermaid schematics — `src` holds the raw mermaid
+    // source (often >1 KB, sometimes much more) and reconstituting it
+    // on a future page load isn't useful: the user asked for it in the
+    // context of a specific conversation. The other embed kinds save a
+    // short URL that's safe to revive across sessions.
+    if (state.embedType === 'mermaid') {
+      window.localStorage.removeItem(STORAGE_KEY);
+      return;
+    }
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
       kind: state.kind,
       src: state.src,
@@ -171,7 +180,7 @@ function setState(patch) {
   state.title = patch.title ?? null;
   // Pin valid embed types only — anything else collapses to 'iframe'
   // so a stale persisted record doesn't render the wrong renderer.
-  const allowedEmbed = new Set(['iframe', 'image', 'external', 'audio']);
+  const allowedEmbed = new Set(['iframe', 'image', 'external', 'audio', 'mermaid']);
   state.embedType = allowedEmbed.has(patch.embedType) ? patch.embedType : 'iframe';
   state.updatedAt = Date.now();
   savePersisted();
@@ -593,4 +602,28 @@ export function showImageOnMonitor({ src, title } = {}) {
     embedType: 'image',
   });
   return `Monitor now showing: ${title || 'generated image'}.`;
+}
+
+// Project a Mermaid block / wiring / state diagram onto the avatar's
+// stage monitor. Adrian (2026-04-25): "nu stie sa genereze scheme
+// electronice, cablaje, lista de componente". This is the schematics-
+// generation entry point — the model emits Mermaid source, the
+// MonitorOverlay (KelionStage.jsx) lazy-loads the mermaid library and
+// renders the SVG inline. `src` holds the raw Mermaid source (NOT a
+// URL) — the renderer recognises this via embedType:'mermaid'.
+//
+// Renders block diagrams ("Source 220V → Transformer → Rectifier → …"),
+// wiring graphs ("Arduino D2 → LED1 + R220Ω → GND"), and state machines.
+// For real symbol-level schematics (resistor zigzag, op-amp triangle, IC
+// pin-outs) we'd need a KiCad CLI pipeline server-side — Adrian flagged
+// that as a separate, larger follow-up.
+export function showSchematicOnMonitor({ code, title } = {}) {
+  if (!code || typeof code !== 'string') return 'No schematic to display.';
+  setState({
+    kind: 'schematic',
+    src: code,
+    title: title || 'Schematic',
+    embedType: 'mermaid',
+  });
+  return `Monitor now showing schematic: ${title || 'diagram'}.`;
 }

@@ -7,7 +7,7 @@
 // mutates the emotion store, which the avatar subscribes to.
 
 import { setEmotion } from './emotionStore'
-import { handleShowOnMonitor, showImageOnMonitor } from './monitorStore'
+import { handleShowOnMonitor, showImageOnMonitor, showSchematicOnMonitor } from './monitorStore'
 import { openEmailComposer } from './composerStore'
 import { getLatestCameraFrame } from './cameraFrameBuffer'
 import { setNarrationMode } from './narrationMode'
@@ -328,6 +328,72 @@ export async function runTool(name, args) {
       // it under ~80 chars avoids filler latency on the TTS pass.
       const label = (j.title || args?.prompt || '').toString().slice(0, 80)
       return label ? `Generated: ${label}` : 'Image generated and displayed.'
+    }
+    case 'generate_schematic': {
+      // Local-only: the model emits Mermaid source for a block / wiring /
+      // state diagram, we render it as SVG on the stage monitor via
+      // MermaidView. Adrian (2026-04-25): "nu stie sa genereze scheme
+      // electronice, cablaje". Real symbol-level schematics (resistor
+      // zigzag, op-amp triangle, IC pin-outs) need a KiCad CLI pipeline
+      // and ship in a follow-up; this gets us blocks + wiring graphs
+      // shipped today.
+      const code = (args?.code ?? args?.mermaid ?? args?.source ?? '').toString().trim()
+      if (!code) return 'No diagram source provided.'
+      const title = (args?.title ?? '').toString().slice(0, 120)
+      try {
+        showSchematicOnMonitor({ code, title })
+        return `ok:schematic:${title || 'diagram'}`
+      } catch (e) {
+        return `Failed to display schematic: ${(e && e.message) || 'unknown error'}`
+      }
+    }
+    case 'generate_bom': {
+      // Local-only: the model emits a structured component list, we
+      // build a CSV blob and trigger a download. Adrian (2026-04-25):
+      // "lista de componente". Excel opens UTF-8 CSV cleanly with the
+      // BOM marker prepended, so this is a zero-dependency BOM solution
+      // for hobby / maker workflows. No round-trip; no server credentials
+      // involved.
+      const itemsRaw = args?.items
+      if (!Array.isArray(itemsRaw) || itemsRaw.length === 0) {
+        return 'No components in BOM.'
+      }
+      const title = (args?.title ?? 'Bill of Materials').toString().slice(0, 200)
+      // Coerce + escape one CSV field. Excel's CSV dialect quotes the
+      // whole cell when it contains comma / quote / newline; embedded
+      // quotes are doubled.
+      const csvCell = (v) => {
+        const s = (v == null ? '' : String(v))
+        if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`
+        return s
+      }
+      const cols = ['ref', 'component', 'value', 'package', 'qty', 'datasheet', 'supplier', 'price']
+      const header = ['Ref', 'Component', 'Value', 'Package', 'Qty', 'Datasheet', 'Supplier', 'Price']
+      const lines = [header.map(csvCell).join(',')]
+      for (const it of itemsRaw) {
+        if (!it || typeof it !== 'object') continue
+        lines.push(cols.map((c) => csvCell(it[c])).join(','))
+      }
+      // UTF-8 BOM (\ufeff) so Excel detects encoding instead of mangling
+      // accented characters in component names like "Rezistor 220Ω".
+      const csv = '\ufeff' + lines.join('\r\n') + '\r\n'
+      try {
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        const fileTitle = title.replace(/[^A-Za-z0-9._-]+/g, '_').slice(0, 100) || 'bom'
+        a.download = `${fileTitle}.csv`
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+        // Revoke after a tick so Safari has a chance to start the
+        // download before the URL is invalidated.
+        setTimeout(() => { try { URL.revokeObjectURL(url) } catch (_) {} }, 4000)
+        return `ok:bom:${itemsRaw.length}:${title}`
+      } catch (e) {
+        return `Failed to download BOM: ${(e && e.message) || 'unknown error'}`
+      }
     }
     case 'set_narration_mode': {
       // Accessibility mode. Flips a module-level flag that

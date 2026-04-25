@@ -5,7 +5,9 @@ import { useNavigate } from 'react-router-dom'
 import * as THREE from 'three'
 import { useLipSync, useAudioElementLipSync } from '../lib/lipSync'
 import { subscribeMonitor, handleShowOnMonitor, setMonitorGeoProvider, EXTERNAL_ONLY_HOSTS } from '../lib/monitorStore'
+import MermaidView from '../components/MermaidView'
 import { subscribeComposer, getComposer, openEmailComposer, closeComposer } from '../lib/composerStore'
+import { runTool } from '../lib/kelionTools'
 import { setClientGeoProvider } from '../lib/clientGeoProvider'
 import { setUIActionController } from '../lib/uiActionStore'
 import UIActionToast from '../components/UIActionToast'
@@ -618,6 +620,7 @@ function MonitorOverlay() {
   const isImage = m.embedType === 'image'
   const isExternal = m.embedType === 'external'
   const isAudio = m.embedType === 'audio'
+  const isMermaid = m.embedType === 'mermaid'
   const externalCopy = isExternal ? externalCardCopy(m) : null
   const onClose = (e) => {
     e.stopPropagation()
@@ -716,6 +719,12 @@ function MonitorOverlay() {
             referrerPolicy="no-referrer"
             style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', background: '#0d0b1d' }}
           />
+        ) : isMermaid ? (
+          // Schematic / wiring / block diagram. `m.src` holds the
+          // raw Mermaid source emitted by the model via the
+          // `generate_schematic` tool. MermaidView lazy-loads the
+          // mermaid library on first render and substitutes the SVG.
+          <MermaidView code={m.src} title={m.title} />
         ) : isAudio ? (
           // Faza A — live radio / streaming audio playback. Renders a
           // dedicated card with an HTML5 <audio> element + station
@@ -2105,6 +2114,17 @@ export default function KelionStage() {
             // Nothing is delivered without an explicit click on Send.
             try { openEmailComposer(obj.arguments) } catch (e) {
               console.warn('[chat] compose_email_draft failed', e && e.message)
+            }
+          } else if (
+            (obj.tool === 'generate_schematic' || obj.tool === 'generate_bom')
+            && obj.arguments
+          ) {
+            // Schematic Mermaid render / BOM CSV download. Both are
+            // pure-renderer tools — runTool's local cases handle them
+            // (no backend call), so we route through the central
+            // dispatcher to keep behaviour identical to the voice path.
+            try { runTool(obj.tool, obj.arguments) } catch (e) {
+              console.warn('[chat]', obj.tool, 'failed', e && e.message)
             }
           } else if (obj.error) {
             throw new Error(obj.error)
