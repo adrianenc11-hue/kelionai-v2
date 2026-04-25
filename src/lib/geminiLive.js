@@ -404,7 +404,9 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
             clientContent: {
               turns: [{
                 role: 'user',
-                parts: [{ text: 'Greet me briefly and ask what I need. One sentence. Use the user-language locked in your system instructions — do NOT translate or add a second-language version.' }],
+                parts: [{ text: translatorMode
+                  ? 'You are now in LIVE TRANSLATOR mode. Listen carefully to everything I say in ANY language. Translate it immediately and naturally into my locked language (the one in your system instructions). Do NOT respond with your own words — just translate what you hear. Acknowledge by saying only "Translator mode active" in my language, then wait and translate.'
+                  : 'Greet me briefly and ask what I need. One sentence. Use the user-language locked in your system instructions — do NOT translate or add a second-language version.' }],
               }],
               turnComplete: true,
             },
@@ -443,6 +445,9 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
     // on the next microtask; fresh sessions explicitly reset to false
     // so the kickstart greeting keeps firing as before.
     handoffSessionRef.current = priorTurns.length > 0
+    // Translator mode — override the session kickstart so Kelion listens
+    // to ANY language and translates everything to the user's language.
+    const translatorMode = opts.translatorMode || false
     // If a previous ws is still live (or in CONNECTING), tear it down
     // before opening a new one — otherwise the old handlers keep firing
     // against `wsRef.current` after we reassign it below.
@@ -1174,6 +1179,14 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
     return false
   }, [])
 
+  // setMuted — instantly silences or restores Kelion's voice output by
+  // controlling the Web Audio gain node. Works without restarting the session.
+  const setMuted = useCallback((muted) => {
+    if (outputGainRef.current) {
+      outputGainRef.current.gain.value = muted ? 0 : 1
+    }
+  }, [])
+
   return {
     status, error, start, stop, turns, userLevel,
     // Stage 2
@@ -1183,5 +1196,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
     trial,
     // Audit M6 — handoff double-start guard (see lib/handoffGuard.js).
     isBusy,
+    // Mute/unmute Kelion's voice output without restarting the session.
+    setMuted,
   }
 }
