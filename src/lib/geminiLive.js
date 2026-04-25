@@ -104,6 +104,9 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
   // the system instruction and Gemini would re-greet anyway, defeating F4.
   // handleMessage reads this ref to decide whether to skip the kickstart.
   const handoffSessionRef = useRef(false)
+  // translatorModeRef — set in start() before the WS opens so handleMessage
+  // can read it inside setupComplete without a closure/scope issue.
+  const translatorModeRef = useRef(false)
 
   const wsRef = useRef(null)
   const audioCtxRef = useRef(null)       // 16kHz capture context for Gemini — MUST match SAMPLE_RATE_IN
@@ -404,7 +407,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
             clientContent: {
               turns: [{
                 role: 'user',
-                parts: [{ text: translatorMode
+                parts: [{ text: translatorModeRef.current
                   ? 'You are now in LIVE TRANSLATOR mode. Listen carefully to everything I say in ANY language. Translate it immediately and naturally into my locked language (the one in your system instructions). Do NOT respond with your own words — just translate what you hear. Acknowledge by saying only "Translator mode active" in my language, then wait and translate.'
                   : 'Greet me briefly and ask what I need. One sentence. Use the user-language locked in your system instructions — do NOT translate or add a second-language version.' }],
               }],
@@ -445,9 +448,10 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
     // on the next microtask; fresh sessions explicitly reset to false
     // so the kickstart greeting keeps firing as before.
     handoffSessionRef.current = priorTurns.length > 0
-    // Translator mode — override the session kickstart so Kelion listens
-    // to ANY language and translates everything to the user's language.
-    const translatorMode = opts.translatorMode || false
+    // Translator mode — store in ref so handleMessage's setupComplete handler
+    // can read it (handleMessage is defined outside start(), so local vars
+    // declared here are not in its closure).
+    translatorModeRef.current = opts.translatorMode || false
     // If a previous ws is still live (or in CONNECTING), tear it down
     // before opening a new one — otherwise the old handlers keep firing
     // against `wsRef.current` after we reassign it below.
