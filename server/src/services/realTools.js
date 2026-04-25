@@ -1330,9 +1330,8 @@ const MAX_DOC_BYTES = 15 * 1024 * 1024;
 
 async function fetchDocumentBuffer(url) {
   const u = (url || '').toString().trim();
-  if (!/^https:\/\//i.test(u)) {
-    return { ok: false, error: 'url must start with https:// (http not allowed)' };
-  }
+  const guard = await assertPublicHttpsUrl(u);
+  if (!guard.ok) return guard;
   let r;
   try {
     r = await fetchWithTimeout(u, {
