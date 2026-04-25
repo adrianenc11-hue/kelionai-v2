@@ -1,6 +1,6 @@
 const {
   KELION_TOOLS,
-  buildKelionToolsOpenAI,
+  buildKelionToolsChatCompletions,
   buildKelionToolsGemini,
 } = require('../src/routes/realtime');
 
@@ -95,7 +95,7 @@ describe('PR #199 — verbal camera controls', () => {
   });
 
   test('OpenAI adapter surfaces all four camera tools', () => {
-    const openaiTools = buildKelionToolsOpenAI();
+    const openaiTools = buildKelionToolsChatCompletions();
     const names = openaiTools.map((t) => t.name || t.function?.name).filter(Boolean);
     for (const n of ['switch_camera', 'camera_on', 'camera_off', 'zoom_camera']) {
       expect(names).toContain(n);

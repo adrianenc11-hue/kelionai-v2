@@ -11,8 +11,6 @@ import { setUIActionController } from '../lib/uiActionStore'
 import UIActionToast from '../components/UIActionToast'
 import { STATUS_COLORS, STATUS_PULSE_HZ } from '../lib/kelionStatus'
 import { useGeminiLive } from '../lib/geminiLive'
-import { useOpenAIRealtime } from '../lib/openaiRealtime'
-import { decideHandoff } from '../lib/handoffGuard'
 import { selectPriorTurns } from '../lib/priorTurnsSelector'
 import { useWakeWord } from '../lib/useWakeWord'
 import { useTrial } from '../lib/useTrial'
@@ -2353,66 +2351,17 @@ export default function KelionStage() {
     return () => { if (bubbleHideTimerRef.current) clearTimeout(bubbleHideTimerRef.current) }
   }, [chatMessages, chatBusy])
 
-  // Single voice transport — Gemini Live on Vertex AI.
-  //
-  // Adrian's product decision (April 2026): "vreau un LLM care face tot".
-  // Vertex AI Gemini Live (`gemini-live-2.5-flash-native-audio`) is the
-  // only GA API that does voice + live video + tools in a single stream,
-  // with a Google Cloud SLA. OpenAI Realtime remains in the codebase as
-  // a dormant escape hatch (the hook is still allocated below with
-  // `active: false`) in case of an unforeseen Vertex incident; re-
-  // activating it requires editing this component's state via React
-  // DevTools — no supported runtime override/setter is exposed, which
-  // is intentional (users should never see a provider toggle), but it
-  // does mean an operator recovering from a Vertex outage must flip
-  // the value by hand. If that ever becomes a real-world recovery
-  // path we'd want a dedicated `?emergency=openai` URL param wired
-  // directly to useOpenAIRealtime's `active` flag. The previous auto-
-  // fallback + UI toggle + localStorage persistence have been removed
-  // — a single provider means a single mental model for users, and
-  // reconnect-on-1007/1008 (the actual failure modes we saw) is
-  // handled at the transport level in `geminiLive.js`, not by swapping
-  // to a different LLM.
-  const [liveProvider /* setLiveProvider intentionally unused */] = useState('gemini')
-  // Clean up the localStorage key the old multi-provider code used to
-  // persist the user's choice. Left in place across releases it would
-  // read as "the user previously picked OpenAI" to any rollback or
-  // downstream reader, which is misleading now that the choice no
-  // longer exists. Best-effort; localStorage may be disabled (private
-  // mode, storage quota, Safari intelligent tracking prevention) —
-  // the key is already ignored either way, removal just tidies up.
-  useEffect(() => {
-    try { window.localStorage.removeItem('kelion_live_provider') }
-    catch (_) { /* storage disabled — harmless no-op */ }
-  }, [])
-
-  const geminiHook = useGeminiLive({
-    audioRef,
-    coords: clientGeo,
-    // Live HUD: every successful consume response carries the
-    // post-deduction balance. Pipe it straight into the top-right
-    // "Credits · N" chip so users see the credit tick down per minute
-    // without a page refresh. Admins get `null` (exempt) and the
-    // hook skips the update — chip stays on whatever /balance loaded.
-    onBalanceUpdate: (minutes) => setBalance(minutes),
-    // Only the active transport registers the verbal camera
-    // controller (see hook internals for why). Without this gate,
-    // both hooks claim the single controller slot in cameraControl.js
-    // and whichever committed last silently won, so camera voice
-    // commands ("pornește camera", "schimbă camera", "zoom") routed
-    // to the wrong transport whenever it wasn't the selected one.
-    active: liveProvider === 'gemini',
-  })
-  const openaiHook = useOpenAIRealtime({
+  // Single voice transport — Gemini Live on Vertex AI. Per Adrian's
+  // single-LLM cleanup (April 2026): one LLM end-to-end (Gemini), one
+  // voice the user hears (ElevenLabs native per detected language).
+  // The dual-provider scaffold (OpenAI Realtime + auto-fallback) and
+  // every escape hatch around it were removed.
+  const liveHook = useGeminiLive({
     audioRef,
     coords: clientGeo,
     onBalanceUpdate: (minutes) => setBalance(minutes),
-    active: liveProvider === 'openai',
+    active: true,
   })
-  // Active transport — rest of the component destructures from this.
-  // Both hooks return the same shape (see lib/openaiRealtime.js
-  // "Public signature matches useGeminiLive exactly").
-  const liveHook = liveProvider === 'openai' ? openaiHook : geminiHook
   const {
     status,
     error,
@@ -2434,15 +2383,6 @@ export default function KelionStage() {
     // also ticks for text-chat-only guests who never touch the mic.
     trial: voiceTrial,
   } = liveHook
-  // Cross-provider auto-fallback and the flip-provider cleanup effect
-  // were removed with the single-provider consolidation — `liveProvider`
-  // is now a constant `'gemini'`, so there is nothing to swap between.
-  // Transport-level reconnect on transient close codes (1007/1008) lives
-  // in `geminiLive.js`. The `decideHandoff` import and `openaiHook` are
-  // retained as compile-time anchors so the dormant escape hatch keeps
-  // building; flipping `liveProvider` back to `'openai'` via DevTools
-  // will rewire the old behaviour.
-  void decideHandoff
 
   // Unified trial HUD source of truth. Applies to both voice AND text
   // chat via the shared 15-min/day IP window on the server. Collapses
@@ -3541,16 +3481,8 @@ export default function KelionStage() {
           display: 'flex', alignItems: 'center', gap: 8,
         }}
       >
-        {/* Plan C — voice-transport selection. Previously surfaced as a
-            "🎙️ GPT / Gem" pill next to the Credits chip so the active
-            provider could be flipped without DevTools. Adrian's feedback
-            ("de ce am 2 butoane de mic ... poate face functia asta dar
-            in spate automat, fara user sa vada, el vede doar butonul de
-            jos, de mic") asked for a single visible mic — the provider
-            swap is now done automatically on terminal failure (see the
-            auto-fallback effect where `liveProvider` is declared) and
-            persisted in localStorage so the next session starts on the
-            provider that last worked. Keyboard-quiet. */}
+        {/* Single-LLM cleanup (2026-04): voice transport pill removed —
+            Gemini Live is the only provider, no UI swap. */}
         {/* Credits pill — hidden for admins (they have unlimited access and
             no billing; showing "0 min" confused Adrian in testing). For
             regular signed-in users we still show balance + open the Stripe

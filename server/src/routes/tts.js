@@ -259,38 +259,10 @@ async function synthesizeGemini(text, lang) {
   return pcmToWav(Buffer.from(b64, 'base64'));
 }
 
-// OpenAI TTS — used to unify the text-chat voice with the voice transport.
-// When the user talks to Kelion via the OpenAI Realtime API and text chat
-// via TTS, the two must sound like the same person. `ash` is the one voice
-// available in BOTH the GA Realtime API and the standalone TTS endpoint
-// (`gpt-4o-mini-tts`), so we default to it on both sides (see also
-// server/src/routes/realtime.js `OPENAI_REALTIME_LIVE_VOICE`). The previous
-// default `onyx` exists only in TTS, not in Realtime — picking it there
-// gave Adrian two audibly different people across transports. Operator
-// can override via OPENAI_TTS_VOICE / OPENAI_TTS_MODEL.
-async function synthesizeOpenAI(text, _lang) {
-  const apiKey = process.env.OPENAI_API_KEY;
-  const voice  = process.env.OPENAI_TTS_VOICE || 'ash';
-  const model  = process.env.OPENAI_TTS_MODEL || 'gpt-4o-mini-tts';
-  const r = await fetch('https://api.openai.com/v1/audio/speech', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type':  'application/json',
-    },
-    body: JSON.stringify({
-      model,
-      voice,
-      input: text,
-      response_format: 'mp3',
-    }),
-  });
-  if (!r.ok) {
-    const err = await r.text();
-    throw new Error(`OpenAI TTS error: ${r.status} ${err}`);
-  }
-  return Buffer.from(await r.arrayBuffer());
-}
+// OpenAI TTS path — REMOVED in single-LLM cleanup (2026-04). The chat
+// surface runs exclusively on Gemini and the user hears one voice from
+// ElevenLabs (cloned or curated library). The OpenAI TTS endpoint is no
+// longer reachable from this route.
 
 // ElevenLabs only accepts `language_code` on Turbo v2.5 / Flash v2.5.
 // Sending it on `eleven_multilingual_v2` triggers HTTP 400 and every TTS
@@ -388,38 +360,24 @@ router.post('/', async (req, res) => {
     }
   }
 
-  const hasOpenAI     = !!process.env.OPENAI_API_KEY;
   const hasGemini     = !!process.env.GEMINI_API_KEY;
   const hasElevenLabs = !!process.env.ELEVENLABS_API_KEY;
-  if (!hasOpenAI && !hasGemini && !hasElevenLabs) {
-    return res.status(503).json({ error: 'TTS not configured. Set OPENAI_API_KEY, GEMINI_API_KEY, or ELEVENLABS_API_KEY.' });
+  if (!hasGemini && !hasElevenLabs) {
+    return res.status(503).json({ error: 'TTS not configured. Set ELEVENLABS_API_KEY (preferred) or GEMINI_API_KEY.' });
   }
 
-  // Provider priority — ElevenLabs wins when its key is configured.
-  // Adrian's explicit ask: "vreau o singura voce auzita de user, indiferent
-  // de ce AI este in spate". OpenAI Realtime (`ash`) and Gemini Live
-  // (`Charon`) are voice-to-voice APIs whose timbre is fixed by the
-  // provider — we cannot reroute THAT audio through ElevenLabs without
-  // rearchitecting the realtime path. But every TEXT-chat reply goes
-  // through this HTTP endpoint, so picking ElevenLabs here with the same
-  // voice id used across modes gives the user a consistent timbre for the
-  // non-realtime surface (text chat, map card narration, reads, etc).
-  //
-  // Priority when TTS_PROVIDER is unset:
-  //   1. ElevenLabs (if key set)  — one voice across every text reply
-  //   2. OpenAI                   — matches Realtime `ash` fallback
-  //   3. Gemini                   — last-resort fallback
-  // Operators override via TTS_PROVIDER=openai|gemini|elevenlabs|11labs.
+  // Single-LLM cleanup (2026-04): one voice for the user, period. ElevenLabs
+  // is the only spoken voice (cloned voice if the signed-in user has one,
+  // otherwise the curated native-male library voice for their language).
+  // Gemini TTS stays as a last-resort fallback if ElevenLabs is not
+  // configured at all on this deployment.
   const providerOverride = (process.env.TTS_PROVIDER || '').toLowerCase();
-  const forceOpenAI      = providerOverride === 'openai';
   const forceGemini      = providerOverride === 'gemini';
   const forceElevenLabs  = providerOverride === 'elevenlabs' || providerOverride === '11labs';
-  let chosen; // 'openai' | 'gemini' | 'elevenlabs'
-  if (forceOpenAI && hasOpenAI) chosen = 'openai';
-  else if (forceGemini && hasGemini) chosen = 'gemini';
+  let chosen; // 'gemini' | 'elevenlabs'
+  if (forceGemini && hasGemini) chosen = 'gemini';
   else if (forceElevenLabs && hasElevenLabs) chosen = 'elevenlabs';
   else if (hasElevenLabs) chosen = 'elevenlabs';
-  else if (hasOpenAI) chosen = 'openai';
   else chosen = 'gemini';
   // Frontend may send a language hint (e.g. `navigator.language`). Trust any
   // well-formed ISO 639-1 code the client supplies; otherwise auto-detect
@@ -442,16 +400,6 @@ router.post('/', async (req, res) => {
     } catch (_) { /* best effort — fall back to library voice */ }
   }
   try {
-    if (chosen === 'openai') {
-      const mp3 = await synthesizeOpenAI(text, lang);
-      res.set({
-        'Content-Type': 'audio/mpeg',
-        'Content-Length': mp3.length,
-        'X-TTS-Provider': 'openai',
-        'X-TTS-Language': lang,
-      });
-      return res.send(mp3);
-    }
     if (chosen === 'elevenlabs') {
       const mp3 = await synthesizeElevenLabs(text, lang, clonedVoiceId);
       if (clonedVoiceId) {

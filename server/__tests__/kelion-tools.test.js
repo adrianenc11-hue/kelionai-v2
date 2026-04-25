@@ -1,20 +1,23 @@
 'use strict';
 
-// Unit tests for the provider-agnostic Kelion tool catalog and its two
+// Unit tests for the provider-agnostic Kelion tool catalog and its
 // shape adapters. Guards against drift between the Gemini Live and
-// OpenAI Realtime renderings when a new tool is added to KELION_TOOLS
+// Chat Completions renderings when a new tool is added to KELION_TOOLS
 // — both shapes must still emit the exact set of tool names and the
 // same required-argument contracts.
+//
+// Single-LLM cleanup (2026-04): the OpenAI Realtime renderer was
+// removed along with the OpenAI voice transport. Only Gemini and the
+// shared Chat Completions adapter remain.
 
 // Minimal env so `src/routes/realtime` loads without exploding on
 // config-required vars.
-process.env.OPENAI_API_KEY = process.env.OPENAI_API_KEY || 'test-openai';
 process.env.GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'test-gemini';
 
 const {
   KELION_TOOLS,
   buildKelionToolsGemini,
-  buildKelionToolsOpenAI,
+  buildKelionToolsChatCompletions,
 } = require('../src/routes/realtime');
 
 const EXPECTED_TOOL_NAMES = [
@@ -216,40 +219,41 @@ describe('buildKelionToolsGemini', () => {
   });
 });
 
-describe('buildKelionToolsOpenAI', () => {
-  const rendered = buildKelionToolsOpenAI();
+describe('buildKelionToolsChatCompletions', () => {
+  const rendered = buildKelionToolsChatCompletions();
 
-  test('returns a flat array of {type:"function", ...} entries', () => {
+  test('returns flat array of {type:"function", function: {...}} entries', () => {
     expect(Array.isArray(rendered)).toBe(true);
     expect(rendered).toHaveLength(EXPECTED_TOOL_NAMES.length);
     for (const t of rendered) {
       expect(t.type).toBe('function');
-      expect(typeof t.name).toBe('string');
-      expect(typeof t.description).toBe('string');
-      expect(t.parameters).toBeDefined();
+      expect(t.function).toBeDefined();
+      expect(typeof t.function.name).toBe('string');
+      expect(typeof t.function.description).toBe('string');
+      expect(t.function.parameters).toBeDefined();
     }
   });
 
   test('types are lowercase (JSON-Schema convention)', () => {
     for (const t of rendered) {
-      expect(t.parameters.type).toBe('object');
-      for (const [, prop] of Object.entries(t.parameters.properties)) {
+      expect(t.function.parameters.type).toBe('object');
+      for (const [, prop] of Object.entries(t.function.parameters.properties)) {
         expect(prop.type).toMatch(/^(string|integer|number|boolean|array|object)$/);
       }
     }
   });
 
-  test('observe_user_emotion keeps its enum intact in OpenAI shape', () => {
-    const fn = rendered.find((f) => f.name === 'observe_user_emotion');
-    expect(fn.parameters.properties.state.enum).toEqual([
+  test('observe_user_emotion keeps its enum intact in Chat Completions shape', () => {
+    const fn = rendered.find((f) => f.function.name === 'observe_user_emotion');
+    expect(fn.function.parameters.properties.state.enum).toEqual([
       'neutral','happy','sad','surprised','angry','tired','focused','confused','anxious',
     ]);
   });
 
   test('tool-name set matches the Gemini rendering exactly', () => {
-    const openaiNames = buildKelionToolsOpenAI().map((t) => t.name).sort();
+    const ccNames = buildKelionToolsChatCompletions().map((t) => t.function.name).sort();
     const geminiNames = buildKelionToolsGemini()[0].functionDeclarations
       .map((t) => t.name).sort();
-    expect(openaiNames).toEqual(geminiNames);
+    expect(ccNames).toEqual(geminiNames);
   });
 });

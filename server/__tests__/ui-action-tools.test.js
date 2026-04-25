@@ -1,6 +1,6 @@
 const {
   KELION_TOOLS,
-  buildKelionToolsOpenAI,
+  buildKelionToolsChatCompletions,
   buildKelionToolsGemini,
 } = require('../src/routes/realtime');
 
@@ -62,7 +62,7 @@ describe('PR #200 — UI action tools', () => {
   });
 
   test('OpenAI adapter surfaces both UI tools', () => {
-    const openaiTools = buildKelionToolsOpenAI();
+    const openaiTools = buildKelionToolsChatCompletions();
     const names = openaiTools.map((t) => t.name || t.function?.name).filter(Boolean);
     expect(names).toContain('ui_notify');
     expect(names).toContain('ui_navigate');

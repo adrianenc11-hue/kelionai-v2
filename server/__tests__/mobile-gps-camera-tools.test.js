@@ -1,4 +1,4 @@
-const { KELION_TOOLS, buildKelionToolsOpenAI, buildKelionToolsGemini } = require('../src/routes/realtime')
+const { KELION_TOOLS, buildKelionToolsChatCompletions, buildKelionToolsGemini } = require('../src/routes/realtime')
 
 describe('PR #139 — mobile GPS + camera voice tools', () => {
   test('KELION_TOOLS includes get_my_location with include_address', () => {
@@ -25,7 +25,7 @@ describe('PR #139 — mobile GPS + camera voice tools', () => {
   })
 
   test('OpenAI adapter surfaces both new tools in the function catalog', () => {
-    const openaiTools = buildKelionToolsOpenAI()
+    const openaiTools = buildKelionToolsChatCompletions()
     const names = openaiTools.map((t) => t.name || t.function?.name).filter(Boolean)
     expect(names).toContain('get_my_location')
     expect(names).toContain('switch_camera')

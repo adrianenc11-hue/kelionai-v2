@@ -39,24 +39,25 @@ function languageNameForTag(short) {
   if (!short) return null;
   return LANG_NAME_BY_TAG[short] || short.toUpperCase();
 }
-// Resolve the LOCKED language for a voice session. Priority:
-//   1. The signed-in user's stored `preferred_language` (set on first login
-//      from Accept-Language and overridable via PUT /auth/me/language).
-//   2. The browser locale forwarded as `?lang=` (already normalized into
-//      `forcedLang` upstream — e.g. "ro-RO").
+// Resolve the LOCKED language for a voice session. Priority — current
+// browser ALWAYS wins (mirrors the text path in chat.js):
+//   1. Browser locale from `?lang=` (already normalized into `forcedLang`
+//      upstream — e.g. "ro-RO").
+//   2. The signed-in user's stored `preferred_language` — fallback when
+//      the client did not send a locale.
 //   3. Accept-Language header on the request.
 //   4. "en" — explicit final fallback.
-// For signed-in users with no stored preference yet but a valid browser
-// locale, we seed `preferred_language` so other sessions / devices stay
-// in sync. We never silently overwrite an existing stored preference.
+// For signed-in users we keep `preferred_language` in sync with the active
+// browser: if it differs from what's stored, overwrite. This is what
+// finally unsticks the case where Google sign-in stamped 'en' at first
+// login but the user's actual browser is ro-RO ever since.
 async function resolveLockedLangTag({ req, user, forcedLang }) {
-  let tag = null;
-  if (user && (Number.isFinite(user.id) || typeof user.id === 'string')) {
+  const browserTag = normalizeLocaleTag(forcedLang);
+  let tag = browserTag;
+  if (!tag && user && (Number.isFinite(user.id) || typeof user.id === 'string')) {
     try { tag = await getPreferredLanguage(user.id); }
     catch (err) { console.warn('[realtime] read preferred_language failed', err && err.message); }
   }
-  const browserTag = normalizeLocaleTag(forcedLang);
-  if (!tag) tag = browserTag;
   if (!tag) {
     const accept = req && req.headers && req.headers['accept-language'];
     if (accept && typeof accept === 'string') {
@@ -71,12 +72,12 @@ async function resolveLockedLangTag({ req, user, forcedLang }) {
   ) {
     try {
       const stored = await getPreferredLanguage(user.id);
-      if (!stored) {
+      if (stored !== tag) {
         const langName = LANG_NAME_BY_TAG[tag] || tag.toUpperCase();
         await setPreferredLanguage(user.id, tag, `Preferred language: ${langName}.`);
       }
     } catch (err) {
-      console.warn('[realtime] seed preferred_language failed', err && err.message);
+      console.warn('[realtime] sync preferred_language failed', err && err.message);
     }
   }
   return tag;
@@ -1103,22 +1104,6 @@ function buildKelionToolsGemini() {
   }];
 }
 
-// OpenAI Realtime GA — flat array of `{ type: 'function', name, description,
-// parameters }` entries. JSON-Schema with lowercase types per OpenAI docs:
-//   https://platform.openai.com/docs/guides/realtime-conversations#function-calling
-function buildKelionToolsOpenAI() {
-  return KELION_TOOLS.map(t => ({
-    type: 'function',
-    name: t.name,
-    description: t.description,
-    parameters: {
-      type: 'object',
-      properties: t.properties,
-      required: t.required,
-    },
-  }));
-}
-
 // OpenAI Chat Completions — historically used on /api/chat. Same JSON-Schema,
 // but wrapped as `{ type: 'function', function: { name, description, parameters } }`.
 // Exported so the text-chat route pulls the catalog from one source of truth
@@ -1139,45 +1124,9 @@ function buildKelionToolsChatCompletions() {
 }
 
 // ──────────────────────────────────────────────────────────────────
-// OpenAI Realtime (legacy, kept for compat)
+// OpenAI Realtime endpoint REMOVED in single-LLM cleanup (2026-04).
+// The chat surface (text + voice) runs exclusively on Gemini.
 // ──────────────────────────────────────────────────────────────────
-router.get('/token', async (req, res) => {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    return res.status(503).json({ error: 'OPENAI_API_KEY not configured' });
-  }
-
-  try {
-    const voice = process.env.OPENAI_VOICE_KELION || 'ash';
-    const r = await fetch('https://api.openai.com/v1/realtime/sessions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: process.env.OPENAI_REALTIME_MODEL || 'gpt-4o-realtime-preview',
-        voice,
-      }),
-    });
-
-    if (!r.ok) {
-      const err = await r.text();
-      console.error('[realtime] OpenAI session error:', err);
-      return res.status(500).json({ error: 'Failed to create realtime session' });
-    }
-
-    const data = await r.json();
-    res.json({
-      token:     data.client_secret.value,
-      expiresAt: data.client_secret.expires_at,
-      voice,
-    });
-  } catch (err) {
-    console.error('[realtime] Error:', err.message);
-    res.status(500).json({ error: 'Failed to create realtime session' });
-  }
-});
 
 // ──────────────────────────────────────────────────────────────────
 // Gemini Live — ephemeral token with Kelion config BAKED IN.
@@ -1573,265 +1522,26 @@ const geminiTokenHandler = async (req, res) => {
 router.get('/gemini-token', geminiTokenHandler);
 router.post('/gemini-token', geminiTokenHandler);
 
-// ──────────────────────────────────────────────────────────────────
-// OpenAI Realtime (GA) — Plan C transport for Kelion voice chat.
-//
-// Why this exists:
-//   Gemini Live preview was unstable for long (>2-min) sessions and hit
-//   hard per-project quotas on our key (close code 1011 "You exceeded your
-//   current quota"). Google's GA Live id we tried (#112) was rejected with
-//   1008 "models/...-live-001 is not found for API version v1main", so the
-//   only Gemini Live model that connects is the preview itself. To remove
-//   the Google-side dependency for voice we added OpenAI's GA Realtime API
-//   as a second provider the client can choose.
-//
-// Protocol: https://platform.openai.com/docs/guides/realtime-websocket
-// Ephemeral token endpoint (GA):
-//   POST https://api.openai.com/v1/realtime/client_secrets
-// Client WebSocket URL:
-//   wss://api.openai.com/v1/realtime?model=<model>
-// First client frame: `session.update` with the full Kelion persona,
-// tool catalog, and audio config. We stamp the persona and tools here
-// server-side so the browser bundle can't tamper with either.
-//
-// Gating matches /gemini-token: guest trial window, credits check for
-// signed-in non-admin, admin unlimited. Keeping two endpoints behind one
-// gate lets the client pick either provider without a second round-trip.
-const openaiLiveTokenHandler = async (req, res) => {
-  const priorTurns = Array.isArray(req.body?.priorTurns) ? req.body.priorTurns : [];
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    return res.status(503).json({ error: 'OPENAI_API_KEY not configured' });
-  }
-
-  const adminUser = await peekSignedInUser(req);
-  const isAdmin   = await isAdminUser(adminUser);
-
-  // Mirror the gating block from /gemini-token. Kept inline rather than
-  // extracted to a helper so this PR is a pure addition with zero risk to
-  // the already-shipping gemini path.
-  const isGuest = !adminUser;
-  let trial = null;
-  if (isGuest && !isAdmin) {
-    const ip = ipGeo.clientIp(req) || req.ip || '';
-    const status = trialStatus(ip);
-    if (!status.allowed) {
-      const isLifetime = status.reason === 'lifetime_expired';
-      return res.status(429).json({
-        error: isLifetime
-          ? 'Your 7-day free trial has ended. Please create an account and buy credits to keep talking to Kelion.'
-          : 'Free trial for today is used up. Come back tomorrow or sign in to continue.',
-        trial: {
-          allowed: false,
-          reason:  status.reason || 'window_expired',
-          remainingMs: 0,
-          ...(status.nextWindowMs != null ? { nextWindowMs: status.nextWindowMs } : {}),
-        },
-      });
-    }
-    stampTrialIfFresh(ip, status);
-    trial = {
-      allowed:     true,
-      remainingMs: status.remainingMs,
-      windowMs:    TRIAL_WINDOW_MS,
-    };
-  } else if (adminUser && !isAdmin) {
-    // Mirror /gemini-token: non-admin with stale-UUID JWT → 401 re-auth,
-    // otherwise check credits balance.
-    if (adminUser.id == null) {
-      res.clearCookie('kelion.token', { path: '/' });
-      return res.status(401).json({
-        error: 'Session expired. Please sign in again to continue.',
-        action: 'reauth',
-      });
-    }
-    try {
-      const balance = await getCreditsBalance(adminUser.id);
-      if (!Number.isFinite(balance) || balance <= 0) {
-        return res.status(402).json({
-          error: 'No credits left. Buy a package to keep talking to Kelion.',
-          balance_minutes: 0,
-          action: 'buy_credits',
-        });
-      }
-    } catch (err) {
-      console.warn('[realtime] credits-balance lookup failed', err && err.message);
-    }
-  }
-
-  try {
-    // Voice: OpenAI GA Realtime voices include `marin`, `cedar`, `alloy`,
-    // `ash`, `ballad`, `coral`, `echo`, `sage`, `shimmer`, `verse`.
-    // We default to `ash` because it is also available in the standalone
-    // OpenAI TTS endpoint (`gpt-4o-mini-tts`) — `cedar` / `marin` are
-    // Realtime-only, which made text-chat TTS render in `onyx` while voice
-    // chat rendered in `cedar` (two audibly different people). Picking a
-    // voice that exists in BOTH Realtime and TTS is the only way to give
-    // Kelion a single timbre across every transport. Operators can
-    // override via OPENAI_REALTIME_LIVE_VOICE.
-    const voice = process.env.OPENAI_REALTIME_LIVE_VOICE || 'ash';
-    // Model: `gpt-realtime` is the GA speech-to-speech model (August 2025
-    // release). The previous `gpt-4o-realtime-preview` is kept only for
-    // the legacy /token endpoint. Override via OPENAI_REALTIME_LIVE_MODEL.
-    const model = process.env.OPENAI_REALTIME_LIVE_MODEL || 'gpt-realtime';
-
-    // Per-user context: memory, geo, voice style, language. Same semantics
-    // as /gemini-token so the user gets identical behavior no matter which
-    // provider the client picks.
-    const user = adminUser;
-    let memoryItems = [];
-    if (user && (Number.isFinite(user.id) || typeof user.id === 'string')) {
-      try { memoryItems = await listMemoryItems(user.id, 60); }
-      catch (err) { console.warn('[realtime] memory load failed', err.message); }
-    }
-    const browserLang = (req.query.lang || 'en-US').toString().slice(0, 16);
-    const forcedLang  = (process.env.KELION_FORCE_LANG || browserLang).toString().slice(0, 16);
-    const styleFromCookie = req.cookies?.['kelion.voice_style'];
-    const styleFromQuery  = (req.query.style || '').toString();
-    const voiceStyle = resolveVoiceStyle(styleFromCookie || styleFromQuery);
-    const ipGeoData = await ipGeo.lookup(ipGeo.clientIp(req));
-    const clientLat = Number.parseFloat(req.query.lat);
-    const clientLon = Number.parseFloat(req.query.lon);
-    const clientAcc = Number.parseFloat(req.query.acc);
-    const geo = (Number.isFinite(clientLat) && Number.isFinite(clientLon))
-      ? {
-          ...(ipGeoData || {}),
-          latitude:  clientLat,
-          longitude: clientLon,
-          accuracy:  Number.isFinite(clientAcc) ? clientAcc : null,
-          source:    'client-gps',
-        }
-      : ipGeoData;
-
-    const lockedLangTag = await resolveLockedLangTag({ req, user, forcedLang });
-    const instructions = buildKelionPersona({ user, memoryItems, voiceStyle, geo, priorTurns, lockedLangTag });
-
-    // Mint a GA ephemeral client_secret. Safe to ship to the browser — it
-    // is scoped to one Realtime session and auto-expires.
-    // Docs: https://platform.openai.com/docs/api-reference/realtime-sessions/create-realtime-client-secret
-    const sessionConfig = {
-      session: {
-        type:  'realtime',
-        model,
-        audio: {
-          output: { voice },
-        },
-      },
-    };
-
-    const r = await fetch('https://api.openai.com/v1/realtime/client_secrets', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type':  'application/json',
-      },
-      body: JSON.stringify(sessionConfig),
-    });
-
-    if (!r.ok) {
-      const err = await r.text();
-      console.error(
-        '[realtime] OpenAI ephemeral client_secret error:',
-        'status=' + r.status,
-        'model=' + model,
-        'voice=' + voice,
-        'body=' + err.slice(0, 2000),
-      );
-      return res.status(500).json({ error: 'Failed to create OpenAI live session' });
-    }
-
-    const data = await r.json();
-    // GA response shape is `{ value, expires_at, session }`. The beta was
-    // `{ client_secret: { value, expires_at } }`. We only rely on value
-    // here so both work, but we read from the GA-preferred shape first.
-    const tokenValue = data.value || data.client_secret?.value;
-    const expiresAt  = data.expires_at || data.client_secret?.expires_at || null;
-    if (!tokenValue) {
-      console.error('[realtime] OpenAI response missing ephemeral value:', JSON.stringify(data).slice(0, 500));
-      return res.status(500).json({ error: 'Failed to create OpenAI live session' });
-    }
-
-    // First frame the client should send on WS open. We ship the full
-    // persona + tools here (not in client_secrets) so we can re-render
-    // the persona per request (user memory, GPS, local time, voice style)
-    // without invalidating caches on OpenAI's side.
-    const firstFrame = {
-      type: 'session.update',
-      session: {
-        type:  'realtime',
-        model,
-        instructions,
-        audio: {
-          input: {
-            format: { type: 'audio/pcm', rate: 24000 },
-            turn_detection: {
-              type: 'server_vad',
-              create_response:     true,
-              interrupt_response:  true,
-            },
-            transcription: { model: 'whisper-1', language: forcedLang.split('-')[0] || 'en' },
-          },
-          output: {
-            voice,
-            format: { type: 'audio/pcm', rate: 24000 },
-          },
-        },
-        tools:       buildKelionToolsOpenAI(),
-        tool_choice: 'auto',
-      },
-    };
-
-    res.json({
-      token:       tokenValue,
-      expiresAt,
-      model,
-      voice,
-      provider:    'openai',
-      wsUrl:       `wss://api.openai.com/v1/realtime?model=${encodeURIComponent(model)}`,
-      signedIn:    !!user,
-      userName:    user?.name || null,
-      memoryCount: memoryItems.length,
-      voiceStyle:  voiceStyle.label,
-      setup:       firstFrame,
-      trial,
-    });
-  } catch (err) {
-    console.error('[realtime] OpenAI error:', err.message);
-    res.status(500).json({ error: 'Failed to create OpenAI live session' });
-  }
-};
-router.get('/openai-live-token', openaiLiveTokenHandler);
-router.post('/openai-live-token', openaiLiveTokenHandler);
 
 // ──────────────────────────────────────────────────────────────────
-// On-demand vision analysis — Gemini Vision as a side-car to OpenAI.
+// On-demand vision analysis — Gemini Vision as a side-car.
 //
-// The voice transport (OpenAI Realtime GA) does not accept live video.
-// When the user says "what do you see?" during an OpenAI voice session,
+// When the user says "what do you see?" during a voice session,
 // the model invokes the `what_do_you_see` tool (declared in KELION_TOOLS
 // above). The client handler in src/lib/kelionTools.js grabs the most
 // recent camera frame from the in-memory ring buffer and POSTs it here
 // as a base64 data URL. We forward the image to Gemini 2.5 Flash (cheap,
 // fast, good vision) with a short prompt and return the plain-text
-// description so the client can fold it back into OpenAI as a
-// function_call_output — OpenAI then vocalises a natural reply.
+// description so the client can fold it back as a function_call_output —
+// the LLM then vocalises a natural reply.
 //
-// Why not OpenAI Vision? OpenAI's GA Realtime function-calling loop can
-// accept an image via `conversation.item.create` of type `input_image`,
-// but that requires a separate non-Realtime /chat/completions hop for
-// an actual description (the Realtime model will refuse to describe
-// images it was just handed without a tool roundtrip). Routing the
-// vision call through Gemini keeps the image pipeline on the provider
-// that has a mature vision endpoint — OpenAI handles the voice, Gemini
-// handles the eyes. Matches Adrian's architectural intent:
-//   "livreaza ce am cerut ... voce + Gemini pe imagini, nu crapa".
 router.post('/vision', async (req, res) => {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return res.status(503).json({ error: 'Gemini vision not configured' });
   }
 
-  // Reuse the same gate as /openai-live-token so guests can't spam the
+  // Reuse the same gate as /gemini-token so guests can't spam the
   // vision endpoint outside a voice session. Signed-in non-admins need
   // a credits balance; admin is unlimited; guests fall under the shared
   // 15-min/day IP trial window.
@@ -1953,7 +1663,6 @@ module.exports.resolveVoiceStyle = resolveVoiceStyle;
 // transport so it can render the same tool catalog without re-declaring.
 module.exports.KELION_TOOLS                    = KELION_TOOLS;
 module.exports.buildKelionToolsGemini          = buildKelionToolsGemini;
-module.exports.buildKelionToolsOpenAI          = buildKelionToolsOpenAI;
 module.exports.buildKelionToolsChatCompletions = buildKelionToolsChatCompletions;
 module.exports.buildKelionPersona              = buildKelionPersona;
 // Audit M9 — exported so chat.js renders memory with the same
