@@ -8,6 +8,7 @@
 
 import { setEmotion } from './emotionStore'
 import { handleShowOnMonitor, showImageOnMonitor } from './monitorStore'
+import { openEmailComposer } from './composerStore'
 import { getLatestCameraFrame } from './cameraFrameBuffer'
 import { setNarrationMode } from './narrationMode'
 import {
@@ -277,6 +278,25 @@ export async function runTool(name, args) {
         query: args?.query,
         title: args?.title,
       })
+    }
+    case 'compose_email_draft': {
+      // Local-only: open the in-app email composer modal pre-populated
+      // with the model's draft. The user reviews / edits / sends — nothing
+      // is delivered without an explicit click. Adrian: "sa deschida
+      // cimpurile de mail, sa poata fi setate".
+      openEmailComposer({
+        to: args?.to,
+        cc: args?.cc,
+        bcc: args?.bcc,
+        subject: args?.subject,
+        body: args?.body,
+        reply_to: args?.reply_to,
+      })
+      // Compact ack so the voice model can confirm to the user without
+      // narrating tool details ("Drafted — review the fields and hit Send
+      // when you're ready"). Kelion's persona forbids enumerating these
+      // fields back; the modal IS the visible state.
+      return 'ok:composer:email_opened'
     }
     case 'generate_image': {
       // F11 — OpenAI gpt-image-1. The server generates the PNG, caches it

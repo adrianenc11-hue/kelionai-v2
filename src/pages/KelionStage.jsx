@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import * as THREE from 'three'
 import { useLipSync, useAudioElementLipSync } from '../lib/lipSync'
 import { subscribeMonitor, handleShowOnMonitor, setMonitorGeoProvider, EXTERNAL_ONLY_HOSTS } from '../lib/monitorStore'
+import { subscribeComposer, getComposer, openEmailComposer, closeComposer } from '../lib/composerStore'
 import { setClientGeoProvider } from '../lib/clientGeoProvider'
 import { setUIActionController } from '../lib/uiActionStore'
 import UIActionToast from '../components/UIActionToast'
@@ -20,6 +21,7 @@ import { TUNING, isTuningEnabled } from '../lib/tuning'
 import TuningPanel from '../components/TuningPanel'
 import SignInModal from '../components/SignInModal'
 import VoiceCloneModal from '../components/VoiceCloneModal'
+import EmailComposerModal from '../components/EmailComposerModal'
 import { getCsrfToken } from '../lib/api'
 import {
   supportsPasskey,
@@ -2096,6 +2098,13 @@ export default function KelionStage() {
               try { handleShowOnMonitor(obj.arguments) } catch (e) {
                 console.warn('[chat] show_on_monitor failed', e && e.message)
               }
+            } else if (obj.tool === 'compose_email_draft' && obj.arguments) {
+              // The model wants to draft an email. Open the in-app
+              // composer modal so the user can review / edit / send.
+              // Nothing is delivered without an explicit click on Send.
+              try { openEmailComposer(obj.arguments) } catch (e) {
+                console.warn('[chat] compose_email_draft failed', e && e.message)
+              }
             } else if (obj.error) {
               throw new Error(obj.error)
             }
@@ -3868,6 +3877,11 @@ export default function KelionStage() {
           ))}
         </div>
       )}
+
+      {/* In-app email composer — opened by the compose_email_draft tool.
+          The user reviews / edits / sends; nothing is delivered without
+          an explicit click on Send (which routes through send_email). */}
+      <EmailComposerModal authToken={authTokenRef.current} />
 
       {/* Full sign-in modal — triggered by the top-bar Sign in button.
           Email+password primary, Google SSO, passkey as 1-tap. */}
