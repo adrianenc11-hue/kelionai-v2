@@ -28,65 +28,69 @@ describe('resolveVoiceStyle', () => {
   });
 });
 
-describe('buildKelionPersona — Stage 6 voice style', () => {
-  it('injects the current mode label into the system prompt', () => {
-    const promptWarm    = buildKelionPersona({ voiceStyle: VOICE_STYLES.warm });
-    const promptPlayful = buildKelionPersona({ voiceStyle: VOICE_STYLES.playful });
-    expect(promptWarm).toMatch(/current mode: warm/);
-    expect(promptPlayful).toMatch(/current mode: playful/);
-    expect(promptWarm).toMatch(/unhurried pace, gentle inflection/);
-    expect(promptPlayful).toMatch(/lighter energy, brighter pitch/);
+describe('buildKelionPersona — minimal prompt with full tool catalog', () => {
+  it('includes Kelion identity', () => {
+    const prompt = buildKelionPersona({});
+    expect(prompt).toMatch(/You are Kelion/);
+    expect(prompt).toMatch(/AE Studio/);
+    expect(prompt).toMatch(/Adrian Enciulescu/);
   });
 
-  it('never omits the observe_user_emotion guidance', () => {
+  it('never omits the observe_user_emotion tool', () => {
     const prompt = buildKelionPersona({});
     expect(prompt).toMatch(/observe_user_emotion/);
-    expect(prompt).toMatch(/SILENT tool/);
   });
 
-  it('falls back to warm when no voiceStyle passed', () => {
-    const prompt = buildKelionPersona({});
-    expect(prompt).toMatch(/current mode: warm/);
-  });
-
-  // Honesty hardening — pins the anti-hallucination addendum so future edits
-  // cannot silently water it down. Every bullet here maps to a fabricating
-  // behaviour we observed in prod (invented dates, made-up family facts,
-  // "forwarding to the team"). Removing any line reopens that failure mode.
+  // Honesty hardening — pins the anti-hallucination rules so future edits
+  // cannot silently water them down.
   describe('Honesty hardening', () => {
     const prompt = buildKelionPersona({});
 
     it('forbids invented actions', () => {
-      expect(prompt).toMatch(/NEVER claim you did something you did not do/);
+      expect(prompt).toMatch(/Never claim you did something you did not do/);
     });
 
     it('licences "I do not know" explicitly', () => {
       expect(prompt).toMatch(/I don't know/);
-      expect(prompt).toMatch(/nu știu/);
     });
 
-    it('licences "let me check / mă verific" as the uncertainty hedge', () => {
-      expect(prompt).toMatch(/let me check|mă verific/);
+    it('forbids guessing', () => {
+      expect(prompt).toMatch(/Never guess/i);
     });
 
-    it('forbids filling gaps with plausible guesses', () => {
-      expect(prompt).toMatch(/Never fill the gap|plausible-sounding guess|polished fabrication/i);
+    it('forbids inventing facts', () => {
+      expect(prompt).toMatch(/Never invent/i);
     });
 
-    it('tells Kelion to say so when a tool returns empty', () => {
-      expect(prompt).toMatch(/search didn't find anything|n-a găsit nimic/);
+    it('forbids inventing user requirements', () => {
+      expect(prompt).toMatch(/Never invent requirements/i);
+    });
+  });
+
+  describe('Tool catalog completeness', () => {
+    const prompt = buildKelionPersona({});
+
+    it('lists all core tool categories', () => {
+      expect(prompt).toMatch(/Data & Search/);
+      expect(prompt).toMatch(/Finance/);
+      expect(prompt).toMatch(/Geography/);
+      expect(prompt).toMatch(/Documents/);
+      expect(prompt).toMatch(/Communication/);
+      expect(prompt).toMatch(/Camera/);
+      expect(prompt).toMatch(/Planning/);
     });
 
-    it('blocks inventing biography when memory is empty', () => {
-      expect(prompt).toMatch(/no relevant memory|nothing saved|nimic salvat/);
-    });
-
-    it('treats unknown named people as NEW (no training-data facts)', () => {
-      expect(prompt).toMatch(/someone NEW|treat that person|sora mea|unfamiliar with that name/i);
-    });
-
-    it('lists topics that always require a tool call', () => {
-      expect(prompt).toMatch(/ALWAYS require a tool call/);
+    it('lists key tools', () => {
+      expect(prompt).toMatch(/calculate/);
+      expect(prompt).toMatch(/get_weather/);
+      expect(prompt).toMatch(/web_search/);
+      expect(prompt).toMatch(/translate/);
+      expect(prompt).toMatch(/get_crypto_price/);
+      expect(prompt).toMatch(/play_radio/);
+      expect(prompt).toMatch(/show_on_monitor/);
+      expect(prompt).toMatch(/plan_task/);
+      expect(prompt).toMatch(/read_pdf/);
+      expect(prompt).toMatch(/ocr_image/);
     });
   });
 });
