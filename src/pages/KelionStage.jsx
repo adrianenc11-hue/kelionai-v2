@@ -2071,6 +2071,49 @@ export default function KelionStage() {
       let buffer = ''
       let assistant = ''
       setChatMessages((m) => [...m, { role: 'assistant', content: '' }])
+
+      // Process one SSE chunk (`data: {json}` or `data: [DONE]`).
+      // Hoisted so the post-loop buffer flush can reuse it — without
+      // the flush, Adrian saw "Salut! Sunt aici. Ce pot face pentru"
+      // because the final SSE event was sitting in `buffer` when
+      // `done` arrived (proxy / stream boundaries don't always end
+      // exactly on `\n\n`), and we'd break out of the loop before
+      // ever parsing it.
+      const handleChunk = (chunk) => {
+        const line = chunk.replace(/^data:\s*/, '').trim()
+        if (!line || line === '[DONE]') return
+        try {
+          const obj = JSON.parse(line)
+          if (obj.content) {
+            assistant += obj.content
+            setChatMessages((m) => {
+              const copy = m.slice()
+              copy[copy.length - 1] = { role: 'assistant', content: assistant }
+              return copy
+            })
+          } else if (obj.tool === 'show_on_monitor' && obj.arguments) {
+            // Server streamed a tool-call frame — the model decided to
+            // open something on the monitor. Invoke the same handler
+            // the voice path uses; a natural-language confirmation
+            // ("Here's Cluj-Napoca on the monitor.") streams next.
+            try { handleShowOnMonitor(obj.arguments) } catch (e) {
+              console.warn('[chat] show_on_monitor failed', e && e.message)
+            }
+          } else if (obj.tool === 'compose_email_draft' && obj.arguments) {
+            // The model wants to draft an email. Open the in-app
+            // composer modal so the user can review / edit / send.
+            // Nothing is delivered without an explicit click on Send.
+            try { openEmailComposer(obj.arguments) } catch (e) {
+              console.warn('[chat] compose_email_draft failed', e && e.message)
+            }
+          } else if (obj.error) {
+            throw new Error(obj.error)
+          }
+        } catch (err) {
+          if (err.message && err.message !== 'Unexpected end of JSON input') throw err
+        }
+      }
+
       // eslint-disable-next-line no-constant-condition
       while (true) {
         const { value, done } = await reader.read()
@@ -2078,41 +2121,16 @@ export default function KelionStage() {
         buffer += decoder.decode(value, { stream: true })
         const chunks = buffer.split('\n\n')
         buffer = chunks.pop() || ''
-        for (const chunk of chunks) {
-          const line = chunk.replace(/^data:\s*/, '').trim()
-          if (!line || line === '[DONE]') continue
-          try {
-            const obj = JSON.parse(line)
-            if (obj.content) {
-              assistant += obj.content
-              setChatMessages((m) => {
-                const copy = m.slice()
-                copy[copy.length - 1] = { role: 'assistant', content: assistant }
-                return copy
-              })
-            } else if (obj.tool === 'show_on_monitor' && obj.arguments) {
-              // Server streamed a tool-call frame — the model decided to
-              // open something on the monitor. Invoke the same handler
-              // the voice path uses; a natural-language confirmation
-              // ("Here's Cluj-Napoca on the monitor.") streams next.
-              try { handleShowOnMonitor(obj.arguments) } catch (e) {
-                console.warn('[chat] show_on_monitor failed', e && e.message)
-              }
-            } else if (obj.tool === 'compose_email_draft' && obj.arguments) {
-              // The model wants to draft an email. Open the in-app
-              // composer modal so the user can review / edit / send.
-              // Nothing is delivered without an explicit click on Send.
-              try { openEmailComposer(obj.arguments) } catch (e) {
-                console.warn('[chat] compose_email_draft failed', e && e.message)
-              }
-            } else if (obj.error) {
-              throw new Error(obj.error)
-            }
-          } catch (err) {
-            if (err.message && err.message !== 'Unexpected end of JSON input') throw err
-          }
-        }
+        for (const chunk of chunks) handleChunk(chunk)
       }
+      // Flush trailing decoder bytes + any buffered SSE event that
+      // didn't end in `\n\n` before the stream closed. Without this,
+      // the last token (e.g. "tine?") of the model's reply was lost
+      // whenever the proxy / TCP boundary fell inside the final
+      // event. A trailing `\n` (vs `\n\n`) is enough to cause it.
+      buffer += decoder.decode()
+      const tailChunks = buffer.split('\n\n')
+      for (const chunk of tailChunks) handleChunk(chunk)
     } catch (err) {
       setChatError(err.message || 'Chat failed')
       // Drop the empty assistant placeholder if we never got content.
@@ -2288,6 +2306,34 @@ export default function KelionStage() {
     ttsMouthOpen || 0,
     ttsCosineMouth || 0,
   )
+
+  // Track whether the half-page MonitorOverlay is currently rendered,
+  // so the bottom UI (chat input bar, voice "tap to talk" pill, chat
+  // bubbles, status pill) can shift to the right half on desktop and
+  // float on top of the overlay instead of being half-hidden behind it.
+  // Adrian (2026-04-25) screenshot showed the map covering the bottom
+  // composer: "promtul de scris si vorbut sunt acoperite de pagina".
+  const [monitorOpen, setMonitorOpen] = useState(false)
+  const [stageNarrow, setStageNarrow] = useState(() => (
+    typeof window !== 'undefined' && window.innerWidth < 640
+  ))
+  useEffect(() => subscribeMonitor((s) => setMonitorOpen(!!s.src)), [])
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+    const onResize = () => setStageNarrow(window.innerWidth < 640)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+  // Desktop only: when the overlay covers the left 50vw, anchor the
+  // composer to the center of the right half so the user always has
+  // a clear typing/tapping target. On mobile the overlay is a top
+  // sheet so leaving the composer at viewport-center is correct.
+  const overlayShiftsBottom = monitorOpen && !stageNarrow
+  const bottomLeft = overlayShiftsBottom ? '75%' : '50%'
+  // z-index sits above MonitorOverlay (zIndex 40) so a transparent
+  // shift fallback still keeps the composer clickable in case a
+  // future change widens the overlay past 50vw.
+  const bottomZIndex = overlayShiftsBottom ? 50 : undefined
 
   // Chat bubble auto-hide — Adrian: "chatul trebuie sa dispara dupa ce s-a
   // spus ramine doar in istoric, se afiseaza doar curent ce scrie user sau
@@ -3096,8 +3142,8 @@ export default function KelionStage() {
             style={{
               position: 'absolute',
               bottom: 'calc(max(32px, env(safe-area-inset-bottom)) + 110px)',
-              left: '50%', transform: 'translateX(-50%)',
-              width: 'min(680px, 92vw)',
+              left: bottomLeft, transform: 'translateX(-50%)',
+              width: overlayShiftsBottom ? 'min(420px, 44vw)' : 'min(680px, 92vw)',
               maxHeight: '42vh', overflowY: 'auto',
               display: 'flex', flexDirection: 'column', gap: 8,
               padding: 14,
@@ -3109,6 +3155,7 @@ export default function KelionStage() {
               fontSize: 14, lineHeight: 1.45,
               fontFamily: 'system-ui, -apple-system, sans-serif',
               boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+              zIndex: bottomZIndex,
             }}
           >
             {userTurn && (
@@ -3118,6 +3165,8 @@ export default function KelionStage() {
                 background: 'rgba(124, 58, 237, 0.25)',
                 border: '1px solid rgba(167, 139, 250, 0.3)',
                 fontSize: 13,
+                wordBreak: 'break-word',
+                overflowWrap: 'anywhere',
               }}>{userTurn.content}</div>
             )}
             {last.role === 'assistant' && (
@@ -3127,6 +3176,8 @@ export default function KelionStage() {
                 background: 'rgba(167, 139, 250, 0.08)',
                 border: '1px solid rgba(167, 139, 250, 0.18)',
                 whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+                overflowWrap: 'anywhere',
               }}>
                 {last.content || (chatBusy ? 'Kelion is thinking…' : '')}
               </div>
@@ -3161,8 +3212,8 @@ export default function KelionStage() {
             style={{
               position: 'absolute',
               bottom: 'calc(max(32px, env(safe-area-inset-bottom)) + 110px)',
-              left: '50%', transform: 'translateX(-50%)',
-              width: 'min(680px, 92vw)',
+              left: bottomLeft, transform: 'translateX(-50%)',
+              width: overlayShiftsBottom ? 'min(420px, 44vw)' : 'min(680px, 92vw)',
               maxHeight: '42vh', overflowY: 'auto',
               display: 'flex', flexDirection: 'column', gap: 8,
               padding: 14,
@@ -3174,7 +3225,7 @@ export default function KelionStage() {
               fontSize: 14, lineHeight: 1.45,
               fontFamily: 'system-ui, -apple-system, sans-serif',
               boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
-              zIndex: 4,
+              zIndex: bottomZIndex || 4,
             }}
           >
             {lastUser && lastUser.text && (
@@ -3184,6 +3235,8 @@ export default function KelionStage() {
                 background: 'rgba(124, 58, 237, 0.25)',
                 border: '1px solid rgba(167, 139, 250, 0.3)',
                 fontSize: 13,
+                wordBreak: 'break-word',
+                overflowWrap: 'anywhere',
               }}>{lastUser.text}</div>
             )}
             {lastAssistant && lastAssistant.text && (
@@ -3193,6 +3246,8 @@ export default function KelionStage() {
                 background: 'rgba(167, 139, 250, 0.08)',
                 border: '1px solid rgba(167, 139, 250, 0.18)',
                 whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+                overflowWrap: 'anywhere',
               }}>{lastAssistant.text}</div>
             )}
             {!lastAssistant && status === 'thinking' && (
@@ -3222,15 +3277,15 @@ export default function KelionStage() {
         style={{
           position: 'absolute',
           bottom: 'calc(max(32px, env(safe-area-inset-bottom)) + 54px)',
-          left: '50%', transform: 'translateX(-50%)',
-          width: 'min(420px, 92vw)',
+          left: bottomLeft, transform: 'translateX(-50%)',
+          width: overlayShiftsBottom ? 'min(420px, 44vw)' : 'min(420px, 92vw)',
           display: 'flex', alignItems: 'center', gap: 8,
           padding: '6px 8px 6px 14px',
           borderRadius: 999,
           background: 'rgba(10, 8, 20, 0.72)',
           backdropFilter: 'blur(14px)',
           border: '1px solid rgba(167, 139, 250, 0.25)',
-          zIndex: 5,
+          zIndex: bottomZIndex || 50,
         }}
       >
         {/* F2 — hidden native file picker driving the "+" button below.
@@ -3398,7 +3453,7 @@ export default function KelionStage() {
       {/* Status pill — bottom center */}
       <div style={{
         position: 'absolute', bottom: 'max(32px, env(safe-area-inset-bottom))',
-        left: '50%', transform: 'translateX(-50%)',
+        left: bottomLeft, transform: 'translateX(-50%)',
         display: 'flex', alignItems: 'center', gap: '10px',
         padding: '10px 22px',
         borderRadius: 999,
@@ -3409,6 +3464,7 @@ export default function KelionStage() {
         fontSize: 14, fontFamily: 'system-ui, -apple-system, sans-serif',
         letterSpacing: '0.02em',
         pointerEvents: 'none',
+        zIndex: bottomZIndex || 50,
       }}>
         <span style={{
           width: 8, height: 8, borderRadius: '50%',
