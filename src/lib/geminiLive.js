@@ -785,31 +785,6 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
       const node = new AudioWorkletNode(ctx, 'kelion-capture', { numberOfInputs: 1, numberOfOutputs: 0 })
       node.port.onmessage = (e) => {
         if (ws.readyState !== WebSocket.OPEN) return
-        // Echo-cancellation guard. While Kelion is actively speaking, we
-        // drop mic frames instead of forwarding them to Gemini.
-        //
-        // Why: getUserMedia opens the mic with `echoCancellation: true`,
-        // but the browser's AEC only attenuates speaker bleed when the
-        // playback path is one the AEC can sample as a reference signal.
-        // Our TTS playback runs through a SEPARATE AudioContext
-        // (`playbackCtxRef` @ 24 kHz) and lands on `ctx.destination`,
-        // which the AEC backing the mic stream cannot see. On phones —
-        // and on laptops with loud built-in speakers — Kelion's own
-        // voice bleeds back through the mic, the server VAD treats it
-        // as user input, transcribes the garbled echo as a "hello" in
-        // a random language, Kelion replies with another greeting in
-        // that perceived language, and we ricochet through 3-4
-        // languages of "Salut!"/"Hello!"/"Hola!" until something breaks
-        // the loop. Adrian 2026-04-25: "se repeta inceputul de mai
-        // multe ori, in mai multe limbi". Confirmed cause: echo, not
-        // model hallucination.
-        //
-        // Gating mic forwarding while `playbackPlayingRef.current` is
-        // true breaks the loop at the source — no echo can reach the
-        // server. Trade-off: barge-in (talking over Kelion) is
-        // disabled. We accept this for now; a level-threshold override
-        // for real user speech is a follow-up.
-        if (playbackPlayingRef.current) return
         const float = e.data
         const pcm16 = floatTo16BitPCM(float)
         const bytes = new Uint8Array(pcm16.buffer, pcm16.byteOffset, pcm16.byteLength)
