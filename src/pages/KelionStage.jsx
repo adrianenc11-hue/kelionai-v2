@@ -1,5 +1,6 @@
 import { Canvas } from '@react-three/fiber'
 import { useGLTF, Environment, ContactShadows, Float } from '@react-three/drei'
+import * as THREE from 'three'
 import { Suspense, useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useLipSync, useAudioElementLipSync } from '../lib/lipSync'
