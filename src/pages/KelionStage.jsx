@@ -1196,13 +1196,17 @@ export default function KelionStage() {
   // can read the current value without waiting for a React re-render.
   const ttsMouthOpenRef = useRef(0)
   useEffect(() => { ttsMouthOpenRef.current = ttsMouthOpen }, [ttsMouthOpen])
+  // statusRef lets the TTS effect (declared before useGeminiLive) read the
+  // current voice-session state without a TDZ — status is initialised later
+  // in the component body by useGeminiLive, so it cannot appear in a dep array
+  // of an effect that runs before that declaration.
+  const statusRef = useRef('idle')
   useEffect(() => {
     if (chatBusy) return
     // Do not run text-TTS while the realtime voice session is active.
-    // status is 'listening' | 'thinking' | 'speaking' | 'connecting' during
-    // a live voice session — firing ElevenLabs TTS at the same time is what
-    // causes the "two avatars speaking one after another" bug.
-    if (status === 'listening' || status === 'thinking' || status === 'speaking' || status === 'connecting') return
+    // Read via ref to avoid TDZ (status is declared after this effect).
+    const st = statusRef.current
+    if (st === 'listening' || st === 'thinking' || st === 'speaking' || st === 'connecting') return
     const last = chatMessages[chatMessages.length - 1]
     if (!last || last.role !== 'assistant' || !last.content) return
     if (last.content === lastSpokenRef.current) return
@@ -1324,7 +1328,7 @@ export default function KelionStage() {
       if (ttsAudioRef.current) { try { ttsAudioRef.current.pause() } catch (_) {} ttsAudioRef.current = null }
       stopDrive()
     }
-  }, [chatMessages, chatBusy, status, attachTtsLipSync, resetTtsLipSync])
+  }, [chatMessages, chatBusy, attachTtsLipSync, resetTtsLipSync])
 
   // Max of voice-chat lipsync, real-audio text-chat envelope, and cosine
   // fallback feeds the avatar. When the analyser is attached, ttsMouthOpen
@@ -1415,6 +1419,9 @@ export default function KelionStage() {
     // also ticks for text-chat-only guests who never touch the mic.
     trial: voiceTrial,
   } = liveHook
+  // Keep statusRef in sync so the TTS guard (declared before this line) can
+  // read the current voice-session state without a temporal dead zone.
+  statusRef.current = status
 
   // Unified trial HUD source of truth. Applies to both voice AND text
   // chat via the shared 15-min/day IP window on the server. Collapses
