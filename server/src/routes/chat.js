@@ -69,10 +69,14 @@ Silent tool use (HARD RULE — no exceptions):
 - Never paste raw tool output. Always paraphrase into a natural conversational reply.
 
 Silent vision (HARD RULE — no exceptions):
-- When the user enables the camera or attaches an image, you may receive a frame. DO NOT describe the frame, DO NOT enumerate objects, DO NOT write "I see…" / "văd…" / "I notice…" unless the user EXPLICITLY asks ("what do you see?", "ce vezi?", "describe this", "look at this", "uită-te la asta", or a direct question about something visible).
+- The user can give you visual input through TWO distinct channels. They are NOT interchangeable:
+  • [ATTACHED FILE] — the user explicitly uploaded an image / PDF / document and IS asking you to read, analyze, or act on it. Always answer about THIS content when they ask "what is this?", "ce vezi?", "analyze this", "rezumă", "tradu", etc.
+  • [CAMERA FRAME — ambient] — a passive snapshot of the room or the user's face, sent automatically while their webcam is on. Use it silently as context (mood, lighting, body language) — DO NOT describe it, DO NOT enumerate objects, DO NOT write "I see…" / "văd…" / "I notice…" unless the user EXPLICITLY asks about what's IN THE ROOM ("what do you see in the camera?", "ce vezi în cameră?", "uită-te în jur", "describe my room").
+- ATTACHMENT PRIORITY (HARD): when an [ATTACHED FILE] is present in the user's message, your answer MUST address the attached content. NEVER describe the camera/room when an attachment is present, even if the user says "what do you see?" — they mean the file, not the camera. Treat the camera as muted while an attachment is being discussed.
+- TASK EXECUTION: when the user gives you a task on attached content ("rezumă", "tradu acest text", "corectează gramatica", "scoate-mi datele relevante", "convertește în CSV", "explain this code") — execute the task on the attached content immediately. Do NOT ask "which one do you mean?", do NOT refuse, do NOT ask them to re-attach. The attachment is right there in the message — use it.
 - Treat the camera the way a polite human treats their own eyes: use the visual context silently to better answer the user's actual question. Do not report what you see back to them unprompted.
-- When the user IS asking about the scene, answer concretely — do not refuse, do not hedge, do not say "I can't see" if a frame is present.
-- If no frame is attached, never pretend to see anything.
+- When the user IS asking about an attachment OR explicitly about the camera scene, answer concretely — do not refuse, do not hedge, do not say "I can't see" if the corresponding input is present.
+- If no frame and no attachment are present, never pretend to see anything.
 
 Silent observation (learning):
 - While the camera is on, you may quietly form private observations about the user (their mood, what they appear to be working on, recurring objects, body language, time-of-day patterns). When such an observation is durable and useful for FUTURE conversations — not just the current turn — call learn_from_observation(observation, kind) silently. This persists the observation as a long-term memory item under the signed-in user with low confidence (≤ 0.6) so it can be overwritten later. NEVER mention the call. NEVER write "I'll remember that" / "noted" / "am salvat". Fire at most every ~30 seconds and only when confident.
@@ -92,7 +96,14 @@ const MAX_MESSAGE_LENGTH = 4000;
 const MAX_MESSAGES_COUNT = 40;
 
 router.post('/', async (req, res) => {
-  const { messages = [], avatar = 'kelion', frame, datetime, timezone, coords } = req.body;
+  const { messages = [], avatar = 'kelion', frame, frameKind, datetime, timezone, coords } = req.body;
+  // `frameKind` disambiguates the two visual channels:
+  //   - 'attachment' → user explicitly uploaded an image; describe / analyze
+  //     it freely.
+  //   - 'camera'     → passive webcam frame; silent-vision rules apply.
+  //   - undefined    → legacy clients; default to 'camera' (safer — keeps
+  //     the model from over-narrating).
+  const visionChannel = frameKind === 'attachment' ? 'attachment' : 'camera';
 
   if (!Array.isArray(messages)) {
     return res.status(400).json({ error: 'messages must be an array' });
@@ -232,15 +243,26 @@ router.post('/', async (req, res) => {
     .map(m => ({ role: m.role, content: typeof m.content === 'string' ? m.content.slice(0, MAX_MESSAGE_LENGTH) : '' }))
     .filter(m => m.content.length > 0);
 
-  // If a camera frame is provided, attach it to the last user message as a vision input
+  // If a frame is provided, attach it to the last user message as a vision
+  // input. We prepend an explicit channel label so the model can apply the
+  // right policy from the persona — describe attachments freely, stay
+  // silent on ambient camera frames. Without the label the two channels
+  // were indistinguishable to the model and it would describe whichever
+  // image was richer (typically the camera), even when the user had
+  // attached a separate file. See PR #213.
   if (frame && sanitized.length > 0) {
     const lastUserIdx = [...sanitized].map(m => m.role).lastIndexOf('user');
     if (lastUserIdx !== -1) {
+      const channelLabel = visionChannel === 'attachment'
+        ? '[ATTACHED FILE — image the user explicitly uploaded for you to analyze; answer about THIS]'
+        : '[CAMERA FRAME — ambient context; do NOT describe unless the user explicitly asked about the camera/room]';
+      const userText = sanitized[lastUserIdx].content;
       sanitized[lastUserIdx] = {
         role: 'user',
         content: [
+          { type: 'text', text: channelLabel },
           { type: 'image_url', image_url: { url: frame, detail: 'low' } },
-          { type: 'text', text: sanitized[lastUserIdx].content },
+          { type: 'text', text: userText },
         ],
       };
     }
