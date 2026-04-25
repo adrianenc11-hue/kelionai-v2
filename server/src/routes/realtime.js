@@ -139,7 +139,8 @@ Tools you can use (Stage 4):
 - browse_web(task) — send an autonomous web agent to perform a task in a real browser (open a page, fill a form, extract info). Use it when search alone is not enough.
 - read_calendar(range), read_email(query), search_files(query) — look into the user's connected accounts when they ask about their own stuff.
 - observe_user_emotion(state, intensity, cue) — SILENT tool. Call it whenever you read a clear emotional shift on the user's face (when the camera is on) or in their voice. Never narrate this call, never tell the user you are doing it. The client uses it to subtly adapt the avatar's expression and the halo color. Fire it at most once every 4-5 seconds and only when you are genuinely confident.
-- show_on_monitor(kind, query) — display something on the presentation monitor behind you in the scene. Use whenever the user asks to "show me", "open", or "display" a map, weather, a page, or a concept (in any language). Pick the right kind: "map" for geographic locations, "weather" for forecasts, "video" for YouTube clips, "image" for photos, "wiki" for Wikipedia, "web" for arbitrary HTTPS URLs, or "clear" to blank the monitor. query is the search term (e.g. "Cluj-Napoca", "New York weather", "https://en.wikipedia.org/wiki/Paris"). Narrate briefly while the monitor loads ("let me put that up"). Call it again with a new query to swap the content. Shortcut: when the user asks for "Linux", "a Linux shell", "a terminal", "deschide Linux", "arată-mi un terminal", or similar — call show_on_monitor with kind="web" and query="https://webvm.io" (Debian running in the browser via WebAssembly; no install needed).
+- show_on_monitor(kind, query, title?) — display something on the presentation monitor behind you in the scene. Use whenever the user asks to "show me", "open", "display", or "play" a map, weather, a page, a concept, or a live audio stream (in any language). Pick the right kind: "map" for geographic locations, "weather" for forecasts, "video" for YouTube clips, "image" for photos, "wiki" for Wikipedia, "web" for arbitrary HTTPS URLs, "audio" for a directly-playable audio stream URL (e.g. live radio), or "clear" to blank the monitor. Call it again with a new query to swap the content. Shortcut: when the user asks for "Linux", "a Linux shell", "a terminal", "deschide Linux", "arată-mi un terminal", or similar — call show_on_monitor with kind="web" and query="https://webvm.io" (Debian running in the browser via WebAssembly; no install needed).
+- play_radio(query?, country?, language?, tag?) — find and PLAY any live radio station, in any language, anywhere in the world. Use whenever the user says "porneste/pune un post de radio", "play a radio station", "metti la radio", "mets la radio", "put on BBC Radio 1", "lance NHK live", "pune Europa FM live", or any equivalent in any language. Returns a directly-playable HTTP(S) stream URL plus station metadata (name, country, codec). Then IMMEDIATELY call show_on_monitor with kind="audio", query=<the stream URL>, title=<the station name> so the audio actually starts playing in the user's browser. Never substitute a YouTube search for live radio — radio-browser.info exposes ~50,000 real stations with raw .mp3 / .aac / .m3u8 URLs that play in any browser.
 - calculate(expression) — DETERMINISTIC math. Whenever the user asks you to compute anything beyond a trivial one-digit sum — arithmetic, percentages, algebra — call this tool. Do not do mental math; it hallucinates on long numbers.
 - get_weather(city or lat/lon, days) — REAL weather + forecast from Open-Meteo. Whenever the user asks about weather, temperature, rain, wind, or a forecast — call this tool. Never invent the weather.
 - web_search(query, limit) — live web search with URLs and snippets. Whenever the user asks about anything time-sensitive (news, prices, events, who-is) — call this tool. Never invent a URL, price, or fact.
@@ -325,14 +326,15 @@ const KELION_TOOLS = [
   },
   {
     name: 'show_on_monitor',
-    description: "Display something on the big presentation monitor in the scene behind you. Use whenever the user asks (in any language) to see / open / show / display a map, the weather, a video, an image, a Wikipedia / reference page, or any web page. Pick the right `kind` — the client resolves it to the best embed URL. Call again with a new query to swap the content on screen.",
+    description: "Display something on the big presentation monitor in the scene behind you. Use whenever the user asks (in any language) to see / open / show / display a map, the weather, a video, an image, a Wikipedia / reference page, any web page, or to PLAY a live audio stream. Pick the right `kind` — the client resolves it to the best embed URL. Call again with a new query to swap the content on screen. For radio: first call play_radio to get the stream URL, then call show_on_monitor with kind='audio' query=<that URL> title=<station name> so the audio actually starts playing in the user's browser.",
     properties: {
       kind: {
         type: 'string',
-        enum: ['map', 'weather', 'video', 'image', 'wiki', 'web', 'clear'],
-        description: "Type of content: 'map' = Google Maps for a place; 'weather' = forecast for a city; 'video' = YouTube clip or search; 'image' = photo search; 'wiki' = Wikipedia article; 'web' = arbitrary URL (must start with https://); 'clear' = blank the monitor.",
+        enum: ['map', 'weather', 'video', 'image', 'wiki', 'web', 'audio', 'clear'],
+        description: "Type of content: 'map' = Google Maps for a place; 'weather' = forecast for a city; 'video' = YouTube clip or search; 'image' = photo search; 'wiki' = Wikipedia article; 'web' = arbitrary URL (must start with https://); 'audio' = live audio stream URL (radio, podcast feed, .mp3/.aac/.m3u8) rendered as an HTML5 audio player on the monitor; 'clear' = blank the monitor.",
       },
-      query: { type: 'string', description: "Search term or URL. Examples: 'Cluj-Napoca', 'New York', 'sunset mountains', 'Paris', 'https://en.wikipedia.org/wiki/Artificial_intelligence'. For a Linux shell / terminal, pass kind='web' with query='https://webvm.io' (a Debian-in-browser that works without install). Required unless kind='clear'." },
+      query: { type: 'string', description: "Search term, URL, or stream URL. Examples: 'Cluj-Napoca', 'New York', 'sunset mountains', 'Paris', 'https://en.wikipedia.org/wiki/Artificial_intelligence', 'https://stream.example.fm/radio.aac'. For audio: pass the directly-playable HTTP(S) stream URL returned by play_radio. For a Linux shell / terminal, pass kind='web' with query='https://webvm.io'. Required unless kind='clear'." },
+      title: { type: 'string', description: "Optional human-friendly label shown above the monitor. For audio playback, pass the station name (e.g. 'Radio ZU — Bucharest'). Otherwise omit and the monitor builds a title from the kind+query." },
     },
     required: ['kind'],
   },
@@ -456,6 +458,18 @@ const KELION_TOOLS = [
       expression: { type: 'string', description: "A mathjs-compatible expression. The engine supports +, -, *, /, ^, parentheses, sqrt, log, sin/cos/tan, percent (%), factorial (!), etc." },
     },
     required: ['expression'],
+  },
+  {
+    name: 'play_radio',
+    description: "Find and PLAY a live radio station, in any country, in any language. Use whenever the user says 'porneste/pune un post de radio', 'play a radio station', 'metti la radio', 'mets la radio', 'put on BBC Radio 1', 'lance NHK live', 'pune Europa FM live', or any equivalent. Returns a directly playable HTTP(S) audio stream URL plus station metadata. After getting the result, immediately call show_on_monitor with kind='audio' and src=<the stream URL> so the avatar's stage actually starts playing the audio. NEVER fall back to YouTube for live radio — radio-browser.info exposes ~50,000 real stations with raw .mp3 / .aac / .m3u8 URLs that play in any browser.",
+    properties: {
+      query:    { type: 'string',  description: "Station name or fuzzy query. Examples: 'BBC Radio 1', 'Europa FM', 'NHK', 'NPR', 'Radio ZU', 'jazz', 'classical Vienna'. Optional when country/language/tag are provided." },
+      country:  { type: 'string',  description: "Optional ISO country name in English ('Romania', 'France', 'Japan', 'United States'). Use when the user asks for radio FROM a specific country." },
+      language: { type: 'string',  description: "Optional spoken-language filter ('romanian', 'french', 'japanese', 'spanish'). Use when the user wants radio in a specific language regardless of country." },
+      tag:      { type: 'string',  description: "Optional genre/topic tag ('jazz', 'news', 'rock', 'classical', 'electronic', 'talk')." },
+      limit:    { type: 'integer', description: "How many candidate stations to return (1-5, default 1). The model usually only needs one." },
+    },
+    required: [],
   },
   {
     name: 'get_weather',

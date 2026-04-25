@@ -615,6 +615,7 @@ function MonitorOverlay() {
 
   const isImage = m.embedType === 'image'
   const isExternal = m.embedType === 'external'
+  const isAudio = m.embedType === 'audio'
   const externalCopy = isExternal ? externalCardCopy(m) : null
   const onClose = (e) => {
     e.stopPropagation()
@@ -713,6 +714,75 @@ function MonitorOverlay() {
             referrerPolicy="no-referrer"
             style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', background: '#0d0b1d' }}
           />
+        ) : isAudio ? (
+          // Faza A — live radio / streaming audio playback. Renders a
+          // dedicated card with an HTML5 <audio> element + station
+          // label. Browsers can play .mp3/.aac/.ogg/.opus natively;
+          // .m3u8 (HLS) is supported on Safari natively and on
+          // Chromium via the URL — for the long tail we let the
+          // <audio> element fail gracefully (the user can open the
+          // homepage from the link below). Autoplay policy: most
+          // browsers allow it once the user has interacted with the
+          // tab (which they did to ask for radio in the first place);
+          // we set `autoPlay` and rely on that gesture.
+          <div
+            style={{
+              width: '100%',
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 22,
+              padding: 24,
+              textAlign: 'center',
+              color: '#ede9fe',
+              background: 'radial-gradient(ellipse at center, #1a1230 0%, #0d0b1d 70%)',
+            }}
+          >
+            <div style={{ fontSize: 56, lineHeight: 1 }} aria-hidden>📻</div>
+            <div style={{
+              fontSize: 16,
+              fontWeight: 700,
+              color: '#c4b5fd',
+              maxWidth: 360,
+              wordBreak: 'break-word',
+            }}>
+              {m.title || 'Live audio'}
+            </div>
+            <audio
+              src={m.src}
+              controls
+              autoPlay
+              preload="auto"
+              crossOrigin="anonymous"
+              style={{
+                width: '100%',
+                maxWidth: 420,
+                outline: 'none',
+              }}
+              onError={() => {
+                try { console.warn('[monitor] audio element failed to play', m.src) } catch (_) {}
+              }}
+            >
+              Your browser does not support the audio element.
+            </audio>
+            <a
+              href={m.src}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                fontSize: 12,
+                opacity: 0.6,
+                color: '#c4b5fd',
+                textDecoration: 'underline',
+                wordBreak: 'break-all',
+                maxWidth: 380,
+              }}
+            >
+              Open stream URL ↗
+            </a>
+          </div>
         ) : isExternal ? (
           <div
             style={{

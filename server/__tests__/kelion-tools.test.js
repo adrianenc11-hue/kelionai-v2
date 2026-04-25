@@ -118,6 +118,13 @@ const EXPECTED_TOOL_NAMES = [
   // announcing the call and forbids reciting accumulated memory back
   // to the user.
   'learn_from_observation',
+  // Faza A — global live-radio search. Adrian's directive: Kelion must
+  // be able to find and play any radio station, anywhere in the world,
+  // in any language. Backed by radio-browser.info (~50k stations, free,
+  // no key). Returns a directly-playable HTTP(S) stream URL the model
+  // then feeds into show_on_monitor(kind='audio') so the avatar's stage
+  // actually starts the audio.
+  'play_radio',
 ];
 
 describe('Kelion tool catalog', () => {
