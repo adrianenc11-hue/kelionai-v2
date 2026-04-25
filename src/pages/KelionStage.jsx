@@ -1203,10 +1203,6 @@ export default function KelionStage() {
   const statusRef = useRef('idle')
   useEffect(() => {
     if (chatBusy) return
-    // Do not run text-TTS while the realtime voice session is active.
-    // Read via ref to avoid TDZ (status is declared after this effect).
-    const st = statusRef.current
-    if (st === 'listening' || st === 'thinking' || st === 'speaking' || st === 'connecting') return
     const last = chatMessages[chatMessages.length - 1]
     if (!last || last.role !== 'assistant' || !last.content) return
     if (last.content === lastSpokenRef.current) return
@@ -1306,7 +1302,6 @@ export default function KelionStage() {
             utt.rate = 1.0; utt.pitch = 1.0; utt.volume = 1.0
             try {
               const voices = window.speechSynthesis.getVoices()
-              // Best-effort male voice pick + locale match.
               const pref = voices.find((v) =>
                 v.lang && v.lang.toLowerCase().startsWith(hint) &&
                 /male|daniel|alex|george|david|mark/i.test(v.name))
