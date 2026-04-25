@@ -270,8 +270,15 @@ router.post('/', async (req, res) => {
   }
 
   res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
   res.setHeader('Connection', 'keep-alive');
+  // Tell upstream proxies (Cloudflare / nginx / Railway edge) not to
+  // buffer this response. Without it, the final tokens of a short
+  // SSE stream can sit in the proxy buffer until well after the
+  // client has rendered the bubble, so users see a half-sentence
+  // reply ("Ce pot face pentru" with the final "tine?" lost) before
+  // the late flush arrives — too late for the bubble to show it.
+  res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders();
 
   // Stream a chat completion with tool-calling enabled. When the model emits
@@ -464,8 +471,9 @@ router.post('/demo', async (req, res) => {
   const model = getDefaultChatModel();
 
   res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
   res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders();
 
   try {

@@ -178,6 +178,110 @@ function setState(patch) {
   notify();
 }
 
+// Build an OpenStreetMap "export embed" URL for a real lat/lon.
+// OSM's embed.html is iframe-friendly (no X-Frame-Options blocking)
+// and renders a Mapnik tile view with a marker. Adrian (2026-04-25)
+// had Google Maps refuse the embed for "Witney, Oxfordshire, Regatul
+// Unit" — switching to OSM gives us a reliably embeddable map.
+function osmMapEmbed(lat, lon) {
+  // ~5 km bbox window — small enough to actually see the marker, big
+  // enough that the user can pan if they want to.
+  const span = 0.04;
+  const minLon = (lon - span).toFixed(5);
+  const maxLon = (lon + span).toFixed(5);
+  const minLat = (lat - span).toFixed(5);
+  const maxLat = (lat + span).toFixed(5);
+  const bbox = `${minLon},${minLat},${maxLon},${maxLat}`;
+  const marker = `${lat.toFixed(5)},${lon.toFixed(5)}`;
+  return `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${marker}`;
+}
+
+// Build a Windy.com weather embed for a real lat/lon. Windy is the
+// industry-standard weather visualization (radar, wind, precipitation,
+// clouds, temperature, pressure, waves). Iframe-friendly with no key.
+// Default layer is `wind` which is the most visually striking; users
+// can switch via Windy's own UI inside the iframe.
+function windyWeatherEmbed(lat, lon, opts = {}) {
+  const overlay = (opts && opts.overlay) || 'wind';
+  const zoom = (opts && opts.zoom) || 8;
+  const params = new URLSearchParams({
+    lat: lat.toFixed(4),
+    lon: lon.toFixed(4),
+    zoom: String(zoom),
+    overlay,
+    level: 'surface',
+    type: 'map',
+    location: 'coordinates',
+    metricWind: 'default',
+    metricTemp: 'default',
+    detailLat: lat.toFixed(4),
+    detailLon: lon.toFixed(4),
+    pressure: 'true',
+    message: 'true',
+    marker: 'true',
+  });
+  return `https://embed.windy.com/embed2.html?${params.toString()}`;
+}
+
+// `lat,lon` literal coordinate strings (e.g. "46.7712,23.6236") get
+// recognized so we can skip geocoding when the model already has GPS
+// figures from get_geolocation / the client-provided coords.
+function parseLatLon(s) {
+  if (!s || typeof s !== 'string') return null;
+  const m = s.trim().match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/);
+  if (!m) return null;
+  const lat = Number.parseFloat(m[1]);
+  const lon = Number.parseFloat(m[2]);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
+  return { lat, lon };
+}
+
+// Fire-and-forget Nominatim geocode → swap the placeholder map / weather
+// card for the real embed when the lookup lands. Same shape as
+// queueYouTubeUpgrade: the most-recent call wins, all earlier ones are
+// no-ops if the user has moved on. Direct browser fetch is fine here —
+// Nominatim sends `Access-Control-Allow-Origin: *`, and the polite
+// rate limit (1 req/s) is met by user-driven request frequency.
+let lastGeocodeQuery = 0;
+async function queueGeocodeUpgrade(kind, query) {
+  if (typeof window === 'undefined' || !window.fetch) return;
+  const q = (query || '').toString().trim();
+  if (!q) return;
+  const token = ++lastGeocodeQuery;
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`;
+    const r = await fetch(url, { credentials: 'omit' });
+    if (token !== lastGeocodeQuery) return; // superseded
+    if (!r.ok) return;
+    const data = await r.json();
+    const hit = Array.isArray(data) ? data[0] : null;
+    if (!hit || hit.lat == null || hit.lon == null) return;
+    const lat = Number.parseFloat(hit.lat);
+    const lon = Number.parseFloat(hit.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+    if (token !== lastGeocodeQuery) return;
+    if (state.kind !== kind) return; // user opened something else
+    if (kind === 'map') {
+      setState({
+        kind: 'map',
+        src: osmMapEmbed(lat, lon),
+        title: hit.display_name ? `Hartă — ${hit.display_name}` : `Hartă — ${q}`,
+        embedType: 'iframe',
+      });
+    } else if (kind === 'weather') {
+      setState({
+        kind: 'weather',
+        src: windyWeatherEmbed(lat, lon),
+        title: hit.display_name ? `Vreme — ${hit.display_name}` : `Vreme — ${q}`,
+        embedType: 'iframe',
+      });
+    }
+  } catch {
+    /* Network / abort — placeholder card stays, user still has a fallback. */
+  }
+}
+
 // F10 — Async YouTube search upgrade. Called fire-and-forget from the
 // sync resolveMonitor('video', query) branch. When the server has
 // YOUTUBE_API_KEY set, `/api/youtube/search` returns a videoId that's
@@ -255,35 +359,102 @@ function resolveMonitor(kind, query) {
       return { kind: null, src: null, title: null, embedType: 'iframe' };
 
     case 'map': {
+      // Switched off Google Maps' `?output=embed` — Adrian (2026-04-25)
+      // had it refused with "Acest site a refuzat să încorporeze"
+      // (X-Frame-Options). OpenStreetMap's export embed is iframe-
+      // friendly and renders a real Mapnik tile view with a marker.
+      // Free-text queries are geocoded async via Nominatim; in the
+      // meantime we render an "Open in Maps" placeholder so the user
+      // always has something clickable instead of a blank pane.
       let label = q;
-      let mapQ = q;
+
+      // Already a coordinate string? Render directly without geocoding.
+      const direct = parseLatLon(q);
+      if (direct) {
+        return {
+          kind: 'map',
+          src: osmMapEmbed(direct.lat, direct.lon),
+          title: `Hartă — ${q}`,
+          embedType: 'iframe',
+        };
+      }
+
       // Empty query → center on the user's current coordinates if the
       // React tree registered a geo provider. Lets voice commands like
       // "arată-mi harta" (no place mentioned) resolve to the user's own
-      // location instead of a blank card. IP-geo coarse coords are a fine
-      // last resort since Google Maps still renders a usable city view.
-      if (!mapQ && geoProvider) {
+      // location instead of a blank card.
+      if (!q && geoProvider) {
         try {
           const g = geoProvider();
           if (g && Number.isFinite(g.latitude) && Number.isFinite(g.longitude)) {
-            mapQ = `${g.latitude},${g.longitude}`;
-            label = 'current location';
+            return {
+              kind: 'map',
+              src: osmMapEmbed(g.latitude, g.longitude),
+              title: 'Hartă — locația ta',
+              embedType: 'iframe',
+            };
           }
         } catch { /* ignore */ }
       }
-      if (!mapQ) return null;
-      // Google Maps embed without an API key — `?output=embed` works for
-      // arbitrary queries, handles places, addresses, coords.
-      const src = `https://www.google.com/maps?q=${encodeURIComponent(mapQ)}&output=embed`;
-      return { kind: 'map', src, title: `Map — ${label}`, embedType: 'iframe' };
+      if (!q) return null;
+
+      // Free-text place name → fire async Nominatim geocode; once it
+      // lands, queueGeocodeUpgrade swaps the placeholder for the real
+      // OSM embed centered on the resolved lat/lon.
+      queueGeocodeUpgrade('map', q);
+      return {
+        kind: 'map',
+        src: `https://www.openstreetmap.org/search?query=${encodeURIComponent(q)}`,
+        title: `Hartă — ${label}`,
+        embedType: 'external',
+      };
     }
 
     case 'weather': {
+      // Switched off the wttr.in text page — Adrian (2026-04-25)
+      // wanted "ceva profesional cu coordonatele reale GPS". Windy.com
+      // is the industry standard: live radar, wind, precipitation,
+      // clouds, temperature, pressure layers, all keyless and iframe-
+      // friendly. We center it on real GPS coords (client geo for "what's
+      // the weather?", or Nominatim-resolved lat/lon for "weather in X").
+
+      // Already a coordinate string? Render directly.
+      const direct = parseLatLon(q);
+      if (direct) {
+        return {
+          kind: 'weather',
+          src: windyWeatherEmbed(direct.lat, direct.lon),
+          title: `Vreme — ${q}`,
+          embedType: 'iframe',
+        };
+      }
+
+      // Empty query → center on the user's current GPS if available.
+      if (!q && geoProvider) {
+        try {
+          const g = geoProvider();
+          if (g && Number.isFinite(g.latitude) && Number.isFinite(g.longitude)) {
+            return {
+              kind: 'weather',
+              src: windyWeatherEmbed(g.latitude, g.longitude),
+              title: 'Vreme — locația ta',
+              embedType: 'iframe',
+            };
+          }
+        } catch { /* ignore */ }
+      }
       if (!q) return null;
-      // wttr.in renders a styled forecast page, no key, iframe-friendly.
-      // 0-flag = minimal today/tomorrow view; m = metric units.
-      const src = `https://wttr.in/${encodeURIComponent(q)}?m`;
-      return { kind: 'weather', src, title: `Weather — ${q}`, embedType: 'iframe' };
+
+      // Free-text place name → fire async Nominatim geocode and render
+      // an external "Open in Windy" card in the meantime so the user
+      // can still get there in one click.
+      queueGeocodeUpgrade('weather', q);
+      return {
+        kind: 'weather',
+        src: `https://www.windy.com/?${encodeURIComponent(q)}`,
+        title: `Vreme — ${q}`,
+        embedType: 'external',
+      };
     }
 
     case 'video': {
