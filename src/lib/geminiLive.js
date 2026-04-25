@@ -97,6 +97,11 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
   // post-sign-in re-renders widen the stale-closure window that lets two
   // concurrent starts slip past the status check.
   const startInFlightRef = useRef(false)
+  // Hard cooldown — reject any start() call within 3 s of the last one.
+  // The in-flight lock releases in `finally` (before setupComplete), so
+  // a second caller (wake word, rapid tap, re-render) can slip through
+  // and open a parallel session → triple greeting. Adrian 2026-04-25.
+  const lastStartAtRef = useRef(0)
   // F5 — when start() is called on a handoff (priorTurns.length > 0), the
   // persona already tells Kelion to continue the conversation rather than
   // re-greet. We must NOT fire the setupComplete kickstart ("Greet me with
@@ -443,6 +448,10 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
     // session that is actually opening the socket. Reject-first,
     // mutate-after.
     if (startInFlightRef.current) return
+    // Hard cooldown: reject start() if the last one was < 3 s ago.
+    const now = Date.now()
+    if (now - lastStartAtRef.current < 3000) return
+    lastStartAtRef.current = now
     // F5 — stash the handoff flag AFTER the concurrent guard so only
     // the winning call writes it. The setupComplete handler reads it
     // on the next microtask; fresh sessions explicitly reset to false
