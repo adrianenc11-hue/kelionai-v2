@@ -86,7 +86,7 @@ const { requireAuth } = require('../middleware/auth');
 const { peekSignedInUser, isAdminUser } = require('../middleware/optionalAuth');
 const ipGeo = require('../services/ipGeo');
 const trialQuota = require('../services/trialQuota');
-const { buildSanitizedPriorTurnsBlock } = require('../util/sanitizePriorTurns');
+const { buildSanitizedPriorTurnsBlock } = require('../utils/sanitizePriorTurns');
 const router = Router();
 
 // Stage 3 — read user from JWT cookie without gating the route.

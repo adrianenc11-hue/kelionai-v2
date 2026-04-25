@@ -12,7 +12,7 @@ const {
   installProcessHandlers,
   serializeReason,
   createStats,
-} = require('../src/util/processHandlers');
+} = require('../src/utils/processHandlers');
 
 const makeLogger = () => ({
   warn: jest.fn(),

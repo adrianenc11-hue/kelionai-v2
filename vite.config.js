@@ -8,13 +8,27 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     build: {
-      chunkSizeWarningLimit: 1400,
+      // Monaco workers are inherently large (~7 MB for TS alone) but only
+      // load on the /studio route (React.lazy). We silence the warning
+      // since they're already code-split and not on the critical path.
+      chunkSizeWarningLimit: 1500,
       rollupOptions: {
         output: {
-          manualChunks: {
-            'react-vendor':  ['react', 'react-dom'],
-            'three-vendor':  ['three', '@react-three/fiber', '@react-three/drei'],
-            'router':        ['react-router-dom'],
+          manualChunks(id) {
+            if (id.includes('node_modules/react-dom') || id.includes('node_modules/react/')) {
+              return 'react-vendor'
+            }
+            if (id.includes('node_modules/three') || id.includes('node_modules/@react-three')) {
+              return 'three-vendor'
+            }
+            if (id.includes('node_modules/react-router')) {
+              return 'router'
+            }
+            // Group all Monaco editor code into a dedicated chunk so it
+            // never leaks into the main KelionStage bundle.
+            if (id.includes('node_modules/monaco-editor') || id.includes('node_modules/@monaco-editor')) {
+              return 'monaco-vendor'
+            }
           },
         },
       },

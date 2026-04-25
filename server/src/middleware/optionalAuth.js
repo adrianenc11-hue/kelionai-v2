@@ -32,10 +32,7 @@ const config = require('../config');
 const { findById } = require('../db');
 
 function getAdminEmailSet() {
-  const defaultAdmins = ['adrianenc11@gmail.com'];
-  const extra = (process.env.ADMIN_EMAILS || '')
-    .split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
-  return new Set([...defaultAdmins, ...extra]);
+  return new Set(config.getAdminEmails());
 }
 
 function isAdminEmail(email) {

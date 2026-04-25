@@ -42,8 +42,11 @@ async function seedPreferredLanguageOnLogin(user, req) {
 
 const router = Router();
 
-// In-memory state storage (use Redis in production)
-const oauthStates = new Map();
+// OAuth state is verified via httpOnly cookies (set on /start, read on
+// /callback). The old in-memory Map was removed (2026-04-25 audit) because
+// it broke horizontal scaling on Railway — state created on instance A was
+// invisible to instance B. Cookies travel with the user's browser so the
+// flow is self-contained regardless of which instance serves the callback.
 
 /**
  * GET /auth/google/start
@@ -54,16 +57,12 @@ router.get('/google/start', (req, res) => {
   const state = google.generateState();
   const { codeVerifier, codeChallenge } = google.generatePKCE();
 
-  oauthStates.set(state, {
-    codeVerifier,
-    mode,
-    expiresAt: Date.now() + 10 * 60 * 1000,
-  });
-
-  // Store state and verifier in cookies for verification
+  // State, verifier, and mode stored in httpOnly cookies — no server-side
+  // Map needed, so horizontal scaling works without Redis.
   const cookieOpts = { httpOnly: true, sameSite: 'lax', maxAge: 10 * 60 * 1000, path: '/' };
   res.cookie('oauth_state', state, cookieOpts);
   res.cookie('oauth_verifier', codeVerifier, cookieOpts);
+  res.cookie('oauth_mode', mode, cookieOpts);
 
   const authUrl = google.buildAuthUrl({ state, codeChallenge, mode });
   res.redirect(authUrl);
@@ -89,20 +88,23 @@ router.get('/google/callback', async (req, res) => {
       return res.status(400).json({ error: 'Missing code or state' });
     }
 
-    const storedState = oauthStates.get(state);
-    if (!storedState) {
+    const storedState = req.cookies?.oauth_state;
+    const storedVerifier = req.cookies?.oauth_verifier;
+    if (!storedState || storedState !== state) {
       return res.status(400).json({ error: 'Invalid or expired state' });
     }
-
-    if (Date.now() > storedState.expiresAt) {
-      oauthStates.delete(state);
-      return res.status(400).json({ error: 'State expired' });
+    if (!storedVerifier) {
+      return res.status(400).json({ error: 'Missing code verifier — cookie expired?' });
     }
 
-    mode = storedState.mode || 'web';
-    oauthStates.delete(state);
+    // Consume the one-time cookies so replay is impossible.
+    res.clearCookie('oauth_state', { path: '/' });
+    res.clearCookie('oauth_verifier', { path: '/' });
+    res.clearCookie('oauth_mode', { path: '/' });
 
-    const tokens = await google.exchangeCode(code, storedState.codeVerifier);
+    mode = req.cookies?.oauth_mode || 'web';
+
+    const tokens = await google.exchangeCode(code, storedVerifier);
     const googleUser = await google.fetchUserInfo(tokens.access_token);
 
     const user = await upsertUser({
@@ -173,9 +175,7 @@ router.get('/me', async (req, res) => {
     }
 
     // Determine effective role (check admin emails list)
-    const defaultAdmins = ['adrianenc11@gmail.com'];
-    const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
-    const allAdmins = [...new Set([...defaultAdmins, ...adminEmails])];
+    const allAdmins = config.getAdminEmails();
     const effectiveRole = (user.role === 'admin' || allAdmins.includes((user.email || '').toLowerCase())) ? 'admin' : user.role;
 
     // Return sanitized user info
@@ -233,9 +233,7 @@ router.post('/local/register', async (req, res) => {
     // registration. Adrian's spec: "daca intilneste adresa mea de email
     // si parola mea, ala devine admin". We reuse the same list the rest
     // of the app trusts: a hardcoded default + ADMIN_EMAILS env override.
-    const defaultAdmins = ['adrianenc11@gmail.com'];
-    const adminEmailsEnv = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
-    const allAdmins = [...new Set([...defaultAdmins, ...adminEmailsEnv])];
+    const allAdmins = config.getAdminEmails();
     const emailLc = String(email).toLowerCase();
     const isAdminEmail = allAdmins.includes(emailLc);
 
@@ -335,9 +333,7 @@ router.post('/local/login', async (req, res) => {
     });
 
     const safeUser = sanitizeUser ? sanitizeUser(user) : user;
-    const defaultAdmins = ['adrianenc11@gmail.com'];
-    const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
-    const allAdmins = [...new Set([...defaultAdmins, ...adminEmails])];
+    const allAdmins = config.getAdminEmails();
     const isAdmin = Boolean(
       (user.role === 'admin') ||
       (user.email && allAdmins.includes(String(user.email).toLowerCase()))

@@ -369,43 +369,5 @@ describe('PUT /api/admin/users/:id/subscription', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// GET /api/payments/history
-// ---------------------------------------------------------------------------
-
-describe('GET /api/payments/history', () => {
-  it('returns 401 when unauthenticated', async () => {
-    const res = await request(app).get('/api/payments/history');
-    expect(res.status).toBe(401);
-  });
-
-  it('returns empty history when authenticated', async () => {
-    const user  = await seedUser();
-    const token = makeToken(user);
-
-    const res = await request(app)
-      .get('/api/payments/history')
-      .set('Authorization', `Bearer ${token}`);
-
-    expect(res.status).toBe(200);
-    expect(Array.isArray(res.body.payments)).toBe(true);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// POST /api/payments/create-checkout-session
-// ---------------------------------------------------------------------------
-
-describe('POST /api/payments/create-checkout-session', () => {
-  it('returns 503 when Stripe is not configured', async () => {
-    const user  = await seedUser();
-    const token = makeToken(user);
-
-    const res = await request(app)
-      .post('/api/payments/create-checkout-session')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ planId: 'basic' });
-
-    expect(res.status).toBe(503);
-  });
-});
+// NOTE: /api/payments/* mock routes removed (2026-04-25 audit).
+// Real Stripe checkout is tested via /api/credits/* test suite.

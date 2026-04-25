@@ -28,8 +28,9 @@ const {
   getCreditsBalance,
   addCreditsTransaction,
 } = require('../db');
+const config = require('../config');
 
-const DEFAULT_ADMIN_EMAIL = 'adrianenc11@gmail.com';
+const DEFAULT_ADMIN_EMAIL = config.DEFAULT_ADMIN_EMAIL;
 
 // Admin credit auto-heal floor. If the admin's credit balance is below
 // this on boot, we top him up with a 'bonus' ledger entry so the dashboard

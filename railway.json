@@ -4,7 +4,7 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "npm run server:start",
+    "startCommand": "node server/src/index.js",
     "healthcheckPath": "/health"
   }
 }

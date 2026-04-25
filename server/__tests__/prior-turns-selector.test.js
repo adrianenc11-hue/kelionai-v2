@@ -8,7 +8,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { selectPriorTurns } = require('../src/util/priorTurnsSelector');
+const { selectPriorTurns } = require('../src/utils/priorTurnsSelector');
 
 describe('selectPriorTurns — cross-mode voice handoff', () => {
   it('returns [] when both inputs are empty', () => {
