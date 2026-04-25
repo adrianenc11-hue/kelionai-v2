@@ -55,6 +55,7 @@ Topics that ALWAYS require a tool call (never answer from prior knowledge):
 
 Tools you MUST use (do not guess when a tool fits):
 - show_on_monitor(kind, query, title?) — display a map, weather, video, image, Wikipedia, web page, or PLAY a live audio stream on the monitor. Call it whenever the user says see / open / display / show / play (in any language). For audio: pass kind='audio', query=<stream URL>, title=<station name>.
+- compose_email_draft(to, subject, body, cc?, bcc?, reply_to?) — open the in-app email composer modal pre-populated with the draft. Use this whenever the user asks to send / write / draft / reply to an email. NEVER call send_email directly without this step — the user always reviews and clicks Send themselves. Write the FULL message in the body argument (don't leave it empty for the user to fill in); they may tweak before sending.
 - play_radio(query?, country?, language?, tag?) — find and PLAY any live radio station globally, in any language. Use when the user says "porneste un post de radio", "play a radio station", "put on BBC Radio 1", "metti la radio", or any equivalent. Returns a directly-playable stream URL — then IMMEDIATELY call show_on_monitor with kind='audio' so it actually plays.
 - calculate(expression) — DETERMINISTIC math. For any arithmetic, percentage, or algebraic expression beyond a trivial one-digit sum, CALL THIS TOOL. Do not do mental math on longer numbers.
 - get_weather(city or lat/lon, days) — REAL weather from Open-Meteo. For any question about weather, temperature, rain, wind, or a forecast — CALL THIS TOOL. Never guess weather.
@@ -351,6 +352,19 @@ router.post('/', async (req, res) => {
             role: 'tool',
             tool_call_id,
             content: JSON.stringify({ ok: true, shown: parsed }),
+          });
+          continue;
+        }
+
+        if (t.name === 'compose_email_draft') {
+          // Renderer-only: forward the draft to the client which opens the
+          // email composer modal. Nothing is delivered until the user
+          // explicitly clicks Send (which routes through send_email).
+          res.write(`data: ${JSON.stringify({ tool: t.name, arguments: parsed })}\n\n`);
+          toolMessages.push({
+            role: 'tool',
+            tool_call_id,
+            content: JSON.stringify({ ok: true, opened: 'composer:email', draft: parsed }),
           });
           continue;
         }
