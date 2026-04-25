@@ -13,7 +13,7 @@
 const {
   buildSanitizedPriorTurnsBlock,
   __test,
-} = require('../src/util/sanitizePriorTurns');
+} = require('../src/utils/sanitizePriorTurns');
 
 const {
   sanitizeTurnText,

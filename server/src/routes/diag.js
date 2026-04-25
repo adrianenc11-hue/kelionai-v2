@@ -208,11 +208,9 @@ router.get('/process', (req, res) => {
   });
 });
 
-const DEFAULT_ADMIN_EMAIL = 'adrianenc11@gmail.com';
-
 router.get('/admin-bootstrap', async (req, res) => {
   try {
-    const email = (process.env.ADMIN_BOOTSTRAP_EMAIL || DEFAULT_ADMIN_EMAIL).trim().toLowerCase();
+    const email = (process.env.ADMIN_BOOTSTRAP_EMAIL || config.DEFAULT_ADMIN_EMAIL).trim().toLowerCase();
     const envPassword = process.env.ADMIN_BOOTSTRAP_PASSWORD;
     const envLen = envPassword ? String(envPassword).length : 0;
     const envTrimmedLen = envPassword ? String(envPassword).trim().length : 0;

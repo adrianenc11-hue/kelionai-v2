@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 
 const http = require('http');
 const path = require('path');
@@ -35,7 +35,7 @@ const voiceCloneRouter = require('./routes/voiceClone');
 const { attachVertexLiveProxy } = require('./routes/vertexLiveProxy');
 const proactive        = require('./services/proactive');
 const { bootstrapAdmin, healAdminCredits } = require('./services/adminBootstrap');
-const { installProcessHandlers } = require('./util/processHandlers');
+const { installProcessHandlers } = require('./utils/processHandlers');
 
 // Audit H3: install global safety net before anything else can throw.
 // - `unhandledRejection` is logged and swallowed — one missing `.catch()`
@@ -159,13 +159,12 @@ const chatLimiter = (process.env.NODE_ENV === 'test') ? (req, res, next) => next
 // stray ?retry=1 from Stripe wouldn't bypass the guard.
 app.use((req, res, next) => {
   if (req.path === '/api/credits/webhook') return next();
-  // Voice-clone POST carries a base64-encoded audio sample up to ~10 MB
-  // (MediaRecorder blob → base64 is ~33% overhead). Raise the JSON cap
-  // only on that path so every other endpoint keeps the tight 1 MB
-  // defence-in-depth limit.
+  // Voice-clone POST carries a base64-encoded audio sample (~30s at 128kbps =
+  // ~480KB raw, ~640KB base64). 5 MB accommodates longer clips with headroom
+  // while capping abuse surface (was 15 MB pre-audit).
   const isVoiceClone =
     req.path === '/api/voice/clone' && req.method === 'POST';
-  return express.json({ limit: isVoiceClone ? '15mb' : '1mb' })(req, res, next);
+  return express.json({ limit: isVoiceClone ? '5mb' : '1mb' })(req, res, next);
 });
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
@@ -201,27 +200,8 @@ app.get('/api/subscription/plans', (req, res) => {
   res.json({ plans: getPlans() });
 });
 
-// Payment routes (auth required)
-app.post('/api/payments/create-checkout-session', requireAuth, (req, res) => {
-  const { planId } = req.body || {};
-  const plans = getPlans();
-  const plan = plans.find(p => p.id === planId);
-
-  if (!plan) {
-    return res.status(400).json({ error: 'Invalid plan ID' });
-  }
-  if (planId === 'free') {
-    return res.status(400).json({ error: 'Cannot create checkout for free plan' });
-  }
-  if (!process.env.STRIPE_SECRET_KEY) {
-    return res.status(503).json({ error: 'Payment system not configured' });
-  }
-  res.json({ sessionId: 'mock-session-id', url: 'https://checkout.stripe.com/mock' });
-});
-
-app.get('/api/payments/history', requireAuth, (req, res) => {
-  res.json({ payments: [] });
-});
+// NOTE: /api/payments/* mock routes removed (2026-04-25 audit).
+// Real Stripe checkout is handled by /api/credits/* routes.
 
 // Referral routes (auth required)
 app.post('/api/referral/generate', requireAuth, async (req, res) => {
