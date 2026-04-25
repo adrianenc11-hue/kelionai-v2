@@ -125,6 +125,13 @@ const EXPECTED_TOOL_NAMES = [
   // then feeds into show_on_monitor(kind='audio') so the avatar's stage
   // actually starts the audio.
   'play_radio',
+  // PR #214 — in-app email composer modal. Renderer-only tool: the model
+  // calls compose_email_draft → the client opens a modal with editable
+  // To / Subject / Body / Cc / Bcc fields. Adrian: "sa deschida cimpurile
+  // de mail, sa poata fi setate". The user reviews and clicks Send; only
+  // then does the modal route through send_email (Resend). Nothing is
+  // delivered without an explicit user click.
+  'compose_email_draft',
 ];
 
 describe('Kelion tool catalog', () => {
