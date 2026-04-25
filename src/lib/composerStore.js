@@ -9,8 +9,13 @@
 //
 // Intentionally dependency-free so the tool runner (outside React) and the
 // component (via useSyncExternalStore below) can both use it.
+//
+// IMPORTANT: the snapshot returned by getComposer() must change reference
+// whenever the store mutates, otherwise useSyncExternalStore (which compares
+// via Object.is) never schedules a re-render and the modal never opens.
+// Always reassign `state` to a fresh object — never mutate in place.
 
-const state = {
+let state = {
   kind: null,    // 'email' | null  (calendar/sms/doc come later)
   draft: null,   // { to, cc, bcc, subject, body, reply_to, attachments } for email
   openedAt: 0,
@@ -25,8 +30,6 @@ function emit() {
 }
 
 export function getComposer() {
-  // Returning the same object reference when nothing has changed lets
-  // useSyncExternalStore short-circuit re-renders.
   return state
 }
 
@@ -60,22 +63,22 @@ function asArray(v) {
  * }} draft
  */
 export function openEmailComposer(draft = {}) {
-  state.kind = 'email'
-  state.draft = {
-    to: asArray(draft.to),
-    cc: asArray(draft.cc),
-    bcc: asArray(draft.bcc),
-    subject: typeof draft.subject === 'string' ? draft.subject.slice(0, 300) : '',
-    body: typeof draft.body === 'string' ? draft.body : '',
-    reply_to: typeof draft.reply_to === 'string' ? draft.reply_to.trim() : '',
+  state = {
+    kind: 'email',
+    draft: {
+      to: asArray(draft.to),
+      cc: asArray(draft.cc),
+      bcc: asArray(draft.bcc),
+      subject: typeof draft.subject === 'string' ? draft.subject.slice(0, 300) : '',
+      body: typeof draft.body === 'string' ? draft.body : '',
+      reply_to: typeof draft.reply_to === 'string' ? draft.reply_to.trim() : '',
+    },
+    openedAt: Date.now(),
   }
-  state.openedAt = Date.now()
   emit()
 }
 
 export function closeComposer() {
-  state.kind = null
-  state.draft = null
-  state.openedAt = 0
+  state = { kind: null, draft: null, openedAt: 0 }
   emit()
 }
