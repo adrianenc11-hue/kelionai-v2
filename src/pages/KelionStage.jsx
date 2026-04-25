@@ -5159,74 +5159,87 @@ export default function KelionStage() {
             </div>
           )}
 
-          {/* Scrollable table. Fixed-width font for IP and timestamp so
-              columns align. */}
-          {!visitorsLoading && visitorsRows.length > 0 && (
-            <div style={{
-              borderRadius: 12,
-              border: '1px solid rgba(167, 139, 250, 0.18)',
-              overflow: 'hidden',
-            }}>
-              {visitorsRows.map((v) => {
-                const when = v.ts ? new Date(v.ts) : null
-                const whenShort = when && !Number.isNaN(when.getTime())
-                  ? when.toLocaleString('en-GB', { hour12: false })
-                  : '—'
-                const uaShort = (v.userAgent || '').slice(0, 80)
-                return (
-                  <div
-                    key={v.id}
-                    style={{
-                      padding: '10px 12px',
-                      borderBottom: '1px solid rgba(167, 139, 250, 0.08)',
-                      fontSize: 12,
-                      lineHeight: 1.45,
-                    }}
-                  >
-                    <div style={{
-                      display: 'flex', justifyContent: 'space-between',
-                      gap: 10, marginBottom: 2,
-                    }}>
-                      <div style={{
-                        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-                        fontVariantNumeric: 'tabular-nums',
-                        opacity: 0.75,
-                      }}>{whenShort}</div>
-                      <div style={{
-                        fontSize: 11, opacity: 0.55, letterSpacing: '0.05em',
-                      }}>
-                        {v.country || '??'} · {v.ip || '—'}
-                      </div>
-                    </div>
-                    <div style={{ marginBottom: 2 }}>
-                      <span style={{ opacity: 0.55, marginRight: 6 }}>path</span>
-                      <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>
-                        {v.path || '/'}
-                      </span>
-                      {v.userEmail && (
-                        <span style={{
-                          marginLeft: 8, padding: '1px 6px',
-                          borderRadius: 6,
-                          background: 'rgba(167, 139, 250, 0.15)',
-                          fontSize: 11,
-                        }}>{v.userEmail}</span>
-                      )}
-                    </div>
-                    {uaShort && (
-                      <div style={{ opacity: 0.55, fontSize: 11 }}>
-                        {uaShort}{v.userAgent && v.userAgent.length > 80 ? '…' : ''}
-                      </div>
-                    )}
-                    {v.referer && (
-                      <div style={{ opacity: 0.45, fontSize: 11 }}>
-                        ← {v.referer.slice(0, 100)}
-                      </div>
-                    )}
+          {/* Scrollable list of recent visits. Bots are hidden by
+              default per Adrian — only real visitors with as much
+              data as we have. UA is parsed into "Chrome 120 ·
+              Windows 10/11" instead of dumping the raw UA string. */}
+          {!visitorsLoading && visitorsRows.length > 0 && (() => {
+            const realRows = visitorsRows.filter((v) => !uaIsBot(v.userAgent))
+            const hiddenBots = visitorsRows.length - realRows.length
+            return (
+              <>
+                {hiddenBots > 0 && (
+                  <div style={{
+                    fontSize: 11, opacity: 0.55, marginBottom: 6,
+                    fontStyle: 'italic',
+                  }}>
+                    {hiddenBots} hit{hiddenBots !== 1 ? '-uri' : ''} de boți / scanere ascunse din listă.
                   </div>
-                )
-              })}
-            </div>
-          )}
+                )}
+                <div style={{
+                  borderRadius: 12,
+                  border: '1px solid rgba(167, 139, 250, 0.18)',
+                  overflow: 'hidden',
+                }}>
+                  {realRows.map((v) => {
+                    const when = v.ts ? new Date(v.ts) : null
+                    const whenShort = when && !Number.isNaN(when.getTime())
+                      ? when.toLocaleString('en-GB', { hour12: false })
+                      : '—'
+                    const browser = uaBrowser(v.userAgent)
+                    const os = uaOs(v.userAgent)
+                    const ref = refHost(v.referer)
+                    return (
+                      <div
+                        key={v.id}
+                        style={{
+                          padding: '10px 12px',
+                          borderBottom: '1px solid rgba(167, 139, 250, 0.08)',
+                          fontSize: 12,
+                          lineHeight: 1.45,
+                        }}
+                      >
+                        <div style={{
+                          display: 'flex', justifyContent: 'space-between',
+                          gap: 10, marginBottom: 2,
+                        }}>
+                          <div style={{
+                            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                            fontVariantNumeric: 'tabular-nums',
+                            opacity: 0.75,
+                          }}>{whenShort}</div>
+                          <div style={{
+                            fontSize: 11, opacity: 0.6, letterSpacing: '0.05em',
+                          }}>
+                            <span style={{ marginRight: 4 }}>{flagEmoji(v.country)}</span>
+                            {v.country || '??'} · {v.ip || '—'}
+                          </div>
+                        </div>
+                        <div style={{ marginBottom: 2 }}>
+                          <span style={{ opacity: 0.55, marginRight: 6 }}>path</span>
+                          <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>
+                            {v.path || '/'}
+                          </span>
+                          {v.userEmail && (
+                            <span style={{
+                              marginLeft: 8, padding: '1px 6px',
+                              borderRadius: 6,
+                              background: 'rgba(167, 139, 250, 0.15)',
+                              fontSize: 11,
+                            }}>{v.userEmail}</span>
+                          )}
+                        </div>
+                        <div style={{ opacity: 0.65, fontSize: 11 }}>
+                          {browser} · {os}
+                          {ref && <span style={{ opacity: 0.7 }}> · ← {ref}</span>}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </>
+            )
+          })()}
         </div>
       )}
 
@@ -5949,13 +5962,72 @@ function flagEmoji(code) {
   return String.fromCodePoint(base + cc.charCodeAt(0), base + cc.charCodeAt(1))
 }
 
+// Client-side UA classifiers. Mirror the server-side ones in
+// `server/src/services/visitorAnalytics.js` so the per-visit row in
+// the admin table reads "Chrome 120 on Windows" instead of dumping the
+// raw UA string. Real-time enrichment, no DB call.
+function uaIsBot(ua) {
+  if (!ua) return false
+  return /bot|crawl|spider|slurp|bing|google|yandex|duckduck|facebookexternalhit|embedly|preview|http[-_ ]?client|python-requests|curl\/|wget|go-http|java\//i.test(ua)
+}
+function uaBrowser(ua) {
+  if (!ua) return 'Unknown'
+  if (/Edg\//i.test(ua)) return 'Edge'
+  if (/OPR\/|Opera/i.test(ua)) return 'Opera'
+  if (/Vivaldi/i.test(ua)) return 'Vivaldi'
+  if (/Firefox\//i.test(ua)) {
+    const m = ua.match(/Firefox\/([0-9]+)/i)
+    return m ? `Firefox ${m[1]}` : 'Firefox'
+  }
+  if (/SamsungBrowser/i.test(ua)) return 'Samsung Internet'
+  if (/Chrome\//i.test(ua)) {
+    const m = ua.match(/Chrome\/([0-9]+)/i)
+    return m ? `Chrome ${m[1]}` : 'Chrome'
+  }
+  if (/Safari\//i.test(ua) && /Version\//i.test(ua)) {
+    const m = ua.match(/Version\/([0-9]+)/i)
+    return m ? `Safari ${m[1]}` : 'Safari'
+  }
+  return 'Other'
+}
+function uaOs(ua) {
+  if (!ua) return 'Unknown'
+  if (/iPhone|iPad|iPod/i.test(ua)) return 'iOS'
+  if (/Android/i.test(ua)) {
+    const m = ua.match(/Android ([0-9]+)/i)
+    return m ? `Android ${m[1]}` : 'Android'
+  }
+  if (/Windows NT 10/i.test(ua)) return 'Windows 10/11'
+  if (/Windows/i.test(ua)) return 'Windows'
+  if (/Mac OS X|Macintosh/i.test(ua)) return 'macOS'
+  if (/CrOS/i.test(ua)) return 'ChromeOS'
+  if (/Linux/i.test(ua)) return 'Linux'
+  return 'Other'
+}
+function refHost(ref) {
+  if (!ref || typeof ref !== 'string') return null
+  try {
+    const u = new URL(ref)
+    let h = (u.hostname || '').toLowerCase()
+    if (h.startsWith('www.')) h = h.slice(4)
+    return h || null
+  } catch (_) {
+    return null
+  }
+}
+
 function VisitorsAnalyticsPanel({ data }) {
   if (!data) return null
   const totals = data.totals || { visits: 0, signedInVisits: 0, uniqueUsers: 0 }
   const byCountry = Array.isArray(data.byCountry) ? data.byCountry : []
   const byDevice = data.byDevice || {}
+  const byBrowser = Array.isArray(data.byBrowser) ? data.byBrowser : []
+  const byOs = Array.isArray(data.byOs) ? data.byOs : []
+  const topReferrers = Array.isArray(data.topReferrers) ? data.topReferrers : []
+  const topPaths = Array.isArray(data.topPaths) ? data.topPaths : []
   const byDay = Array.isArray(data.byDay) ? data.byDay : []
   const funnel = data.funnel || {}
+  const bots = data.bots || { count: 0, byCountry: [] }
 
   // Sparkline path for the 30-day visitors chart. Inline SVG keeps us
   // from pulling a charting dep for one line + a filled area.
@@ -5971,11 +6043,13 @@ function VisitorsAnalyticsPanel({ data }) {
     ? `${linePath} L${pts[pts.length - 1][0]},${h - pad} L${pts[0][0]},${h - pad} Z`
     : ''
 
+  // Adrian 2026-04-25: "boti nu-i mai afisam, doar reali cu datele lor
+  // cit mai complete". Bots are excluded from `byDevice` server-side;
+  // the chart reflects only real visitors.
   const deviceOrder = [
     ['desktop', 'Desktop', '#818cf8'],
     ['mobile', 'Mobil', '#f472b6'],
     ['tablet', 'Tabletă', '#34d399'],
-    ['bot', 'Bot', '#fbbf24'],
     ['unknown', 'Necunoscut', '#64748b'],
   ]
   const deviceTotal = deviceOrder.reduce((a, [k]) => a + (byDevice[k] || 0), 0) || 1
@@ -6091,6 +6165,26 @@ function VisitorsAnalyticsPanel({ data }) {
         </div>
       </div>
 
+      {/* Browser + OS mix — two columns */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+        <RankList card={card} label="BROWSER" rows={byBrowser} accent="#a78bfa" />
+        <RankList card={card} label="SISTEM" rows={byOs} accent="#f472b6" />
+      </div>
+
+      {/* Top referrers + landing paths */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+        <RankList
+          card={card} label="DE UNDE VIN (REFERRERS)"
+          rows={topReferrers} accent="#34d399"
+          empty="Doar trafic direct (fără referrer header)."
+        />
+        <RankList
+          card={card} label="PAGINI DE INTRARE"
+          rows={topPaths} accent="#818cf8"
+          empty="Niciun path înregistrat."
+        />
+      </div>
+
       {/* Funnel */}
       <div style={card}>
         <div style={{ ...label, marginBottom: 6 }}>CONVERSIE (VIZITĂ → CLIENT)</div>
@@ -6113,6 +6207,54 @@ function VisitorsAnalyticsPanel({ data }) {
           ))}
         </div>
       </div>
+
+      {/* Bots — small footnote, not a primary metric */}
+      {bots.count > 0 && (
+        <div style={{ ...card, opacity: 0.7 }}>
+          <div style={{ ...label, marginBottom: 4 }}>BOȚI / CRAWLERS (excluși din restul calculelor)</div>
+          <div style={{ fontSize: 12, lineHeight: 1.5 }}>
+            <b>{bots.count}</b> hit-uri identificate ca scanere / crawlere
+            (Googlebot, scanere de vulnerabilități pe `/xmlrpc.php`, etc.)
+            în ultimele {data.windowDays || 30} zile. Nu apar în vizite,
+            țări, dispozitive sau funnel.
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Reusable bar-chart row list. Used for browser / OS / referrer /
+// landing-path widgets so they all look consistent and can fit two
+// to a row on the admin grid.
+function RankList({ card, label, rows, accent, empty }) {
+  const max = Math.max(1, ...rows.map((r) => r.count))
+  const labelStyle = { fontSize: 10, opacity: 0.6, letterSpacing: '0.1em' }
+  return (
+    <div style={card}>
+      <div style={{ ...labelStyle, marginBottom: 6 }}>{label}</div>
+      {rows.length === 0 ? (
+        <div style={{ fontSize: 12, opacity: 0.55 }}>{empty || '—'}</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {rows.map((r) => (
+            <div key={r.key} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+              <span style={{ flex: '0 0 130px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {r.key}
+              </span>
+              <div style={{ flex: 1, height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 3 }}>
+                <div style={{
+                  height: '100%', width: `${(r.count / max) * 100}%`,
+                  background: accent || '#a78bfa', borderRadius: 3,
+                }} />
+              </div>
+              <span style={{ width: 36, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                {r.count}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

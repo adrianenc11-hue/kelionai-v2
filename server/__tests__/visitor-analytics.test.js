@@ -85,16 +85,20 @@ describe('_buildDayAxis', () => {
 });
 
 describe('getVisitorAnalytics', () => {
-  test('aggregates country / device / funnel correctly', async () => {
+  test('aggregates real visitors only — bots are excluded from every metric except `bots`', async () => {
+    // Adrian 2026-04-25: "boti nu-i mai afisam, doar reali cu datele
+    // lor cit mai complete". Bots must not pollute the country mix,
+    // device mix, day chart, or funnel — they go into a dedicated
+    // `bots` block.
     const now = Date.now();
     const iso = (daysAgo) => new Date(now - daysAgo * 86400000).toISOString();
     db.__setFixture({
       visits: [
-        { ts: iso(0), country: 'RO', user_agent: 'iPhone; Mobile', user_id: 1 },
-        { ts: iso(0), country: 'RO', user_agent: 'Windows Chrome', user_id: 1 },
-        { ts: iso(1), country: 'DE', user_agent: 'iPad', user_id: 2 },
-        { ts: iso(2), country: null, user_agent: 'Googlebot', user_id: null },
-        { ts: iso(3), country: 'US', user_agent: 'Macintosh Safari', user_id: 3 },
+        { ts: iso(0), country: 'RO', user_agent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605 Mobile', user_id: 1, referer: 'https://www.google.com/search', path: '/' },
+        { ts: iso(0), country: 'RO', user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64) Chrome/120.0', user_id: 1, referer: '', path: '/' },
+        { ts: iso(1), country: 'DE', user_agent: 'Mozilla/5.0 (iPad; CPU OS 17_0) AppleWebKit/605', user_id: 2, referer: 'https://twitter.com/i/u', path: '/pricing' },
+        { ts: iso(2), country: 'CN', user_agent: 'Googlebot/2.1', user_id: null, referer: '', path: '/' },
+        { ts: iso(3), country: 'US', user_agent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) Version/16 Safari/605', user_id: 3, referer: 'https://news.ycombinator.com/', path: '/' },
       ],
       tops: [{ user_id: 1 }, { user_id: 3 }],
       cons: [{ user_id: 1 }],
@@ -102,29 +106,57 @@ describe('getVisitorAnalytics', () => {
     const out = await getVisitorAnalytics({ days: 7 });
 
     expect(out.windowDays).toBe(7);
-    expect(out.totals.visits).toBe(5);
+    // 5 raw rows; 1 was Googlebot — totals.visits counts real only.
+    expect(out.totals.visits).toBe(4);
     expect(out.totals.signedInVisits).toBe(4);
     expect(out.totals.uniqueUsers).toBe(3);
 
-    // byCountry sorted desc, no null rows
+    // byCountry excludes the bot's CN row.
     expect(out.byCountry).toEqual([
       { country: 'RO', count: 2 },
       { country: 'DE', count: 1 },
       { country: 'US', count: 1 },
     ]);
 
+    // byDevice does NOT have a 'bot' key any more — bots live in
+    // `out.bots`. The visible categories sum to the real-visit count.
     expect(out.byDevice.mobile).toBe(1);
     expect(out.byDevice.tablet).toBe(1);
     expect(out.byDevice.desktop).toBe(2);
-    expect(out.byDevice.bot).toBe(1);
+    expect(out.byDevice.bot).toBeUndefined();
 
-    // byDay has N entries, totals add up to visits
+    // Bots reported separately so admin can still see crawl pressure.
+    expect(out.bots.count).toBe(1);
+    expect(out.bots.byCountry).toEqual([{ country: 'CN', count: 1 }]);
+
+    // Browser / OS mix derived from the UA — only real visitors.
+    const browsers = Object.fromEntries(out.byBrowser.map((b) => [b.key, b.count]));
+    expect(browsers.Chrome).toBe(1);
+    expect(browsers.Safari).toBeGreaterThanOrEqual(1);
+    const os = Object.fromEntries(out.byOs.map((b) => [b.key, b.count]));
+    expect(os.Windows).toBe(1);
+    expect(os.macOS).toBe(1);
+    expect(os.iOS).toBeGreaterThanOrEqual(1);
+
+    // Top referrers: google + twitter + ycombinator + 1 direct visit.
+    const refs = Object.fromEntries(out.topReferrers.map((r) => [r.key, r.count]));
+    expect(refs['google.com']).toBe(1);
+    expect(refs['twitter.com']).toBe(1);
+    expect(refs['news.ycombinator.com']).toBe(1);
+    expect(refs['(direct)']).toBe(1);
+
+    // Top landing paths.
+    const paths = Object.fromEntries(out.topPaths.map((p) => [p.key, p.count]));
+    expect(paths['/']).toBe(3);
+    expect(paths['/pricing']).toBe(1);
+
+    // byDay has N entries, totals add up to real visits (bot excluded).
     expect(out.byDay.length).toBe(7);
     const daySum = out.byDay.reduce((a, b) => a + b.count, 0);
-    expect(daySum).toBe(5);
+    expect(daySum).toBe(4);
 
-    // Funnel: 3 users visited signed-in, 2 of them also topped up,
-    // 1 of them also consumed.
+    // Funnel mirrors the real-visitor totals.
+    expect(out.funnel.visits).toBe(4);
     expect(out.funnel.uniqueSignedInUsers).toBe(3);
     expect(out.funnel.usersWithTopup).toBe(2);
     expect(out.funnel.usersWithConsumption).toBe(1);
@@ -136,5 +168,6 @@ describe('getVisitorAnalytics', () => {
     expect(out.totals.visits).toBe(0);
     expect(out.byCountry).toEqual([]);
     expect(out.byDay.length).toBe(30);
+    expect(out.bots.count).toBe(0);
   });
 });
