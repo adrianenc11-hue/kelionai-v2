@@ -400,11 +400,37 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
         handoffSessionRef.current = false
       } else if (ws && ws.readyState === WebSocket.OPEN) {
         try {
+          // Build a kickstart message in the user's actual locale so the
+          // model never has to choose between "Greet me in English"
+          // (literal kickstart) and a Romanian/Italian/etc. speechConfig
+          // languageCode (TTS voice locale). When those two disagree
+          // Gemini "splits the difference" and emits the same greeting
+          // twice — once in the voice's native language, once in the
+          // language the kickstart text named. Adrian 2026-04-25:
+          // "se aude in ro raspuns si dupa in engleza". Aligning the
+          // kickstart text with the speechConfig (both derived from
+          // navigator.language) eliminates the contradiction at the
+          // source.
+          const browserLang = (typeof navigator !== 'undefined' && navigator.language)
+            ? String(navigator.language).toLowerCase().slice(0, 2)
+            : 'en'
+          const KICKSTART_BY_LANG = {
+            ro: 'Salută-mă scurt și prietenos în română și întreabă-mă cu ce te pot ajuta. O singură propoziție, EXCLUSIV în română, fără traducere.',
+            en: 'Greet me with a short friendly hello in English and ask what I need. ONE sentence, English ONLY, no translation, no second version in another language.',
+            es: 'Salúdame con un hola breve y amistoso en español y pregúntame qué necesito. UNA sola frase, SOLO en español, sin traducción.',
+            fr: 'Salue-moi brièvement en français et demande-moi ce qu\'il me faut. UNE seule phrase, UNIQUEMENT en français, sans traduction.',
+            de: 'Begrüße mich kurz auf Deutsch und frage, was ich brauche. EIN einziger Satz, NUR auf Deutsch, keine Übersetzung.',
+            it: 'Salutami brevemente in italiano e chiedimi di cosa ho bisogno. UNA sola frase, SOLO in italiano, senza traduzione.',
+            pt: 'Cumprimenta-me brevemente em português e pergunta-me o que preciso. UMA frase, APENAS em português, sem tradução.',
+            ru: 'Поприветствуй меня одной короткой фразой по-русски и спроси, чем помочь. ОДНО предложение, ТОЛЬКО на русском, без перевода.',
+          }
+          const kickstartText = KICKSTART_BY_LANG[browserLang]
+            || `Greet me with a short friendly hello in the user's locale (${browserLang}) and ask what I need. ONE sentence, in ${browserLang} ONLY, no translation, no second version in another language.`
           ws.send(JSON.stringify({
             clientContent: {
               turns: [{
                 role: 'user',
-                parts: [{ text: 'Greet me with a short friendly hello in English and ask what I need. One sentence.' }],
+                parts: [{ text: kickstartText }],
               }],
               turnComplete: true,
             },
