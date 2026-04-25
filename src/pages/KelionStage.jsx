@@ -873,6 +873,8 @@ export default function KelionStage() {
     const text = chatInput.trim()
     if (!text && !attachedFile) return
     if (chatBusy) return
+    // Detect mute/unmute/translator commands from user text before sending.
+    applyMuteCommand(text)
     setChatError(null)
     // F2 — the paperclip attachment previously only mentioned the
     // filename + size in a bracketed note (e.g. "[attached file:
@@ -1196,13 +1198,14 @@ export default function KelionStage() {
   // can read the current value without waiting for a React re-render.
   const ttsMouthOpenRef = useRef(0)
   useEffect(() => { ttsMouthOpenRef.current = ttsMouthOpen }, [ttsMouthOpen])
-  // statusRef lets the TTS effect (declared before useGeminiLive) read the
-  // current voice-session state without a TDZ — status is initialised later
-  // in the component body by useGeminiLive, so it cannot appear in a dep array
-  // of an effect that runs before that declaration.
+  // statusRef and muteModeRef: declared before the TTS useEffect to avoid TDZ.
+  // Their useState counterparts live after useGeminiLive; these refs are
+  // synced via useEffect once the values are available.
   const statusRef = useRef('idle')
+  const muteModeRef = useRef(false)
   useEffect(() => {
     if (chatBusy) return
+    if (muteModeRef.current) return   // mute mode — no TTS
     const last = chatMessages[chatMessages.length - 1]
     if (!last || last.role !== 'assistant' || !last.content) return
     if (last.content === lastSpokenRef.current) return
@@ -1408,6 +1411,8 @@ export default function KelionStage() {
     stopCamera,
     startScreen,
     stopScreen,
+    // Mute/unmute voice output without restarting the session.
+    setMuted: setVoiceMuted,
     // Voice-chat trial countdown returned by the active transport's
     // token mint. We no longer drive the HUD off this — the HUD
     // pulls from the shared /api/trial/status endpoint so the timer
@@ -1417,8 +1422,38 @@ export default function KelionStage() {
   // Keep statusRef in sync so the TTS guard (declared before this line) can
   // read the current voice-session state without a temporal dead zone.
   statusRef.current = status
+  // ── Mute mode ──────────────────────────────────────────────────────────
+  // Activated when the user explicitly says "nu mai vorbi", "mute",
+  // "fii silentios", etc. Suppresses both ElevenLabs text-TTS and the
+  // Gemini Live voice gain. Deactivated on "stop", "reactiveaza", etc.
+  // muteModeRef is declared before the TTS useEffect (above) to avoid TDZ.
+  const [muteMode, setMuteMode] = useState(false)
+  useEffect(() => {
+    muteModeRef.current = muteMode
+    if (setVoiceMuted) setVoiceMuted(muteMode)
+  }, [muteMode, setVoiceMuted])
 
-  // Unified trial HUD source of truth. Applies to both voice AND text
+  // Regex patterns for mute/unmute detection (matches user messages in any mode)
+  const MUTE_RE = /\b(nu (mai )?scoate (sun[ăe]t|audio|voc[ăe]|niciun sunet)|f(ii|ă) (silențios|silenț|mut[ăe]?|tăcut|liniștit)|fără (sun[ăe]t|audio|voce)|opre[șs]te (sunet|audio|vocea)|taci complet|silent( mode)?|mute|no (sound|audio|voice output)|nu vorbis?|nu mai vorbis?)\b/i
+  const UNMUTE_RE = /\b(stop|reactivea[zz][ăa]|reactiveaz[ăa]|porneste (din nou|sunet|audio|vocea?)|unmute|activeaz[ăa] (sunet|audio|vocea?)|mai (vorbis?|scoate sunet)|vorbis?te( din nou)?)\b/i
+  const TRANSLATOR_RE = /\b(asculta?[- ]?[șs]i traduce|traduce [șs]i(?: scrie|afis?ea[zz]ă)?|interpret(ator|ează)?|mod traduc|translator mode|audio ?to ?text|transcri(e|ere)|scrie ce (aud|se aude|spun))\b/i
+
+  // Detect commands from user input (text chat) before sending.
+  // Called in sendChat and in the voice turns watcher below.
+  const applyMuteCommand = useCallback((text) => {
+    if (!text) return
+    if (UNMUTE_RE.test(text)) { setMuteMode(false); return }
+    if (MUTE_RE.test(text)) { setMuteMode(true); return }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Watch voice turns — if user said a mute/unmute command by voice, apply it.
+  useEffect(() => {
+    const last = turns[turns.length - 1]
+    if (!last || last.role !== 'user') return
+    applyMuteCommand(last.text)
+  }, [turns, applyMuteCommand])
+
+
   // chat via the shared 15-min/day IP window on the server. Collapses
   // (`applicable: false`) the moment the user signs in.
   const trialHud = useTrial({ signedIn: !!authState.signedIn })
