@@ -2525,7 +2525,57 @@ async function executeRealTool(name, args, ctx) {
     case 'plan_task':         return toolPlanTask(a);
     // ── PR 8/N — Memory of Actions (read-only self-reflection) ──
     case 'get_action_history': return toolGetActionHistory(a, ctx);
+    // ── Silent vision auto-learn — write durable observations ──
+    case 'learn_from_observation': return toolLearnFromObservation(a, ctx);
     default:                  return null; // signal "not handled here"
+  }
+}
+
+// Silent auto-learn. Adrian: "sa tina pentru el si sa faca propriile
+// analize si sa invete". When the camera is on, Kelion forms private
+// observations about the user (mood, environment, recurring objects,
+// what they appear to be working on). The HARD rule in the persona
+// forbids announcing these out loud — so this tool persists them
+// directly into memory_items as low-confidence facts, ready to be
+// re-affirmed (or overridden) by the explicit fact-extractor on the
+// next conversation. For guests we no-op gracefully.
+async function toolLearnFromObservation(args, ctx) {
+  const userId = ctx?.user?.id;
+  if (!userId) {
+    // Guests: silently succeed so the model doesn't loop / apologize.
+    return { ok: true, signed_in: false, persisted: 0 };
+  }
+  const observation = typeof args?.observation === 'string' ? args.observation.trim() : '';
+  if (!observation) {
+    return { ok: false, error: 'observation is required' };
+  }
+  // Cap to a sane size; the fact-extractor schema also caps at 500.
+  const fact = observation.slice(0, 280);
+  const kindIn = typeof args?.kind === 'string' ? args.kind.trim().toLowerCase() : '';
+  // Allowed kinds mirror the fact extractor + a new "observation" bucket
+  // so the consolidator can later separate "she said it" from "I noticed
+  // it from video".
+  const allowed = new Set(['observation', 'preference', 'routine', 'context', 'mood', 'skill']);
+  const kind = allowed.has(kindIn) ? kindIn : 'observation';
+  // Confidence MUST stay low — these are model inferences, not user
+  // statements. The consolidator promotes a fact only after multiple
+  // affirmations across sessions. Cap at 0.6.
+  const confRaw = Number(args?.confidence);
+  const confidence = Number.isFinite(confRaw)
+    ? Math.max(0.1, Math.min(0.6, confRaw))
+    : 0.4;
+  try {
+    const db = require('../db');
+    const inserted = await db.addMemoryItems(userId, [{
+      kind,
+      fact,
+      subject: 'self',
+      confidence,
+    }]);
+    return { ok: true, signed_in: true, persisted: inserted.length };
+  } catch (err) {
+    console.warn('[learn_from_observation] failed:', err && err.message);
+    return { ok: false, error: 'persist failed' };
   }
 }
 
@@ -2676,4 +2726,6 @@ module.exports = {
   toolPlanTask,
   // PR 8/N — Memory of Actions
   toolGetActionHistory,
+  // Silent auto-learn — observations from camera persisted to memory_items
+  toolLearnFromObservation,
 };

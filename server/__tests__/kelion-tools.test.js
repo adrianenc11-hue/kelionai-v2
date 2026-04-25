@@ -112,6 +112,12 @@ const EXPECTED_TOOL_NAMES = [
   // voice model queries action_history for the signed-in user before
   // repeating a tool call. Guests receive { ok:false, signed_in:false }.
   'get_action_history',
+  // Silent vision auto-learn. Persists a private camera/voice
+  // observation about the signed-in user as a low-confidence
+  // memory_items row. Guests are a no-op. The persona forbids
+  // announcing the call and forbids reciting accumulated memory back
+  // to the user.
+  'learn_from_observation',
 ];
 
 describe('Kelion tool catalog', () => {
