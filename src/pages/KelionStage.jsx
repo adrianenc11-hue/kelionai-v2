@@ -1914,6 +1914,16 @@ export default function KelionStage() {
       // frame (the user explicitly picked this image, they're not
       // asking about what the webcam happens to see right now).
       const visionFrame = attachedFrame || frame || null
+      // Always volunteer the device's real GPS coords to the server when
+      // we have a fix — the chat route uses them to ground the system
+      // prompt and the get_my_location tool. Without this the server
+      // would say "location unknown" even on devices that already
+      // granted permission, forcing useless re-prompts. Adrian:
+      // "permanent trebuie sa foloseasca coordonatele gps reale ale
+      // aparatului".
+      const gpsCoords = (clientGeo && Number.isFinite(clientGeo.lat) && Number.isFinite(clientGeo.lon))
+        ? { lat: clientGeo.lat, lon: clientGeo.lon, accuracy: clientGeo.accuracy ?? null }
+        : null
       const r = await fetch('/api/chat', {
         method: 'POST',
         credentials: 'include',
@@ -1923,6 +1933,7 @@ export default function KelionStage() {
           datetime: new Date().toISOString(),
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           ...(visionFrame ? { frame: visionFrame } : {}),
+          ...(gpsCoords ? { coords: gpsCoords } : {}),
         }),
       })
       if (r.status === 401) {
