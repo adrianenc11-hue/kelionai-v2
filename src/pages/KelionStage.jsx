@@ -1981,11 +1981,31 @@ export default function KelionStage() {
           }
         }
       } catch (_) { frame = null }
-      // If the user attached an image via the paperclip, use that as
-      // the vision payload — it takes priority over a live camera
-      // frame (the user explicitly picked this image, they're not
-      // asking about what the webcam happens to see right now).
-      const visionFrame = attachedFrame || frame || null
+      // Channel selection (PR #213 — fix attachment-vs-camera bug):
+      //   • If the user attached an IMAGE via the paperclip, send it
+      //     labeled as 'attachment' so the model knows to describe /
+      //     analyze it freely.
+      //   • If the user attached a NON-IMAGE (PDF / docx / text), the
+      //     content is already inlined as text in the message. We MUST
+      //     suppress the live camera frame in this case — otherwise the
+      //     server only sees the camera and Kelion replies about the
+      //     room instead of the file (Adrian: "i-am dat sa analizeze in
+      //     chat un file, l-am intrebat daca l-a vazut, el descrie ce
+      //     vede camera").
+      //   • Otherwise (no attachment, camera on) → send the camera frame
+      //     labeled as 'camera' so silent-vision rules apply.
+      const hasAttachment = !!attachedFile
+      const hasImageAttachment = !!attachedFrame
+      let visionFrame = null
+      let visionChannel = null
+      if (hasImageAttachment) {
+        visionFrame = attachedFrame
+        visionChannel = 'attachment'
+      } else if (!hasAttachment && frame) {
+        visionFrame = frame
+        visionChannel = 'camera'
+      }
+      // else: non-image attachment + camera on → suppress camera entirely.
       // Always volunteer the device's real GPS coords to the server when
       // we have a fix — the chat route uses them to ground the system
       // prompt and the get_my_location tool. Without this the server
@@ -2004,7 +2024,7 @@ export default function KelionStage() {
           messages: next,
           datetime: new Date().toISOString(),
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          ...(visionFrame ? { frame: visionFrame } : {}),
+          ...(visionFrame ? { frame: visionFrame, frameKind: visionChannel } : {}),
           ...(gpsCoords ? { coords: gpsCoords } : {}),
         }),
       })
