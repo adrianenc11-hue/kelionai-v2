@@ -1196,6 +1196,11 @@ export default function KelionStage() {
   // can read the current value without waiting for a React re-render.
   const ttsMouthOpenRef = useRef(0)
   useEffect(() => { ttsMouthOpenRef.current = ttsMouthOpen }, [ttsMouthOpen])
+  // statusRef lets the TTS effect (declared before useGeminiLive) read the
+  // current voice-session state without a TDZ — status is initialised later
+  // in the component body by useGeminiLive, so it cannot appear in a dep array
+  // of an effect that runs before that declaration.
+  const statusRef = useRef('idle')
   useEffect(() => {
     if (chatBusy) return
     const last = chatMessages[chatMessages.length - 1]
