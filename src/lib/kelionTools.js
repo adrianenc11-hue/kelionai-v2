@@ -74,6 +74,16 @@ const REAL_TOOL_NAMES = new Set([
   // done this session. Server returns a compact JSON list; the
   // summariser below renders it as numbered bullet points.
   'get_action_history',
+  // Silent vision auto-learn (PR #210). Persists a private camera/voice
+  // observation about the signed-in user as a low-confidence
+  // memory_items row. Guests are a no-op server-side. Voice transports
+  // need this entry so the toolCall reaches /api/tools/execute instead
+  // of the client-side "not implemented" branch.
+  'learn_from_observation',
+  // Faza A (PR #211) — global live-radio search via radio-browser.info.
+  // Without this the voice transports return "Tool not implemented"
+  // and Kelion silently fails the user when they ask for radio.
+  'play_radio',
   // F11 — `generate_image` is handled specially in the runTool switch
   // below so we can side-effect the monitor; it isn't in this set.
 ])
@@ -195,6 +205,23 @@ function summarizeRealTool(name, j) {
       : ''
     return `${header}\n${body}${cautions}`.slice(0, 4000)
   }
+  if (name === 'play_radio' && j.pick) {
+    // Faza A. The voice model gets a compact line so it can confirm
+    // ("now playing Radio ZU, Bucharest") and then immediately call
+    // show_on_monitor(kind='audio', query=<url>, title=<name>) to
+    // actually start playback. We surface the stream URL verbatim
+    // because the next tool call needs it.
+    const p = j.pick
+    const where = [p.country, p.language].filter(Boolean).join(', ')
+    const codec = p.codec ? `, ${p.codec}${p.bitrate ? ` ${p.bitrate}kbps` : ''}` : ''
+    return `Pick: ${p.name}${where ? ` (${where})` : ''}${codec}. Stream: ${p.url}`
+  }
+  if (name === 'learn_from_observation') {
+    // Silent tool. Persona forbids any user-visible mention of this
+    // call — return a compact ack the model will not narrate.
+    if (j.signed_in === false) return 'ok:learn:guest'
+    return `ok:learn:${j.persisted || 0}`
+  }
   // Generic fallback — stringify but cap so the model never chokes.
   try {
     return JSON.stringify(j).slice(0, 2000)
@@ -243,7 +270,13 @@ export async function runTool(name, args) {
       // Local-only: project content onto the avatar's on-stage monitor.
       // monitorStore resolves (kind, query) → iframe/image URL and notifies
       // the React tree via subscribeMonitor. No backend round-trip needed.
-      return handleShowOnMonitor({ kind: args?.kind, query: args?.query })
+      // `title` was added in Faza A so the audio card can show the live
+      // station name instead of falling back to the stream hostname.
+      return handleShowOnMonitor({
+        kind: args?.kind,
+        query: args?.query,
+        title: args?.title,
+      })
     }
     case 'generate_image': {
       // F11 — OpenAI gpt-image-1. The server generates the PNG, caches it
