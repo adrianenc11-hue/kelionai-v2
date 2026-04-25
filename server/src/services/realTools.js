@@ -270,6 +270,131 @@ async function toolGetWeather({ city, lat, lon, days, _maxDays }) {
 }
 
 // ──────────────────────────────────────────────────────────────────
+// play_radio — global live-radio search via radio-browser.info
+//
+// Returns a directly-playable HTTP(S) stream URL for the matching
+// station so the client can feed it into an HTML5 <audio> element.
+// Bypasses the YouTube embed-restriction trap that drove "porneste un
+// post de radio live" to error 153 — radio-browser stations expose
+// raw `.aac` / `.mp3` / `.m3u8` URLs that play in any browser without
+// X-Frame-Options trouble.
+//
+// API: https://api.radio-browser.info/ — community-mirrored, no key,
+// rate-limited politely by sending a UA. We pick a random server from
+// the public DNS round-robin so we never hammer one mirror. If a
+// station's `url_resolved` is missing (the redirect chain failed at
+// scrape time), fall back to `url`. The model gets back enough
+// metadata to say "now playing Radio ZU, Bucharest" without further
+// calls.
+//
+// Adrian's directive: Kelion must speak any language and find any
+// station globally — radio-browser ships ~50,000 stations across
+// every country. The optional `country` / `language` / `tag` filters
+// let the model narrow down when the user is specific ("a French jazz
+// station", "a Japanese news station"); the default `byname` search
+// is fuzzy enough to handle "Europa FM", "BBC Radio 1", "NHK", etc.
+
+let _radioBrowserHost = null;
+async function getRadioBrowserHost() {
+  if (_radioBrowserHost) return _radioBrowserHost;
+  // The community keeps a JSON list of healthy mirrors. Pick one at
+  // random so traffic is spread. Cache for the lifetime of the process
+  // (the list is stable — Railway redeploys reset this anyway).
+  try {
+    const r = await fetchWithTimeout('https://all.api.radio-browser.info/json/servers', {}, 4000);
+    if (r.ok) {
+      const arr = await r.json();
+      if (Array.isArray(arr) && arr.length > 0) {
+        const pick = arr[Math.floor(Math.random() * arr.length)];
+        if (pick && typeof pick.name === 'string') {
+          _radioBrowserHost = `https://${pick.name}`;
+          return _radioBrowserHost;
+        }
+      }
+    }
+  } catch { /* fall through */ }
+  _radioBrowserHost = 'https://de1.api.radio-browser.info';
+  return _radioBrowserHost;
+}
+
+async function toolPlayRadio({ query, country, language, tag, limit }) {
+  const q = (query || '').toString().trim();
+  if (!q && !country && !language && !tag) {
+    return { ok: false, error: 'provide query, country, language, or tag' };
+  }
+  const n = Math.max(1, Math.min(5, Number.parseInt(limit, 10) || 1));
+  const host = await getRadioBrowserHost();
+  // Prefer name search when a query is given; fall back to advanced
+  // search when only filters are present.
+  let url;
+  if (q) {
+    const params = new URLSearchParams({
+      name: q,
+      limit: String(n * 4),    // overfetch + filter to playable
+      hidebroken: 'true',
+      order: 'clickcount',     // popularity-weighted, biases to live
+      reverse: 'true',
+    });
+    if (country)  params.set('country',  String(country).slice(0, 60));
+    if (language) params.set('language', String(language).slice(0, 60));
+    if (tag)      params.set('tag',      String(tag).slice(0, 40));
+    url = `${host}/json/stations/search?${params.toString()}`;
+  } else {
+    const params = new URLSearchParams({
+      hidebroken: 'true',
+      order: 'clickcount',
+      reverse: 'true',
+      limit: String(n * 4),
+    });
+    if (country)  params.set('country',  String(country).slice(0, 60));
+    if (language) params.set('language', String(language).slice(0, 60));
+    if (tag)      params.set('tag',      String(tag).slice(0, 40));
+    url = `${host}/json/stations/search?${params.toString()}`;
+  }
+  try {
+    const r = await fetchWithTimeout(url, {
+      headers: { 'User-Agent': 'KelionAI/1.0 (+https://kelionai.app)' },
+    }, 6000);
+    if (!r.ok) return { ok: false, error: `radio-browser ${r.status}` };
+    const arr = await r.json();
+    if (!Array.isArray(arr) || arr.length === 0) {
+      return { ok: false, error: `no station found for "${q || (country||language||tag)}"` };
+    }
+    // Filter to entries that have a working stream URL.
+    const playable = arr
+      .map((s) => ({
+        name:    (s.name || '').toString().trim(),
+        url:     (s.url_resolved || s.url || '').toString().trim(),
+        country: (s.country || '').toString(),
+        language:(s.language || '').toString(),
+        codec:   (s.codec || '').toString().toLowerCase(),
+        bitrate: Number(s.bitrate) || null,
+        homepage:(s.homepage || '').toString(),
+        favicon: (s.favicon || '').toString(),
+        tags:    (s.tags || '').toString(),
+      }))
+      .filter((s) => /^https?:\/\//i.test(s.url) && s.name)
+      // Drop video-only or DRM-locked codecs the browser can't play
+      // inline. AAC / MP3 / Opus / Ogg cover the vast majority.
+      .filter((s) => !s.codec || /(aac|mp3|opus|ogg|mpeg|flac)/.test(s.codec))
+      .slice(0, n);
+    if (playable.length === 0) {
+      return { ok: false, error: 'no playable stream URL among matches' };
+    }
+    return {
+      ok: true,
+      stations: playable,
+      // Convenience: the model usually wants the first one. Saves a
+      // second round trip when it just needs to call play_audio_stream.
+      pick: playable[0],
+      source: 'radio-browser.info',
+    };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────
 // web_search
 
 async function toolWebSearch({ query, limit }) {
@@ -2465,6 +2590,8 @@ async function executeRealTool(name, args, ctx) {
     case 'calculate':         return toolCalculate(a);
     case 'unit_convert':      return toolUnitConvert(a);
     case 'get_moon_phase':    return toolGetMoonPhase(a);
+    // ── radio / streaming ──
+    case 'play_radio':        return toolPlayRadio(a);
     // ── weather / feeds ──
     case 'get_weather':       return toolGetWeather(a);
     case 'get_forecast':      return toolGetForecast(a);
@@ -2728,4 +2855,6 @@ module.exports = {
   toolGetActionHistory,
   // Silent auto-learn — observations from camera persisted to memory_items
   toolLearnFromObservation,
+  // Faza A — global live radio search (radio-browser.info, ~50k stations)
+  toolPlayRadio,
 };

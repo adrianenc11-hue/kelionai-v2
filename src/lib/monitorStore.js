@@ -15,10 +15,10 @@ const STORAGE_KEY = 'kelion.monitor.v1';
 const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 const state = {
-  kind: null,        // 'map' | 'weather' | 'video' | 'image' | 'wiki' | 'web' | null
-  src: null,         // string — final URL (iframe) or image URL
+  kind: null,        // 'map' | 'weather' | 'video' | 'image' | 'wiki' | 'web' | 'audio' | null
+  src: null,         // string — final URL (iframe), image URL, or audio stream URL
   title: null,       // short label shown above the frame
-  embedType: 'iframe', // 'iframe' | 'image' | 'external'
+  embedType: 'iframe', // 'iframe' | 'image' | 'external' | 'audio'
   updatedAt: 0,
 };
 
@@ -113,7 +113,9 @@ function loadPersisted() {
     state.kind = parsed.kind;
     state.src = parsed.src;
     state.title = parsed.title || null;
-    state.embedType = parsed.embedType === 'image' ? 'image' : 'iframe';
+    state.embedType = ['image', 'external', 'audio'].includes(parsed.embedType)
+      ? parsed.embedType
+      : 'iframe';
     state.updatedAt = updatedAt;
   } catch {
     /* corrupt entry — ignore */
@@ -167,7 +169,10 @@ function setState(patch) {
   state.kind = patch.kind ?? null;
   state.src = patch.src ?? null;
   state.title = patch.title ?? null;
-  state.embedType = patch.embedType || 'iframe';
+  // Pin valid embed types only — anything else collapses to 'iframe'
+  // so a stale persisted record doesn't render the wrong renderer.
+  const allowedEmbed = new Set(['iframe', 'image', 'external', 'audio']);
+  state.embedType = allowedEmbed.has(patch.embedType) ? patch.embedType : 'iframe';
   state.updatedAt = Date.now();
   savePersisted();
   notify();
@@ -347,6 +352,23 @@ function resolveMonitor(kind, query) {
       return { kind: 'wiki', src, title: `Wikipedia — ${q}`, embedType: 'iframe' };
     }
 
+    case 'audio': {
+      // Faza A — global radio / live audio stream playback.
+      // The server-side `play_radio` tool returns a directly-playable
+      // HTTP(S) stream URL (radio-browser.info). We render it through
+      // an HTML5 <audio> element on the monitor — bypasses YouTube
+      // embed restrictions entirely. Accepts a tile-friendly title so
+      // the avatar can show "Now playing: BBC Radio 1".
+      const src = safeUrl(q);
+      if (!src) return null;
+      // `title` is passed through resolveMonitor's caller chain (see
+      // handleShowOnMonitor below) — preserve when explicitly given,
+      // otherwise derive from the host so we never show a blank label.
+      let label;
+      try { label = new URL(src).hostname.replace(/^www\./, ''); } catch { label = 'Live audio'; }
+      return { kind: 'audio', src, title: label, embedType: 'audio' };
+    }
+
     case 'web': {
       const src = safeUrl(q);
       if (!src) return null;
@@ -374,6 +396,12 @@ export function handleShowOnMonitor(args = {}) {
   const resolved = resolveMonitor(args.kind, args.query);
   if (!resolved) {
     return 'Monitor update skipped (invalid kind or missing query).';
+  }
+  // The model may pass an explicit `title` (e.g. station name from
+  // play_radio). Honor it so the audio card / iframe header shows
+  // human-friendly text instead of a hostname or hash.
+  if (typeof args.title === 'string' && args.title.trim()) {
+    resolved.title = args.title.trim().slice(0, 120);
   }
   setState(resolved);
   if (resolved.kind === null) return 'Monitor cleared.';
