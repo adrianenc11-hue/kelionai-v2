@@ -5,6 +5,7 @@ import { Suspense, useState, useRef, useEffect, useMemo, useCallback } from 'rea
 import { useNavigate } from 'react-router-dom'
 import { useLipSync, useAudioElementLipSync } from '../lib/lipSync'
 import { handleShowOnMonitor, setMonitorGeoProvider } from '../lib/monitorStore'
+import { STATUS_COLORS } from '../lib/kelionStatus'
 import { subscribeComposer, getComposer, openEmailComposer, closeComposer } from '../lib/composerStore'
 import { setClientGeoProvider } from '../lib/clientGeoProvider'
 import { setUIActionController } from '../lib/uiActionStore'
