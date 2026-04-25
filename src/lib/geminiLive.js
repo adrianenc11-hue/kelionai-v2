@@ -400,37 +400,11 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
         handoffSessionRef.current = false
       } else if (ws && ws.readyState === WebSocket.OPEN) {
         try {
-          // Build a kickstart message in the user's actual locale so the
-          // model never has to choose between "Greet me in English"
-          // (literal kickstart) and a Romanian/Italian/etc. speechConfig
-          // languageCode (TTS voice locale). When those two disagree
-          // Gemini "splits the difference" and emits the same greeting
-          // twice — once in the voice's native language, once in the
-          // language the kickstart text named. Adrian 2026-04-25:
-          // "se aude in ro raspuns si dupa in engleza". Aligning the
-          // kickstart text with the speechConfig (both derived from
-          // navigator.language) eliminates the contradiction at the
-          // source.
-          const browserLang = (typeof navigator !== 'undefined' && navigator.language)
-            ? String(navigator.language).toLowerCase().slice(0, 2)
-            : 'en'
-          const KICKSTART_BY_LANG = {
-            ro: 'Salută-mă scurt și prietenos în română și întreabă-mă cu ce te pot ajuta. O singură propoziție, EXCLUSIV în română, fără traducere.',
-            en: 'Greet me with a short friendly hello in English and ask what I need. ONE sentence, English ONLY, no translation, no second version in another language.',
-            es: 'Salúdame con un hola breve y amistoso en español y pregúntame qué necesito. UNA sola frase, SOLO en español, sin traducción.',
-            fr: 'Salue-moi brièvement en français et demande-moi ce qu\'il me faut. UNE seule phrase, UNIQUEMENT en français, sans traduction.',
-            de: 'Begrüße mich kurz auf Deutsch und frage, was ich brauche. EIN einziger Satz, NUR auf Deutsch, keine Übersetzung.',
-            it: 'Salutami brevemente in italiano e chiedimi di cosa ho bisogno. UNA sola frase, SOLO in italiano, senza traduzione.',
-            pt: 'Cumprimenta-me brevemente em português e pergunta-me o que preciso. UMA frase, APENAS em português, sem tradução.',
-            ru: 'Поприветствуй меня одной короткой фразой по-русски и спроси, чем помочь. ОДНО предложение, ТОЛЬКО на русском, без перевода.',
-          }
-          const kickstartText = KICKSTART_BY_LANG[browserLang]
-            || `Greet me with a short friendly hello in the user's locale (${browserLang}) and ask what I need. ONE sentence, in ${browserLang} ONLY, no translation, no second version in another language.`
           ws.send(JSON.stringify({
             clientContent: {
               turns: [{
                 role: 'user',
-                parts: [{ text: kickstartText }],
+                parts: [{ text: 'Greet me with a short friendly hello in English and ask what I need. One sentence.' }],
               }],
               turnComplete: true,
             },
@@ -811,31 +785,6 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
       const node = new AudioWorkletNode(ctx, 'kelion-capture', { numberOfInputs: 1, numberOfOutputs: 0 })
       node.port.onmessage = (e) => {
         if (ws.readyState !== WebSocket.OPEN) return
-        // Echo-cancellation guard. While Kelion is actively speaking, we
-        // drop mic frames instead of forwarding them to Gemini.
-        //
-        // Why: getUserMedia opens the mic with `echoCancellation: true`,
-        // but the browser's AEC only attenuates speaker bleed when the
-        // playback path is one the AEC can sample as a reference signal.
-        // Our TTS playback runs through a SEPARATE AudioContext
-        // (`playbackCtxRef` @ 24 kHz) and lands on `ctx.destination`,
-        // which the AEC backing the mic stream cannot see. On phones —
-        // and on laptops with loud built-in speakers — Kelion's own
-        // voice bleeds back through the mic, the server VAD treats it
-        // as user input, transcribes the garbled echo as a "hello" in
-        // a random language, Kelion replies with another greeting in
-        // that perceived language, and we ricochet through 3-4
-        // languages of "Salut!"/"Hello!"/"Hola!" until something breaks
-        // the loop. Adrian 2026-04-25: "se repeta inceputul de mai
-        // multe ori, in mai multe limbi". Confirmed cause: echo, not
-        // model hallucination.
-        //
-        // Gating mic forwarding while `playbackPlayingRef.current` is
-        // true breaks the loop at the source — no echo can reach the
-        // server. Trade-off: barge-in (talking over Kelion) is
-        // disabled. We accept this for now; a level-threshold override
-        // for real user speech is a follow-up.
-        if (playbackPlayingRef.current) return
         const float = e.data
         const pcm16 = floatTo16BitPCM(float)
         const bytes = new Uint8Array(pcm16.buffer, pcm16.byteOffset, pcm16.byteLength)
