@@ -416,12 +416,46 @@ app.get('/ping',   (_req, res) => res.send('<h1>PONG - Server is alive and reach
 
 if (process.env.NODE_ENV === 'production') {
   console.log(`[kelion-api] Production mode: serving from ${distPath}`);
-  app.use(express.static(distPath));
 
+  // ── Caching strategy ────────────────────────────────────────────────────
+  // 1. Hashed assets (JS/CSS with content hash in filename) → immutable 1yr.
+  //    Vite always changes the hash when content changes, so this is safe.
+  app.use('/assets', express.static(path.join(distPath, 'assets'), {
+    immutable: true,
+    maxAge: '1y',
+    etag: false,
+    lastModified: false,
+  }));
+
+  // 2. GLB / 3D models → 7-day cache (large files, rarely change).
+  app.use(express.static(distPath, {
+    etag: false,
+    lastModified: false,
+    setHeaders(res, filePath) {
+      const f = filePath.toLowerCase();
+      if (f.endsWith('.glb') || f.endsWith('.gltf')) {
+        res.setHeader('Cache-Control', 'public, max-age=604800'); // 7d
+      } else if (
+        f.endsWith('sw.js') ||
+        f.endsWith('.webmanifest') ||
+        f.endsWith('index.html')
+      ) {
+        // 3. HTML shell, service worker, manifest → never cache.
+        //    Browser MUST always get the latest index.html so it loads
+        //    the correct hashed JS bundles after every deploy.
+        //    Without this, a cached index.html referencing old bundle
+        //    hashes causes 404s → "Ceva nu a mers bine" crash.
+        res.setHeader('Cache-Control', 'no-store');
+      }
+    },
+  }));
+
+  // SPA fallback — all non-API routes serve index.html with no-store.
   app.get('*', (req, res, next) => {
-    if (/^\/(api)(\/|$)/.test(req.path) || req.path === '/health') {
+    if (/^\/api(\/|$)/.test(req.path) || req.path === '/health' || req.path === '/ping') {
       return next();
     }
+    res.setHeader('Cache-Control', 'no-store');
     res.sendFile(path.join(distPath, 'index.html'), (err) => {
       if (err) next(err);
     });
