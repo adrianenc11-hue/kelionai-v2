@@ -50,6 +50,13 @@ jest.mock('../src/db', () => {
     appendConversationMessage: async (userId, id, role, content) => {
       const conv = mockBucket(userId).get(Number(id));
       if (!conv) return null;
+      // Mirror the real impl's defense-in-depth dedupe: if the most
+      // recent row matches (role, content) exactly, reuse it instead
+      // of inserting a duplicate (fixes the orphan-thread bug on prod).
+      const last = conv.messages[conv.messages.length - 1];
+      if (last && last.role === role && last.content === content) {
+        return { ...last };
+      }
       const msg = {
         id: mockNextMsgId++, conversation_id: conv.id,
         role, content, created_at: new Date().toISOString(),
@@ -174,6 +181,27 @@ describe('POST /api/conversations/:id/messages', () => {
       .post(`/api/conversations/${id}/messages`)
       .send({});
     expect(res.status).toBe(400);
+  });
+  it('dedupes back-to-back identical messages (orphan-thread fix)', async () => {
+    // Audit finding #1/#2: the client-side autosave cursor failed to
+    // advance when the effect got cancelled mid-await, so a successfully
+    // persisted message was sometimes re-POSTed on the next chunk. The
+    // server-side guard returns the existing row instead of inserting
+    // a duplicate, keeping the thread clean even with legacy clients.
+    const app = makeApp(7);
+    const create = await request(app).post('/api/conversations').send({});
+    const id = create.body.conversation.id;
+    const first = await request(app)
+      .post(`/api/conversations/${id}/messages`)
+      .send({ role: 'user', content: 'salut' });
+    const second = await request(app)
+      .post(`/api/conversations/${id}/messages`)
+      .send({ role: 'user', content: 'salut' });
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(second.body.messages[0].id).toBe(first.body.messages[0].id);
+    const detail = await request(app).get(`/api/conversations/${id}`);
+    expect(detail.body.conversation.messages).toHaveLength(1);
   });
   it('404s when appending to another user\'s thread', async () => {
     const appA = makeApp(1);

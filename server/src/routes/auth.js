@@ -4,14 +4,49 @@ const { Router } = require('express');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const config = require('../config');
-const { upsertUser, getUserById, insertUser, findByEmail, sanitizeUser } = require('../db');
-const { signAppToken } = require('../middleware/auth');
+const {
+  upsertUser,
+  getUserById,
+  insertUser,
+  findByEmail,
+  sanitizeUser,
+  setPreferredLanguage,
+  getPreferredLanguage,
+} = require('../db');
+const { signAppToken, requireAuth } = require('../middleware/auth');
 const google = require('../utils/google');
+const {
+  normalizeLanguage,
+  parseAcceptLanguage,
+  memoryFactForLanguage,
+} = require('../utils/language');
+
+// F8 — seed preferred_language on first successful auth when it isn't
+// already set, using the request's Accept-Language header. Keeping the
+// existing column value wins (user may have changed it via /me/language
+// since the last login), so this is a no-op for returning users.
+async function seedPreferredLanguageOnLogin(user, req) {
+  try {
+    if (!user || !user.id) return;
+    if (user.preferred_language) return;
+    const fromHeader = parseAcceptLanguage(req && req.headers && req.headers['accept-language']);
+    const short = normalizeLanguage(fromHeader);
+    if (!short) return;
+    const fact = memoryFactForLanguage(short);
+    await setPreferredLanguage(user.id, short, fact || undefined);
+  } catch (err) {
+    // Never fail login because language seeding failed.
+    console.warn('[auth] preferred_language seed failed:', err && err.message);
+  }
+}
 
 const router = Router();
 
-// In-memory state storage (use Redis in production)
-const oauthStates = new Map();
+// OAuth state is verified via httpOnly cookies (set on /start, read on
+// /callback). The old in-memory Map was removed (2026-04-25 audit) because
+// it broke horizontal scaling on Railway — state created on instance A was
+// invisible to instance B. Cookies travel with the user's browser so the
+// flow is self-contained regardless of which instance serves the callback.
 
 /**
  * GET /auth/google/start
@@ -22,16 +57,12 @@ router.get('/google/start', (req, res) => {
   const state = google.generateState();
   const { codeVerifier, codeChallenge } = google.generatePKCE();
 
-  oauthStates.set(state, {
-    codeVerifier,
-    mode,
-    expiresAt: Date.now() + 10 * 60 * 1000,
-  });
-
-  // Store state and verifier in cookies for verification
+  // State, verifier, and mode stored in httpOnly cookies — no server-side
+  // Map needed, so horizontal scaling works without Redis.
   const cookieOpts = { httpOnly: true, sameSite: 'lax', maxAge: 10 * 60 * 1000, path: '/' };
   res.cookie('oauth_state', state, cookieOpts);
   res.cookie('oauth_verifier', codeVerifier, cookieOpts);
+  res.cookie('oauth_mode', mode, cookieOpts);
 
   const authUrl = google.buildAuthUrl({ state, codeChallenge, mode });
   res.redirect(authUrl);
@@ -57,20 +88,23 @@ router.get('/google/callback', async (req, res) => {
       return res.status(400).json({ error: 'Missing code or state' });
     }
 
-    const storedState = oauthStates.get(state);
-    if (!storedState) {
+    const storedState = req.cookies?.oauth_state;
+    const storedVerifier = req.cookies?.oauth_verifier;
+    if (!storedState || storedState !== state) {
       return res.status(400).json({ error: 'Invalid or expired state' });
     }
-
-    if (Date.now() > storedState.expiresAt) {
-      oauthStates.delete(state);
-      return res.status(400).json({ error: 'State expired' });
+    if (!storedVerifier) {
+      return res.status(400).json({ error: 'Missing code verifier — cookie expired?' });
     }
 
-    mode = storedState.mode || 'web';
-    oauthStates.delete(state);
+    // Consume the one-time cookies so replay is impossible.
+    res.clearCookie('oauth_state', { path: '/' });
+    res.clearCookie('oauth_verifier', { path: '/' });
+    res.clearCookie('oauth_mode', { path: '/' });
 
-    const tokens = await google.exchangeCode(code, storedState.codeVerifier);
+    mode = req.cookies?.oauth_mode || 'web';
+
+    const tokens = await google.exchangeCode(code, storedVerifier);
     const googleUser = await google.fetchUserInfo(tokens.access_token);
 
     const user = await upsertUser({
@@ -79,6 +113,7 @@ router.get('/google/callback', async (req, res) => {
       name: googleUser.name,
       picture: googleUser.picture,
     });
+    await seedPreferredLanguageOnLogin(user, req);
 
     if (mode === 'mobile') {
       const token = signAppToken(user);
@@ -140,9 +175,7 @@ router.get('/me', async (req, res) => {
     }
 
     // Determine effective role (check admin emails list)
-    const defaultAdmins = ['adrianenc11@gmail.com'];
-    const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
-    const allAdmins = [...new Set([...defaultAdmins, ...adminEmails])];
+    const allAdmins = config.getAdminEmails();
     const effectiveRole = (user.role === 'admin' || allAdmins.includes((user.email || '').toLowerCase())) ? 'admin' : user.role;
 
     // Return sanitized user info
@@ -200,9 +233,7 @@ router.post('/local/register', async (req, res) => {
     // registration. Adrian's spec: "daca intilneste adresa mea de email
     // si parola mea, ala devine admin". We reuse the same list the rest
     // of the app trusts: a hardcoded default + ADMIN_EMAILS env override.
-    const defaultAdmins = ['adrianenc11@gmail.com'];
-    const adminEmailsEnv = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
-    const allAdmins = [...new Set([...defaultAdmins, ...adminEmailsEnv])];
+    const allAdmins = config.getAdminEmails();
     const emailLc = String(email).toLowerCase();
     const isAdminEmail = allAdmins.includes(emailLc);
 
@@ -244,6 +275,7 @@ router.post('/local/register', async (req, res) => {
       });
     }
 
+    await seedPreferredLanguageOnLogin(user, req);
     const token = signAppToken(user);
 
     res.cookie('kelion.token', token, {
@@ -289,6 +321,7 @@ router.post('/local/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
+    await seedPreferredLanguageOnLogin(user, req);
     const token = signAppToken(user);
 
     res.cookie('kelion.token', token, {
@@ -300,9 +333,7 @@ router.post('/local/login', async (req, res) => {
     });
 
     const safeUser = sanitizeUser ? sanitizeUser(user) : user;
-    const defaultAdmins = ['adrianenc11@gmail.com'];
-    const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
-    const allAdmins = [...new Set([...defaultAdmins, ...adminEmails])];
+    const allAdmins = config.getAdminEmails();
     const isAdmin = Boolean(
       (user.role === 'admin') ||
       (user.email && allAdmins.includes(String(user.email).toLowerCase()))
@@ -321,6 +352,51 @@ router.post('/local/login', async (req, res) => {
 router.post('/logout', (req, res) => {
   res.clearCookie('kelion.token');
   res.json({ message: 'Logged out successfully' });
+});
+
+/**
+ * F8 — user's preferred-language API.
+ *
+ * GET  /auth/me/language  →  { language, source }
+ *   - `language` = short BCP-47 primary tag stored on the user row,
+ *     falling back to the first supported tag in Accept-Language when
+ *     we haven't seeded it yet (so the client always gets something
+ *     usable to greet with).
+ *   - `source`   = 'stored' | 'header' | 'default'
+ *
+ * PUT  /auth/me/language  { language }  →  { language }
+ *   Accepts either a browser tag ("ro-RO"), a short tag ("ro"), or a
+ *   full English name ("Romanian"). Normalizes to the supported short
+ *   tag. Also rewrites the `locale` memory_item so the persona picks
+ *   up the new language on the next turn without any chat.js change.
+ */
+router.get('/me/language', requireAuth, async (req, res) => {
+  try {
+    const stored = await getPreferredLanguage(req.user.id);
+    if (stored) return res.json({ language: stored, source: 'stored' });
+    const header = parseAcceptLanguage(req.headers['accept-language']);
+    if (header) return res.json({ language: header, source: 'header' });
+    return res.json({ language: 'en', source: 'default' });
+  } catch (err) {
+    console.error('[auth] GET /me/language error:', err && err.message);
+    return res.status(500).json({ error: 'Failed to read preferred language' });
+  }
+});
+
+router.put('/me/language', requireAuth, async (req, res) => {
+  try {
+    const requested = req.body && req.body.language;
+    const short = normalizeLanguage(requested);
+    if (!short) {
+      return res.status(400).json({ error: 'Unsupported or missing language' });
+    }
+    const fact = memoryFactForLanguage(short);
+    await setPreferredLanguage(req.user.id, short, fact || undefined);
+    return res.json({ language: short });
+  } catch (err) {
+    console.error('[auth] PUT /me/language error:', err && err.message);
+    return res.status(500).json({ error: 'Failed to update preferred language' });
+  }
 });
 
 module.exports = router;

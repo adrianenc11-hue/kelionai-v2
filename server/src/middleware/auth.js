@@ -2,7 +2,8 @@
 
 const jwt = require('jsonwebtoken');
 const config = require('../config');
-const { getUserByGoogleId, findById, findByEmail, getUserByEmail } = require('../db');
+const { getUserByGoogleId, findById, findByEmail, getUserByEmail, createUser } = require('../db');
+const { resolveBanStatus } = require('../services/banCache');
 
 /**
  * Middleware pentru verificarea autentificării.
@@ -162,6 +163,18 @@ async function requireAuth(req, res, next) {
           name: decoded.name,
           role: decoded.role || 'user',
         };
+        // PR E5 — banned users get a 403 from every authed route. The
+        // ban bit is resolved through an in-process 60s cache so this
+        // stays cheap on the hot path.
+        try {
+          const ban = await resolveBanStatus(effectiveSub);
+          if (ban.banned) {
+            return res.status(403).json({
+              error: 'Cont suspendat',
+              reason: ban.reason || null,
+            });
+          }
+        } catch (_) { /* fail open */ }
         return next();
       } catch (err) {
         if (err.name === 'TokenExpiredError') {
@@ -203,9 +216,7 @@ async function requireAdmin(req, res, next) {
     }
   } catch (_) { /* fall through to other checks */ }
 
-  const defaultAdmins = ['adrianenc11@gmail.com'];
-  const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
-  const allAdmins = [...new Set([...defaultAdmins, ...adminEmails])];
+  const allAdmins = config.getAdminEmails();
   
   if (req.user.role === 'admin' || (req.user.email && allAdmins.includes(req.user.email.toLowerCase()))) {
     return next();

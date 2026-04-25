@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { runTool } from './kelionTools'
 import { setCameraController, setCurrentFacingMode } from './cameraControl'
+import { getCsrfToken } from './api'
 
 const SAMPLE_RATE_IN = 16000   // Gemini Live expects 16kHz PCM16 mic
 const SAMPLE_RATE_OUT = 24000  // Gemini Live returns 24kHz PCM16 audio
@@ -37,7 +38,7 @@ function bytesFromBase64(b64) {
   return out
 }
 
-export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null }) {
+export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null, active = true }) {
   // Kept in a ref so the parent can pass a fresh closure (e.g. a useState
   // setter wrapped in useCallback) without tearing down the WS or the
   // credits heartbeat every render.
@@ -96,6 +97,13 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
   // post-sign-in re-renders widen the stale-closure window that lets two
   // concurrent starts slip past the status check.
   const startInFlightRef = useRef(false)
+  // F5 — when start() is called on a handoff (priorTurns.length > 0), the
+  // persona already tells Kelion to continue the conversation rather than
+  // re-greet. We must NOT fire the setupComplete kickstart ("Greet me with
+  // a short hello…") in that case — an explicit user turn would override
+  // the system instruction and Gemini would re-greet anyway, defeating F4.
+  // handleMessage reads this ref to decide whether to skip the kickstart.
+  const handoffSessionRef = useRef(false)
 
   const wsRef = useRef(null)
   const audioCtxRef = useRef(null)       // 16kHz capture context for Gemini — MUST match SAMPLE_RATE_IN
@@ -379,13 +387,26 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
       // violates Google's protocol and triggers close-code 1007. If
       // send fails we silently skip; next user utterance still triggers
       // a response like before. Adrian 2026-04-20.
-      if (ws && ws.readyState === WebSocket.OPEN) {
+      //
+      // F5 — skip the kickstart entirely on F4 handoff sessions. The
+      // persona already carries the prior-turns block with a "do NOT
+      // re-greet, continue from the last Kelion turn" directive; firing
+      // a fresh "Greet me" user turn here would override that system
+      // instruction and Gemini would re-greet anyway.
+      if (handoffSessionRef.current) {
+        // Nothing to do — the model already has context and will speak
+        // when the user does (or on first mic audio). Reset the flag so
+        // the next fresh start() behaves normally.
+        handoffSessionRef.current = false
+      } else if (ws && ws.readyState === WebSocket.OPEN) {
         try {
           ws.send(JSON.stringify({
             clientContent: {
               turns: [{
                 role: 'user',
-                parts: [{ text: 'Greet me with a short friendly hello in English and ask what I need. One sentence.' }],
+                parts: [{ text: translatorMode
+                  ? 'You are now in LIVE TRANSLATOR mode. Listen carefully to everything I say in ANY language. Translate it immediately and naturally into my locked language (the one in your system instructions). Do NOT respond with your own words — just translate what you hear. Acknowledge by saying only "Translator mode active" in my language, then wait and translate.'
+                  : 'Greet me briefly and ask what I need. One sentence. Use the user-language locked in your system instructions — do NOT translate or add a second-language version.' }],
               }],
               turnComplete: true,
             },
@@ -402,13 +423,31 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
   }, [appendTurn, enqueueAudio, clearAudioQueue])
 
   // ───── Start full pipeline ─────
-  const start = useCallback(async () => {
+  const start = useCallback(async (opts = {}) => {
+    // F4 — on auto-fallback from OpenAI, KelionStage passes the current
+    // session transcript so Gemini continues rather than re-greeting.
+    // Fresh sessions call start() with no args and stay on GET.
+    const priorTurns = Array.isArray(opts.priorTurns) ? opts.priorTurns : []
     // Concurrent-call guard — see comment on `startInFlightRef`. Tap and
     // wake-word both call start() off stale closures; without this lock
     // two WebSockets open in parallel, wsRef gets clobbered, and the
     // orphaned ws's setupComplete handler fires clientContent on the
     // live ws BEFORE its own setup ack arrives → 1007.
+    //
+    // F6 — the guard MUST run before we touch `handoffSessionRef`.
+    // Otherwise a rejected concurrent start() (a tap firing while a
+    // handoff is still in-flight) would clobber the flag for the
+    // session that is actually opening the socket. Reject-first,
+    // mutate-after.
     if (startInFlightRef.current) return
+    // F5 — stash the handoff flag AFTER the concurrent guard so only
+    // the winning call writes it. The setupComplete handler reads it
+    // on the next microtask; fresh sessions explicitly reset to false
+    // so the kickstart greeting keeps firing as before.
+    handoffSessionRef.current = priorTurns.length > 0
+    // Translator mode — override the session kickstart so Kelion listens
+    // to ANY language and translates everything to the user's language.
+    const translatorMode = opts.translatorMode || false
     // If a previous ws is still live (or in CONNECTING), tear it down
     // before opening a new one — otherwise the old handlers keep firing
     // against `wsRef.current` after we reassign it below.
@@ -446,7 +485,29 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
       const geoQuery = (coords && Number.isFinite(coords.lat) && Number.isFinite(coords.lon))
         ? `&lat=${coords.lat.toFixed(6)}&lon=${coords.lon.toFixed(6)}&acc=${Math.round(coords.accuracy || 0)}`
         : ''
-      const tokenRes = await fetch(`/api/realtime/gemini-token?lang=${encodeURIComponent(langHint)}${geoQuery}`, { credentials: 'include' })
+      // Backend selector. Default is `vertex` — GA `gemini-live-2.5-flash-
+      // native-audio` on Vertex AI via the same-origin proxy at
+      // `/api/realtime/vertex-live-ws`. `?liveBackend=aistudio` (or
+      // `localStorage.kelion_live_backend = 'aistudio'`) forces the legacy
+      // preview AI Studio ephemeral-token path — kept as an operator-only
+      // escape hatch in case the Vertex proxy is unreachable.
+      let liveBackend = 'vertex'
+      try {
+        const fromUrl = new URL(window.location.href).searchParams.get('liveBackend')
+        const fromStorage = window.localStorage?.getItem('kelion_live_backend')
+        const raw = (fromUrl || fromStorage || '').toString().toLowerCase()
+        if (raw === 'aistudio') liveBackend = 'aistudio'
+      } catch (_) { /* window/localStorage missing in SSR — default stays */ }
+      const backendQuery = liveBackend === 'aistudio' ? '&backend=aistudio' : '&backend=vertex'
+      const tokenUrl = `/api/realtime/gemini-token?lang=${encodeURIComponent(langHint)}${geoQuery}${backendQuery}`
+      const tokenRes = priorTurns.length
+        ? await fetch(tokenUrl, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+            body: JSON.stringify({ priorTurns, backend: liveBackend }),
+          })
+        : await fetch(tokenUrl, { credentials: 'include' })
       // Guest trial exhaustion — propagate a clean user-facing error so
       // the HUD can render "Sign in / buy credits" instead of a raw
       // "HTTP 429".
@@ -474,7 +535,10 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
       const tokenBody = await tokenRes.json()
       const token = tokenBody?.token
       const setupPayload = tokenBody?.setup
-      if (!token) throw new Error('No ephemeral token returned')
+      const resolvedBackend = tokenBody?.backend === 'vertex' ? 'vertex' : 'aistudio'
+      // Vertex path doesn't return a token (auth lives on the server-side
+      // proxy). Only enforce the token presence for AI Studio.
+      if (resolvedBackend !== 'vertex' && !token) throw new Error('No ephemeral token returned')
       if (!setupPayload) throw new Error('No live-connect setup returned')
 
       // Trial countdown. Server returns tokenBody.trial = null for
@@ -520,7 +584,21 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
       // accepted verbatim with all the rich fields (systemInstruction,
       // tools, transcription, realtimeInputConfig, speechConfig) that used
       // to trigger close code 1007 when baked into the token.
-      const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained?access_token=${encodeURIComponent(token)}`
+      // Vertex backend: connect to our same-origin proxy. The proxy
+      // holds a GCP service-account access token server-side and opens
+      // an upstream WebSocket to `<region>-aiplatform.googleapis.com`
+      // with the correct Bearer header — a step the browser WebSocket
+      // API cannot perform itself (no custom headers allowed). The
+      // JSON frame format on the client-facing side is identical to
+      // the AI Studio path, so nothing below this line needs to care
+      // which backend the session is on.
+      let wsUrl
+      if (resolvedBackend === 'vertex') {
+        const scheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+        wsUrl = `${scheme}//${window.location.host}/api/realtime/vertex-live-ws`
+      } else {
+        wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained?access_token=${encodeURIComponent(token)}`
+      }
       const ws = new WebSocket(wsUrl)
       wsRef.current = ws
 
@@ -577,7 +655,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
             const r = await fetch('/api/credits/consume', {
               method: 'POST',
               credentials: 'include',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
               body: JSON.stringify({ minutes: 1, silent }),
             })
             if (r.status === 401) {
@@ -657,6 +735,19 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
         // status / abnormal, 1008 = policy (wrong endpoint / bad token),
         // 1007 = protocol (double setup), 1011 = server / quota.
         console.warn('[geminiLive] ws close', { code: e?.code, reason: e?.reason, wasClean: e?.wasClean })
+        // Always tear down the credits heartbeat on socket close. Without
+        // this guard the 60s interval kept ticking after the ws died and
+        // fired a stray /api/credits/consume on tab wake hours later —
+        // audit 2026-04-22 saw a -1 credit ledger entry 7 h after the
+        // session actually ended. stop() handles the idle/error path;
+        // this handler is the only one for abnormal closes where stop()
+        // is never called by the UI.
+        if (creditsIntervalRef.current) {
+          clearInterval(creditsIntervalRef.current)
+          creditsIntervalRef.current = null
+        }
+        creditsStartedRef.current = false
+        creditsStartFnRef.current = null
         if (statusRef.current === 'idle') return
         if (statusRef.current === 'error') return
         // If we never reached 'listening' (i.e. the session died before
@@ -758,8 +849,16 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
     // Kelion to "see" the camera).
     const TARGET_FPS = kind === 'screen' ? 8 : 15
     const MIN_INTERVAL_MS = Math.floor(1000 / TARGET_FPS)
-    const MAX_W = kind === 'screen' ? 960 : 480
-    const JPEG_Q = kind === 'screen' ? 0.6 : 0.55
+    // PR 5/N — high-quality live vision. Adrian 2026-04-20: "fiind o
+    // aplicație profesională, camerele trebuie să trimită către avatar
+    // imagini live de foarte bună calitate". Camera short-edge goes
+    // 480 → 1024 (4.5× pixel area) and JPEG_Q 0.55 → 0.78 — still well
+    // inside the 2 MB back-pressure budget at 15 fps because the
+    // existing `bufferedAmount > BACKPRESSURE_BYTES` guard already
+    // drops frames when the socket is full. Screen share keeps its
+    // higher ceiling (was already 960).
+    const MAX_W = kind === 'screen' ? 1280 : 1024
+    const JPEG_Q = kind === 'screen' ? 0.75 : 0.78
     const BACKPRESSURE_BYTES = 2_000_000
 
     let busy = false
@@ -851,8 +950,28 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
     // NVIDIA Broadcast) that only honours default constraints. Trying
     // `facingMode: 'user'` explicitly is a known offender on
     // external webcams. Dropping constraints almost always recovers.
+    // When the voice model picks a specific rear lens via camera_on /
+    // switch_camera (non-ultrawide, non-tele) we forward the deviceId
+    // so getUserMedia can lock to that lens instead of the default
+    // rear camera (which on multi-lens phones is often ultrawide).
+    // PR 5/N — high-quality live vision: ask the browser for up to 4K
+    // first so the camera opens at the best resolution the device
+    // advertises (previous 640×480 ceiling capped the downsample
+    // budget no matter how high MAX_W was set in the frame sender).
+    // Every rung is wrapped in try/catch below, so a phone that can
+    // only produce 720p still succeeds on a lower rung, and anything
+    // that rejects explicit resolutions still falls back to the
+    // permissive `video: true`.
+    const deviceId = opts.deviceId || null
+    const baseSelector = deviceId
+      ? { deviceId: { exact: deviceId } }
+      : { facingMode: nextFacing }
     const constraintLadder = [
-      { video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: nextFacing }, audio: false },
+      { video: { ...baseSelector, width: { ideal: 3840 }, height: { ideal: 2160 } }, audio: false },
+      { video: { ...baseSelector, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false },
+      { video: { ...baseSelector, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
+      { video: { ...baseSelector, width: { ideal: 640 }, height: { ideal: 480 } }, audio: false },
+      { video: { width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
       { video: { width: { ideal: 640 }, height: { ideal: 480 } }, audio: false },
       { video: true, audio: false },
     ]
@@ -885,6 +1004,11 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
       friendly = 'Camera is in use by another app (Teams, Zoom, OBS…). Close it and try again.'
     }
     setVisionError(friendly)
+    // Propagate so the cameraControl.restart() wrapper used by the
+    // switch_camera tool sees the failure. Without the rethrow the
+    // tool returned ok:true on every call because the ladder caught
+    // every getUserMedia rejection without re-signalling it upward.
+    throw (lastError instanceof Error) ? lastError : new Error(friendly)
   }, [startFrameSender])
 
   const stopCamera = useCallback(() => {
@@ -1007,18 +1131,61 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
 
   useEffect(() => () => { stop() }, [stop])
 
-  // Register the camera controller so the `switch_camera` tool handler
-  // in kelionTools.js can flip front/back without reaching into this
-  // hook directly. Keeps the coupling one-way: the tool dispatches via
-  // cameraControl.js and whichever voice transport is mounted picks up
-  // the restart call.
+  // Register the camera controller so the `switch_camera` / camera_on /
+  // camera_off / zoom_camera voice tools can drive this hook. Only the
+  // ACTIVE transport registers — KelionStage always mounts both the
+  // Gemini and OpenAI hooks and without the `active` gate both commit
+  // setCameraController in the same render pass, with whichever ran
+  // last silently winning. That caused verbal camera commands to land
+  // on the wrong transport whenever the user picked the "losing"
+  // provider (user-visible symptom: "camera nu merge corect" because
+  // the stream opened on the inactive hook and the UI reads
+  // liveHook.cameraStream from the active one).
   useEffect(() => {
+    if (!active) return undefined
     setCameraController({
+      start: (opts) => startCamera(opts),
+      stop: () => stopCamera(),
       restart: (opts) => startCamera(opts),
       getFacingMode: () => cameraFacingRef.current || 'user',
+      // camera_zoom tool reaches through to the live MediaStreamTrack
+      // and applies a native zoom constraint where supported. Gemini's
+      // hidden <video> element is tracked on hiddenVideoCameraRef; fall
+      // back to cameraStreamRef when the hidden video hasn't attached
+      // yet (first frame hasn't fired).
+      getActiveTrack: () => {
+        const v = hiddenVideoCameraRef.current
+        const src = (v && v.srcObject) || cameraStreamRef.current
+        if (src && typeof src.getVideoTracks === 'function') {
+          const tracks = src.getVideoTracks()
+          return tracks && tracks[0] ? tracks[0] : null
+        }
+        return null
+      },
     })
     return () => setCameraController(null)
-  }, [startCamera])
+  }, [active, startCamera, stopCamera])
+
+  // Audit M6 — `isBusy()` lets KelionStage's auto-fallback effect
+  // (2) detect whether the user already kicked off a manual
+  // start() between the provider flip and the handoff call.
+  // Returns true while `start()` is in flight OR while the live
+  // ws is anything other than CLOSED. Reading refs directly so a
+  // caller sees the latest value without waiting for a re-render.
+  const isBusy = useCallback(() => {
+    if (startInFlightRef.current) return true
+    const ws = wsRef.current
+    if (ws && ws.readyState !== WebSocket.CLOSED) return true
+    return false
+  }, [])
+
+  // setMuted — instantly silences or restores Kelion's voice output by
+  // controlling the Web Audio gain node. Works without restarting the session.
+  const setMuted = useCallback((muted) => {
+    if (outputGainRef.current) {
+      outputGainRef.current.gain.value = muted ? 0 : 1
+    }
+  }, [])
 
   return {
     status, error, start, stop, turns, userLevel,
@@ -1027,5 +1194,9 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null 
     startCamera, stopCamera, startScreen, stopScreen,
     // Trial countdown (null for signed-in users, object for guests).
     trial,
+    // Audit M6 — handoff double-start guard (see lib/handoffGuard.js).
+    isBusy,
+    // Mute/unmute Kelion's voice output without restarting the session.
+    setMuted,
   }
 }

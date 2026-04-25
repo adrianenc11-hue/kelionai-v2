@@ -107,3 +107,20 @@ module.exports = {
     webhookSecret: optional('STRIPE_WEBHOOK_SECRET'),
   },
 };
+
+// ───── Centralized admin email list ─────
+// Previously this was hardcoded as `['adrianenc11@gmail.com']` in 6+ files.
+// Now every file should `require('./config').getAdminEmails()` instead.
+const DEFAULT_ADMIN_EMAIL = 'adrianenc11@gmail.com';
+
+/**
+ * Returns the list of admin emails. Reads ADMIN_EMAILS env var
+ * (comma-separated) with a single-email default fallback.
+ */
+module.exports.getAdminEmails = function getAdminEmails() {
+  const raw = process.env.ADMIN_EMAILS;
+  if (raw) return raw.split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+  return [DEFAULT_ADMIN_EMAIL];
+};
+
+module.exports.DEFAULT_ADMIN_EMAIL = DEFAULT_ADMIN_EMAIL;

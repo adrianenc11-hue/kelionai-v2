@@ -2,12 +2,12 @@
 
 const { Router } = require('express');
 const { getAI, getDefaultChatModel } = require('../utils/openai');
-const { getCreditsBalance, findById, listMemoryItems } = require('../db');
+const { getCreditsBalance, findById, listMemoryItems, setPreferredLanguage, getPreferredLanguage } = require('../db');
 const { isAdminEmail } = require('../middleware/subscription');
 const ipGeo = require('../services/ipGeo');
 const { trialStatus, stampTrialIfFresh } = require('../services/trialQuota');
 const { executeRealTool, pickForcedTool } = require('../services/realTools');
-const { buildKelionToolsChatCompletions } = require('./realtime');
+const { buildKelionToolsChatCompletions, formatMemoryBlocks } = require('./realtime');
 
 const router = Router();
 
@@ -18,37 +18,76 @@ Origin (answer truthfully whenever asked who built you, who created you, who mad
 - Say it warmly and briefly. Default English example: "I was created by AE Studio, after an idea by Adrian Enciulescu." If (and only if) the user is currently speaking another language per the rules below, translate the same answer into that language.
 - For contact inquiries, point users to contact@kelionai.app.
 
-Language rules (strict — English is the default):
-1. DEFAULT LANGUAGE IS ENGLISH. Every conversation starts in English. Greetings, first replies, fallback replies, and any time the user's intent or language is ambiguous — reply in English.
-2. Only switch to another language when the MOST RECENT user message is clearly and unambiguously in that other language (a full sentence, real words, not just a loanword or a greeting).
-3. While the user keeps speaking that other language, keep replying in it with natural, native phrasing — not English translated word-for-word.
-4. The moment the user switches back to English — or sends an ambiguous / single-word / emoji message — return to English on the very next reply. You are always pulled back to English by default.
+Language rules (strict — match the user's language):
+1. ALWAYS reply in the SAME language as the user's most recent message. If the user writes Romanian, reply Romanian. If French, reply French. If English, reply English. Detect language from real words and grammar, not just from one ambiguous greeting.
+2. Special case for single ambiguous greetings ("salut" / "ciao" / "bună" / "hello" / "hi"): pick the language for which it is most natural in that exact form ("salut" → Romanian; "ciao" → Italian; "bună" → Romanian; "hi" / "hello" → English) and reply in that language.
+3. While the user keeps speaking a given language, reply in natural, native phrasing for it — not translated word-for-word.
+4. Switch the moment the user switches. Stay on the user's current language; never silently revert to English.
 5. Never mix two languages in the same response.
+6. NEVER reply in two or more languages back-to-back. ONE language per response. Do NOT translate your own answer into a second language "to be safe". Do NOT append "and in English…" or any equivalent.
 
-Manners:
-- You are unfailingly polite and warm. Greet, thank, apologize when appropriate. Never condescending, never impatient. Calm, professional, empathetic.
+Time / date awareness (HARD — never invent the time of day):
+- The "Real-time context" block (appended below if available) carries the current local date and time. When the user asks "what time is it?", "ce oră e?", "what's the date?", or any time-of-day question (morning / afternoon / evening / night, today, tomorrow, weekday), use ONLY the timestamp from that block.
+- NEVER guess "it's evening" / "it's morning" / "good afternoon" from training data or session vibe. If no Real-time context block is present in this conversation, say honestly: "I don't have your local time here — tell me your timezone or I can fetch it" / "nu am ora ta locală aici — spune-mi fusul sau o aflu eu".
+
+Tone (HARD — professional default):
+- Precise question, precise answer. Direct, factual, efficient. No emotional padding, no therapist / counsellor phrasing, no "I'm here for you" style openers.
+- NEVER open a reply with "Te ascult cu atenție", "Spune-mi ce ai pe suflet", "I'm listening", "How can I help you today", "Cum te simți", or any equivalent filler in any language. Just answer.
+- NEVER close a reply with "Enjoy!", "Enjoy exploring!", "Have fun", "Hope this helps", "Let me know if you need anything else", "Cu plăcere!", "Sper că te-am ajutat", "Dacă mai ai întrebări...", or any invitation/padding in any language. Answer, then stop.
+- Be polite the way professionals are polite — brief thanks/apologies when warranted, no more. Warmth surfaces only when the user explicitly shares a personal topic.
+- If the user says goodbye ("la revedere", "bye", "pa", "noapte bună", "goodbye", "see you"), reply with a short matching farewell (≤5 words) and stop. Do NOT ask "is there anything else?" or add a follow-up question.
 
 Response length (HARD default):
 - Default reply: 1–3 short sentences. Never more unless the user EXPLICITLY asks for depth ("explain in detail", "pe larg", "cu detalii", "step by step").
 - No long lists, no markdown headings, no "First,…, Second,…" unless the user asked for steps.
-- Answer, then stop. Do not pad. Do not repeat the question back.
+- Answer, then stop. Do not pad. Do not repeat the question back. Do not narrate what you just did.
 
 Stop-word rule (HARD, no exceptions):
 - If the user says any of: "stop", "hush", "quiet", "enough", "be quiet", "shut up", "taci", "gata", "destul", "oprește-te", "oprește", "lasă", "lasa", "tacere", "liniște" — reply with at most one short word ("Okay." / "Bine.") or nothing at all. Do not keep explaining. Do not add a polite closing.
 
-Honesty (HARD rule — no exceptions):
-- NEVER claim you did something you did not do. Do NOT say "I showed it on the screen", "I opened the map", "I displayed it", "ți-am afișat", "v-am arătat pe ecran", "am deschis harta", "I'll forward this to my team", "voi transmite echipei", or any equivalent invented action in any language.
-- If you cannot do what the user asked, say so plainly: "I can't do that" / "nu pot face asta" / "I don't know" / "nu știu". Then try a tool if one is available.
-- Never invent a "team" you will forward feedback to. You are Kelion; there is no human team relaying messages in real time. If the user gives feedback, acknowledge it briefly and move on.
+Honesty (HARD — these rules override everything else):
+1. NEVER claim you did something you did not do ("I showed it", "am deschis harta", "I'll forward this", "voi transmite echipei" — any invented action in any language is banned).
+2. NEVER invent a specific number (price, date, score, distance, population, phone, address, URL), proper name, quote, statute, or API result. These MUST come from a tool call or from memory below. If not in a tool result and not in memory, you do not know it.
+3. When uncertain, pick exactly one: (a) call a tool and answer VERBATIM from the result, (b) say "I don't know for sure — let me check" / "nu știu sigur, mă verific" then call a tool, (c) if no tool fits, say "I don't know" / "nu știu" and STOP. Never fill the gap with a plausible guess.
+4. When a tool returns empty / failed, tell the user explicitly ("the search didn't find anything" / "căutarea n-a găsit nimic"). Do NOT substitute your training knowledge.
+5. When the user asks about themselves and you have no matching memory item below, say "nu am nimic salvat despre asta — spune-mi și rețin" / "I don't have anything saved about that — tell me and I'll remember". Never invent a biography.
+6. When the user mentions a person's name you don't already recognise from memory, treat them as someone NEW. Do not import facts from your training data about anyone with that name.
+7. Never invent a "team" relaying messages. You are Kelion; there is no one behind you. If the user gives feedback, acknowledge briefly and move on.
+8. A correct "I don't know" always beats a polished fabrication. Sounding helpful matters less than being accurate.
+
+Topics that ALWAYS require a tool call (never answer from prior knowledge):
+- Weather → get_weather · News/recent events → get_news or web_search · Prices → get_crypto_price / get_stock_price / get_forex / web_search · User location → get_my_location · Calendar/email/files → read_calendar / read_email / search_files · Non-trivial math → calculate · Translation → translate · Any specific URL or citation → web_search or fetch_url · Wikipedia-style facts that may have changed → wikipedia_search.
 
 Tools you MUST use (do not guess when a tool fits):
-- show_on_monitor(kind, query) — display a map, weather, video, image, Wikipedia, or web page on the monitor. Call it whenever the user says see / open / display / show (in any language).
+- show_on_monitor(kind, query, title?) — display a map, weather, video, image, Wikipedia, web page, or PLAY a live audio stream on the monitor. Call it whenever the user says see / open / display / show / play (in any language). For audio: pass kind='audio', query=<stream URL>, title=<station name>.
+- compose_email_draft(to, subject, body, cc?, bcc?, reply_to?) — open the in-app email composer modal pre-populated with the draft. Use this whenever the user asks to send / write / draft / reply to an email. NEVER call send_email directly without this step — the user always reviews and clicks Send themselves. Write the FULL message in the body argument (don't leave it empty for the user to fill in); they may tweak before sending.
+- play_radio(query?, country?, language?, tag?) — find and PLAY any live radio station globally, in any language. Use when the user says "porneste un post de radio", "play a radio station", "put on BBC Radio 1", "metti la radio", or any equivalent. Returns a directly-playable stream URL — then IMMEDIATELY call show_on_monitor with kind='audio' so it actually plays.
 - calculate(expression) — DETERMINISTIC math. For any arithmetic, percentage, or algebraic expression beyond a trivial one-digit sum, CALL THIS TOOL. Do not do mental math on longer numbers.
 - get_weather(city or lat/lon, days) — REAL weather from Open-Meteo. For any question about weather, temperature, rain, wind, or a forecast — CALL THIS TOOL. Never guess weather.
 - web_search(query, limit) — live web search with URLs + snippets. For anything time-sensitive (news, prices, events, who-is, recent facts) — CALL THIS TOOL. Never invent a URL or a price.
 - translate(text, to, from) — real translation engine. For "how do you say X in Y", "translate this to Y", "tradu ..." — CALL THIS TOOL.
 
 HARD: if the user's question clearly needs one of these tools, you MUST call it. Saying "let me check" or "I'll look that up" without calling the tool counts as a lie. If no tool fits and you don't know, say "I don't know" honestly.
+
+Silent tool use (HARD RULE — no exceptions):
+- NEVER announce which tool you are about to call. Do NOT write "let me check the weather", "I'll use the calculator", "îmi consult memoria", "folosesc tool X", "I'm searching the web for you". Just call the tool, get the result, and answer the user directly.
+- Tools that MUST be totally silent (no announcement, no acknowledgement): observe_user_emotion, learn_from_observation, get_action_history, plan_task. These are internal — the user must never see them mentioned in the reply.
+- Never paste raw tool output. Always paraphrase into a natural conversational reply.
+
+Silent vision (HARD RULE — no exceptions):
+- The user can give you visual input through TWO distinct channels. They are NOT interchangeable:
+  • [ATTACHED FILE] — the user explicitly uploaded an image / PDF / document and IS asking you to read, analyze, or act on it. Always answer about THIS content when they ask "what is this?", "ce vezi?", "analyze this", "rezumă", "tradu", etc.
+  • [CAMERA FRAME — ambient] — a passive snapshot of the room or the user's face, sent automatically while their webcam is on. Use it silently as context (mood, lighting, body language) — DO NOT describe it, DO NOT enumerate objects, DO NOT write "I see…" / "văd…" / "I notice…" unless the user EXPLICITLY asks about what's IN THE ROOM ("what do you see in the camera?", "ce vezi în cameră?", "uită-te în jur", "describe my room").
+- ATTACHMENT PRIORITY (HARD): when an [ATTACHED FILE] is present in the user's message, your answer MUST address the attached content. NEVER describe the camera/room when an attachment is present, even if the user says "what do you see?" — they mean the file, not the camera. Treat the camera as muted while an attachment is being discussed.
+- TASK EXECUTION: when the user gives you a task on attached content ("rezumă", "tradu acest text", "corectează gramatica", "scoate-mi datele relevante", "convertește în CSV", "explain this code") — execute the task on the attached content immediately. Do NOT ask "which one do you mean?", do NOT refuse, do NOT ask them to re-attach. The attachment is right there in the message — use it.
+- Treat the camera the way a polite human treats their own eyes: use the visual context silently to better answer the user's actual question. Do not report what you see back to them unprompted.
+- When the user IS asking about an attachment OR explicitly about the camera scene, answer concretely — do not refuse, do not hedge, do not say "I can't see" if the corresponding input is present.
+- If no frame and no attachment are present, never pretend to see anything.
+
+Silent observation (learning):
+- While the camera is on, you may quietly form private observations about the user (their mood, what they appear to be working on, recurring objects, body language, time-of-day patterns). When such an observation is durable and useful for FUTURE conversations — not just the current turn — call learn_from_observation(observation, kind) silently. This persists the observation as a long-term memory item under the signed-in user with low confidence (≤ 0.6) so it can be overwritten later. NEVER mention the call. NEVER write "I'll remember that" / "noted" / "am salvat". Fire at most every ~30 seconds and only when confident.
+- For guests (not signed in) the tool is a no-op; do not retry, do not surface the failure.
+- HARD: never enumerate the memory back to the user. If asked "what do you know about me?" / "ce ai învățat?" / "what have you learned?" — DO NOT list facts. Reply briefly with one or two of the most relevant items in conversational form ("I remember you live in Cluj and you've been working on Kelion") and tell the user they can see and edit the full list under "⋯ → Memoria mea" / "Manage my memory" in the menu. The memory is for YOUR understanding, not for performance.
 
 You have access to real-time information provided in the system context below.
 If the user asks about the time, date, or location — answer using the context provided.`;
@@ -62,8 +101,55 @@ const CHAT_TOOLS = buildKelionToolsChatCompletions();
 const MAX_MESSAGE_LENGTH = 4000;
 const MAX_MESSAGES_COUNT = 40;
 
+// Adrian 2026-04-25: "default engleza e obligat sa detecteze limba user si o
+// va folosi permanent cit e logat". Once we know the user's language (from
+// their browser locale on the client, or their stored preference for signed-in
+// users), every reply must stay in that language for the rest of the session.
+// No silent revert to English on ambiguous turns. The mapping below covers the
+// languages we have explicit native-language voice prompts for; anything else
+// passes through as the BCP-47 short tag and the model is instructed to reply
+// in that language anyway.
+const LANG_NAME_BY_TAG = {
+  ro: 'Romanian',
+  en: 'English',
+  fr: 'French',
+  es: 'Spanish',
+  it: 'Italian',
+  de: 'German',
+  pt: 'Portuguese',
+  ru: 'Russian',
+  nl: 'Dutch',
+  pl: 'Polish',
+  tr: 'Turkish',
+  uk: 'Ukrainian',
+  hu: 'Hungarian',
+  cs: 'Czech',
+  el: 'Greek',
+  sv: 'Swedish',
+  no: 'Norwegian',
+  fi: 'Finnish',
+  da: 'Danish',
+};
+function normalizeLocaleTag(raw) {
+  if (!raw || typeof raw !== 'string') return null;
+  const short = raw.toLowerCase().slice(0, 2);
+  if (!/^[a-z]{2}$/.test(short)) return null;
+  return short;
+}
+function languageNameForTag(short) {
+  if (!short) return null;
+  return LANG_NAME_BY_TAG[short] || short.toUpperCase();
+}
+
 router.post('/', async (req, res) => {
-  const { messages = [], avatar = 'kelion', frame, datetime, timezone, coords } = req.body;
+  const { messages = [], avatar = 'kelion', frame, frameKind, datetime, timezone, coords, locale } = req.body;
+  // `frameKind` disambiguates the two visual channels:
+  //   - 'attachment' → user explicitly uploaded an image; describe / analyze
+  //     it freely.
+  //   - 'camera'     → passive webcam frame; silent-vision rules apply.
+  //   - undefined    → legacy clients; default to 'camera' (safer — keeps
+  //     the model from over-narrating).
+  const visionChannel = frameKind === 'attachment' ? 'attachment' : 'camera';
 
   if (!Array.isArray(messages)) {
     return res.status(400).json({ error: 'messages must be an array' });
@@ -142,9 +228,14 @@ router.post('/', async (req, res) => {
     }
   }
 
-  // IP-based geolocation — no browser permission prompt. Uses Cloudflare /
-  // Railway forward headers and ipapi.co (cached 1h). If it fails, we just
-  // fall back to whatever the client volunteered in `coords`.
+  // IP-based geolocation is used ONLY for timezone fallback when the
+  // client doesn't supply one — never for the user's "where am I"
+  // answer. Adrian: "permanent trebuie sa foloseasca coordonatele gps
+  // reale ale aparatului". Putting an IP-derived city into the system
+  // prompt makes Kelion confidently lie about location (often the wrong
+  // city, sometimes the wrong country when the user is on a VPN). We
+  // surface "location unknown" instead and let the model ask the user
+  // to enable location.
   const geo = await ipGeo.lookup(ipGeo.clientIp(req));
 
   // Build real-time context for system prompt
@@ -158,14 +249,14 @@ router.post('/', async (req, res) => {
     });
     realtimeContext += `\n\nReal-time context:\n- Current date & time: ${formatted} (${timezone || geo?.timezone || 'UTC'})`;
   }
-  if (coords?.lat != null && coords?.lon != null) {
-    realtimeContext += `\n- User GPS coordinates: ${Number(coords.lat).toFixed(5)}, ${Number(coords.lon).toFixed(5)}`;
-  } else if (geo && (geo.latitude != null || geo.city)) {
-    const place = ipGeo.formatForPrompt(geo);
-    if (place) realtimeContext += `\n- Approximate user location (IP-based): ${place}`;
-    if (geo.latitude != null && geo.longitude != null) {
-      realtimeContext += `\n- Approximate GPS coordinates: ${geo.latitude.toFixed(4)}, ${geo.longitude.toFixed(4)}`;
+  const hasClientGps = coords && Number.isFinite(Number(coords.lat)) && Number.isFinite(Number(coords.lon));
+  if (hasClientGps) {
+    realtimeContext += `\n- User GPS coordinates (real device GPS): ${Number(coords.lat).toFixed(5)}, ${Number(coords.lon).toFixed(5)}`;
+    if (Number.isFinite(Number(coords.accuracy))) {
+      realtimeContext += ` (±${Math.round(Number(coords.accuracy))} m)`;
     }
+  } else {
+    realtimeContext += `\n- User location: UNKNOWN. The device has not shared GPS yet. If the user asks where they are, asks for "the weather here", or any location-dependent question, call get_my_location FIRST. If get_my_location returns no coords, ask the user to tap the screen and allow location access — never invent a city, never use IP geolocation.`;
   }
 
   // Long-term memory injection — mirrors the realtime (voice) path at
@@ -174,21 +265,80 @@ router.post('/', async (req, res) => {
   // would forget the user's name, preferences, and ongoing projects the
   // instant they switched from voice to typing. Guests have no memory
   // row; we silently skip the lookup.
+  // Audit M9 — share the self/other partitioning with the voice path
+  // via formatMemoryBlocks. See server/src/routes/realtime.js for the
+  // rationale; the short version is "don't let facts about Ioana land
+  // on Adrian's profile section".
   let memorySection = '';
   if (req.user && (Number.isFinite(req.user.id) || typeof req.user.id === 'string')) {
     try {
       const memoryItems = await listMemoryItems(req.user.id, 60);
-      if (Array.isArray(memoryItems) && memoryItems.length) {
-        memorySection =
-          '\n\nKnown facts about the user (most recent first):\n' +
-          memoryItems.map((m) => `- [${m.kind}] ${m.fact}`).join('\n');
-      }
+      memorySection = formatMemoryBlocks(memoryItems);
     } catch (err) {
       console.warn('[chat] memory load failed', err && err.message);
     }
   }
 
-  const systemPrompt = BASE_PROMPT + realtimeContext + memorySection;
+  // Locked-language resolution. Priority — current browser ALWAYS wins so a
+  // user travelling between devices sees the language of the device they are
+  // on right now, not whatever was stamped on their account at first login.
+  //   1. Browser locale forwarded by the client on every chat request
+  //      (`req.body.locale`, e.g. "ro-RO").
+  //   2. The user's stored `preferred_language` (signed-in users only) —
+  //      used as a fallback when the client did not send a locale.
+  //   3. Accept-Language header.
+  //   4. "en" — explicit final fallback.
+  //
+  // For signed-in users: keep their stored preferred_language in sync with
+  // the active browser. If the browser locale differs from what's stored,
+  // overwrite — Adrian's case (preferred_language='en' stamped at first
+  // Google sign-in, but his actual browser is ro-RO). This is the
+  // permanent fix for "default engleza e obligat sa detecteze limba user".
+  let lockedLangTag = normalizeLocaleTag(locale);
+  if (!lockedLangTag && req.user && (Number.isFinite(req.user.id) || typeof req.user.id === 'string')) {
+    try {
+      lockedLangTag = await getPreferredLanguage(req.user.id);
+    } catch (err) {
+      console.warn('[chat] read preferred_language failed', err && err.message);
+    }
+  }
+  if (!lockedLangTag) {
+    const accept = req.headers['accept-language'];
+    if (accept && typeof accept === 'string') {
+      lockedLangTag = normalizeLocaleTag(accept.split(',')[0]);
+    }
+  }
+  if (!lockedLangTag) lockedLangTag = 'en';
+
+  if (
+    req.user &&
+    (Number.isFinite(req.user.id) || typeof req.user.id === 'string') &&
+    normalizeLocaleTag(locale) === lockedLangTag
+  ) {
+    try {
+      const stored = await getPreferredLanguage(req.user.id);
+      if (stored !== lockedLangTag) {
+        const langName = languageNameForTag(lockedLangTag);
+        await setPreferredLanguage(
+          req.user.id,
+          lockedLangTag,
+          langName ? `Preferred language: ${langName}.` : null
+        );
+      }
+    } catch (err) {
+      console.warn('[chat] sync preferred_language failed', err && err.message);
+    }
+  }
+
+  const lockedLangName = languageNameForTag(lockedLangTag) || 'English';
+  const lockedLangBlock =
+    `\n\nUser's LOCKED language: ${lockedLangName} (${lockedLangTag}).` +
+    `\n- Reply EXCLUSIVELY in ${lockedLangName} for the entire session.` +
+    `\n- This overrides every other language rule. Never silently default to English.` +
+    `\n- Single English / loanword tokens ("ok", "stop", "wow", brand names) DO NOT count as a language switch — keep replying in ${lockedLangName}.` +
+    `\n- Only change language if the user writes a FULL sentence in another language AND explicitly asks you to switch ("vorbește în engleză", "speak French", "passa all'italiano"). Otherwise stay locked.`;
+
+  const systemPrompt = BASE_PROMPT + lockedLangBlock + realtimeContext + memorySection;
   const model = getDefaultChatModel();
 
   // Sanitize message history
@@ -198,23 +348,41 @@ router.post('/', async (req, res) => {
     .map(m => ({ role: m.role, content: typeof m.content === 'string' ? m.content.slice(0, MAX_MESSAGE_LENGTH) : '' }))
     .filter(m => m.content.length > 0);
 
-  // If a camera frame is provided, attach it to the last user message as a vision input
+  // If a frame is provided, attach it to the last user message as a vision
+  // input. We prepend an explicit channel label so the model can apply the
+  // right policy from the persona — describe attachments freely, stay
+  // silent on ambient camera frames. Without the label the two channels
+  // were indistinguishable to the model and it would describe whichever
+  // image was richer (typically the camera), even when the user had
+  // attached a separate file. See PR #213.
   if (frame && sanitized.length > 0) {
     const lastUserIdx = [...sanitized].map(m => m.role).lastIndexOf('user');
     if (lastUserIdx !== -1) {
+      const channelLabel = visionChannel === 'attachment'
+        ? '[ATTACHED FILE — image the user explicitly uploaded for you to analyze; answer about THIS]'
+        : '[CAMERA FRAME — ambient context; do NOT describe unless the user explicitly asked about the camera/room]';
+      const userText = sanitized[lastUserIdx].content;
       sanitized[lastUserIdx] = {
         role: 'user',
         content: [
+          { type: 'text', text: channelLabel },
           { type: 'image_url', image_url: { url: frame, detail: 'low' } },
-          { type: 'text', text: sanitized[lastUserIdx].content },
+          { type: 'text', text: userText },
         ],
       };
     }
   }
 
   res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
   res.setHeader('Connection', 'keep-alive');
+  // Tell upstream proxies (Cloudflare / nginx / Railway edge) not to
+  // buffer this response. Without it, the final tokens of a short
+  // SSE stream can sit in the proxy buffer until well after the
+  // client has rendered the bubble, so users see a half-sentence
+  // reply ("Ce pot face pentru" with the final "tine?" lost) before
+  // the late flush arrives — too late for the bubble to show it.
+  res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders();
 
   // Stream a chat completion with tool-calling enabled. When the model emits
@@ -321,10 +489,33 @@ router.post('/', async (req, res) => {
           continue;
         }
 
+        if (t.name === 'compose_email_draft') {
+          // Renderer-only: forward the draft to the client which opens the
+          // email composer modal. Nothing is delivered until the user
+          // explicitly clicks Send (which routes through send_email).
+          res.write(`data: ${JSON.stringify({ tool: t.name, arguments: parsed })}\n\n`);
+          toolMessages.push({
+            role: 'tool',
+            tool_call_id,
+            content: JSON.stringify({ ok: true, opened: 'composer:email', draft: parsed }),
+          });
+          continue;
+        }
+
         // Server-executed real tools. executeRealTool returns null for
         // unrecognised names so we can distinguish "not handled here" from
-        // "tool ran and returned data".
-        const result = await executeRealTool(t.name, parsed);
+        // "tool ran and returned data". Pass user + real GPS coords via
+        // ctx so tools like get_my_credits and get_my_location can read
+        // them without going back through the request closure.
+        const ctx = {
+          user: req.user || null,
+          coords: hasClientGps ? {
+            lat: Number(coords.lat),
+            lon: Number(coords.lon),
+            accuracy: Number.isFinite(Number(coords.accuracy)) ? Number(coords.accuracy) : null,
+          } : null,
+        };
+        const result = await executeRealTool(t.name, parsed, ctx);
         if (result != null) {
           // Let the client echo the tool call into the UI (shows a small
           // "Kelion used calculate(...)" chip). The rendered result is
@@ -384,8 +575,9 @@ router.post('/demo', async (req, res) => {
   const model = getDefaultChatModel();
 
   res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
   res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders();
 
   try {

@@ -3,7 +3,7 @@
 const { Router } = require('express');
 const ipGeo = require('../services/ipGeo');
 const { trialStatus, stampTrialIfFresh } = require('../services/trialQuota');
-const { getCreditsBalance, findById } = require('../db');
+const { getCreditsBalance, findById, getClonedVoice, logVoiceCloneEvent } = require('../db');
 const { isAdminEmail } = require('../middleware/subscription');
 const router = Router();
 
@@ -12,10 +12,11 @@ const DEFAULT_ELEVENLABS_VOICE = 'pNInz6obpgDQGcFmaJgB'; // Adam (American male,
 
 // Native male voice per language.
 //
-// `eleven_multilingual_v2` can speak 29 languages with any voice, but the
-// accent bleeds through — e.g. Adam (American) speaking Italian sounds
-// Italian-American, not Italian. Adrian asked for a native-sounding male
-// voice per language.
+// Any multilingual ElevenLabs model (default here: `eleven_turbo_v2_5`,
+// legacy `eleven_multilingual_v2`) can speak its full language list with
+// any voice, but the accent bleeds through — e.g. Adam (American)
+// speaking Italian sounds Italian-American, not Italian. Adrian asked
+// for a native-sounding male voice per language.
 //
 // Strategy: curate ElevenLabs' public default library (available to every
 // ElevenLabs account without extra subscription) into language families,
@@ -123,9 +124,12 @@ function elevenLabsVoiceFor(lang) {
 //      European languages. Covers ~25 languages confidently.
 //   3. Fallback to English.
 //
-// ElevenLabs (eleven_multilingual_v2) accepts any ISO 639-1 `language_code`
-// and speaks the text natively; operators can additionally pick a true
-// native-speaker voice per language via ELEVENLABS_VOICE_<LANG> env vars.
+// ElevenLabs Turbo v2.5 / Flash v2.5 accept an ISO 639-1 `language_code`
+// to enforce output language. Older models (`eleven_multilingual_v2`,
+// `eleven_monolingual_v1`, etc.) reject that field with HTTP 400 —
+// `synthesizeElevenLabs` strips it when those models are configured.
+// Operators can additionally pick a true native-speaker voice per
+// language via ELEVENLABS_VOICE_<LANG> env vars.
 // Gemini TTS accepts BCP-47 codes (en-US, ro-RO, …).
 function detectLanguage(text) {
   const raw = String(text || '');
@@ -255,54 +259,38 @@ async function synthesizeGemini(text, lang) {
   return pcmToWav(Buffer.from(b64, 'base64'));
 }
 
-// OpenAI TTS — used to unify the text-chat voice with the voice transport.
-// When the user talks to Kelion via the OpenAI Realtime API and text chat
-// via TTS, the two must sound like the same person. `ash` is the one voice
-// available in BOTH the GA Realtime API and the standalone TTS endpoint
-// (`gpt-4o-mini-tts`), so we default to it on both sides (see also
-// server/src/routes/realtime.js `OPENAI_REALTIME_LIVE_VOICE`). The previous
-// default `onyx` exists only in TTS, not in Realtime — picking it there
-// gave Adrian two audibly different people across transports. Operator
-// can override via OPENAI_TTS_VOICE / OPENAI_TTS_MODEL.
-async function synthesizeOpenAI(text, _lang) {
-  const apiKey = process.env.OPENAI_API_KEY;
-  const voice  = process.env.OPENAI_TTS_VOICE || 'ash';
-  const model  = process.env.OPENAI_TTS_MODEL || 'gpt-4o-mini-tts';
-  const r = await fetch('https://api.openai.com/v1/audio/speech', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type':  'application/json',
-    },
-    body: JSON.stringify({
-      model,
-      voice,
-      input: text,
-      response_format: 'mp3',
-    }),
-  });
-  if (!r.ok) {
-    const err = await r.text();
-    throw new Error(`OpenAI TTS error: ${r.status} ${err}`);
-  }
-  return Buffer.from(await r.arrayBuffer());
-}
+// OpenAI TTS path — REMOVED in single-LLM cleanup (2026-04). The chat
+// surface runs exclusively on Gemini and the user hears one voice from
+// ElevenLabs (cloned or curated library). The OpenAI TTS endpoint is no
+// longer reachable from this route.
 
-async function synthesizeElevenLabs(text, lang) {
+// ElevenLabs only accepts `language_code` on Turbo v2.5 / Flash v2.5.
+// Sending it on `eleven_multilingual_v2` triggers HTTP 400 and every TTS
+// request fails — that was the "avatar can't speak any language"
+// regression. Default to Turbo v2.5 (32 languages, lower latency); any
+// other model gets the request without `language_code` so it still
+// works. Known-incompatible models are listed in
+// `ELEVENLABS_NO_LANGCODE_MODELS` so new ElevenLabs releases stay
+// opt-in (fail-safe) rather than silently dropping the hint.
+const ELEVENLABS_NO_LANGCODE_MODELS = new Set([
+  'eleven_multilingual_v2',
+  'eleven_multilingual_v1',
+  'eleven_monolingual_v1',
+  'eleven_english_sts_v2',
+]);
+
+async function synthesizeElevenLabs(text, lang, voiceOverride) {
   const apiKey  = process.env.ELEVENLABS_API_KEY;
-  const voiceId = elevenLabsVoiceFor(lang);
-  // eleven_multilingual_v2 auto-detects language natively and speaks with a
-  // native accent (Adam sounds native in Romanian, English, Italian, etc).
-  // We pass `language_code` only as an explicit hint — the provider accepts
-  // ISO 639-1 codes (e.g. "ro", "en", "it") and uses them to disambiguate
-  // short inputs.
+  const voiceId = voiceOverride || elevenLabsVoiceFor(lang);
+  const modelId = process.env.ELEVENLABS_TTS_MODEL || 'eleven_turbo_v2_5';
+  const supportsLangCode = !ELEVENLABS_NO_LANGCODE_MODELS.has(modelId);
   const r = await fetch(`${ELEVENLABS_URL}/${voiceId}`, {
     method: 'POST',
     headers: { 'xi-api-key': apiKey, 'Content-Type': 'application/json', 'Accept': 'audio/mpeg' },
     body: JSON.stringify({
       text,
-      model_id: 'eleven_multilingual_v2',
-      ...(lang ? { language_code: lang } : {}),
+      model_id: modelId,
+      ...(lang && supportsLangCode ? { language_code: lang } : {}),
       voice_settings: { stability: 0.5, similarity_boost: 0.75 },
     }),
   });
@@ -372,53 +360,65 @@ router.post('/', async (req, res) => {
     }
   }
 
-  const hasOpenAI     = !!process.env.OPENAI_API_KEY;
   const hasGemini     = !!process.env.GEMINI_API_KEY;
   const hasElevenLabs = !!process.env.ELEVENLABS_API_KEY;
-  if (!hasOpenAI && !hasGemini && !hasElevenLabs) {
-    return res.status(503).json({ error: 'TTS not configured. Set OPENAI_API_KEY, GEMINI_API_KEY, or ELEVENLABS_API_KEY.' });
+  if (!hasGemini && !hasElevenLabs) {
+    return res.status(503).json({ error: 'TTS not configured. Set ELEVENLABS_API_KEY (preferred) or GEMINI_API_KEY.' });
   }
 
-  // Adrian: "cind sunt in chat e o voce cu un timbru, cind ii cer o harta
-  // apare o alta voce" — text chat voice (Gemini Charon) and voice chat
-  // voice (OpenAI Realtime cedar) sound like different people. Default now
-  // to OpenAI TTS `onyx` (deep masculine, closest standalone match to cedar)
-  // so the same provider speaks in both modes. Operators opt out with
-  // TTS_PROVIDER=gemini or TTS_PROVIDER=elevenlabs.
+  // Single-LLM cleanup (2026-04): one voice for the user, period. ElevenLabs
+  // is the only spoken voice (cloned voice if the signed-in user has one,
+  // otherwise the curated native-male library voice for their language).
+  // Gemini TTS stays as a last-resort fallback if ElevenLabs is not
+  // configured at all on this deployment.
   const providerOverride = (process.env.TTS_PROVIDER || '').toLowerCase();
-  const forceOpenAI      = providerOverride === 'openai';
   const forceGemini      = providerOverride === 'gemini';
   const forceElevenLabs  = providerOverride === 'elevenlabs' || providerOverride === '11labs';
-  let chosen; // 'openai' | 'gemini' | 'elevenlabs'
-  if (forceOpenAI && hasOpenAI) chosen = 'openai';
-  else if (forceGemini && hasGemini) chosen = 'gemini';
+  let chosen; // 'gemini' | 'elevenlabs'
+  if (forceGemini && hasGemini) chosen = 'gemini';
   else if (forceElevenLabs && hasElevenLabs) chosen = 'elevenlabs';
-  else if (hasOpenAI) chosen = 'openai';
-  else if (hasGemini) chosen = 'gemini';
-  else chosen = 'elevenlabs';
+  else if (hasElevenLabs) chosen = 'elevenlabs';
+  else chosen = 'gemini';
   // Frontend may send a language hint (e.g. `navigator.language`). Trust any
   // well-formed ISO 639-1 code the client supplies; otherwise auto-detect
   // from the reply text itself.
   const hint = typeof langHint === 'string' ? langHint.toLowerCase().slice(0, 2) : '';
   const lang = /^[a-z]{2}$/.test(hint) ? hint : detectLanguage(text);
+
+  // Voice-clone opt-in: if the signed-in user has a clone AND enabled
+  // the toggle, force ElevenLabs (the only provider that can render
+  // that voice_id) and pass their id as the voice override. Falls back
+  // silently if the user has no clone or the flag is off.
+  let clonedVoiceId = null;
+  if (req.user && hasElevenLabs) {
+    try {
+      const clone = await getClonedVoice(req.user.id);
+      if (clone && clone.enabled && clone.voiceId) {
+        clonedVoiceId = clone.voiceId;
+        chosen = 'elevenlabs';
+      }
+    } catch (_) { /* best effort — fall back to library voice */ }
+  }
   try {
-    if (chosen === 'openai') {
-      const mp3 = await synthesizeOpenAI(text, lang);
-      res.set({
-        'Content-Type': 'audio/mpeg',
-        'Content-Length': mp3.length,
-        'X-TTS-Provider': 'openai',
-        'X-TTS-Language': lang,
-      });
-      return res.send(mp3);
-    }
     if (chosen === 'elevenlabs') {
-      const mp3 = await synthesizeElevenLabs(text, lang);
+      const mp3 = await synthesizeElevenLabs(text, lang, clonedVoiceId);
+      if (clonedVoiceId) {
+        // Cheap audit — fire-and-forget, never block the response.
+        logVoiceCloneEvent({
+          userId: req.user.id,
+          action: 'synthesize',
+          voiceId: clonedVoiceId,
+          ip: ipGeo.clientIp(req) || req.ip || null,
+          userAgent: (req.get && req.get('user-agent')) || null,
+          note: `chars=${Math.min(text.length, 2000)};lang=${lang}`,
+        }).catch(() => {});
+      }
       res.set({
         'Content-Type': 'audio/mpeg',
         'Content-Length': mp3.length,
         'X-TTS-Provider': 'elevenlabs',
         'X-TTS-Language': lang,
+        ...(clonedVoiceId ? { 'X-TTS-Cloned-Voice': '1' } : {}),
       });
       return res.send(mp3);
     }

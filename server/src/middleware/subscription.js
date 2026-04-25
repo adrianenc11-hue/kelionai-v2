@@ -1,6 +1,7 @@
 'use strict';
 
 const { findById, getUsageToday, incrementUsage } = require('../db');
+const config = require('../config');
 
 /**
  * Subscription tiers with daily limits.
@@ -41,15 +42,8 @@ const SUBSCRIPTION_PLANS = {
   },
 };
 
-function getAdminEmails() {
-  const defaultAdmins = ['adrianenc11@gmail.com'];
-  const extraAdmins = (process.env.ADMIN_EMAILS || '')
-    .split(',')
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
-
-  return [...new Set([...defaultAdmins, ...extraAdmins])];
-}
+// Delegate to the centralized config helper.
+const getAdminEmails = config.getAdminEmails;
 
 function isAdminEmail(email) {
   const normalizedEmail = (email || '').trim().toLowerCase();

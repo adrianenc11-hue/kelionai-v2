@@ -11,6 +11,8 @@ const { Router } = require('express');
 const jwt = require('jsonwebtoken');
 const config = require('../config');
 const { executeRealTool, REAL_TOOL_NAMES } = require('../services/realTools');
+const { logAction } = require('../db');
+const { summarizeResultForHistory } = require('../services/actionHistorySummarizer');
 
 const router = Router();
 
@@ -221,9 +223,39 @@ router.post('/execute', async (req, res) => {
     return res.status(200).json({ ok: false, unavailable: true, error: `Tool "${name}" is not available on this build.` });
   }
   try {
-    const result = await executeRealTool(name, args);
+    // PR C adds user-intern tools (`get_my_credits`, `get_my_usage`,
+    // `get_my_profile`) that need the caller identity. They return a
+    // "sign in first" message when the ctx is absent, so this peek
+    // never fails the request — it only enriches it.
+    const user = await peekUser(req);
+    const ctx = user ? { user } : undefined;
+    const startedAt = Date.now();
+    const result = await executeRealTool(name, args, ctx);
+    const durationMs = Date.now() - startedAt;
     if (result == null) {
       return res.status(200).json({ ok: false, unavailable: true, error: `Tool "${name}" has no executor.` });
+    }
+    // PR #8/N — Memory of Actions. Record the tool call for signed-in
+    // users so Kelion's `get_action_history` can answer "did you
+    // already do X?" without re-running the tool. The summarizer only
+    // sees the OUTPUT; args sanitisation lives inside logAction().
+    // Writes are best-effort and the helper already swallows errors —
+    // but we also await a fire-and-forget wrapper here so an unexpected
+    // synchronous throw can never bubble up and 500 the live request.
+    if (user?.id) {
+      const sessionId = typeof req.body?.session_id === 'string' ? req.body.session_id : null;
+      const resultSummary = summarizeResultForHistory(name, result);
+      Promise.resolve()
+        .then(() => logAction({
+          userId: user.id,
+          sessionId,
+          toolName: name,
+          args,
+          resultSummary,
+          ok: result?.ok !== false,
+          durationMs,
+        }))
+        .catch(() => { /* logAction already logs internally when NODE_ENV != 'test' */ });
     }
     return res.status(200).json(result);
   } catch (err) {

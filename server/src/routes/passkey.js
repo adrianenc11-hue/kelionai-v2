@@ -233,10 +233,7 @@ router.get('/me', async (req, res) => {
     // Surface role + email so the frontend can gate admin-only UI
     // (credits dashboard, business panel). Email is also used client-side
     // against the env-configured ADMIN_EMAILS fallback list.
-    const defaultAdmins = ['adrianenc11@gmail.com'];
-    const adminEmails = (process.env.ADMIN_EMAILS || '')
-      .split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
-    const allAdmins = [...new Set([...defaultAdmins, ...adminEmails])];
+    const allAdmins = config.getAdminEmails();
     const jwtEmail = decoded.email || null;
     const roleIsAdmin = decoded.role === 'admin';
     const jwtEmailIsAdmin = jwtEmail ? allAdmins.includes(jwtEmail.toLowerCase()) : false;

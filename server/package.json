@@ -14,6 +14,7 @@
     "dotenv": "^16.0.0",
     "express": "^4.18.0",
     "express-rate-limit": "^7.1.0",
+    "google-auth-library": "^10.6.2",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.0",
     "mammoth": "^1.12.0",
@@ -36,5 +37,8 @@
       "/node_modules/",
       "__tests__/helpers/"
     ]
+  },
+  "optionalDependencies": {
+    "@e2b/code-interpreter": "^1.5.1"
   }
 }

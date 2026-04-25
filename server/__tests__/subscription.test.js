@@ -47,14 +47,5 @@ describe('New user defaults', () => {
   it('tier=free, status=active, usage=0',    async () => { const {token}=await createUser(); const r=await request(app).get('/api/users/me').set('Authorization',`Bearer ${token}`); expect(r.body.subscription_tier).toBe('free'); expect(r.body.subscription_status).toBe('active'); expect(r.body.usage.today).toBe(0); expect(r.body.usage.daily_limit).toBe(10); });
 });
 
-describe('POST /api/payments/create-checkout-session', () => {
-  it('401 unauthenticated',                  async () => { expect((await request(app).post('/api/payments/create-checkout-session').send({planId:'basic'})).status).toBe(401); });
-  it('400 for free plan',                    async () => { const {token}=await createUser(); expect((await request(app).post('/api/payments/create-checkout-session').set('Authorization',`Bearer ${token}`).send({planId:'free'})).status).toBe(400); });
-  it('400 for invalid plan',                 async () => { const {token}=await createUser(); expect((await request(app).post('/api/payments/create-checkout-session').set('Authorization',`Bearer ${token}`).send({planId:'xxx'})).status).toBe(400); });
-  it('503 when Stripe not configured',       async () => { const {token}=await createUser(); expect((await request(app).post('/api/payments/create-checkout-session').set('Authorization',`Bearer ${token}`).send({planId:'basic'})).status).toBe(503); });
-});
-
-describe('GET /api/payments/history', () => {
-  it('401 unauthenticated',                  async () => { expect((await request(app).get('/api/payments/history')).status).toBe(401); });
-  it('empty array for new user',             async () => { const {token}=await createUser(); const r=await request(app).get('/api/payments/history').set('Authorization',`Bearer ${token}`); expect(r.status).toBe(200); expect(r.body.payments).toHaveLength(0); });
-});
+// NOTE: /api/payments/* mock routes removed (2026-04-25 audit).
+// Real Stripe checkout is tested via /api/credits/* test suite.

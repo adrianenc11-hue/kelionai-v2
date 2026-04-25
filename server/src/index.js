@@ -1,5 +1,6 @@
-﻿'use strict';
+'use strict';
 
+const http = require('http');
 const path = require('path');
 const express = require('express');
 const cors = require('cors');
@@ -8,7 +9,7 @@ const cookieParser = require('cookie-parser');
 const rateLimit = require('express-rate-limit');
 
 const config = require('./config');
-const { csrfSeed } = require('./middleware/csrf');
+const { csrfSeed, csrfProtection } = require('./middleware/csrf');
 const { visitorLog } = require('./middleware/visitorLog');
 const { requireAuth } = require('./middleware/auth');
 const { checkSubscription, getPlans } = require('./middleware/subscription');
@@ -23,15 +24,34 @@ const realtimeRouter   = require('./routes/realtime');
 const passkeyRouter    = require('./routes/passkey');
 const memoryRouter     = require('./routes/memory');
 const conversationsRouter = require('./routes/conversations');
+const studioRouter     = require('./routes/studio');
 const toolsRouter      = require('./routes/tools');
 const pushRouter       = require('./routes/push');
 const creditsRouter    = require('./routes/credits');
 const diagRouter       = require('./routes/diag');
+const youtubeRouter    = require('./routes/youtube');
+const generatedImagesRouter = require('./routes/generatedImages');
+const voiceCloneRouter = require('./routes/voiceClone');
+const { attachVertexLiveProxy } = require('./routes/vertexLiveProxy');
 const proactive        = require('./services/proactive');
-const { bootstrapAdmin } = require('./services/adminBootstrap');
+const { bootstrapAdmin, healAdminCredits } = require('./services/adminBootstrap');
+const { installProcessHandlers } = require('./utils/processHandlers');
+
+// Audit H3: install global safety net before anything else can throw.
+// - `unhandledRejection` is logged and swallowed — one missing `.catch()`
+//   shouldn't take down every other user's live voice session.
+// - `uncaughtException` is logged and followed by a clean exit(1) so
+//   Railway can spin a replacement with known-good state. Skipped under
+//   Jest so a single failing test never kills the runner.
+const processHandlerStats = installProcessHandlers(process, {
+  exitOnException: process.env.NODE_ENV !== 'test',
+}).stats;
 
 const app = express();
 app.disable('x-powered-by');
+// Expose process-handler counters on `app.locals` so /api/diag can
+// surface them without importing this module back.
+app.locals.processHandlerStats = processHandlerStats;
 
 // Initialize database, then seed admin if ADMIN_BOOTSTRAP_PASSWORD is set.
 // Seeding is idempotent — running every boot lets Adrian rotate the admin
@@ -45,6 +65,19 @@ initDb().then(async () => {
     }
   } catch (err) {
     console.warn('[kelion-startup] admin bootstrap failed:', err && err.message);
+  }
+  // After the admin user row is guaranteed to exist, ensure he has a working
+  // credits balance. This is the permanent fix for "iar au disparut creditele
+  // lui kelion" — every Railway redeploy wipes SQLite, so after each redeploy
+  // we auto-top-up the admin back to a configurable floor. Fully idempotent
+  // (no-op when balance is already above the floor).
+  try {
+    const h = await healAdminCredits();
+    if (h && h.healed) {
+      console.log(`[kelion-startup] admin credit auto-heal: granted ${h.granted} min (balance=${h.balance})`);
+    }
+  } catch (err) {
+    console.warn('[kelion-startup] admin credit auto-heal failed:', err && err.message);
   }
 }).catch(err => {
   console.error('[kelion-startup] Database initialization failed:', err.message);
@@ -126,11 +159,33 @@ const chatLimiter = (process.env.NODE_ENV === 'test') ? (req, res, next) => next
 // stray ?retry=1 from Stripe wouldn't bypass the guard.
 app.use((req, res, next) => {
   if (req.path === '/api/credits/webhook') return next();
-  return express.json({ limit: '1mb' })(req, res, next);
+  // Voice-clone POST carries a base64-encoded audio sample (~30s at 128kbps =
+  // ~480KB raw, ~640KB base64). 5 MB accommodates longer clips with headroom
+  // while capping abuse surface (was 15 MB pre-audit).
+  const isVoiceClone =
+    req.path === '/api/voice/clone' && req.method === 'POST';
+  return express.json({ limit: isVoiceClone ? '5mb' : '1mb' })(req, res, next);
 });
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(csrfSeed);
+
+// Audit C2 — enforce the double-submit CSRF check on every state-changing
+// request. `csrfProtection` already:
+//   · skips GET / HEAD / OPTIONS (safe methods),
+//   · bypasses any request carrying `Authorization: Bearer ...` (mobile
+//     and external API callers authenticate via header, not cookie, so
+//     they are not CSRF-able in the first place),
+//   · is a no-op when NODE_ENV === 'test' (so the Jest suite is unaffected).
+// The one endpoint that legitimately receives cookie-less POSTs from a
+// third party is the Stripe webhook — it authenticates via raw-body
+// signature (`stripe-signature` header) and must not be fed through the
+// CSRF gate. Exempting it by path keeps the rest of /api/credits/*
+// protected.
+app.use((req, res, next) => {
+  if (req.path === '/api/credits/webhook') return next();
+  return csrfProtection(req, res, next);
+});
 
 // Visitor analytics — fires only on HTML page loads, never on API / static
 // requests. Wrapped internally so failure can't break a page load. See
@@ -145,27 +200,8 @@ app.get('/api/subscription/plans', (req, res) => {
   res.json({ plans: getPlans() });
 });
 
-// Payment routes (auth required)
-app.post('/api/payments/create-checkout-session', requireAuth, (req, res) => {
-  const { planId } = req.body || {};
-  const plans = getPlans();
-  const plan = plans.find(p => p.id === planId);
-
-  if (!plan) {
-    return res.status(400).json({ error: 'Invalid plan ID' });
-  }
-  if (planId === 'free') {
-    return res.status(400).json({ error: 'Cannot create checkout for free plan' });
-  }
-  if (!process.env.STRIPE_SECRET_KEY) {
-    return res.status(503).json({ error: 'Payment system not configured' });
-  }
-  res.json({ sessionId: 'mock-session-id', url: 'https://checkout.stripe.com/mock' });
-});
-
-app.get('/api/payments/history', requireAuth, (req, res) => {
-  res.json({ payments: [] });
-});
+// NOTE: /api/payments/* mock routes removed (2026-04-25 audit).
+// Real Stripe checkout is handled by /api/credits/* routes.
 
 // Referral routes (auth required)
 app.post('/api/referral/generate', requireAuth, async (req, res) => {
@@ -215,37 +251,20 @@ app.post('/api/referral/use', requireAuth, async (req, res) => {
   }
 });
 
-// Free trial token (no auth, rate limited per IP - 1 per day)
-const trialTokens = new Map(); // ip -> timestamp
-app.get('/api/realtime/trial-token', async (req, res) => {
-  const ip = req.ip || req.connection.remoteAddress;
-  const now = Date.now();
-  const last = trialTokens.get(ip);
-  if (last && (now - last) < 24 * 60 * 60 * 1000) {
-    return res.status(429).json({ error: 'Free trial: one session per day' });
-  }
-
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return res.status(503).json({ error: 'Not configured' });
-
-  try {
-    const voice = process.env.OPENAI_VOICE_KELION || 'ash';
-    const r = await fetch('https://api.openai.com/v1/realtime/sessions', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: process.env.OPENAI_REALTIME_MODEL || 'gpt-4o-realtime-preview',
-        voice,
-      }),
-    });
-    if (!r.ok) return res.status(500).json({ error: 'Failed to create session' });
-    const data = await r.json();
-    trialTokens.set(ip, now);
-    res.json({ token: data.client_secret.value, expiresAt: data.client_secret.expires_at, trial: true, voice });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to create session' });
-  }
-});
+// Audit M2 — the legacy /api/realtime/trial-token endpoint (mounted
+// here directly on `app`, _before_ the realtime router) has been
+// removed. It was:
+//   - bypassing the shared 15-min/day trial window enforced by
+//     /api/trial/status + /api/chat + /api/tts, so a guest could mint
+//     a new OpenAI Realtime session every 24 h _on top of_ their
+//     text-chat quota — effectively doubling free minutes.
+//   - storing a per-IP last-issued timestamp in a Map that was never
+//     garbage-collected (same leak shape as H2 `consumeStateByUser`).
+//   - duplicating the mint logic of the canonical /api/realtime/token
+//     handler (in ./routes/realtime.js), which already applies
+//     chatLimiter + admin-project routing.
+// Guests reach voice via the regular /api/realtime/token flow, gated
+// by the shared trial window. Removing the shadow closes the bypass.
 
 // API routes (auth required)
 app.use('/api/users', requireAuth, usersRouter);
@@ -303,11 +322,28 @@ app.use('/api/diag', diagRouter);
 app.use('/api/auth/passkey', chatLimiter, passkeyRouter);
 app.use('/api/memory', requireAuth, memoryRouter);
 app.use('/api/conversations', requireAuth, conversationsRouter);
+// Dev Studio (DS-1) — per-user Python project workspaces. All routes
+// require a signed-in user; ownership is enforced again inside every
+// DB helper (listStudioWorkspaces, getStudioWorkspace, …).
+app.use('/api/studio', requireAuth, studioRouter);
 
 // Stage 4 — M19 (browser use) + M20 (web search status) + M21 (MCP stubs).
 // Router is PUBLIC by design: Gemini Live tool-call flow has no login gate,
 // and MCP endpoints self-check for a signed-in user inside the handler.
 app.use('/api/tools', chatLimiter, toolsRouter);
+
+// F10 — YouTube Data API v3 search wrapper. Public (no auth) so the
+// stage monitor can resolve `show_on_monitor('video', query)` into an
+// embeddable video id inline. Rate-limited under chatLimiter like the
+// other public monitor helpers. Gracefully 404s when YOUTUBE_API_KEY
+// is not configured; the client then falls back to the external
+// search card shipped in PR #160.
+app.use('/api/youtube', chatLimiter, youtubeRouter);
+
+// F11 — short-lived PNG serving for `generate_image` tool. The route
+// lives outside chatLimiter because it's a pure GET by opaque UUID;
+// rate-limiting the tool call itself happens on /api/tools/execute.
+app.use('/api/generated-images', generatedImagesRouter);
 
 // Stage 5 — M23 push + M24/M25 proactive scheduler. Requires passkey auth,
 // except /public-key which the browser needs to fetch BEFORE authenticating.
@@ -315,6 +351,7 @@ app.get('/api/push/public-key', (_req, res) => {
   res.json({ publicKey: pushRouter.getVapidPublicKey() });
 });
 app.use('/api/push', requireAuth, pushRouter);
+app.use('/api/voice/clone', requireAuth, voiceCloneRouter);
 
 if (process.env.NODE_ENV !== 'test' && process.env.PROACTIVE_DISABLED !== '1') {
   try { proactive.start(require('./routes/push').getWebPush()); }
@@ -379,12 +416,46 @@ app.get('/ping',   (_req, res) => res.send('<h1>PONG - Server is alive and reach
 
 if (process.env.NODE_ENV === 'production') {
   console.log(`[kelion-api] Production mode: serving from ${distPath}`);
-  app.use(express.static(distPath));
 
+  // ── Caching strategy ────────────────────────────────────────────────────
+  // 1. Hashed assets (JS/CSS with content hash in filename) → immutable 1yr.
+  //    Vite always changes the hash when content changes, so this is safe.
+  app.use('/assets', express.static(path.join(distPath, 'assets'), {
+    immutable: true,
+    maxAge: '1y',
+    etag: false,
+    lastModified: false,
+  }));
+
+  // 2. GLB / 3D models → 7-day cache (large files, rarely change).
+  app.use(express.static(distPath, {
+    etag: false,
+    lastModified: false,
+    setHeaders(res, filePath) {
+      const f = filePath.toLowerCase();
+      if (f.endsWith('.glb') || f.endsWith('.gltf')) {
+        res.setHeader('Cache-Control', 'public, max-age=604800'); // 7d
+      } else if (
+        f.endsWith('sw.js') ||
+        f.endsWith('.webmanifest') ||
+        f.endsWith('index.html')
+      ) {
+        // 3. HTML shell, service worker, manifest → never cache.
+        //    Browser MUST always get the latest index.html so it loads
+        //    the correct hashed JS bundles after every deploy.
+        //    Without this, a cached index.html referencing old bundle
+        //    hashes causes 404s → "Ceva nu a mers bine" crash.
+        res.setHeader('Cache-Control', 'no-store');
+      }
+    },
+  }));
+
+  // SPA fallback — all non-API routes serve index.html with no-store.
   app.get('*', (req, res, next) => {
-    if (/^\/(api)(\/|$)/.test(req.path) || req.path === '/health') {
+    if (/^\/api(\/|$)/.test(req.path) || req.path === '/health' || req.path === '/ping') {
       return next();
     }
+    res.setHeader('Cache-Control', 'no-store');
     res.sendFile(path.join(distPath, 'index.html'), (err) => {
       if (err) next(err);
     });
@@ -399,13 +470,23 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
+// Wrap the Express app in a raw http.Server so we can attach a
+// WebSocket upgrade handler for the Vertex AI Gemini Live proxy on
+// the same port (see `routes/vertexLiveProxy.js`). Keeping everything
+// on one port keeps Railway's single-port routing happy and means
+// the browser hits the proxy over the same origin it already talks
+// HTTP to, so no CORS/CSP changes are needed.
+const httpServer = http.createServer(app);
+attachVertexLiveProxy(httpServer);
+
 if (require.main === module) {
   const PORT = config.port;
-  app.listen(PORT, () => {
+  httpServer.listen(PORT, () => {
     console.log(`[kelion-api] Server listening on port ${PORT} (${config.nodeEnv})`);
     console.log(`[kelion-api] CORS origins: ${config.corsOrigins.join(', ')}`);
   });
 }
 
 module.exports = app;
+module.exports.httpServer = httpServer;
 

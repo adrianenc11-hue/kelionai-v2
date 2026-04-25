@@ -24,9 +24,30 @@ CREATE TABLE IF NOT EXISTS users (
   passkey_credentials        TEXT DEFAULT '[]',
   current_webauthn_challenge TEXT,
   credits_balance_minutes    INTEGER NOT NULL DEFAULT 0,
+  banned                     INTEGER NOT NULL DEFAULT 0,
+  banned_reason              TEXT,
+  banned_at                  TIMESTAMPTZ,
+  preferred_language         TEXT,
   created_at                 TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   updated_at                 TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+-- F8: idempotent migration for older Supabase clusters that existed
+-- before the column was added to the CREATE TABLE above.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS preferred_language TEXT;
+
+-- PR E5 — admin user management. Idempotent migration for clusters
+-- created before these columns existed.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS banned         INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS banned_reason  TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS banned_at      TIMESTAMPTZ;
+
+-- Voice clone — opt-in ElevenLabs Instant Voice Cloning (see
+-- server/src/db/index.js for the SQLite counterpart and the full
+-- GDPR / BIPA consent rationale).
+ALTER TABLE users ADD COLUMN IF NOT EXISTS cloned_voice_id              TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS cloned_voice_consent_at      TIMESTAMPTZ;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS cloned_voice_consent_version TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS cloned_voice_enabled         INTEGER NOT NULL DEFAULT 0;
 CREATE INDEX IF NOT EXISTS idx_users_google_id     ON users(google_id);
 CREATE INDEX IF NOT EXISTS idx_users_email         ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_referral_code ON users(referral_code);
@@ -50,7 +71,24 @@ CREATE TABLE IF NOT EXISTS memory_items (
   fact       TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX IF NOT EXISTS idx_memory_items_user ON memory_items(user_id, created_at DESC);
+-- Audit M8 — idempotent migrations for existing Supabase rows that
+-- pre-date the consolidator. New columns default to the same values
+-- the consolidator expects for fresh inserts. See
+-- server/src/services/memoryConsolidator.js for the full rationale.
+ALTER TABLE memory_items ADD COLUMN IF NOT EXISTS tier             TEXT NOT NULL DEFAULT 'recent';
+ALTER TABLE memory_items ADD COLUMN IF NOT EXISTS last_affirmed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE memory_items ADD COLUMN IF NOT EXISTS archived_at      TIMESTAMPTZ;
+ALTER TABLE memory_items ADD COLUMN IF NOT EXISTS archived_reason  TEXT;
+-- Audit M9 — memory subject tagging. Pre-migration rows are safe to
+-- default to 'self' (legacy behaviour). See server/src/db/index.js
+-- for the full rationale.
+ALTER TABLE memory_items ADD COLUMN IF NOT EXISTS subject          TEXT NOT NULL DEFAULT 'self';
+ALTER TABLE memory_items ADD COLUMN IF NOT EXISTS subject_name     TEXT;
+ALTER TABLE memory_items ADD COLUMN IF NOT EXISTS confidence       REAL NOT NULL DEFAULT 1.0;
+UPDATE memory_items SET last_affirmed_at = created_at WHERE last_affirmed_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_memory_items_user         ON memory_items(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_memory_items_user_live    ON memory_items(user_id, archived_at, tier);
+CREATE INDEX IF NOT EXISTS idx_memory_items_user_subject ON memory_items(user_id, subject, archived_at);
 
 CREATE TABLE IF NOT EXISTS push_subscriptions (
   id           BIGSERIAL PRIMARY KEY,
@@ -86,13 +124,22 @@ CREATE TABLE IF NOT EXISTS credit_transactions (
   kind                   TEXT NOT NULL,
   stripe_session_id      TEXT,
   stripe_payment_intent  TEXT,
+  idempotency_key        TEXT,
   note                   TEXT,
   created_at             TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+ALTER TABLE credit_transactions ADD COLUMN IF NOT EXISTS idempotency_key TEXT;
 CREATE INDEX IF NOT EXISTS idx_credit_tx_user ON credit_transactions(user_id, created_at DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_credit_tx_session
   ON credit_transactions(stripe_session_id)
   WHERE stripe_session_id IS NOT NULL;
+-- Non-Stripe callers (admin grants, auto-topup retries, proactive
+-- refunds) pass an idempotency_key to dedupe on their side. The
+-- partial unique index collapses duplicate writes into a no-op,
+-- just like Stripe webhook replays already do.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_credit_tx_idem
+  ON credit_transactions(idempotency_key)
+  WHERE idempotency_key IS NOT NULL;
 
 -- Conversation history — persists the text chat transcript so a signed-in
 -- user can return later and pick up where they left off. One row in
@@ -116,6 +163,37 @@ CREATE TABLE IF NOT EXISTS conversation_messages (
 );
 CREATE INDEX IF NOT EXISTS idx_conv_messages_conv ON conversation_messages(conversation_id, id);
 
+CREATE TABLE IF NOT EXISTS voice_clone_events (
+  id              BIGSERIAL PRIMARY KEY,
+  user_id         BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  action          TEXT NOT NULL,
+  voice_id        TEXT,
+  consent_version TEXT,
+  ip              TEXT,
+  user_agent      TEXT,
+  note            TEXT,
+  created_at      TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_voice_clone_events_user ON voice_clone_events(user_id, created_at DESC);
+
+-- PR #8/N — Memory of Actions. Mirrors the SQLite DDL in
+-- server/src/db/index.js so the get_action_history tool answers the
+-- same way on Postgres and SQLite. Rows are sanitised at write time
+-- in logAction() — only short, speakable summaries land here.
+CREATE TABLE IF NOT EXISTS action_history (
+  id             BIGSERIAL PRIMARY KEY,
+  user_id        BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  session_id     TEXT,
+  tool_name      TEXT NOT NULL,
+  ok             INTEGER NOT NULL DEFAULT 1,
+  args_summary   TEXT,
+  result_summary TEXT,
+  duration_ms    INTEGER,
+  created_at     TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_action_history_user    ON action_history(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_action_history_session ON action_history(user_id, session_id, created_at DESC);
+
 CREATE TABLE IF NOT EXISTS visitor_events (
   id          BIGSERIAL PRIMARY KEY,
   ts          TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
@@ -128,4 +206,49 @@ CREATE TABLE IF NOT EXISTS visitor_events (
   user_email  TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_visitor_events_ts ON visitor_events(ts DESC);
+
+-- Dev Studio (DS-1) — per-user Python project workspaces.
+-- Each row is one "project" that Kelion can read/write into by voice
+-- (see server/src/routes/studio.js). Files live inline as a JSON
+-- object mapping each repo-style path to a { content, size,
+-- updated_at } entry, so the whole project round-trips in a single
+-- SELECT / UPDATE and autosaves stay cheap.
+--
+-- Quotas (enforced in server/src/db/index.js writeStudioFile):
+--   - 5 MB per file
+--   - 50 MB per project
+--   - 1 GB per user (sum across all projects)
+-- The per-user cap is soft; writes past any cap return 413 and leave
+-- the workspace untouched.
+CREATE TABLE IF NOT EXISTS studio_workspaces (
+  id         BIGSERIAL PRIMARY KEY,
+  user_id    BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name       TEXT NOT NULL,
+  -- files is a JSON object serialized as TEXT so the same SELECT /
+  -- UPDATE round-trips verbatim on SQLite (which has no JSONB). We
+  -- never query into the blob — writeStudioFile replaces the whole
+  -- payload — so a real JSONB column would be overkill.
+  files      TEXT NOT NULL DEFAULT '{}',
+  size_bytes BIGINT NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_studio_workspaces_user_name
+  ON studio_workspaces(user_id, name);
+CREATE INDEX IF NOT EXISTS idx_studio_workspaces_user
+  ON studio_workspaces(user_id, updated_at DESC);
+
+-- Audit M7 — cross-instance consume state for the H1 silent-bypass
+-- cap. Mirrors the SQLite definition in server/src/db/index.js. The
+-- timestamps are stored as epoch-ms INTEGER so the same
+-- evaluateConsumeDecision() policy works byte-for-byte across SQLite
+-- and Postgres. Payload is three integers per active user.
+CREATE TABLE IF NOT EXISTS credits_consume_state (
+  user_id          BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  last_billable_at BIGINT NOT NULL DEFAULT 0,
+  silent_streak    INTEGER NOT NULL DEFAULT 0,
+  silent_since     BIGINT NOT NULL DEFAULT 0,
+  updated_at       BIGINT NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_credits_consume_state_updated ON credits_consume_state(updated_at);
 `;

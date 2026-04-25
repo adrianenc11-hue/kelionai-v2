@@ -25,9 +25,22 @@ const {
   getUserByEmail,
   createUser,
   updateUser,
+  getCreditsBalance,
+  addCreditsTransaction,
 } = require('../db');
+const config = require('../config');
 
-const DEFAULT_ADMIN_EMAIL = 'adrianenc11@gmail.com';
+const DEFAULT_ADMIN_EMAIL = config.DEFAULT_ADMIN_EMAIL;
+
+// Admin credit auto-heal floor. If the admin's credit balance is below
+// this on boot, we top him up with a 'bonus' ledger entry so the dashboard
+// always shows a working balance — even after a SQLite wipe on a Railway
+// redeploy (which is the root cause of "iar au disparut creditele lui kelion").
+// Tune via ADMIN_MIN_CREDIT_MINUTES env var. Default 600 minutes = 10 hours
+// of voice, which is plenty for ops work without being wildly large.
+const DEFAULT_ADMIN_MIN_CREDITS = 600;
+
+let lastCreditHealResult = { ranAt: null, result: null };
 
 // Last bootstrap result kept in-process so the diag endpoint can report
 // whether this deploy's admin seed actually ran. Never contains hashes
@@ -115,4 +128,62 @@ function getLastBootstrapResult() {
   return lastResult;
 }
 
-module.exports = { bootstrapAdmin, getLastBootstrapResult };
+/**
+ * Ensure the admin account has at least ADMIN_MIN_CREDIT_MINUTES worth of
+ * credits. If not, insert a 'bonus' ledger entry that brings it back up to
+ * that floor. Idempotent-enough: on a healthy deploy the balance is already
+ * at/above the floor so this is a no-op. On a wiped deploy (SQLite lost on
+ * Railway redeploy) the balance reads zero and we restore it automatically.
+ *
+ * This does NOT restore other users' balances — only the admin. For a full
+ * multi-user persistence fix the DB itself must sit on a Railway Volume
+ * or move to Postgres via DATABASE_URL (both already supported by the app).
+ */
+async function healAdminCredits() {
+  const email = (process.env.ADMIN_BOOTSTRAP_EMAIL || DEFAULT_ADMIN_EMAIL).trim().toLowerCase();
+  const envFloor = Number(process.env.ADMIN_MIN_CREDIT_MINUTES);
+  const floor = Number.isFinite(envFloor) && envFloor >= 0 ? Math.floor(envFloor) : DEFAULT_ADMIN_MIN_CREDITS;
+
+  try {
+    const user = await getUserByEmail(email);
+    if (!user) {
+      const r = { healed: false, reason: 'admin user missing', email, floor };
+      lastCreditHealResult = { ranAt: new Date().toISOString(), result: r };
+      console.warn(`[adminBootstrap] credit heal skipped — admin user not found (${email})`);
+      return r;
+    }
+    const current = await getCreditsBalance(user.id);
+    if (current >= floor) {
+      const r = { healed: false, reason: 'already above floor', email, userId: user.id, current, floor };
+      lastCreditHealResult = { ranAt: new Date().toISOString(), result: r };
+      return r;
+    }
+    const delta = floor - current;
+    const res = await addCreditsTransaction({
+      userId: user.id,
+      deltaMinutes: delta,
+      kind: 'bonus',
+      note: `admin auto-heal @boot (floor=${floor}, was=${current})`,
+    });
+    console.log(`[adminBootstrap] credit auto-heal: granted ${delta} min to ${email} (new balance=${res.balance})`);
+    const r = { healed: true, email, userId: user.id, previous: current, floor, granted: delta, balance: res.balance };
+    lastCreditHealResult = { ranAt: new Date().toISOString(), result: r };
+    return r;
+  } catch (err) {
+    console.error('[adminBootstrap] credit heal failed:', err && err.message);
+    const r = { healed: false, error: err && err.message, email, floor };
+    lastCreditHealResult = { ranAt: new Date().toISOString(), result: r };
+    return r;
+  }
+}
+
+function getLastCreditHealResult() {
+  return lastCreditHealResult;
+}
+
+module.exports = {
+  bootstrapAdmin,
+  getLastBootstrapResult,
+  healAdminCredits,
+  getLastCreditHealResult,
+};

@@ -32,10 +32,7 @@ const config = require('../config');
 const { findById } = require('../db');
 
 function getAdminEmailSet() {
-  const defaultAdmins = ['adrianenc11@gmail.com'];
-  const extra = (process.env.ADMIN_EMAILS || '')
-    .split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
-  return new Set([...defaultAdmins, ...extra]);
+  return new Set(config.getAdminEmails());
 }
 
 function isAdminEmail(email) {
@@ -58,6 +55,16 @@ function peekSignedInUser(req) {
     }
     if (!token) return null;
     const decoded = jwt.verify(token, config.jwt.secret);
+    // Previously in Postgres mode we returned null for any non-numeric
+    // `sub` (pre-Postgres Google UUIDs, etc.), which silently demoted
+    // a signed-in admin to "guest" on every public endpoint — including
+    // /api/realtime/gemini-token, triggering the 429 "Free trial used
+    // up" gate on an admin with unlimited credits. Adrian 2026-04-20:
+    // "admin nu expira nici o data, ai inca un bag". The public-endpoint
+    // surface must honour the JWT's email + role claims regardless of
+    // what the DB looks like — downstream routes that need a numeric id
+    // (credits ledger, etc.) can still DB-lookup themselves. Always
+    // return a user object when the JWT is cryptographically valid.
     const sub = decoded.sub;
     const USE_POSTGRES = !!process.env.DATABASE_URL;
     let id = null;
@@ -74,7 +81,7 @@ function peekSignedInUser(req) {
       id,
       name:  decoded.name || null,
       email: decoded.email || null,
-      role:  decoded.role || null,
+      role:  decoded.role || 'user',
       sub,
     };
   } catch {
@@ -86,6 +93,9 @@ function peekSignedInUser(req) {
 // (middleware/auth.js): OR of JWT role ∨ JWT email allowlist ∨ DB role
 // ∨ DB email allowlist. Tolerates `{id: null}` identities — admins with
 // a stale pre-Postgres JWT (UUID sub) are still recognized by email.
+// The JWT-side branches deliberately DO NOT touch the DB so that a
+// wiped user row (ephemeral-storage regression, #108) cannot lock the
+// admin out of the admin code path.
 // Accepts a user object, a raw express `req`, or null (→ false). Never
 // throws.
 async function isAdminUser(userOrReq) {
@@ -108,7 +118,9 @@ async function isAdminUser(userOrReq) {
   //    email path (Adrian's main recovery vector on 2026-04-20).
   if (isAdminEmail(user.email)) return true;
 
-  // 3. DB lookup — only meaningful when `id` is numeric (BIGINT FK).
+  // 3. DB lookup — only meaningful when `id` is numeric (BIGINT FK)
+  //    or a string sub. A missing user row cannot lock the admin out,
+  //    since the JWT-side checks above already ran.
   if (Number.isFinite(user.id) || typeof user.id === 'string') {
     try {
       const dbUser = await findById(user.id);
