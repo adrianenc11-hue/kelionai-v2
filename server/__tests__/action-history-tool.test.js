@@ -1,6 +1,6 @@
 const {
   KELION_TOOLS,
-  buildKelionToolsOpenAI,
+  buildKelionToolsChatCompletions,
   buildKelionToolsGemini,
 } = require('../src/routes/realtime');
 const {
@@ -57,9 +57,9 @@ describe('PR #8 — get_action_history (Memory of Actions)', () => {
       expect(REAL_TOOL_NAMES).toContain('get_action_history');
     });
 
-    test('OpenAI adapter surfaces get_action_history', () => {
-      const openaiTools = buildKelionToolsOpenAI();
-      const names = openaiTools.map((t) => t.name);
+    test('Chat Completions adapter surfaces get_action_history', () => {
+      const ccTools = buildKelionToolsChatCompletions();
+      const names = ccTools.map((t) => t.function?.name);
       expect(names).toContain('get_action_history');
     });
 

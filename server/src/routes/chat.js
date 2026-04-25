@@ -279,27 +279,28 @@ router.post('/', async (req, res) => {
     }
   }
 
-  // Locked-language resolution. Priority:
-  //   1. The user's stored `preferred_language` (signed-in users only — set on
-  //      first login from Accept-Language and overridable via PUT
-  //      /auth/me/language).
-  //   2. The browser locale forwarded by the client on every chat request
+  // Locked-language resolution. Priority — current browser ALWAYS wins so a
+  // user travelling between devices sees the language of the device they are
+  // on right now, not whatever was stamped on their account at first login.
+  //   1. Browser locale forwarded by the client on every chat request
   //      (`req.body.locale`, e.g. "ro-RO").
+  //   2. The user's stored `preferred_language` (signed-in users only) —
+  //      used as a fallback when the client did not send a locale.
   //   3. Accept-Language header.
   //   4. "en" — explicit final fallback.
-  // For signed-in users: if (1) is empty but (2) is present, persist it now so
-  // future sessions on other devices still match. We never silently overwrite a
-  // user's stored preference — only seed on first sight.
-  let lockedLangTag = null;
-  if (req.user && (Number.isFinite(req.user.id) || typeof req.user.id === 'string')) {
+  //
+  // For signed-in users: keep their stored preferred_language in sync with
+  // the active browser. If the browser locale differs from what's stored,
+  // overwrite — Adrian's case (preferred_language='en' stamped at first
+  // Google sign-in, but his actual browser is ro-RO). This is the
+  // permanent fix for "default engleza e obligat sa detecteze limba user".
+  let lockedLangTag = normalizeLocaleTag(locale);
+  if (!lockedLangTag && req.user && (Number.isFinite(req.user.id) || typeof req.user.id === 'string')) {
     try {
       lockedLangTag = await getPreferredLanguage(req.user.id);
     } catch (err) {
       console.warn('[chat] read preferred_language failed', err && err.message);
     }
-  }
-  if (!lockedLangTag) {
-    lockedLangTag = normalizeLocaleTag(locale);
   }
   if (!lockedLangTag) {
     const accept = req.headers['accept-language'];
@@ -316,7 +317,7 @@ router.post('/', async (req, res) => {
   ) {
     try {
       const stored = await getPreferredLanguage(req.user.id);
-      if (!stored) {
+      if (stored !== lockedLangTag) {
         const langName = languageNameForTag(lockedLangTag);
         await setPreferredLanguage(
           req.user.id,
@@ -325,7 +326,7 @@ router.post('/', async (req, res) => {
         );
       }
     } catch (err) {
-      console.warn('[chat] seed preferred_language failed', err && err.message);
+      console.warn('[chat] sync preferred_language failed', err && err.message);
     }
   }
 

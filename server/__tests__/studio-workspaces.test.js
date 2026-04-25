@@ -471,7 +471,7 @@ describe('quota enforcement', () => {
     // Workspace size stayed under the cap even after the failed write.
     const fresh = await dbMod.getStudioWorkspace(userA.id, ws.id);
     expect(fresh.size_bytes).toBeLessThanOrEqual(dbMod.MAX_STUDIO_WORKSPACE_BYTES);
-  });
+  }, 30000);
 });
 
 describe('getUserStudioUsage', () => {

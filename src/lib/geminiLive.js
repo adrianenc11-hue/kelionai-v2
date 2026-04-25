@@ -404,7 +404,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
             clientContent: {
               turns: [{
                 role: 'user',
-                parts: [{ text: 'Greet me with a short friendly hello in English and ask what I need. One sentence.' }],
+                parts: [{ text: 'Greet me briefly and ask what I need. One sentence. Use the user-language locked in your system instructions — do NOT translate or add a second-language version.' }],
               }],
               turnComplete: true,
             },

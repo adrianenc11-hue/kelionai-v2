@@ -1,6 +1,6 @@
 const {
   KELION_TOOLS,
-  buildKelionToolsOpenAI,
+  buildKelionToolsChatCompletions,
   buildKelionToolsGemini,
 } = require('../src/routes/realtime');
 const {
@@ -57,7 +57,7 @@ describe('PR #7 — plan_task (Planner Brain)', () => {
     });
 
     test('OpenAI adapter surfaces plan_task', () => {
-      const openaiTools = buildKelionToolsOpenAI();
+      const openaiTools = buildKelionToolsChatCompletions();
       const names = openaiTools.map((t) => t.name || t.function?.name).filter(Boolean);
       expect(names).toContain('plan_task');
     });
