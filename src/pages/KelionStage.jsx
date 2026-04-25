@@ -1206,6 +1206,16 @@ export default function KelionStage() {
   useEffect(() => {
     if (chatBusy) return
     if (muteModeRef.current) return   // mute mode — no TTS
+    // Guard: skip TTS when a Gemini Live voice session is active or was
+    // JUST active. The voice transport produces its own audio natively;
+    // firing ElevenLabs TTS on the transcribed assistant text creates the
+    // "2 AI voices responding" bug. This covers two scenarios:
+    //   1. Voice session still running (status is listening/speaking/etc.)
+    //   2. Voice session just ended and turns were seeded into chatMessages
+    //      (status flipped to 'idle'/'error' but lastSpokenRef hasn't
+    //      caught up yet — the seeded messages are NOT from text chat).
+    const liveStatus = statusRef.current
+    if (liveStatus && liveStatus !== 'idle' && liveStatus !== 'error') return
     const last = chatMessages[chatMessages.length - 1]
     if (!last || last.role !== 'assistant' || !last.content) return
     if (last.content === lastSpokenRef.current) return
@@ -1819,6 +1829,14 @@ export default function KelionStage() {
         // by the voice transport, so treat them as already-saved here to
         // avoid a duplicate POST from the text-chat autosave effect.
         savedUpToRef.current = seeded.length
+        // Stamp lastSpokenRef with the last assistant message so the TTS
+        // effect doesn't fire on content Gemini Live already spoke aloud.
+        // Without this the effect sees a "new" assistant message and plays
+        // ElevenLabs TTS on top → the "2 AI voices" bug.
+        const lastAssistant = [...seeded].reverse().find((m) => m.role === 'assistant')
+        if (lastAssistant && lastAssistant.content) {
+          lastSpokenRef.current = lastAssistant.content
+        }
         setChatMessages(seeded)
       }
     }
