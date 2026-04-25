@@ -1198,6 +1198,11 @@ export default function KelionStage() {
   useEffect(() => { ttsMouthOpenRef.current = ttsMouthOpen }, [ttsMouthOpen])
   useEffect(() => {
     if (chatBusy) return
+    // Do not run text-TTS while the realtime voice session is active.
+    // status is 'listening' | 'thinking' | 'speaking' | 'connecting' during
+    // a live voice session — firing ElevenLabs TTS at the same time is what
+    // causes the "two avatars speaking one after another" bug.
+    if (status === 'listening' || status === 'thinking' || status === 'speaking' || status === 'connecting') return
     const last = chatMessages[chatMessages.length - 1]
     if (!last || last.role !== 'assistant' || !last.content) return
     if (last.content === lastSpokenRef.current) return
@@ -1319,7 +1324,7 @@ export default function KelionStage() {
       if (ttsAudioRef.current) { try { ttsAudioRef.current.pause() } catch (_) {} ttsAudioRef.current = null }
       stopDrive()
     }
-  }, [chatMessages, chatBusy, attachTtsLipSync, resetTtsLipSync])
+  }, [chatMessages, chatBusy, status, attachTtsLipSync, resetTtsLipSync])
 
   // Max of voice-chat lipsync, real-audio text-chat envelope, and cosine
   // fallback feeds the avatar. When the analyser is attached, ttsMouthOpen
