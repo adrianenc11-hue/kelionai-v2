@@ -1396,7 +1396,7 @@ const TOOL_FORCE_RULES = [
   },
   {
     name: 'translate',
-    re: /\b(translate|in translation|how do you say|translate (?:this|that|to|into)|traduc(?:e|eți)|cum se spune pe|tradu|traducere)\b/i,
+    re: /\b(translate\s+(this|that|to|into)|how do you say .+ in|traduc(?:e|eți)\s+(asta|ăsta|textul|asta\s+în|în)|tradu\s+(asta|în|textul)|traducere\s+în)\b/i,
   },
   {
     name: 'get_news',
