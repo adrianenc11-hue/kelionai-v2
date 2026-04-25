@@ -105,7 +105,12 @@ export default function EmailComposerModal({ authToken }) {
             bcc: bccList.length ? bccList : undefined,
             subject: subject.trim(),
             text: body,
-            reply_to: replyTo && emailRe(replyTo) ? replyTo : undefined,
+            // Only include reply_to when the user can actually see and
+            // edit the field (it lives inside the same advanced
+            // section as Cc/Bcc, gated by `showCc`). Without this
+            // gate, a model-pre-populated reply_to would be sent
+            // silently with no on-screen way to review it.
+            reply_to: showCc && replyTo && emailRe(replyTo) ? replyTo : undefined,
           },
         }),
       })
