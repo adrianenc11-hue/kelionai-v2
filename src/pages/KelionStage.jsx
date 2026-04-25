@@ -2024,6 +2024,7 @@ export default function KelionStage() {
           messages: next,
           datetime: new Date().toISOString(),
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          locale: (typeof navigator !== 'undefined' && navigator.language) ? String(navigator.language) : null,
           ...(visionFrame ? { frame: visionFrame, frameKind: visionChannel } : {}),
           ...(gpsCoords ? { coords: gpsCoords } : {}),
         }),

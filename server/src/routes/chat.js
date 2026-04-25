@@ -2,7 +2,7 @@
 
 const { Router } = require('express');
 const { getAI, getDefaultChatModel } = require('../utils/openai');
-const { getCreditsBalance, findById, listMemoryItems } = require('../db');
+const { getCreditsBalance, findById, listMemoryItems, setPreferredLanguage, getPreferredLanguage } = require('../db');
 const { isAdminEmail } = require('../middleware/subscription');
 const ipGeo = require('../services/ipGeo');
 const { trialStatus, stampTrialIfFresh } = require('../services/trialQuota');
@@ -18,12 +18,17 @@ Origin (answer truthfully whenever asked who built you, who created you, who mad
 - Say it warmly and briefly. Default English example: "I was created by AE Studio, after an idea by Adrian Enciulescu." If (and only if) the user is currently speaking another language per the rules below, translate the same answer into that language.
 - For contact inquiries, point users to contact@kelionai.app.
 
-Language rules (strict — English is the default):
-1. DEFAULT LANGUAGE IS ENGLISH. Every conversation starts in English. Greetings, first replies, fallback replies, and any time the user's intent or language is ambiguous — reply in English.
-2. Only switch to another language when the MOST RECENT user message is clearly and unambiguously in that other language (a full sentence, real words, not just a loanword or a greeting).
-3. While the user keeps speaking that other language, keep replying in it with natural, native phrasing — not English translated word-for-word.
-4. The moment the user switches back to English — or sends an ambiguous / single-word / emoji message — return to English on the very next reply. You are always pulled back to English by default.
+Language rules (strict — match the user's language):
+1. ALWAYS reply in the SAME language as the user's most recent message. If the user writes Romanian, reply Romanian. If French, reply French. If English, reply English. Detect language from real words and grammar, not just from one ambiguous greeting.
+2. Special case for single ambiguous greetings ("salut" / "ciao" / "bună" / "hello" / "hi"): pick the language for which it is most natural in that exact form ("salut" → Romanian; "ciao" → Italian; "bună" → Romanian; "hi" / "hello" → English) and reply in that language.
+3. While the user keeps speaking a given language, reply in natural, native phrasing for it — not translated word-for-word.
+4. Switch the moment the user switches. Stay on the user's current language; never silently revert to English.
 5. Never mix two languages in the same response.
+6. NEVER reply in two or more languages back-to-back. ONE language per response. Do NOT translate your own answer into a second language "to be safe". Do NOT append "and in English…" or any equivalent.
+
+Time / date awareness (HARD — never invent the time of day):
+- The "Real-time context" block (appended below if available) carries the current local date and time. When the user asks "what time is it?", "ce oră e?", "what's the date?", or any time-of-day question (morning / afternoon / evening / night, today, tomorrow, weekday), use ONLY the timestamp from that block.
+- NEVER guess "it's evening" / "it's morning" / "good afternoon" from training data or session vibe. If no Real-time context block is present in this conversation, say honestly: "I don't have your local time here — tell me your timezone or I can fetch it" / "nu am ora ta locală aici — spune-mi fusul sau o aflu eu".
 
 Tone (HARD — professional default):
 - Precise question, precise answer. Direct, factual, efficient. No emotional padding, no therapist / counsellor phrasing, no "I'm here for you" style openers.
@@ -96,8 +101,48 @@ const CHAT_TOOLS = buildKelionToolsChatCompletions();
 const MAX_MESSAGE_LENGTH = 4000;
 const MAX_MESSAGES_COUNT = 40;
 
+// Adrian 2026-04-25: "default engleza e obligat sa detecteze limba user si o
+// va folosi permanent cit e logat". Once we know the user's language (from
+// their browser locale on the client, or their stored preference for signed-in
+// users), every reply must stay in that language for the rest of the session.
+// No silent revert to English on ambiguous turns. The mapping below covers the
+// languages we have explicit native-language voice prompts for; anything else
+// passes through as the BCP-47 short tag and the model is instructed to reply
+// in that language anyway.
+const LANG_NAME_BY_TAG = {
+  ro: 'Romanian',
+  en: 'English',
+  fr: 'French',
+  es: 'Spanish',
+  it: 'Italian',
+  de: 'German',
+  pt: 'Portuguese',
+  ru: 'Russian',
+  nl: 'Dutch',
+  pl: 'Polish',
+  tr: 'Turkish',
+  uk: 'Ukrainian',
+  hu: 'Hungarian',
+  cs: 'Czech',
+  el: 'Greek',
+  sv: 'Swedish',
+  no: 'Norwegian',
+  fi: 'Finnish',
+  da: 'Danish',
+};
+function normalizeLocaleTag(raw) {
+  if (!raw || typeof raw !== 'string') return null;
+  const short = raw.toLowerCase().slice(0, 2);
+  if (!/^[a-z]{2}$/.test(short)) return null;
+  return short;
+}
+function languageNameForTag(short) {
+  if (!short) return null;
+  return LANG_NAME_BY_TAG[short] || short.toUpperCase();
+}
+
 router.post('/', async (req, res) => {
-  const { messages = [], avatar = 'kelion', frame, frameKind, datetime, timezone, coords } = req.body;
+  const { messages = [], avatar = 'kelion', frame, frameKind, datetime, timezone, coords, locale } = req.body;
   // `frameKind` disambiguates the two visual channels:
   //   - 'attachment' → user explicitly uploaded an image; describe / analyze
   //     it freely.
@@ -234,7 +279,65 @@ router.post('/', async (req, res) => {
     }
   }
 
-  const systemPrompt = BASE_PROMPT + realtimeContext + memorySection;
+  // Locked-language resolution. Priority:
+  //   1. The user's stored `preferred_language` (signed-in users only — set on
+  //      first login from Accept-Language and overridable via PUT
+  //      /auth/me/language).
+  //   2. The browser locale forwarded by the client on every chat request
+  //      (`req.body.locale`, e.g. "ro-RO").
+  //   3. Accept-Language header.
+  //   4. "en" — explicit final fallback.
+  // For signed-in users: if (1) is empty but (2) is present, persist it now so
+  // future sessions on other devices still match. We never silently overwrite a
+  // user's stored preference — only seed on first sight.
+  let lockedLangTag = null;
+  if (req.user && (Number.isFinite(req.user.id) || typeof req.user.id === 'string')) {
+    try {
+      lockedLangTag = await getPreferredLanguage(req.user.id);
+    } catch (err) {
+      console.warn('[chat] read preferred_language failed', err && err.message);
+    }
+  }
+  if (!lockedLangTag) {
+    lockedLangTag = normalizeLocaleTag(locale);
+  }
+  if (!lockedLangTag) {
+    const accept = req.headers['accept-language'];
+    if (accept && typeof accept === 'string') {
+      lockedLangTag = normalizeLocaleTag(accept.split(',')[0]);
+    }
+  }
+  if (!lockedLangTag) lockedLangTag = 'en';
+
+  if (
+    req.user &&
+    (Number.isFinite(req.user.id) || typeof req.user.id === 'string') &&
+    normalizeLocaleTag(locale) === lockedLangTag
+  ) {
+    try {
+      const stored = await getPreferredLanguage(req.user.id);
+      if (!stored) {
+        const langName = languageNameForTag(lockedLangTag);
+        await setPreferredLanguage(
+          req.user.id,
+          lockedLangTag,
+          langName ? `Preferred language: ${langName}.` : null
+        );
+      }
+    } catch (err) {
+      console.warn('[chat] seed preferred_language failed', err && err.message);
+    }
+  }
+
+  const lockedLangName = languageNameForTag(lockedLangTag) || 'English';
+  const lockedLangBlock =
+    `\n\nUser's LOCKED language: ${lockedLangName} (${lockedLangTag}).` +
+    `\n- Reply EXCLUSIVELY in ${lockedLangName} for the entire session.` +
+    `\n- This overrides every other language rule. Never silently default to English.` +
+    `\n- Single English / loanword tokens ("ok", "stop", "wow", brand names) DO NOT count as a language switch — keep replying in ${lockedLangName}.` +
+    `\n- Only change language if the user writes a FULL sentence in another language AND explicitly asks you to switch ("vorbește în engleză", "speak French", "passa all'italiano"). Otherwise stay locked.`;
+
+  const systemPrompt = BASE_PROMPT + lockedLangBlock + realtimeContext + memorySection;
   const model = getDefaultChatModel();
 
   // Sanitize message history
