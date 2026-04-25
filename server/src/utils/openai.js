@@ -19,7 +19,7 @@
 let _client = null;
 
 const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/openai/';
-const DEFAULT_GEMINI_CHAT_MODEL = 'gemini-3-flash-preview';
+const DEFAULT_GEMINI_CHAT_MODEL = 'gemini-2.5-flash';
 
 function getAI() {
   if (_client) return _client;

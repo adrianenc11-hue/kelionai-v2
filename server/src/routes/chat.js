@@ -306,7 +306,7 @@ router.post('/', async (req, res) => {
         role: 'user',
         content: [
           { type: 'text', text: channelLabel },
-          { type: 'image_url', image_url: { url: frame, detail: 'low' } },
+          { type: 'image_url', image_url: { url: frame } },
           { type: 'text', text: userText },
         ],
       };
@@ -492,7 +492,7 @@ router.post('/', async (req, res) => {
     res.write('data: [DONE]\n\n');
   } catch (err) {
     console.error('[chat] AI error:', err.message);
-    res.write(`data: ${JSON.stringify({ error: 'AI service error. Please try again.' })}\n\n`);
+    res.write(`data: ${JSON.stringify({ error: `AI error: ${err.message}` })}\n\n`);
   } finally {
     res.end();
   }
