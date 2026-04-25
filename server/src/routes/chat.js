@@ -154,9 +154,14 @@ router.post('/', async (req, res) => {
     }
   }
 
-  // IP-based geolocation — no browser permission prompt. Uses Cloudflare /
-  // Railway forward headers and ipapi.co (cached 1h). If it fails, we just
-  // fall back to whatever the client volunteered in `coords`.
+  // IP-based geolocation is used ONLY for timezone fallback when the
+  // client doesn't supply one — never for the user's "where am I"
+  // answer. Adrian: "permanent trebuie sa foloseasca coordonatele gps
+  // reale ale aparatului". Putting an IP-derived city into the system
+  // prompt makes Kelion confidently lie about location (often the wrong
+  // city, sometimes the wrong country when the user is on a VPN). We
+  // surface "location unknown" instead and let the model ask the user
+  // to enable location.
   const geo = await ipGeo.lookup(ipGeo.clientIp(req));
 
   // Build real-time context for system prompt
@@ -170,14 +175,14 @@ router.post('/', async (req, res) => {
     });
     realtimeContext += `\n\nReal-time context:\n- Current date & time: ${formatted} (${timezone || geo?.timezone || 'UTC'})`;
   }
-  if (coords?.lat != null && coords?.lon != null) {
-    realtimeContext += `\n- User GPS coordinates: ${Number(coords.lat).toFixed(5)}, ${Number(coords.lon).toFixed(5)}`;
-  } else if (geo && (geo.latitude != null || geo.city)) {
-    const place = ipGeo.formatForPrompt(geo);
-    if (place) realtimeContext += `\n- Approximate user location (IP-based): ${place}`;
-    if (geo.latitude != null && geo.longitude != null) {
-      realtimeContext += `\n- Approximate GPS coordinates: ${geo.latitude.toFixed(4)}, ${geo.longitude.toFixed(4)}`;
+  const hasClientGps = coords && Number.isFinite(Number(coords.lat)) && Number.isFinite(Number(coords.lon));
+  if (hasClientGps) {
+    realtimeContext += `\n- User GPS coordinates (real device GPS): ${Number(coords.lat).toFixed(5)}, ${Number(coords.lon).toFixed(5)}`;
+    if (Number.isFinite(Number(coords.accuracy))) {
+      realtimeContext += ` (±${Math.round(Number(coords.accuracy))} m)`;
     }
+  } else {
+    realtimeContext += `\n- User location: UNKNOWN. The device has not shared GPS yet. If the user asks where they are, asks for "the weather here", or any location-dependent question, call get_my_location FIRST. If get_my_location returns no coords, ask the user to tap the screen and allow location access — never invent a city, never use IP geolocation.`;
   }
 
   // Long-term memory injection — mirrors the realtime (voice) path at
@@ -335,8 +340,18 @@ router.post('/', async (req, res) => {
 
         // Server-executed real tools. executeRealTool returns null for
         // unrecognised names so we can distinguish "not handled here" from
-        // "tool ran and returned data".
-        const result = await executeRealTool(t.name, parsed);
+        // "tool ran and returned data". Pass user + real GPS coords via
+        // ctx so tools like get_my_credits and get_my_location can read
+        // them without going back through the request closure.
+        const ctx = {
+          user: req.user || null,
+          coords: hasClientGps ? {
+            lat: Number(coords.lat),
+            lon: Number(coords.lon),
+            accuracy: Number.isFinite(Number(coords.accuracy)) ? Number(coords.accuracy) : null,
+          } : null,
+        };
+        const result = await executeRealTool(t.name, parsed, ctx);
         if (result != null) {
           // Let the client echo the tool call into the UI (shows a small
           // "Kelion used calculate(...)" chip). The rendered result is

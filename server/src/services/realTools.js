@@ -1899,6 +1899,48 @@ function needSignIn() {
   };
 }
 
+// `get_my_location` — server-side counterpart of the client tool. Reads
+// the request's real GPS coords (passed via ctx.coords by the chat /
+// realtime route) and never falls back to IP-geolocation. Adrian:
+// "permanent trebuie sa foloseasca coordonatele gps reale ale aparatului".
+// IP-geo is fine for telemetry but is forbidden as the user's "where am I"
+// answer — too inaccurate (often the wrong city) and Kelion saying
+// "you are in <wrong city>" is a worse failure than "I don't have your
+// location yet, please tap Allow Location".
+async function toolGetMyLocation(args, ctx) {
+  const coords = ctx && ctx.coords;
+  const lat = Number(coords?.lat);
+  const lon = Number(coords?.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+    return {
+      ok: false,
+      have_gps: false,
+      error: 'No real GPS coordinates from the device. Ask the user to tap the screen and allow location access (Settings → Location for the app).',
+    };
+  }
+  const result = {
+    ok: true,
+    have_gps: true,
+    lat,
+    lon,
+    accuracy: Number.isFinite(Number(coords?.accuracy)) ? Number(coords.accuracy) : null,
+  };
+  // Best-effort reverse geocode so Kelion can say "Cluj-Napoca, RO"
+  // instead of raw coords. Failure here is non-fatal — the numeric
+  // answer is still useful for downstream tools.
+  if (args?.include_address !== false) {
+    try {
+      const rg = await toolReverseGeocode({ lat, lon });
+      if (rg && rg.ok) {
+        result.displayName = rg.displayName || rg.display_name || null;
+        result.city        = rg.city || rg.address?.city || rg.address?.town || rg.address?.village || null;
+        result.country     = rg.country || rg.address?.country || null;
+      }
+    } catch { /* keep numeric answer */ }
+  }
+  return result;
+}
+
 async function toolGetMyCredits(_args, ctx) {
   const user = ctx && ctx.user;
   if (!user || !user.id) return needSignIn();
@@ -2473,6 +2515,7 @@ async function executeRealTool(name, args, ctx) {
     // ── PR C — sandbox + regex + user-intern ──
     case 'run_regex':         return toolRunRegex(a);
     case 'run_code':          return toolRunCode(a);
+    case 'get_my_location':   return toolGetMyLocation(a, ctx);
     case 'get_my_credits':    return toolGetMyCredits(a, ctx);
     case 'get_my_usage':      return toolGetMyUsage(a, ctx);
     case 'get_my_profile':    return toolGetMyProfile(a, ctx);
@@ -2615,6 +2658,7 @@ module.exports = {
   // PR C — sandbox + regex + user-intern
   toolRunRegex,
   toolRunCode,
+  toolGetMyLocation,
   toolGetMyCredits,
   toolGetMyUsage,
   toolGetMyProfile,
