@@ -72,8 +72,11 @@ export default function EmailComposerModal({ authToken }) {
   if (!open) return null
 
   const recipients = parseRecipients(to)
-  const ccList = parseRecipients(cc)
-  const bccList = parseRecipients(bcc)
+  // Only validate / send Cc + Bcc when the section is actually visible to the
+  // user. If the model pre-populates a malformed CC and the user never expands
+  // the section, we'd otherwise disable Send with no on-screen explanation.
+  const ccList = showCc ? parseRecipients(cc) : []
+  const bccList = showCc ? parseRecipients(bcc) : []
   const allAddrs = [...recipients, ...ccList, ...bccList]
   const invalidAddr = allAddrs.find((a) => !emailRe(a))
   const canSend =
