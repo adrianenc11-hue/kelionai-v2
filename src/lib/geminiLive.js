@@ -97,11 +97,6 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
   // post-sign-in re-renders widen the stale-closure window that lets two
   // concurrent starts slip past the status check.
   const startInFlightRef = useRef(false)
-  // Hard cooldown — reject any start() call within 3 s of the last one.
-  // The in-flight lock releases in `finally` (before setupComplete), so
-  // a second caller (wake word, rapid tap, re-render) can slip through
-  // and open a parallel session → triple greeting. Adrian 2026-04-25.
-  const lastStartAtRef = useRef(0)
   // F5 — when start() is called on a handoff (priorTurns.length > 0), the
   // persona already tells Kelion to continue the conversation rather than
   // re-greet. We must NOT fire the setupComplete kickstart ("Greet me with
@@ -387,40 +382,23 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
 
     if (msg.setupComplete) {
       setStatus('listening')
-      // Kickstart: make Kelion speak first instead of waiting for the
-      // user to break the ice. We send a tiny synthetic user turn right
-      // after Google confirms setup is done so Gemini responds with a
-      // short English greeting. MUST be sent only after `setupComplete`
-      // — sending it right after our own `setup` frame (as we used to)
-      // violates Google's protocol and triggers close-code 1007. If
-      // send fails we silently skip; next user utterance still triggers
-      // a response like before. Adrian 2026-04-20.
-      //
-      // F5 — skip the kickstart entirely on F4 handoff sessions. The
-      // persona already carries the prior-turns block with a "do NOT
-      // re-greet, continue from the last Kelion turn" directive; firing
-      // a fresh "Greet me" user turn here would override that system
-      // instruction and Gemini would re-greet anyway.
-      if (handoffSessionRef.current) {
-        // Nothing to do — the model already has context and will speak
-        // when the user does (or on first mic audio). Reset the flag so
-        // the next fresh start() behaves normally.
-        handoffSessionRef.current = false
-      } else if (ws && ws.readyState === WebSocket.OPEN) {
+      // Translator mode kickstart — only fires when the user explicitly
+      // selected translator mode from the menu. Normal sessions start
+      // silent: Kelion listens and detects the user's language.
+      if (translatorModeRef.current && ws && ws.readyState === WebSocket.OPEN) {
         try {
           ws.send(JSON.stringify({
             clientContent: {
               turns: [{
                 role: 'user',
-                parts: [{ text: translatorModeRef.current
-                  ? 'You are now in LIVE TRANSLATOR mode. Listen carefully to everything I say in ANY language. Translate it immediately and naturally into my locked language (the one in your system instructions). Do NOT respond with your own words — just translate what you hear. Acknowledge by saying only "Translator mode active" in my language, then wait and translate.'
-                  : 'Greet me briefly and ask what I need. One sentence. Use the user-language locked in your system instructions — do NOT translate or add a second-language version.' }],
+                parts: [{ text: 'You are now in LIVE TRANSLATOR mode. Listen carefully to everything I say in ANY language. Translate it immediately and naturally into my locked language (the one in your system instructions). Do NOT respond with your own words — just translate what you hear. Acknowledge by saying only "Translator mode active" in my language, then wait and translate.' }],
               }],
               turnComplete: true,
             },
           }))
         } catch (_) { /* best-effort */ }
       }
+      handoffSessionRef.current = false
     }
 
     if (msg.error || msg.errorMessage) {
@@ -448,10 +426,6 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
     // session that is actually opening the socket. Reject-first,
     // mutate-after.
     if (startInFlightRef.current) return
-    // Hard cooldown: reject start() if the last one was < 3 s ago.
-    const now = Date.now()
-    if (now - lastStartAtRef.current < 3000) return
-    lastStartAtRef.current = now
     // F5 — stash the handoff flag AFTER the concurrent guard so only
     // the winning call writes it. The setupComplete handler reads it
     // on the next microtask; fresh sessions explicitly reset to false
