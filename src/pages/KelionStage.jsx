@@ -1,4 +1,4 @@
-﻿import { Canvas } from '@react-three/fiber'
+import { Canvas } from '@react-three/fiber'
 import { useGLTF, Environment, ContactShadows, Float } from '@react-three/drei'
 import * as THREE from 'three'
 import { Suspense, useState, useRef, useEffect, useMemo, useCallback } from 'react'
@@ -60,7 +60,7 @@ import {
 } from '../lib/pushClient'
 import { useEmotion } from '../lib/emotionStore'
 
-// Stage 6 â€” M26 voice-style menu presets (labels match server VOICE_STYLES).
+// Stage 6 — M26 voice-style menu presets (labels match server VOICE_STYLES).
 const VOICE_STYLE_OPTIONS = [
   { key: 'warm',    label: 'Warm' },
   { key: 'playful', label: 'Playful' },
@@ -96,18 +96,18 @@ function actionBtnStyle(disabled, color, borderColor) {
   }
 }
 
-// â”€â”€â”€â”€â”€ Main page â”€â”€â”€â”€â”€
+// ───── Main page ─────
 export default function KelionStage() {
   // React-router navigator. Used for in-app route changes (e.g. the
   // "Contact us" menu item) so we stay inside the SPA and preserve
-  // auth state, mic state, etc. â€” full-page reloads via
+  // auth state, mic state, etc. — full-page reloads via
   // `window.location.assign` discarded the React tree and the browser
   // back button then returned to a freshly-mounted, effectively
   // logged-out-looking page until `/api/auth/me` re-resolved. Adrian
   // 2026-04-20: "cind esti logat si folosesti butonul back, te
   // intorci in pagina anterioara, dar logat".
   const navigate = useNavigate()
-  // PR #200 â€” register the ui_navigate controller so the voice model's
+  // PR #200 — register the ui_navigate controller so the voice model's
   // ui_navigate tool (kelionTools.js) can actually move the user
   // between SPA routes instead of just narrating that it did. The
   // allowlist lives inside uiActionStore; this effect only wires the
@@ -119,7 +119,7 @@ export default function KelionStage() {
     return () => setUIActionController(null)
   }, [navigate])
   const audioRef = useRef(null)
-  // Real client GPS (falls back to null â†’ server uses IP-geo instead).
+  // Real client GPS (falls back to null → server uses IP-geo instead).
   // The hook fires once on mount; if the browser remembers a previous
   // grant there is no prompt, otherwise the browser shows its standard
   // one-time permission dialog. Coords are cached in localStorage so
@@ -127,12 +127,12 @@ export default function KelionStage() {
   // useClientGeo v2 exposes { coords, permission, lastError, requestNow }.
   // We forward `coords` to the Gemini Live hook (the pipeline only needs
   // lat/lon), and the top-level stage wires `requestNow` to the first
-  // user gesture so iOS Safari actually shows the permission prompt â€”
+  // user gesture so iOS Safari actually shows the permission prompt —
   // see handling in onStageClick below.
   const { coords: clientGeo, permission: geoPermission, requestNow: requestGeo } = useClientGeo()
   // Register a geo provider so monitorStore can fall back to the user's
   // current coords when the model calls show_on_monitor({kind:'map'}) without
-  // a query (e.g. "aratÄƒ-mi harta" / "show me a map" without a place name).
+  // a query (e.g. "arată-mi harta" / "show me a map" without a place name).
   const clientGeoRef = useRef(null)
   const geoPermissionRef = useRef('unknown')
   const requestGeoRef = useRef(null)
@@ -162,7 +162,7 @@ export default function KelionStage() {
   const [transcriptOpen, setTranscriptOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
 
-  // Stage 3 â€” auth + memory state
+  // Stage 3 — auth + memory state
   const [authState, setAuthState] = useState({ signedIn: false, user: null })
   // JWT bearer-token fallback. register/login return a `token` in the body
   // and also set the httpOnly `kelion.token` cookie. In some browsers the
@@ -171,8 +171,8 @@ export default function KelionStage() {
   // proxies rewriting headers). When that happens, the next authenticated
   // call (e.g. POST /api/chat) returns 401 and the UI flips to
   // "Session expired" seconds after the user signed in. Storing the token
-  // in-memory and attaching it as `Authorization: Bearer â€¦` on authenticated
-  // fetches closes that gap â€” the server middleware already reads either
+  // in-memory and attaching it as `Authorization: Bearer …` on authenticated
+  // fetches closes that gap — the server middleware already reads either
   // the header or the cookie, whichever is present.
   const authTokenRef = useRef(null)
   const [memoryOpen, setMemoryOpen] = useState(false)
@@ -181,18 +181,18 @@ export default function KelionStage() {
   const [rememberPromptOpen, setRememberPromptOpen] = useState(false)
   const [rememberBusy, setRememberBusy] = useState(false)
   const [rememberError, setRememberError] = useState(null)
-  // Full sign-in modal (email+password primary, Google, passkey) â€” opened
+  // Full sign-in modal (email+password primary, Google, passkey) — opened
   // from the top-bar "Sign in" button. Separate from the soft passkey prompt
   // above which auto-opens mid-conversation after several turns.
   const [signInModalOpen, setSignInModalOpen] = useState(false)
   const dismissedPromptRef = useRef(false)
 
-  // Stage 5 â€” proactive pings state
+  // Stage 5 — proactive pings state
   const [pushState, setPushState] = useState({ supported: false, enabled: false, permission: 'default' })
   const [pushBusy, setPushBusy] = useState(false)
   const [pushError, setPushError] = useState(null)
 
-  // Admin-only â€” AI credits dashboard state (Stage 7 / monetization gate).
+  // Admin-only — AI credits dashboard state (Stage 7 / monetization gate).
   // `creditsOpen` controls the overlay; `creditsCards` is the normalized
   // array returned by GET /api/admin/credits; `creditsLoading` shows a
   // skeleton while the server probes providers.
@@ -200,7 +200,7 @@ export default function KelionStage() {
   const [creditsCards, setCreditsCards] = useState([])
   const [creditsLoading, setCreditsLoading] = useState(false)
   const [creditsError, setCreditsError] = useState(null)
-  // PR E2 â€” auto-topup configuration snapshot returned alongside the
+  // PR E2 — auto-topup configuration snapshot returned alongside the
   // provider cards (threshold, amount, last-run history). Drives the
   // info strip at the top of the AI tab so the admin can see at a
   // glance whether auto-refill is armed and when it last fired.
@@ -212,16 +212,16 @@ export default function KelionStage() {
   const [revenueSplit, setRevenueSplit] = useState(null)
   const [revenueSplitLoading, setRevenueSplitLoading] = useState(false)
   const [revenueSplitError, setRevenueSplitError] = useState(null)
-  // Live usage ledger â€” most recent credit transactions across all
+  // Live usage ledger — most recent credit transactions across all
   // users. Auto-refreshed every 5s while the credits overlay is open
   // so Adrian can watch consumption tick in real time. Added after
-  // the 2026-04-20 charge-on-open bug drained a Â£10 pack in seconds;
+  // the 2026-04-20 charge-on-open bug drained a £10 pack in seconds;
   // visibility is now a standing requirement ("permanent la toti
   // userii").
   const [ledgerRows, setLedgerRows] = useState([])
   const [ledgerError, setLedgerError] = useState(null)
   const [ledgerLoading, setLedgerLoading] = useState(false)
-  // Grant / refund form â€” hits POST /api/admin/credits/grant.
+  // Grant / refund form — hits POST /api/admin/credits/grant.
   // Added so Adrian can refund compromised accounts (e.g. Kelion's
   // 33-credit loss from the 2026-04-20 charge-on-open incident)
   // without having to touch the browser console or a raw curl.
@@ -259,7 +259,7 @@ export default function KelionStage() {
     }
     setGrantBusy(true)
     setGrantMessage(null)
-    // Per-submission idempotency key â€” a double-click or retry uses
+    // Per-submission idempotency key — a double-click or retry uses
     // the same key, and the server's UNIQUE index collapses it into
     // a no-op (audit #7). The key includes email+minutes+timestamp+
     // random so two *different* intentional grants to the same user
@@ -337,15 +337,15 @@ export default function KelionStage() {
     return () => clearInterval(id)
   }, [creditsOpen, isAdmin, refreshLedger])
 
-  // Admin-only â€” Visitors overlay. One row per SPA page load recorded by
+  // Admin-only — Visitors overlay. One row per SPA page load recorded by
   // the server-side `visitorLog` middleware. Shows IP, country, UA,
   // referer, path, user email (if signed in), timestamp. Auto-refresh
   // every 10s while open so Adrian can watch the live flow.
   const [visitorsOpen, setVisitorsOpen] = useState(false)
   const [visitorsRows, setVisitorsRows] = useState([])
   const [visitorsStats, setVisitorsStats] = useState(null)
-  // PR E4 â€” advanced analytics: 30-day chart, country list, device mix,
-  // loginâ†’topupâ†’usage funnel. Fetched alongside the raw rows.
+  // PR E4 — advanced analytics: 30-day chart, country list, device mix,
+  // login→topup→usage funnel. Fetched alongside the raw rows.
   const [visitorsAnalytics, setVisitorsAnalytics] = useState(null)
   const [visitorsLoading, setVisitorsLoading] = useState(false)
   const [visitorsError, setVisitorsError] = useState(null)
@@ -380,7 +380,7 @@ export default function KelionStage() {
     return () => clearInterval(id)
   }, [visitorsOpen, isAdmin, refreshVisitors])
 
-  // Stage 7 â€” monetization. User-facing top-up modal (Stripe Checkout)
+  // Stage 7 — monetization. User-facing top-up modal (Stripe Checkout)
   // and live balance. `buyOpen` shows the package picker; `buyBusy` is
   // true while we create the Stripe Checkout session; `balance` is
   // null until loaded so we can hide the chip until we know it.
@@ -446,7 +446,7 @@ export default function KelionStage() {
     }
   }, [refreshBalance])
 
-  // PWA install prompt â€” Chrome / Edge / Android fire `beforeinstallprompt`
+  // PWA install prompt — Chrome / Edge / Android fire `beforeinstallprompt`
   // which we stash; iOS Safari has no such event, so we show instructions
   // inline in the modal instead.
   const [installPromptEvent, setInstallPromptEvent] = useState(null)
@@ -474,8 +474,8 @@ export default function KelionStage() {
     } catch (_) { /* user dismissed */ }
   }, [installPromptEvent])
 
-  // Global ESC handler â€” closes any open overlay / drawer so the user is
-  // never stuck with a side panel they cannot dismiss. Also closes the â‹¯
+  // Global ESC handler — closes any open overlay / drawer so the user is
+  // never stuck with a side panel they cannot dismiss. Also closes the ⋯
   // menu. The Buy-credits modal has its own backdrop so it also closes
   // on click-outside; this just adds keyboard parity. Covers every
   // admin-shell drawer (Business / AI / Visitors / Users / Payouts) so
@@ -499,7 +499,7 @@ export default function KelionStage() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  // Admin-only â€” live business metrics (revenue + minutes sold/consumed).
+  // Admin-only — live business metrics (revenue + minutes sold/consumed).
   const [businessOpen, setBusinessOpen] = useState(false)
   const [businessData, setBusinessData] = useState(null)
   const [businessLoading, setBusinessLoading] = useState(false)
@@ -519,17 +519,17 @@ export default function KelionStage() {
     }
   }, [])
 
-  // PR E1 â€” unified admin shell. Two new tab panels (Users, Payouts)
+  // PR E1 — unified admin shell. Two new tab panels (Users, Payouts)
   // replace the scattered overflow-menu entries; Business / AI / Visitors
   // keep their existing open*() data fetchers but now share a tab bar at
   // the top. switchAdminTab is the single entry point the top-bar
-  // "Admin Â· âˆž" button and the tab bar both call â€” it closes whichever
+  // "Admin · ∞" button and the tab bar both call — it closes whichever
   // tab is currently visible and opens the target one, re-using the
   // existing fetcher so the data is always fresh.
   const [usersOpen, setUsersOpen] = useState(false)
   const [payoutsOpen, setPayoutsOpen] = useState(false)
 
-  // PR E5 â€” Users drawer state. `usersData` holds the last list
+  // PR E5 — Users drawer state. `usersData` holds the last list
   // response; `usersQuery`/`usersStatus` are the current filters;
   // `selectedUserId` opens a detail sub-drawer with per-user actions
   // (grant credits, ban/unban, reset password, ledger history). The
@@ -559,7 +559,7 @@ export default function KelionStage() {
       if (!r.ok) throw new Error(`HTTP ${r.status}`)
       setUsersData(await r.json())
     } catch (err) {
-      setUsersError(err.message || 'Nu am putut Ã®ncÄƒrca lista de useri')
+      setUsersError(err.message || 'Nu am putut încărca lista de useri')
     } finally {
       setUsersLoading(false)
     }
@@ -602,7 +602,7 @@ export default function KelionStage() {
     if (!selectedUserId || selectedBusy) return
     let reason = null
     if (banned) {
-      reason = window.prompt('Motiv suspendare (opÈ›ional):', '') || ''
+      reason = window.prompt('Motiv suspendare (opțional):', '') || ''
     } else if (!window.confirm('Reactivezi contul?')) {
       return
     }
@@ -620,7 +620,7 @@ export default function KelionStage() {
       setSelectedResult({ ok: true, message: banned ? 'Cont suspendat' : 'Cont reactivat' })
       await Promise.all([loadUserDetail(selectedUserId), refreshUsersList()])
     } catch (err) {
-      setSelectedResult({ ok: false, error: err.message || 'AcÈ›iunea a eÈ™uat' })
+      setSelectedResult({ ok: false, error: err.message || 'Acțiunea a eșuat' })
     } finally {
       setSelectedBusy(false)
     }
@@ -628,14 +628,14 @@ export default function KelionStage() {
 
   const grantCreditsToSelected = useCallback(async () => {
     if (!selectedUserId || selectedBusy) return
-    const raw = window.prompt('CÃ¢te minute adaugi? (negativ = retragi)', '10')
+    const raw = window.prompt('Câte minute adaugi? (negativ = retragi)', '10')
     if (raw == null) return
     const minutes = Number(raw)
     if (!Number.isFinite(minutes) || minutes === 0) {
-      setSelectedResult({ ok: false, error: 'IntroduceÈ›i un numÄƒr diferit de 0' })
+      setSelectedResult({ ok: false, error: 'Introduceți un număr diferit de 0' })
       return
     }
-    const note = window.prompt('NotÄƒ (opÈ›ional):', '') || ''
+    const note = window.prompt('Notă (opțional):', '') || ''
     setSelectedBusy(true)
     setSelectedResult(null)
     try {
@@ -649,11 +649,11 @@ export default function KelionStage() {
       if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`)
       setSelectedResult({
         ok: true,
-        message: `${minutes > 0 ? 'AdÄƒugate' : 'Retrase'} ${Math.abs(Math.trunc(minutes))} minute Â· sold nou ${body.balance}`,
+        message: `${minutes > 0 ? 'Adăugate' : 'Retrase'} ${Math.abs(Math.trunc(minutes))} minute · sold nou ${body.balance}`,
       })
       await Promise.all([loadUserDetail(selectedUserId), refreshUsersList()])
     } catch (err) {
-      setSelectedResult({ ok: false, error: err.message || 'AcÈ›iunea a eÈ™uat' })
+      setSelectedResult({ ok: false, error: err.message || 'Acțiunea a eșuat' })
     } finally {
       setSelectedBusy(false)
     }
@@ -661,7 +661,7 @@ export default function KelionStage() {
 
   const resetSelectedPassword = useCallback(async () => {
     if (!selectedUserId || selectedBusy) return
-    if (!window.confirm('È˜terg parola + passkey-ul? Userul va trebui sÄƒ se relogheazÄƒ cu Google sau passkey nou.')) {
+    if (!window.confirm('Șterg parola + passkey-ul? Userul va trebui să se reloghează cu Google sau passkey nou.')) {
       return
     }
     setSelectedBusy(true)
@@ -674,10 +674,10 @@ export default function KelionStage() {
       })
       const body = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`)
-      setSelectedResult({ ok: true, message: 'Parola + passkey È™terse. ContacteazÄƒ userul.' })
+      setSelectedResult({ ok: true, message: 'Parola + passkey șterse. Contactează userul.' })
       await loadUserDetail(selectedUserId)
     } catch (err) {
-      setSelectedResult({ ok: false, error: err.message || 'AcÈ›iunea a eÈ™uat' })
+      setSelectedResult({ ok: false, error: err.message || 'Acțiunea a eșuat' })
     } finally {
       setSelectedBusy(false)
     }
@@ -690,12 +690,12 @@ export default function KelionStage() {
     return () => clearInterval(id)
   }, [usersOpen, refreshUsersList])
 
-  // F3 â€” Adrian 2026-04-22: audit found adrianenc11@gmail.com split across
+  // F3 — Adrian 2026-04-22: audit found adrianenc11@gmail.com split across
   // two user rows (id=5 Google + id=6 local signup) and the admin panel
   // had no way to collapse them. `dupGroups` holds whatever
   // /api/admin/users/duplicates returned; the card in the Users drawer
   // renders one row per group with a "Merge" button per peer. We keep
-  // the group list lazy â€” it only loads on demand when the Users tab
+  // the group list lazy — it only loads on demand when the Users tab
   // is opened, and re-loads after each successful merge.
   const [dupGroups, setDupGroups] = useState([])
   const [dupLoading, setDupLoading] = useState(false)
@@ -713,7 +713,7 @@ export default function KelionStage() {
       const j = await r.json().catch(() => null)
       setDupGroups(Array.isArray(j && j.groups) ? j.groups : [])
     } catch (err) {
-      setDupError(err && err.message ? err.message : 'Nu am putut Ã®ncÄƒrca conturile duplicate')
+      setDupError(err && err.message ? err.message : 'Nu am putut încărca conturile duplicate')
     } finally {
       setDupLoading(false)
     }
@@ -721,9 +721,9 @@ export default function KelionStage() {
   const mergeDuplicateUsers = useCallback(async (sourceId, targetId, email) => {
     if (sourceId == null || targetId == null) return
     const confirmMsg =
-      `Merge user ${sourceId} â†’ ${targetId} (${email})?\n\n` +
-      'Toate conversaÈ›iile, creditele È™i istoricul sursei se vor muta pe È›intÄƒ.\n' +
-      'Sursa va fi È™tearsÄƒ. AcÈ›iune ireversibilÄƒ.'
+      `Merge user ${sourceId} → ${targetId} (${email})?\n\n` +
+      'Toate conversațiile, creditele și istoricul sursei se vor muta pe țintă.\n' +
+      'Sursa va fi ștearsă. Acțiune ireversibilă.'
     if (typeof window !== 'undefined' && !window.confirm(confirmMsg)) return
     const key = `${sourceId}->${targetId}`
     setDupBusyKey(key)
@@ -747,14 +747,14 @@ export default function KelionStage() {
         sourceId,
         targetId,
         email,
-        error: err && err.message ? err.message : 'Merge eÈ™uat',
+        error: err && err.message ? err.message : 'Merge eșuat',
       })
     } finally {
       setDupBusyKey(null)
     }
   }, [refreshDuplicateUsers])
 
-  // PR E3 â€” Payouts drawer pulls a live snapshot from Stripe (balance,
+  // PR E3 — Payouts drawer pulls a live snapshot from Stripe (balance,
   // linked external account, next-payout schedule, last ~10 payouts)
   // plus the 50/50 AI-vs-profit split over the last 30 days. The
   // snapshot aggregator on the server never throws; partial failures
@@ -765,7 +765,7 @@ export default function KelionStage() {
   const [payoutBusy, setPayoutBusy] = useState(false)
   const [payoutResult, setPayoutResult] = useState(null)
   // `refreshPayoutsData` pulls a fresh snapshot without touching
-  // `payoutResult`; that way the "OK â€” 50.00 EUR Â· status in_transit"
+  // `payoutResult`; that way the "OK — 50.00 EUR · status in_transit"
   // banner survives the refresh triggered right after a successful
   // instant payout. `openPayouts` wraps it and additionally clears the
   // previous result so opening the drawer from scratch feels clean.
@@ -789,9 +789,9 @@ export default function KelionStage() {
   }, [refreshPayoutsData])
   const triggerInstantPayout = useCallback(async () => {
     if (payoutBusy) return
-    // A confirm() keeps this honest â€” an instant payout cannot be
-    // undone, and the Stripe fee (~1% + â‚¬0.25) is real money.
-    if (!window.confirm('Instant payout: transferÄƒ soldul disponibil pe cardul legat acum. Taxa Stripe ~1% + 0.25 EUR. ContinuÄƒm?')) {
+    // A confirm() keeps this honest — an instant payout cannot be
+    // undone, and the Stripe fee (~1% + €0.25) is real money.
+    if (!window.confirm('Instant payout: transferă soldul disponibil pe cardul legat acum. Taxa Stripe ~1% + 0.25 EUR. Continuăm?')) {
       return
     }
     setPayoutBusy(true)
@@ -801,7 +801,7 @@ export default function KelionStage() {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
-        // Empty body â†’ Stripe pays out the full instant-available balance.
+        // Empty body → Stripe pays out the full instant-available balance.
         body: JSON.stringify({}),
       })
       const body = await r.json().catch(() => ({}))
@@ -835,7 +835,7 @@ export default function KelionStage() {
     else if (tab === 'payouts')  { openPayouts() }
   }, [openBusiness, openCredits, openVisitors, openUsers, openPayouts, refreshDuplicateUsers])
 
-  // Stage 6 â€” emotion mirroring + voice style
+  // Stage 6 — emotion mirroring + voice style
   const emotion = useEmotion()
   const [voiceStyle, setVoiceStyleState] = useState(() => readVoiceStyleCookie())
   const handleVoiceStyleChange = useCallback(async (style) => {
@@ -843,7 +843,7 @@ export default function KelionStage() {
     if (resolved) setVoiceStyleState(resolved)
   }, [])
 
-  // Text chat â€” user-typed prompts in addition to voice. Talks to
+  // Text chat — user-typed prompts in addition to voice. Talks to
   // /api/chat which streams assistant deltas via SSE. We keep the last
   // ~6 turns in memory so the model has short-term context; voice and
   // text share the same session but don't (yet) share a message log.
@@ -851,7 +851,7 @@ export default function KelionStage() {
   const [chatMessages, setChatMessages] = useState([]) // [{ role, content }]
   const [chatBusy, setChatBusy] = useState(false)
   const [chatError, setChatError] = useState(null)
-  // Conversation history â€” user-requested ("sa aiba optiune de save").
+  // Conversation history — user-requested ("sa aiba optiune de save").
   // Signed-in users get server persistence via /api/conversations; guests
   // fall back to localStorage. See src/lib/conversationStore.js.
   const [historyOpen, setHistoryOpen] = useState(false)
@@ -862,27 +862,325 @@ export default function KelionStage() {
   // Track how many messages we've already persisted so the save-effect
   // only appends deltas (not the whole transcript on every turn).
   const savedUpToRef = useRef(0)
-  // F2 â€” "+" attach. Adrian: "lipseste + de introdus date". Accepts
+  // F2 — "+" attach. Adrian: "lipseste + de introdus date". Accepts
   // images, PDFs and text files. For MVP we only surface the filename to
   // the model (as a bracketed note) and preview-pill it in the composer
   // so the user gets visual confirmation of the attachment. Full upload
   // + embedding support lands in a follow-up PR.
   const [attachedFile, setAttachedFile] = useState(null)
-  const fileInputRef = useRef(null)
+  const fileInputRef = useRef(null)
+  const sendTextMessage = useCallback(async () => {
+    const text = chatInput.trim()
+    if (!text && !attachedFile) return
+    if (chatBusy) return
+    // Detect mute/unmute/translator commands from user text before sending.
+    applyMuteCommand(text)
+    setChatError(null)
+    // F2 — the paperclip attachment previously only mentioned the
+    // filename + size in a bracketed note (e.g. "[attached file:
+    // passport.jpg (2 KB)]"); the actual bytes never left the browser
+    // so the model replied "I received the image" but couldn't
+    // describe it (audit 2026-04-22, conversations #4/#5). Now we
+    // read the file client-side and turn it into something the chat
+    // route already knows how to handle — without touching chat.js:
+    //   • image/* → base64 data URL, sent as `frame` (chat.js already
+    //     wires that into the vision image_url part of the last user
+    //     message, line 201-212);
+    //   • application/pdf → POST to /api/tools/read_pdf (existing
+    //     endpoint, ships in PR #147) and inline the extracted text;
+    //   • text/plain / md / csv / json / log / yaml / ini → inline
+    //     the first ~32 KB directly into the user message;
+    //   • anything else → legacy bracketed note so the user at least
+    //     knows the file was noticed.
+    let attachedFrame = null
+    let attachedTextInline = ''
+    let attachNote = ''
+    if (attachedFile) {
+      try {
+        const t = (attachedFile.type || '').toLowerCase()
+        const name = attachedFile.name || 'file'
+        if (t.startsWith('image/')) {
+          if (attachedFile.size > 4 * 1024 * 1024) {
+            attachNote = `\n\n[attached image "${name}" is ${Math.round(attachedFile.size / 1024)} KB — too large to send, please paste or resize under 4 MB]`
+          } else {
+            attachedFrame = await new Promise((resolve, reject) => {
+              const r = new FileReader()
+              r.onload = () => resolve(String(r.result || ''))
+              r.onerror = () => reject(r.error || new Error('read failed'))
+              r.readAsDataURL(attachedFile)
+            })
+          }
+        } else if (t === 'application/pdf' || /\.pdf$/i.test(name)) {
+          if (attachedFile.size > 8 * 1024 * 1024) {
+            attachNote = `\n\n[attached PDF "${name}" is ${Math.round(attachedFile.size / 1024)} KB — too large, please send under 8 MB]`
+          } else {
+            const b64 = await new Promise((resolve, reject) => {
+              const r = new FileReader()
+              r.onload = () => {
+                const s = String(r.result || '')
+                const comma = s.indexOf(',')
+                resolve(comma >= 0 ? s.slice(comma + 1) : s)
+              }
+              r.onerror = () => reject(r.error || new Error('read failed'))
+              r.readAsDataURL(attachedFile)
+            })
+            try {
+              const pdfHeaders = { 'Content-Type': 'application/json' }
+              if (authTokenRef.current) pdfHeaders['Authorization'] = `Bearer ${authTokenRef.current}`
+              const rr = await fetch('/api/tools/execute', {
+                method: 'POST',
+                credentials: 'include',
+                headers: pdfHeaders,
+                body: JSON.stringify({
+                  name: 'read_pdf',
+                  args: { base64: b64, max_chars: 32 * 1024 },
+                }),
+              })
+              const j = await rr.json().catch(() => null)
+              const txt = j && j.ok && typeof j.text === 'string' ? j.text : ''
+              if (txt) {
+                attachedTextInline = `\n\n[attached PDF: ${name}]\n\`\`\`\n${txt}\n\`\`\``
+              } else {
+                attachNote = `\n\n[attached PDF "${name}" — could not extract text${j && j.error ? ` (${j.error})` : ''}]`
+              }
+            } catch (e) {
+              attachNote = `\n\n[attached PDF "${name}" — read failed: ${e && e.message ? e.message : 'network error'}]`
+            }
+          }
+        } else if (
+          t.startsWith('text/') ||
+          /\.(txt|md|csv|json|log|ya?ml|ini|conf)$/i.test(name)
+        ) {
+          const raw = await attachedFile.text()
+          const clipped = raw.length > 32 * 1024 ? raw.slice(0, 32 * 1024) + '\n...[truncated]' : raw
+          attachedTextInline = `\n\n[attached file: ${name}]\n\`\`\`\n${clipped}\n\`\`\``
+        } else {
+          attachNote = `\n\n[attached file: ${name}${attachedFile.size ? ` (${Math.round(attachedFile.size / 1024)} KB)` : ''} — unsupported type, please paste text or a supported image/PDF]`
+        }
+      } catch (err) {
+        console.warn('[kelionStage] attachment read failed', err)
+        attachNote = `\n\n[attached file "${attachedFile.name || 'file'}" could not be read]`
+      }
+    }
+    const combined = (text + attachedTextInline + attachNote).trim()
+    const next = [...chatMessages, { role: 'user', content: combined }].slice(-12)
+    setChatMessages(next)
+    setChatInput('')
+    setAttachedFile(null)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+    setChatBusy(true)
+    try {
+      const chatHeaders = { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() }
+      if (authTokenRef.current) {
+        chatHeaders['Authorization'] = `Bearer ${authTokenRef.current}`
+      }
+      // ───── Vision: capture a frame from the user's webcam ─────
+      // Adrian: "viziunea nu merge, gpt 5.4 trebuie sa capteze si sa-i dea
+      // avatarului detaliile cind este intrebat". The backend `/api/chat`
+      // route already accepts an optional `frame` (base64 data URL) and
+      // attaches it to the last user message as an image_url part; we just
+      // weren't ever sending one from the text composer. Grab the latest
+      // frame from the hidden <video> that mirrors `cameraStream` whenever
+      // the camera is live — if the user is on trial / camera off / grant
+      // denied, we skip the frame and fall back to text-only chat.
+      let frame = null
+      try {
+        const v = cameraVideoRef.current
+        if (
+          v && !v.paused && v.readyState >= 2 &&
+          v.videoWidth > 0 && v.videoHeight > 0
+        ) {
+          // Downscale to 512px on the long edge: vision models only need a
+          // rough view, and keeping the payload small avoids slow uploads
+          // from the user's home uplink.
+          const maxDim = 512
+          const scale = Math.min(1, maxDim / Math.max(v.videoWidth, v.videoHeight))
+          const w = Math.max(1, Math.round(v.videoWidth * scale))
+          const h = Math.max(1, Math.round(v.videoHeight * scale))
+          const c = document.createElement('canvas')
+          c.width = w; c.height = h
+          const ctx = c.getContext('2d')
+          if (ctx) {
+            ctx.drawImage(v, 0, 0, w, h)
+            // JPEG at q=0.7 keeps a 512-px frame at ~25-40 KB — small
+            // enough to send inline without blocking the request.
+            frame = c.toDataURL('image/jpeg', 0.7)
+          }
+        }
+      } catch (_) { frame = null }
+      // Channel selection (PR #213 — fix attachment-vs-camera bug):
+      //   • If the user attached an IMAGE via the paperclip, send it
+      //     labeled as 'attachment' so the model knows to describe /
+      //     analyze it freely.
+      //   • If the user attached a NON-IMAGE (PDF / docx / text), the
+      //     content is already inlined as text in the message. We MUST
+      //     suppress the live camera frame in this case — otherwise the
+      //     server only sees the camera and Kelion replies about the
+      //     room instead of the file (Adrian: "i-am dat sa analizeze in
+      //     chat un file, l-am intrebat daca l-a vazut, el descrie ce
+      //     vede camera").
+      //   • Otherwise (no attachment, camera on) → send the camera frame
+      //     labeled as 'camera' so silent-vision rules apply.
+      const hasAttachment = !!attachedFile
+      const hasImageAttachment = !!attachedFrame
+      let visionFrame = null
+      let visionChannel = null
+      if (hasImageAttachment) {
+        visionFrame = attachedFrame
+        visionChannel = 'attachment'
+      } else if (!hasAttachment && frame) {
+        visionFrame = frame
+        visionChannel = 'camera'
+      }
+      // else: non-image attachment + camera on → suppress camera entirely.
+      // Always volunteer the device's real GPS coords to the server when
+      // we have a fix — the chat route uses them to ground the system
+      // prompt and the get_my_location tool. Without this the server
+      // would say "location unknown" even on devices that already
+      // granted permission, forcing useless re-prompts. Adrian:
+      // "permanent trebuie sa foloseasca coordonatele gps reale ale
+      // aparatului".
+      const gpsCoords = (clientGeo && Number.isFinite(clientGeo.lat) && Number.isFinite(clientGeo.lon))
+        ? { lat: clientGeo.lat, lon: clientGeo.lon, accuracy: clientGeo.accuracy ?? null }
+        : null
+      const r = await fetch('/api/chat', {
+        method: 'POST',
+        credentials: 'include',
+        headers: chatHeaders,
+        body: JSON.stringify({
+          messages: next,
+          datetime: new Date().toISOString(),
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          locale: (typeof navigator !== 'undefined' && navigator.language) ? String(navigator.language) : null,
+          ...(visionFrame ? { frame: visionFrame, frameKind: visionChannel } : {}),
+          ...(gpsCoords ? { coords: gpsCoords } : {}),
+        }),
+      })
+      if (r.status === 401) {
+        // Stale JWT or expired session — server already cleared the cookie.
+        // Drop local auth state so the UI reverts to the Sign-in button and
+        // trial flow instead of looking "signed in" with a dead session.
+        setAuthState({ signedIn: false, user: null })
+        throw new Error('Session expired — please sign in again (⋯ menu).')
+      }
+      if (r.status === 402) {
+        // Signed-in user out of credits (Adrian: "daca ti-ai facut user nu
+        // trebuie sa functioneze daca nu ai cumparat credit"). Pop the
+        // buy-credits modal and surface a clear message. The modal is
+        // already wired below; we just trigger it here.
+        const body = await r.json().catch(() => ({}))
+        try { setBuyOpen(true) } catch (_) {}
+        throw new Error(body.error || 'No credits left — please buy a package to continue.')
+      }
+      if (r.status === 429) {
+        // Guest trial exhausted. `reason` distinguishes the daily 15-min
+        // window from the 7-day lifetime cap. For lifetime_expired we show
+        // a "create account" message so the user knows free access is
+        // permanently gone from this IP.
+        const body = await r.json().catch(() => ({}))
+        const lifetime = body && body.trial && body.trial.reason === 'lifetime_expired'
+        trialHud.refresh()
+        if (lifetime) {
+          try { setSignInModalOpen(true) } catch (_) {}
+          throw new Error(body.error || 'Your 7-day free trial has ended — create an account and buy credits to continue.')
+        }
+        throw new Error(body.error || 'Free trial used up — sign in or buy credits to continue.')
+      }
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      // First successful POST as a guest stamps the shared 15-min
+      // window on the server — refresh the HUD so the top-right timer
+      // starts counting down without waiting for the next poll.
+      if (!authState.signedIn) {
+        trialHud.refresh()
+      }
+      // Parse SSE stream: lines of form "data: {json}\n\n"
+      const reader = r.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let assistant = ''
+      setChatMessages((m) => [...m, { role: 'assistant', content: '' }])
 
+      // Process one SSE chunk (`data: {json}` or `data: [DONE]`).
+      // Hoisted so the post-loop buffer flush can reuse it — without
+      // the flush, Adrian saw "Salut! Sunt aici. Ce pot face pentru"
+      // because the final SSE event was sitting in `buffer` when
+      // `done` arrived (proxy / stream boundaries don't always end
+      // exactly on `\n\n`), and we'd break out of the loop before
+      // ever parsing it.
+      const handleChunk = (chunk) => {
+        const line = chunk.replace(/^data:\s*/, '').trim()
+        if (!line || line === '[DONE]') return
+        try {
+          const obj = JSON.parse(line)
+          if (obj.content) {
+            assistant += obj.content
+            setChatMessages((m) => {
+              const copy = m.slice()
+              copy[copy.length - 1] = { role: 'assistant', content: assistant }
+              return copy
+            })
+          } else if (obj.tool === 'show_on_monitor' && obj.arguments) {
+            // Server streamed a tool-call frame — the model decided to
+            // open something on the monitor. Invoke the same handler
+            // the voice path uses; a natural-language confirmation
+            // ("Here's Cluj-Napoca on the monitor.") streams next.
+            try { handleShowOnMonitor(obj.arguments) } catch (e) {
+              console.warn('[chat] show_on_monitor failed', e && e.message)
+            }
+          } else if (obj.tool === 'compose_email_draft' && obj.arguments) {
+            // The model wants to draft an email. Open the in-app
+            // composer modal so the user can review / edit / send.
+            // Nothing is delivered without an explicit click on Send.
+            try { openEmailComposer(obj.arguments) } catch (e) {
+              console.warn('[chat] compose_email_draft failed', e && e.message)
+            }
+          } else if (obj.error) {
+            throw new Error(obj.error)
+          }
+        } catch (err) {
+          if (err.message && err.message !== 'Unexpected end of JSON input') throw err
+        }
+      }
+
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const { value, done } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const chunks = buffer.split('\n\n')
+        buffer = chunks.pop() || ''
+        for (const chunk of chunks) handleChunk(chunk)
+      }
+      // Flush trailing decoder bytes + any buffered SSE event that
+      // didn't end in `\n\n` before the stream closed. Without this,
+      // the last token (e.g. "tine?") of the model's reply was lost
+      // whenever the proxy / TCP boundary fell inside the final
+      // event. A trailing `\n` (vs `\n\n`) is enough to cause it.
+      buffer += decoder.decode()
+      const tailChunks = buffer.split('\n\n')
+      for (const chunk of tailChunks) handleChunk(chunk)
+    } catch (err) {
+      setChatError(err.message || 'Chat failed')
+      // Drop the empty assistant placeholder if we never got content.
+      setChatMessages((m) => m[m.length - 1]?.role === 'assistant' && m[m.length - 1].content === ''
+        ? m.slice(0, -1) : m)
+    } finally {
+      setChatBusy(false)
+    }
+  }, [chatInput, chatBusy, chatMessages, attachedFile])
 
   const micMouthOpen = useLipSync(audioRef)
 
-  // â”€â”€â”€â”€â”€ Text-chat TTS (server-side ElevenLabs, male native voice) â”€â”€â”€â”€â”€
+  // ───── Text-chat TTS (server-side ElevenLabs, male native voice) ─────
   // Adrian: "vocea nu este elevenlab, nativa, barbateasca, voce de femeie acum".
   // Previously this path used `window.speechSynthesis` which defaults to the
   // OS voice (on Windows/Chrome that's typically a female English voice).
-  // We now POST the assistant's reply to /api/tts â€” the server synthesizes
-  // with ElevenLabs (Adam â€” male, multilingual) or Gemini "Charon" (male)
+  // We now POST the assistant's reply to /api/tts — the server synthesizes
+  // with ElevenLabs (Adam — male, multilingual) or Gemini "Charon" (male)
   // and returns an audio/mpeg or audio/wav blob. We play it via an offscreen
   // <audio> element and drive the mouth from the *actual* audio amplitude
-  // via `useAudioElementLipSync` (MediaElementSource â†’ analyzer), so the
-  // avatar opens its mouth on vowels and closes it on pauses/consonants â€”
+  // via `useAudioElementLipSync` (MediaElementSource → analyzer), so the
+  // avatar opens its mouth on vowels and closes it on pauses/consonants —
   // same envelope shape as the realtime-voice `useLipSync` path. If the
   // AudioContext can't be created (autoplay policy, older browsers) we
   // fall back to the legacy 4 Hz cosine so the avatar still lip-flaps.
@@ -906,15 +1204,135 @@ export default function KelionStage() {
   const statusRef = useRef('idle')
   const muteModeRef = useRef(false)
   useEffect(() => {
-    // PHYSICALLY REMOVED: TTS (/api/tts + speechSynthesis).
-    // Voice comes ONLY from Canal B (Gemini Live WebSocket).
+    if (chatBusy) return
+    if (muteModeRef.current) return   // mute mode — no TTS
+    const last = chatMessages[chatMessages.length - 1]
+    if (!last || last.role !== 'assistant' || !last.content) return
+    if (last.content === lastSpokenRef.current) return
+    lastSpokenRef.current = last.content
+
+    // Cancel any in-flight TTS from the previous message.
+    if (ttsAbortRef.current) { try { ttsAbortRef.current.abort() } catch (_) {} }
+    if (ttsAudioRef.current) { try { ttsAudioRef.current.pause() } catch (_) {} ttsAudioRef.current = null }
+    try { if (typeof window !== 'undefined' && window.speechSynthesis) window.speechSynthesis.cancel() } catch (_) {}
+
+    const controller = new AbortController()
+    ttsAbortRef.current = controller
+
+    // Cosine envelope used ONLY as a fallback when the analyzer can't
+    // attach (blocked autoplay, old browser). 4 Hz, 0..0.9, approximates
+    // average jaw motion during speech.
+    const driveCosine = () => {
+      const t = performance.now() / 1000
+      const v = 0.45 + 0.45 * Math.abs(Math.sin(t * 4 * Math.PI))
+      setTtsCosineMouth(v)
+      ttsRafRef.current = requestAnimationFrame(driveCosine)
+    }
+    const stopDrive = () => {
+      if (ttsRafRef.current) { cancelAnimationFrame(ttsRafRef.current); ttsRafRef.current = null }
+      setTtsCosineMouth(0)
+      try { resetTtsLipSync() } catch (_) { /* hook already reset */ }
+    }
+
+    const ttsHeaders = { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() }
+    if (authTokenRef.current) ttsHeaders['Authorization'] = `Bearer ${authTokenRef.current}`
+
+    // Browser locale is a highly reliable signal for which language the user
+    // types in — we forward it as a hint so short replies still route to a
+    // native voice (server falls back to text-based detection otherwise).
+    const hint = (typeof navigator !== 'undefined' && navigator.language)
+      ? String(navigator.language).toLowerCase().slice(0, 2) : ''
+
+    ;(async () => {
+      let audioUrl = null
+      try {
+        const r = await fetch('/api/tts', {
+          method: 'POST',
+          credentials: 'include',
+          headers: ttsHeaders,
+          body: JSON.stringify({ text: last.content, lang: hint }),
+          signal: controller.signal,
+        })
+        if (!r.ok) throw new Error(`TTS ${r.status}`)
+        const blob = await r.blob()
+        audioUrl = URL.createObjectURL(blob)
+        const audio = new Audio(audioUrl)
+        ttsAudioRef.current = audio
+        audio.onplay = () => {
+          if (ttsRafRef.current) cancelAnimationFrame(ttsRafRef.current)
+          // Try the real-audio analyzer first; the hook returns silently
+          // (envelope stays 0) if createMediaElementSource throws or the
+          // context can't resume. We detect that by checking the hook's
+          // envelope a couple of frames later — if it's still 0 while
+          // audio is playing, something's wrong, so we lip-flap via
+          // cosine to avoid the avatar standing still with a closed mouth.
+          try { attachTtsLipSync(audio) } catch (_) { /* fall through to cosine */ }
+          let cosineStarted = false
+          const guardStart = performance.now()
+          const guard = () => {
+            if (!ttsAudioRef.current || ttsAudioRef.current !== audio) return
+            // 250 ms grace period for the analyser — fast enough that any
+            // delay is imperceptible, slow enough to avoid false positives
+            // during the first few quiet frames after decoder warm-up.
+            if (performance.now() - guardStart < 250) {
+              ttsRafRef.current = requestAnimationFrame(guard)
+              return
+            }
+            if (ttsMouthOpenRef.current < 0.02 && !audio.paused && !cosineStarted) {
+              cosineStarted = true
+              driveCosine()
+            }
+          }
+          ttsRafRef.current = requestAnimationFrame(guard)
+        }
+        const cleanup = () => {
+          stopDrive()
+          if (audioUrl) { try { URL.revokeObjectURL(audioUrl) } catch (_) {} audioUrl = null }
+        }
+        audio.onended = cleanup
+        audio.onerror = cleanup
+        audio.onpause = () => { stopDrive() }
+        await audio.play()
+      } catch (err) {
+        if (err.name === 'AbortError') return
+        // Hard fallback: if /api/tts fails (no key configured, rate limit,
+        // network), speak with the browser synth so the user still hears
+        // *something*. This is the old behaviour and intentionally a last
+        // resort — the voice on Windows may be female.
+        try {
+          if (typeof window !== 'undefined' && window.speechSynthesis) {
+            const utt = new SpeechSynthesisUtterance(last.content)
+            utt.rate = 1.0; utt.pitch = 1.0; utt.volume = 1.0
+            try {
+              const voices = window.speechSynthesis.getVoices()
+              const pref = voices.find((v) =>
+                v.lang && v.lang.toLowerCase().startsWith(hint) &&
+                /male|daniel|alex|george|david|mark/i.test(v.name))
+                || voices.find((v) => v.lang && v.lang.toLowerCase().startsWith(hint))
+                || voices.find((v) => /male|daniel|alex|george|david|mark/i.test(v.name))
+              if (pref) utt.voice = pref
+            } catch (_) { /* best-effort */ }
+            utt.onstart = () => { if (ttsRafRef.current) cancelAnimationFrame(ttsRafRef.current); driveCosine() }
+            utt.onend = stopDrive
+            utt.onerror = stopDrive
+            window.speechSynthesis.speak(utt)
+          }
+        } catch (_) { stopDrive() }
+      }
+    })()
+
+    return () => {
+      try { controller.abort() } catch (_) {}
+      if (ttsAudioRef.current) { try { ttsAudioRef.current.pause() } catch (_) {} ttsAudioRef.current = null }
+      stopDrive()
+    }
   }, [chatMessages, chatBusy, attachTtsLipSync, resetTtsLipSync])
 
   // Max of voice-chat lipsync, real-audio text-chat envelope, and cosine
   // fallback feeds the avatar. When the analyser is attached, ttsMouthOpen
   // carries the real amplitude and ttsCosineMouth stays 0; when we fall
   // back on autoplay-blocked browsers, ttsCosineMouth drives the jaw and
-  // ttsMouthOpen stays 0 â€” taking the max means we always render whichever
+  // ttsMouthOpen stays 0 — taking the max means we always render whichever
   // source is active without double-counting.
   const mouthOpen = Math.max(
     micMouthOpen || 0,
@@ -950,7 +1368,7 @@ export default function KelionStage() {
   // future change widens the overlay past 50vw.
   const bottomZIndex = overlayShiftsBottom ? 50 : undefined
 
-  // Chat bubble auto-hide â€” Adrian: "chatul trebuie sa dispara dupa ce s-a
+  // Chat bubble auto-hide — Adrian: "chatul trebuie sa dispara dupa ce s-a
   // spus ramine doar in istoric, se afiseaza doar curent ce scrie user sau
   // avatar". We keep chatMessages as the persistent history (for context +
   // transcript panel), but fade the on-stage bubble out after 8s of quiet
@@ -967,7 +1385,7 @@ export default function KelionStage() {
     return () => { if (bubbleHideTimerRef.current) clearTimeout(bubbleHideTimerRef.current) }
   }, [chatMessages, chatBusy])
 
-  // Single voice transport â€” Gemini Live on Vertex AI. Per Adrian's
+  // Single voice transport — Gemini Live on Vertex AI. Per Adrian's
   // single-LLM cleanup (April 2026): one LLM end-to-end (Gemini), one
   // voice the user hears (ElevenLabs native per detected language).
   // The dual-provider scaffold (OpenAI Realtime + auto-fallback) and
@@ -985,7 +1403,7 @@ export default function KelionStage() {
     stop,
     turns,
     userLevel,
-    // Stage 2 â€” Kelion Sees
+    // Stage 2 — Kelion Sees
     cameraStream,
     screenStream,
     visionError,
@@ -996,33 +1414,15 @@ export default function KelionStage() {
     // Mute/unmute voice output without restarting the session.
     setMuted: setVoiceMuted,
     // Voice-chat trial countdown returned by the active transport's
-    // token mint. We no longer drive the HUD off this â€” the HUD
+    // token mint. We no longer drive the HUD off this — the HUD
     // pulls from the shared /api/trial/status endpoint so the timer
     // also ticks for text-chat-only guests who never touch the mic.
     trial: voiceTrial,
-    // Send typed text through the live WebSocket (replaces /api/chat).
-    sendText: liveSendText,
   } = liveHook
-
-
-  // â”€â”€ Text input â†’ routed through Canal B (live WebSocket) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // Previously this was a ~300-line SSE handler talking to /api/chat.
-  // Now ALL communication goes through the single Gemini Live WebSocket.
-  const sendTextMessage = useCallback(async () => {
-    const text = chatInput.trim()
-    if (!text) return
-    // Detect mute/unmute/translator commands from user text before sending.
-    applyMuteCommand(text)
-    setChatError(null)
-    setChatInput('')
-    setAttachedFile(null)
-    // Route through the live WebSocket â€” Kelion will respond with voice.
-    await liveSendText(text)
-  }, [chatInput, liveSendText])
   // Keep statusRef in sync so the TTS guard (declared before this line) can
   // read the current voice-session state without a temporal dead zone.
   statusRef.current = status
-  // â”€â”€ Mute mode â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Mute mode ──────────────────────────────────────────────────────────
   // Activated when the user explicitly says "nu mai vorbi", "mute",
   // "fii silentios", etc. Suppresses both ElevenLabs text-TTS and the
   // Gemini Live voice gain. Deactivated on "stop", "reactiveaza", etc.
@@ -1034,9 +1434,9 @@ export default function KelionStage() {
   }, [muteMode, setVoiceMuted])
 
   // Regex patterns for mute/unmute detection (matches user messages in any mode)
-  const MUTE_RE = /\b(nu (mai )?scoate (sun[Äƒe]t|audio|voc[Äƒe]|niciun sunet)|f(ii|Äƒ) (silenÈ›ios|silenÈ›|mut[Äƒe]?|tÄƒcut|liniÈ™tit)|fÄƒrÄƒ (sun[Äƒe]t|audio|voce)|opre[È™s]te (sunet|audio|vocea)|taci complet|silent( mode)?|mute|no (sound|audio|voice output)|nu vorbis?|nu mai vorbis?)\b/i
-  const UNMUTE_RE = /\b(stop|reactivea[zz][Äƒa]|reactiveaz[Äƒa]|porneste (din nou|sunet|audio|vocea?)|unmute|activeaz[Äƒa] (sunet|audio|vocea?)|mai (vorbis?|scoate sunet)|vorbis?te( din nou)?)\b/i
-  const TRANSLATOR_RE = /\b(asculta?[- ]?[È™s]i traduce|traduce [È™s]i(?: scrie|afis?ea[zz]Äƒ)?|interpret(ator|eazÄƒ)?|mod traduc|translator mode|audio ?to ?text|transcri(e|ere)|scrie ce (aud|se aude|spun))\b/i
+  const MUTE_RE = /\b(nu (mai )?scoate (sun[ăe]t|audio|voc[ăe]|niciun sunet)|f(ii|ă) (silențios|silenț|mut[ăe]?|tăcut|liniștit)|fără (sun[ăe]t|audio|voce)|opre[șs]te (sunet|audio|vocea)|taci complet|silent( mode)?|mute|no (sound|audio|voice output)|nu vorbis?|nu mai vorbis?)\b/i
+  const UNMUTE_RE = /\b(stop|reactivea[zz][ăa]|reactiveaz[ăa]|porneste (din nou|sunet|audio|vocea?)|unmute|activeaz[ăa] (sunet|audio|vocea?)|mai (vorbis?|scoate sunet)|vorbis?te( din nou)?)\b/i
+  const TRANSLATOR_RE = /\b(asculta?[- ]?[șs]i traduce|traduce [șs]i(?: scrie|afis?ea[zz]ă)?|interpret(ator|ează)?|mod traduc|translator mode|audio ?to ?text|transcri(e|ere)|scrie ce (aud|se aude|spun))\b/i
 
   // Detect commands from user input (text chat) before sending.
   // Called in sendChat and in the voice turns watcher below.
@@ -1046,7 +1446,7 @@ export default function KelionStage() {
     if (MUTE_RE.test(text)) { setMuteMode(true); return }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Watch voice turns â€” if user said a mute/unmute command by voice, apply it.
+  // Watch voice turns — if user said a mute/unmute command by voice, apply it.
   useEffect(() => {
     const last = turns[turns.length - 1]
     if (!last || last.role !== 'user') return
@@ -1069,13 +1469,13 @@ export default function KelionStage() {
     }
   }, [])
   // Kick the Gemini Live hook's local trial state when the server flips
-  // to exhausted on either surface â€” prevents a just-started voice
+  // to exhausted on either surface — prevents a just-started voice
   // session from running past the shared quota that a text-chat user
   // might have burned down first.
   useEffect(() => {
     if (trialHud.applicable && !trialHud.allowed && voiceTrial && voiceTrial.active) {
       // eslint-disable-next-line no-console
-      console.log('[trial] server quota exhausted â€” voice session will stop')
+      console.log('[trial] server quota exhausted — voice session will stop')
     }
   }, [trialHud.applicable, trialHud.allowed, voiceTrial])
 
@@ -1103,17 +1503,17 @@ export default function KelionStage() {
 
   useEffect(() => { setVoiceLevel(userLevel || 0) }, [userLevel])
 
-  // F16 â€” camera ON from the moment the user enters the interface,
+  // F16 — camera ON from the moment the user enters the interface,
   // OFF only at sign-out / unmount. Adrian: "camera este on din momentul
   // intrarii pe interfata pina la inchidere la logoff sau iesire
   // accidentala din aplicatie". No debounce-off, no gating on keystroke
-  // or VAD â€” the camera is a persistent ambient sensor for as long as
-  // the stage is mounted. Manual toggle via â‹¯ menu still works for users
+  // or VAD — the camera is a persistent ambient sensor for as long as
+  // the stage is mounted. Manual toggle via ⋯ menu still works for users
   // who explicitly turn it off.
-  // F16 â€” camera auto-start once per mount. Runs for trial (not signed
+  // F16 — camera auto-start once per mount. Runs for trial (not signed
   // in) AND signed-in users per spec ("camera este on din momentul
   // intrarii pe interfata"). The guard is set true on first run and
-  // deliberately NEVER cleared for the lifetime of this mount â€” that
+  // deliberately NEVER cleared for the lifetime of this mount — that
   // way, once the user has signed out (see stop effect below), the
   // camera will not auto-restart in the same tab without a page
   // reload. Re-engagement on re-sign-in is a reload, not an in-tab
@@ -1139,10 +1539,10 @@ export default function KelionStage() {
     const tryOnce = () => {
       if (calledOnce) return
       calledOnce = true
-      // startCamera is async and now rejects on getUserMedia failure â€” use
+      // startCamera is async and now rejects on getUserMedia failure — use
       // .catch() so an unhandled rejection doesn't crash the page. The
       // visionError banner already surfaces the human-readable reason.
-      try { const p = startCamera(); if (p && typeof p.catch === 'function') p.catch(() => {}) } catch (_) { /* sync guard â€” same banner */ }
+      try { const p = startCamera(); if (p && typeof p.catch === 'function') p.catch(() => {}) } catch (_) { /* sync guard — same banner */ }
     }
     const onGesture = () => {
       tryOnce()
@@ -1182,7 +1582,7 @@ export default function KelionStage() {
       hasBeenSignedInRef.current = true
       return
     }
-    // Only stop on the signed-in â†’ signed-out transition, not on the
+    // Only stop on the signed-in → signed-out transition, not on the
     // initial { signedIn: false } mount state (trial users).
     if (!hasBeenSignedInRef.current) return
     if (typeof stopCamera === 'function') {
@@ -1205,7 +1605,7 @@ export default function KelionStage() {
   // We intentionally do NOT hydrate auth from /api/auth/passkey/me here;
   // instead we best-effort clear the server cookie on mount so the user
   // must explicitly click "Sign in" and re-enter credentials. Auth still
-  // works normally after they click through the modal â€” handleSignIn in
+  // works normally after they click through the modal — handleSignIn in
   // the modal onSuccess path does its own fetchMe + setAuthState below.
   useEffect(() => {
     let cancelled = false
@@ -1233,14 +1633,14 @@ export default function KelionStage() {
         // Audit #3: when the JWT expires mid-session, /api/conversations
         // starts returning 401. Without a prompt, the user's turns leak
         // into a hidden `g-*` guest thread and the real server thread
-        // silently stops receiving messages â€” from their POV the
+        // silently stops receiving messages — from their POV the
         // history "vanishes" on next reload. Tell them explicitly and
         // reopen the sign-in modal so they can restore the session.
         try { setAuthState({ signedIn: false, user: null }) } catch (_) {}
         try { setSignInModalOpen(true) } catch (_) {}
         try {
           window.alert(
-            'Session expired â€” please sign in again to keep saving your chat history.'
+            'Session expired — please sign in again to keep saving your chat history.'
           )
         } catch (_) { /* alert blocked (iframe sandbox) */ }
       },
@@ -1255,7 +1655,7 @@ export default function KelionStage() {
   // `chatBusy` was true, and held back only the streaming assistant
   // tail. On a 4xx/5xx (session expired, 402 no-credits, 429 trial
   // exhausted, upstream model failure) the `/api/chat` call threw
-  // before any assistant chunk arrived â€” but the user turn had already
+  // before any assistant chunk arrived — but the user turn had already
   // been POSTed and a fresh `conversations` row was already created.
   // The error banner appeared, the empty assistant placeholder got
   // popped in the catch handler (see sendTextMessage), and the DB was
@@ -1267,10 +1667,10 @@ export default function KelionStage() {
   // landed). A pair is only written after streaming completes and the
   // last message in the transcript is an assistant turn with content.
   // Retries by the user append a fresh user turn onto the unsaved
-  // one â€” both get persisted in order once a reply finally lands, so
+  // one — both get persisted in order once a reply finally lands, so
   // the conversation history stays faithful without producing orphans.
   useEffect(() => {
-    // Defer until the streaming turn finishes â€” otherwise we'd race
+    // Defer until the streaming turn finishes — otherwise we'd race
     // the SSE loop and possibly write partial assistant content.
     if (chatBusy) return
     const total = chatMessages.length
@@ -1299,12 +1699,12 @@ export default function KelionStage() {
           await appendConversationMessage({ role: m.role || 'user', content: m.content })
           // IMPORTANT: advance the cursor even when the effect got
           // cancelled mid-await. The SSE streaming path flips
-          // `chatMessages` ~30Ã—/s, so every chunk triggers a cleanup
+          // `chatMessages` ~30×/s, so every chunk triggers a cleanup
           // that sets `cancelled=true` on the in-flight save. Gating
           // the cursor update on `!cancelled` meant a message that
           // was *successfully* persisted could still be re-sent on
-          // the next effect run â€” which is how the same user turn
-          // ended up in the DB 2â€“3 times (audit #1, orphan threads).
+          // the next effect run — which is how the same user turn
+          // ended up in the DB 2–3 times (audit #1, orphan threads).
           // The save is idempotent from our side: once the POST
           // resolves, the row exists, so cursor++ is correct
           // regardless of whether we continue iterating.
@@ -1370,7 +1770,7 @@ export default function KelionStage() {
     }
   }, [refreshHistory])
 
-  // Stage 3 â€” after enough user turns, if not signed in, gently open the
+  // Stage 3 — after enough user turns, if not signed in, gently open the
   // "Remember me?" prompt ONCE. Dismissed permanently per-session on close.
   const userTurnCount = useMemo(
     () => turns.filter((t) => t && t.role === 'user' && t.text && t.text.trim()).length,
@@ -1385,7 +1785,7 @@ export default function KelionStage() {
     }
   }, [userTurnCount, authState.signedIn, rememberPromptOpen])
 
-  // Stage 3 â€” when the user ends a session, extract facts (if signed in)
+  // Stage 3 — when the user ends a session, extract facts (if signed in)
   // AND seed the text-chat transcript with the voice turns so a user
   // who swaps from voice to text doesn't lose context.
   // Previously the user complained that "memoria intre AI-uri nu merge":
@@ -1405,7 +1805,7 @@ export default function KelionStage() {
     if (!justEnded) return
     const snapshot = turnsRef.current.filter((t) => t && t.role && t.text && t.text.trim())
     if (snapshot.length < 2) return
-    // Seed chatMessages with the voice conversation â€” the two UIs share a
+    // Seed chatMessages with the voice conversation — the two UIs share a
     // single logical thread so the user's follow-up typed question lands
     // with the voice context still in scope.
     if (chatMessagesRef.current.length === 0) {
@@ -1429,22 +1829,22 @@ export default function KelionStage() {
   }, [status, authState.signedIn])
 
   // Long-term memory extraction for text chat. Previously extractAndStore
-  // only fired on voice session end â€” a user who only typed never built
+  // only fired on voice session end — a user who only typed never built
   // any long-term memory, so every text chat started cold even when
   // signed in. Trigger the same extractor once the streaming reply
-  // finishes (chatBusy trueâ†’false) and the last message is a finalised
-  // assistant turn. Debounced implicitly by chatBusy â€” further keystrokes
+  // finishes (chatBusy true→false) and the last message is a finalised
+  // assistant turn. Debounced implicitly by chatBusy — further keystrokes
   // flip it true again and reset.
   const prevChatBusyRef = useRef(chatBusy)
   useEffect(() => {
     const prev = prevChatBusyRef.current
     prevChatBusyRef.current = chatBusy
-    if (!prev || chatBusy) return // only on true â†’ false
+    if (!prev || chatBusy) return // only on true → false
     if (!authState.signedIn) return
     const msgs = chatMessagesRef.current
     const last = msgs[msgs.length - 1]
     if (!last || last.role !== 'assistant' || !last.content || !String(last.content).trim()) return
-    // Convert {role, content} â†’ {role, text} for the extractor API.
+    // Convert {role, content} → {role, text} for the extractor API.
     const snapshot = msgs
       .filter((m) => m && m.role && m.content && String(m.content).trim())
       .slice(-12)
@@ -1533,7 +1933,7 @@ export default function KelionStage() {
     }
   }, [authState.signedIn])
 
-  // Stage 5 â€” probe current push subscription state on mount + when auth changes
+  // Stage 5 — probe current push subscription state on mount + when auth changes
   useEffect(() => {
     let cancelled = false
     if (!pushSupported()) {
@@ -1580,15 +1980,15 @@ export default function KelionStage() {
 
   const statusLabel = {
     idle:       'Tap to talk',
-    requesting: 'Requesting micâ€¦',
-    connecting: 'Connectingâ€¦',
+    requesting: 'Requesting mic…',
+    connecting: 'Connecting…',
     listening:  'Listening',
     thinking:   'Thinking',
     speaking:   'Speaking',
     error:      error || 'Error',
   }[status] || 'Kelion'
 
-  // Shared entry point â€” tap-to-talk + wake-word both start a voice
+  // Shared entry point — tap-to-talk + wake-word both start a voice
   // session from idle. Carry any existing text/voice transcript as
   // `priorTurns` so Kelion continues the conversation instead of
   // re-greeting. chatMessages is preferred because it is the cross-mode
@@ -1607,7 +2007,7 @@ export default function KelionStage() {
 
   const onStageClick = useCallback(() => {
     if (menuOpen) return setMenuOpen(false)
-    // First user gesture â†’ kick the geolocation permission prompt.
+    // First user gesture → kick the geolocation permission prompt.
     // iOS Safari silently skips `getCurrentPosition` called outside a
     // real gesture, so the passive on-mount request in useClientGeo
     // often never shows a dialog on iPhone/iPad. Calling it from this
@@ -1615,11 +2015,11 @@ export default function KelionStage() {
     // No-op once permission is already 'granted' (requestNow short-
     // circuits on repeat).
     if (geoPermission !== 'granted') {
-      try { requestGeo() } catch { /* ignore â€” hook logs internally */ }
+      try { requestGeo() } catch { /* ignore — hook logs internally */ }
     }
     if (status === 'idle' || status === 'error') {
       startVoiceWithPriorTurns()
-      // Tap-to-talk is a gated guest action â€” refresh the trial HUD so
+      // Tap-to-talk is a gated guest action — refresh the trial HUD so
       // the top-right countdown starts ticking immediately once the
       // token mint stamps the 15-min window server-side. No-op for
       // signed-in users (applicable: false).
@@ -1627,7 +2027,7 @@ export default function KelionStage() {
         // Small delay so the server has time to stamp on the token mint
         // request before we poll. 600 ms is well under the first audio
         // chunk, so the HUD update feels instant. Tracked in a ref so
-        // we can clear it on unmount (Copilot review pr-74) â€” otherwise
+        // we can clear it on unmount (Copilot review pr-74) — otherwise
         // a quick navigation mid-delay would setState on an unmounted
         // useTrial consumer.
         if (trialRefreshTimerRef.current) clearTimeout(trialRefreshTimerRef.current)
@@ -1639,7 +2039,7 @@ export default function KelionStage() {
     }
   }, [menuOpen, status, startVoiceWithPriorTurns, geoPermission, requestGeo, authState.signedIn, trialHud])
 
-  // â”€â”€â”€â”€â”€ Wake-word "Kelion" â”€â”€â”€â”€â”€
+  // ───── Wake-word "Kelion" ─────
   // Adrian: "cind zic kelion se auto porneste butonul de chat".
   // When the status is idle (no live session yet, or a previous error
   // cleared the state), run a background recogniser that listens for
@@ -1647,7 +2047,7 @@ export default function KelionStage() {
   // click. The hook is a no-op on browsers without the Web Speech API
   // (Safari iOS, Firefox), so the manual tap flow stays untouched for
   // those users.
-  // Wake-word is armed ONLY on 'idle' â€” not on 'error'. After a
+  // Wake-word is armed ONLY on 'idle' — not on 'error'. After a
   // protocol failure (1007/1008/1011) the user must tap the stage to
   // explicitly retry. Auto-retrying from 'error' re-opens a WS against
   // the same failing token / quota / model and loops the same error,
@@ -1684,13 +2084,13 @@ export default function KelionStage() {
       {/* Debug-only Leva tuning drawer. Renders null unless the URL
           carries ?debug=1 or ?tune=1; zero cost for real users. */}
       {isTuningEnabled() && <TuningPanel />}
-      {/* PR #200 â€” toast overlay driven by uiActionStore. Fires when
+      {/* PR #200 — toast overlay driven by uiActionStore. Fires when
           Kelion calls ui_notify. Renders null when the queue is empty
           so idle cost is zero. */}
       <UIActionToast />
       <Canvas
         /* THREE 0.183 deprecated PCFSoftShadowMap (the r3f default when
-           `shadows` is passed bare). Switch to VSMShadowMap â€” softer
+           `shadows` is passed bare). Switch to VSMShadowMap — softer
            results and no console warning. */
         shadows={{ type: THREE.VSMShadowMap }}
         camera={{ position: [0, 0.2, 4.2], fov: 36 }}
@@ -1703,21 +2103,21 @@ export default function KelionStage() {
         <Suspense fallback={null}>
           <Environment preset="city" environmentIntensity={0.35} />
           <StudioDecor />
-          {/* Halo removed â€” Adrian asked to stop the pulsating circle behind
+          {/* Halo removed — Adrian asked to stop the pulsating circle behind
               the avatar; it was too busy. Status color is still conveyed
               through the spotlights + status-dot in the HUD. */}
           <group position={[1.6, 0, 0]}>
             {/* `presenting` flips true whenever Kelion is speaking an answer
-                â€” that's when we have (or will have) content on the monitor
-                and want the body to rotate ~8Â° toward it. When we wire the
+                — that's when we have (or will have) content on the monitor
+                and want the body to rotate ~8° toward it. When we wire the
                 tool-use pipeline, this will be driven by an explicit
                 "content on monitor" signal instead. */}
             <AvatarModel
               mouthOpen={mouthOpen}
               status={status}
               emotion={emotion}
-              // Adrian: "avatarul nu priveste catre user" â€” previously the
-              // body yawed ~8Â° toward the on-stage monitor whenever Kelion
+              // Adrian: "avatarul nu priveste catre user" — previously the
+              // body yawed ~8° toward the on-stage monitor whenever Kelion
               // spoke, which left the avatar glancing away from the webcam.
               // We always face the user now; hand gestures still fire while
               // speaking (see AvatarModel below where we key them off
@@ -1729,17 +2129,17 @@ export default function KelionStage() {
         </Suspense>
       </Canvas>
 
-      {/* Half-page monitor overlay â€” when Kelion calls show_on_monitor (map /
+      {/* Half-page monitor overlay — when Kelion calls show_on_monitor (map /
           video / image / wiki / web), the content is rendered here as a 2D
           panel covering the LEFT half of the viewport on desktop (bottom
           sheet on mobile). Adrian: "inlocuirea monitorului cu jumate de
-          pagina â€¦ avatarul pe dreapta". The small 3D monitor in the scene
+          pagina … avatarul pe dreapta". The small 3D monitor in the scene
           stays as decor. */}
       <MonitorOverlay />
 
       <audio ref={audioRef} autoPlay playsInline />
 
-      {/* Last assistant text reply (when chatting by typing) â€” fades
+      {/* Last assistant text reply (when chatting by typing) — fades
           above the input bar. Only the latest assistant message shows
           so we don't clutter the stage. The bubble auto-hides 8s after
           the reply finishes (kept in history/transcript). */}
@@ -1789,7 +2189,7 @@ export default function KelionStage() {
                 wordBreak: 'break-word',
                 overflowWrap: 'anywhere',
               }}>
-                {last.content || (chatBusy ? 'Kelion is thinkingâ€¦' : '')}
+                {last.content || (chatBusy ? 'Kelion is thinking…' : '')}
               </div>
             )}
             {chatError && (
@@ -1803,12 +2203,12 @@ export default function KelionStage() {
         )
       })()}
 
-      {/* Live voice chat bubble â€” mirrors the text-chat bubble above but
+      {/* Live voice chat bubble — mirrors the text-chat bubble above but
           reads from `turns` (populated by useGeminiLive from the Gemini Live
           inputTranscription / outputTranscription stream). Adrian: "logat
           vocea e cea corecta dar nu e chat live, nu afiseaza absolut nimic
           pe ecran". Previously the turns only rendered inside the transcript
-          panel (closed by default) â€” so live voice users heard Kelion but
+          panel (closed by default) — so live voice users heard Kelion but
           saw nothing. This bubble shows the last user utterance + the
           streaming assistant reply while a voice session is active. It is
           hidden when the text-chat bubble is shown to avoid two overlapping
@@ -1864,19 +2264,19 @@ export default function KelionStage() {
               <div style={{
                 alignSelf: 'flex-start', fontSize: 13, opacity: 0.7,
                 padding: '8px 12px',
-              }}>Kelion is thinkingâ€¦</div>
+              }}>Kelion is thinking…</div>
             )}
             {!lastUser && !lastAssistant && status === 'listening' && (
               <div style={{
                 alignSelf: 'center', fontSize: 13, opacity: 0.7,
                 padding: '8px 12px',
-              }}>Listeningâ€¦</div>
+              }}>Listening…</div>
             )}
           </div>
         )
       })()}
 
-      {/* Text chat composer â€” bottom center, above the status pill.
+      {/* Text chat composer — bottom center, above the status pill.
           Narrower (420px) than the old 680px because the wider pill was
           overlapping the stage monitor on the left. Stops click
           propagation so typing doesn't toggle the voice session.
@@ -1898,7 +2298,7 @@ export default function KelionStage() {
           zIndex: bottomZIndex || 50,
         }}
       >
-        {/* F2 â€” hidden native file picker driving the "+" button below.
+        {/* F2 — hidden native file picker driving the "+" button below.
             Accepts images, PDFs and text files. The selected file shows
             as a dismissible pill and its filename + size land in the
             outgoing message as a bracketed note. */}
@@ -1941,7 +2341,7 @@ export default function KelionStage() {
             flexShrink: 0,
           }} title={attachedFile.name}>
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              ðŸ“Ž {attachedFile.name}
+              📎 {attachedFile.name}
             </span>
             <button
               type="button"
@@ -1956,14 +2356,14 @@ export default function KelionStage() {
               }}
               aria-label="Remove attachment"
               title="Remove attachment"
-            >Ã—</button>
+            >×</button>
           </div>
         )}
         <input
           type="text"
           value={chatInput}
           onChange={(e) => setChatInput(e.target.value)}
-          // Explicit paste handler â€” Adrian 2026-04-20: "trebuie sa
+          // Explicit paste handler — Adrian 2026-04-20: "trebuie sa
           // pot face paste la orice in tab de scris". On some
           // Capacitor / WebView builds (and occasionally on Chrome
           // when a focused 3D canvas sibling intercepts the keyboard
@@ -1973,7 +2373,7 @@ export default function KelionStage() {
           // value at the caret position, and call setState so React
           // renders the new text. `preventDefault` blocks any
           // duplicate insertion from the browser's default handler.
-          // Right-click â†’ Paste from the browser menu also fires
+          // Right-click → Paste from the browser menu also fires
           // this event, so both paths work.
           onPaste={(e) => {
             try {
@@ -2022,7 +2422,7 @@ export default function KelionStage() {
               // than before.
             }
           }}
-          placeholder="Type to Kelionâ€¦"
+          placeholder="Type to Kelion…"
           disabled={chatBusy}
           autoComplete="off"
           autoCorrect="off"
@@ -2057,10 +2457,10 @@ export default function KelionStage() {
             fontSize: 16,
           }}
           aria-label="Send message"
-        >â†‘</button>
+        >↑</button>
       </form>
 
-      {/* Status pill â€” bottom center */}
+      {/* Status pill — bottom center */}
       <div style={{
         position: 'absolute', bottom: 'max(32px, env(safe-area-inset-bottom))',
         left: bottomLeft, transform: 'translateX(-50%)',
@@ -2080,14 +2480,14 @@ export default function KelionStage() {
           width: 8, height: 8, borderRadius: '50%',
           background: STATUS_COLORS[status],
           boxShadow: `0 0 12px ${STATUS_COLORS[status]}`,
-          // No pulsing animation â€” Adrian found the blinking tiring.
+          // No pulsing animation — Adrian found the blinking tiring.
         }} />
         {statusLabel}
       </div>
 
-      {/* Guest trial countdown â€” Adrian: "timer se afiseaza dreapta sus
+      {/* Guest trial countdown — Adrian: "timer se afiseaza dreapta sus
           vizibil". Renders top-right, above the action bar, only while
-          the server reports `applicable: true` (guests only â€” signed-in
+          the server reports `applicable: true` (guests only — signed-in
           and admin users never see it). Shows MM:SS once the 15-min
           window is stamped (first gated interaction); before that it
           shows "15:00 free" as a preview. When exhausted it turns red
@@ -2120,11 +2520,11 @@ export default function KelionStage() {
           aria-live="polite"
           title={trialHud.stamped
             ? 'Free trial is counting down. Sign in or buy credits to keep using Kelion after it expires.'
-            : '15 free minutes â€” the timer starts on your first message or Tap-to-talk.'}
+            : '15 free minutes — the timer starts on your first message or Tap-to-talk.'}
         >
-          <span aria-hidden style={{ fontSize: 13 }}>â±</span>
+          <span aria-hidden style={{ fontSize: 13 }}>⏱</span>
           {!trialHud.allowed ? (
-            <>Free trial used up â€” <button
+            <>Free trial used up — <button
               onClick={() => setSignInModalOpen(true)}
               style={{
                 background: 'transparent', border: 'none',
@@ -2133,14 +2533,14 @@ export default function KelionStage() {
               }}
             >sign in</button></>
           ) : (
-            <>Free trial Â· {Math.floor(trialRemainingMs / 60000)}:{String(Math.floor((trialRemainingMs % 60000) / 1000)).padStart(2, '0')} left</>
+            <>Free trial · {Math.floor(trialRemainingMs / 60000)}:{String(Math.floor((trialRemainingMs % 60000) / 1000)).padStart(2, '0')} left</>
           )}
         </div>
       )}
 
-      {/* Top-right action bar â€” Adrian: "panoul cu butoane e gÃ¢ndit
-          greÈ™it". Simplified to: Credits/Admin pill + Sign in/out + â‹¯.
-          Camera, screen, transcript, contact all moved into the â‹¯
+      {/* Top-right action bar — Adrian: "panoul cu butoane e gândit
+          greșit". Simplified to: Credits/Admin pill + Sign in/out + ⋯.
+          Camera, screen, transcript, contact all moved into the ⋯
           overflow menu. Camera also now auto-starts when the user types
           or speaks and auto-stops after idle (F15). */}
       <div
@@ -2150,9 +2550,9 @@ export default function KelionStage() {
           display: 'flex', alignItems: 'center', gap: 8,
         }}
       >
-        {/* Single-LLM cleanup (2026-04): voice transport pill removed â€”
+        {/* Single-LLM cleanup (2026-04): voice transport pill removed —
             Gemini Live is the only provider, no UI swap. */}
-        {/* Credits pill â€” hidden for admins (they have unlimited access and
+        {/* Credits pill — hidden for admins (they have unlimited access and
             no billing; showing "0 min" confused Adrian in testing). For
             regular signed-in users we still show balance + open the Stripe
             Checkout flow on click. */}
@@ -2170,16 +2570,16 @@ export default function KelionStage() {
             title="Buy credits"
             aria-label="Buy credits"
           >
-            <span style={{ fontSize: 14 }}>ðŸ’³</span>
+            <span style={{ fontSize: 14 }}>💳</span>
             {/* Adrian: "creditul nu trebuie sa arate minute, trebuie sa fie
                 o unitate x credite". 1 credit = 1 min of Kelion Live kept
                 internally (backend still tracks balance_minutes), but the
                 UI shows the neutral unit label so users think in "credits"
                 not "minutes". */}
-            <span>Credits{balance != null ? ` Â· ${balance}` : ''}</span>
+            <span>Credits{balance != null ? ` · ${balance}` : ''}</span>
           </button>
         )}
-        {/* Unlimited pill â€” admin-only, replaces Credits pill. Visual cue
+        {/* Unlimited pill — admin-only, replaces Credits pill. Visual cue
             that the current account is not gated. Click opens the business
             metrics overlay, same as the overflow menu entry. */}
         {authState.signedIn && isAdmin && (
@@ -2194,11 +2594,11 @@ export default function KelionStage() {
               display: 'flex', alignItems: 'center', gap: 6,
               fontWeight: 600,
             }}
-            title="Admin dashboard â€” Business, AI credits, Visitors, Users, Payouts"
+            title="Admin dashboard — Business, AI credits, Visitors, Users, Payouts"
             aria-label="Open admin dashboard"
           >
-            <span style={{ fontSize: 14 }}>ðŸ›¡ï¸</span>
-            <span>Admin Â· âˆž</span>
+            <span style={{ fontSize: 14 }}>🛡️</span>
+            <span>Admin · ∞</span>
           </button>
         )}
         <button
@@ -2230,7 +2630,7 @@ export default function KelionStage() {
           aria-label={authState.signedIn ? 'Sign out' : 'Sign in'}
         >
           {authState.signedIn
-            ? `Sign out${authState.user?.name ? ` Â· ${authState.user.name}` : ''}`
+            ? `Sign out${authState.user?.name ? ` · ${authState.user.name}` : ''}`
             : 'Sign in'}
         </button>
         <TopBarIconButton
@@ -2238,7 +2638,7 @@ export default function KelionStage() {
           active={menuOpen}
           title="More"
           ariaLabel="More options"
-        >â‹¯</TopBarIconButton>
+        >⋯</TopBarIconButton>
       </div>
 
       {menuOpen && (
@@ -2255,9 +2655,9 @@ export default function KelionStage() {
             boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
           }}
         >
-          {/* Camera / Screen share / Transcript â€” tools moved back into
+          {/* Camera / Screen share / Transcript — tools moved back into
               the overflow menu so the top bar stays clean (Adrian: "panoul
-              e gÃ¢ndit greÈ™it"). Camera also now auto-starts on speech/
+              e gândit greșit"). Camera also now auto-starts on speech/
               typing, so the explicit toggle here is for manual override. */}
           <div
             style={{
@@ -2275,16 +2675,16 @@ export default function KelionStage() {
             else { startCamera().catch(() => { /* banner surfaces the error */ }) }
             setMenuOpen(false)
           }}>
-            {cameraStream ? 'ðŸ“¹ Turn camera off' : 'ðŸ“¹ Turn camera on'}
+            {cameraStream ? '📹 Turn camera off' : '📹 Turn camera on'}
           </MenuItem>
           <MenuItem onClick={() => { screenStream ? stopScreen() : startScreen(); setMenuOpen(false) }}>
-            {screenStream ? 'ðŸ–¥ï¸ Stop sharing screen' : 'ðŸ–¥ï¸ Share screen'}
+            {screenStream ? '🖥️ Stop sharing screen' : '🖥️ Share screen'}
           </MenuItem>
           <MenuItem onClick={() => { setTranscriptOpen((v) => !v); setMenuOpen(false) }}>
-            {transcriptOpen ? 'ðŸ“ Hide transcript' : 'ðŸ“ Show transcript'}
+            {transcriptOpen ? '📝 Hide transcript' : '📝 Show transcript'}
           </MenuItem>
           <MenuItem onClick={() => { navigate('/contact'); setMenuOpen(false) }}>
-            âœ‰ï¸ Contact us
+            ✉️ Contact us
           </MenuItem>
           <div
             style={{
@@ -2293,7 +2693,7 @@ export default function KelionStage() {
               margin: '6px 8px',
             }}
           />
-          {/* Stage 6 â€” voice style submenu */}
+          {/* Stage 6 — voice style submenu */}
           <div
             style={{
               padding: '6px 10px 4px',
@@ -2311,13 +2711,13 @@ export default function KelionStage() {
               onClick={() => { handleVoiceStyleChange(opt.key); setMenuOpen(false) }}
             >
               <span style={{ opacity: voiceStyle === opt.key ? 1 : 0.75 }}>
-                {voiceStyle === opt.key ? 'â— ' : 'â—‹ '}
+                {voiceStyle === opt.key ? '● ' : '○ '}
                 {opt.label}
               </span>
             </MenuItem>
           ))}
           <div style={{ height: 6 }} />
-          {/* Conversation history â€” works for guests (localStorage)
+          {/* Conversation history — works for guests (localStorage)
               and signed-in users (server). Above the auth gate so guests
               can find their saved threads too. */}
           <MenuItem onClick={() => { setHistoryOpen(true); setMenuOpen(false) }}>
@@ -2327,19 +2727,19 @@ export default function KelionStage() {
             New chat
           </MenuItem>
           <div style={{ height: 6 }} />
-          {/* Stage 3 â€” memory + passkey */}
+          {/* Stage 3 — memory + passkey */}
           {authState.signedIn ? (
             <>
               <MenuItem onClick={() => { openMemory(); setMenuOpen(false) }}>
                 What do you know about me?
               </MenuItem>
-              {/* Consensual voice clone â€” opens the multi-step modal
+              {/* Consensual voice clone — opens the multi-step modal
                   (consent + record + manage). Signed-in only; the
                   backend route is gated by requireAuth. */}
               <MenuItem onClick={() => { setVoiceCloneOpen(true); setMenuOpen(false) }}>
                 Clone my voice
               </MenuItem>
-              {/* Stage 5 â€” proactive pings */}
+              {/* Stage 5 — proactive pings */}
               {pushState.supported && (
                 pushState.enabled ? (
                   <>
@@ -2353,7 +2753,7 @@ export default function KelionStage() {
                       onClick={() => { handleDisablePush(); setMenuOpen(false) }}
                       disabled={pushBusy}
                     >
-                      {pushBusy ? 'Disabling pingsâ€¦' : 'Disable pings'}
+                      {pushBusy ? 'Disabling pings…' : 'Disable pings'}
                     </MenuItem>
                   </>
                 ) : (
@@ -2361,12 +2761,12 @@ export default function KelionStage() {
                     onClick={() => { handleEnablePush(); setMenuOpen(false) }}
                     disabled={pushBusy}
                   >
-                    {pushBusy ? 'Enabling pingsâ€¦' : 'Enable pings'}
+                    {pushBusy ? 'Enabling pings…' : 'Enable pings'}
                   </MenuItem>
                 )
               )}
               {/* Buy credits moved to the top-right action bar. */}
-              {/* PWA install â€” only shows when the browser actually
+              {/* PWA install — only shows when the browser actually
                   fired beforeinstallprompt (Chrome/Edge/Android). iOS
                   users get instructions inside the Buy-credits modal. */}
               {!installed && installPromptEvent && (
@@ -2374,7 +2774,7 @@ export default function KelionStage() {
                   Install Kelion on this device
                 </MenuItem>
               )}
-              {/* Admin-only â€” unified dashboard. One entry that opens the
+              {/* Admin-only — unified dashboard. One entry that opens the
                   admin shell with tabs for Business, AI credits, Visitors,
                   Users, and Payouts. Replaces the three separate menu
                   entries that used to live here (2026-04-20 Adrian:
@@ -2407,19 +2807,19 @@ export default function KelionStage() {
         </div>
       )}
 
-      {/* Contact moved to the top-bar as an icon (âœ‰ï¸) per Adrian's
-          request â€” the old bottom-strip was cluttering the stage. The
+      {/* Contact moved to the top-bar as an icon (✉️) per Adrian's
+          request — the old bottom-strip was cluttering the stage. The
           menu entry now routes via react-router `navigate('/contact')`
           so the SPA stays mounted and auth state survives the browser
           back button. */}
 
-      {/* F17 â€” camera self-view removed from the page per Adrian's request:
+      {/* F17 — camera self-view removed from the page per Adrian's request:
           "am cerut sa nu fie vizibila informatia pe pagina". The camera
           stream still runs (frames feed the vision pipeline for Kelion),
           but there is no visible preview thumbnail. We still mount a
           hidden <video> element so the MediaStream attachment lifecycle
           (srcObject assignment + play() trigger) works the same way it
-          did with a visible preview â€” some browsers stall the track if
+          did with a visible preview — some browsers stall the track if
           no element ever consumes the stream. Hidden via display:none. */}
       {cameraStream && (
         <video
@@ -2431,7 +2831,7 @@ export default function KelionStage() {
         />
       )}
 
-      {/* Screen share indicator â€” Kelion is watching your screen (M10) */}
+      {/* Screen share indicator — Kelion is watching your screen (M10) */}
       {screenStream && (
         <div
           onClick={(e) => e.stopPropagation()}
@@ -2474,8 +2874,8 @@ export default function KelionStage() {
         </div>
       )}
 
-      {/* Transcript drawer â€” opt-in, has X + backdrop + ESC to close.
-          Previously the only way to close it was to re-open the â‹¯ menu
+      {/* Transcript drawer — opt-in, has X + backdrop + ESC to close.
+          Previously the only way to close it was to re-open the ⋯ menu
           and pick "Hide transcript", which was not discoverable. */}
       {transcriptOpen && (
         <div
@@ -2514,7 +2914,7 @@ export default function KelionStage() {
                 fontSize: 20, cursor: 'pointer', opacity: 0.7,
               }}
               aria-label="Close transcript"
-            >âœ•</button>
+            >✕</button>
           </div>
           {turns.length === 0 && (
             <div style={{ opacity: 0.5, fontSize: 14 }}>Conversation will appear here.</div>
@@ -2530,18 +2930,18 @@ export default function KelionStage() {
               <div style={{ fontSize: 10, opacity: 0.55, marginBottom: 4, letterSpacing: '0.1em' }}>
                 {t.role === 'user' ? 'YOU' : 'KELION'}
               </div>
-              {t.text || <i style={{ opacity: 0.4 }}>â€¦</i>}
+              {t.text || <i style={{ opacity: 0.4 }}>…</i>}
             </div>
           ))}
         </div>
       )}
 
-      {/* In-app email composer â€” opened by the compose_email_draft tool.
+      {/* In-app email composer — opened by the compose_email_draft tool.
           The user reviews / edits / sends; nothing is delivered without
           an explicit click on Send (which routes through send_email). */}
       <EmailComposerModal authToken={authTokenRef.current} />
 
-      {/* Full sign-in modal â€” triggered by the top-bar Sign in button.
+      {/* Full sign-in modal — triggered by the top-bar Sign in button.
           Email+password primary, Google SSO, passkey as 1-tap. */}
       <SignInModal
         open={signInModalOpen}
@@ -2557,7 +2957,7 @@ export default function KelionStage() {
           // Re-fetch /api/auth/passkey/me so we get the canonical
           // { isAdmin } flag computed server-side (covers the admin email
           // allow-list). Fall back to the raw response if the probe fails
-          // â€” at worst the admin-only UI pieces won't render until next
+          // — at worst the admin-only UI pieces won't render until next
           // reload.
           setSignInModalOpen(false)
           try {
@@ -2577,7 +2977,7 @@ export default function KelionStage() {
             const res = await authenticateWithPasskey()
             setAuthState({ signedIn: true, user: res.user })
           } catch (err) {
-            // Re-open with the error surfaced â€” but the modal has its own
+            // Re-open with the error surfaced — but the modal has its own
             // state now, so just log; user can retry.
             console.warn('[passkey auth]', err && err.message)
           }
@@ -2591,7 +2991,7 @@ export default function KelionStage() {
         userName={authState.user && (authState.user.name || authState.user.displayName)}
       />
 
-      {/* Stage 3 â€” "Remember me" soft prompt */}
+      {/* Stage 3 — "Remember me" soft prompt */}
       {rememberPromptOpen && (
         <div
           onClick={(e) => e.stopPropagation()}
@@ -2615,7 +3015,7 @@ export default function KelionStage() {
           <div style={{ fontSize: 14, lineHeight: 1.45, marginBottom: 14 }}>
             I'd like to remember you next time.<br />
             <span style={{ opacity: 0.65, fontSize: 13 }}>
-              Save a passkey on this device â€” no password, no email.
+              Save a passkey on this device — no password, no email.
             </span>
           </div>
           {rememberError && (
@@ -2640,7 +3040,7 @@ export default function KelionStage() {
                 fontSize: 14, fontWeight: 600,
               }}
             >
-              {rememberBusy ? 'Savingâ€¦' : 'Remember me'}
+              {rememberBusy ? 'Saving…' : 'Remember me'}
             </button>
             <button
               onClick={handleSignInExisting}
@@ -2680,7 +3080,7 @@ export default function KelionStage() {
         </div>
       )}
 
-      {/* Stage 3 â€” memory drawer */}
+      {/* Stage 3 — memory drawer */}
       {memoryOpen && (
         <div
           onClick={() => setMemoryOpen(false)}
@@ -2720,15 +3120,15 @@ export default function KelionStage() {
                 fontSize: 20, cursor: 'pointer', opacity: 0.7,
               }}
               aria-label="Close"
-            >âœ•</button>
+            >✕</button>
           </div>
 
           {memoryLoading && (
-            <div style={{ opacity: 0.5, fontSize: 14 }}>Loadingâ€¦</div>
+            <div style={{ opacity: 0.5, fontSize: 14 }}>Loading…</div>
           )}
           {!memoryLoading && memoryItems.length === 0 && (
             <div style={{ opacity: 0.55, fontSize: 14, lineHeight: 1.5 }}>
-              Nothing yet. Keep talking â€” I'll pick up on things worth remembering
+              Nothing yet. Keep talking — I'll pick up on things worth remembering
               and save them here. You can review and delete anything.
             </div>
           )}
@@ -2765,7 +3165,7 @@ export default function KelionStage() {
         </div>
       )}
 
-      {/* Conversation history drawer â€” lists saved threads for both
+      {/* Conversation history drawer — lists saved threads for both
           guests (localStorage) and signed-in users (server). Clicking a
           row replays that transcript into the chat log. */}
       {historyOpen && (
@@ -2808,7 +3208,7 @@ export default function KelionStage() {
                 fontSize: 20, cursor: 'pointer', opacity: 0.7,
               }}
               aria-label="Close"
-            >âœ•</button>
+            >✕</button>
           </div>
 
           <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
@@ -2839,13 +3239,13 @@ export default function KelionStage() {
               border: '1px solid rgba(250, 204, 21, 0.25)',
               fontSize: 12, lineHeight: 1.5, opacity: 0.9,
             }}>
-              Signed-out â€” history is saved locally on this browser only. Sign in
+              Signed-out — history is saved locally on this browser only. Sign in
               to keep it across devices.
             </div>
           )}
 
           {historyLoading && (
-            <div style={{ opacity: 0.5, fontSize: 14 }}>Loadingâ€¦</div>
+            <div style={{ opacity: 0.5, fontSize: 14 }}>Loading…</div>
           )}
           {historyError && (
             <div style={{
@@ -2891,7 +3291,7 @@ export default function KelionStage() {
                   </div>
                   <div style={{ fontSize: 11, opacity: 0.55 }}>
                     {c.message_count} {c.message_count === 1 ? 'message' : 'messages'}
-                    {tsLabel ? ` Â· ${tsLabel}` : ''}
+                    {tsLabel ? ` · ${tsLabel}` : ''}
                   </div>
                 </button>
                 <button
@@ -2910,7 +3310,7 @@ export default function KelionStage() {
         </div>
       )}
 
-      {/* User-facing Buy-credits modal â€” centered overlay with the
+      {/* User-facing Buy-credits modal — centered overlay with the
           three standard packages (starter / standard / pro). Clicking
           a package creates a Stripe Checkout session and redirects to
           Stripe's hosted page (3DS + VAT + chargebacks handled by
@@ -2958,7 +3358,7 @@ export default function KelionStage() {
                   fontSize: 22, cursor: 'pointer', opacity: 0.7,
                 }}
                 aria-label="Close"
-              >âœ•</button>
+              >✕</button>
             </div>
 
             {balance != null && (
@@ -3010,10 +3410,10 @@ export default function KelionStage() {
                       justifyContent: 'space-between', marginBottom: 4,
                     }}>
                       <div style={{ fontSize: 15, fontWeight: 700 }}>{pkg.name}</div>
-                      <div style={{ fontSize: 18, fontWeight: 700 }}>Â£{amount}</div>
+                      <div style={{ fontSize: 18, fontWeight: 700 }}>£{amount}</div>
                     </div>
                     <div style={{ fontSize: 12, opacity: 0.65 }}>
-                      {pkg.minutes} credits Â· Â£{perCredit}/credit
+                      {pkg.minutes} credits · £{perCredit}/credit
                     </div>
                     {pkg.description && (
                       <div style={{ fontSize: 12, opacity: 0.55, marginTop: 4 }}>
@@ -3024,7 +3424,7 @@ export default function KelionStage() {
                 )
               })}
               {packages.length === 0 && !buyError && (
-                <div style={{ opacity: 0.55, fontSize: 13 }}>Loading packagesâ€¦</div>
+                <div style={{ opacity: 0.55, fontSize: 13 }}>Loading packages…</div>
               )}
             </div>
 
@@ -3043,15 +3443,15 @@ export default function KelionStage() {
                 borderRadius: 10, fontSize: 12, opacity: 0.85,
               }}>
                 <strong>Add Kelion to your home screen:</strong>{' '}
-                on iPhone, tap the Share button â†’ <em>Add to Home Screen</em>.
-                On Android Chrome, tap â‹® â†’ <em>Install app</em>.
+                on iPhone, tap the Share button → <em>Add to Home Screen</em>.
+                On Android Chrome, tap ⋮ → <em>Install app</em>.
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* Admin-only â€” live business metrics drawer. */}
+      {/* Admin-only — live business metrics drawer. */}
       {businessOpen && (
         <div
           onClick={() => setBusinessOpen(false)}
@@ -3082,7 +3482,7 @@ export default function KelionStage() {
             marginBottom: 12,
           }}>
             <div style={{ fontSize: 11, opacity: 0.6, letterSpacing: '0.15em' }}>
-              ADMIN Â· BUSINESS â€” LAST 30 DAYS
+              ADMIN · BUSINESS — LAST 30 DAYS
             </div>
             <button
               onClick={() => setBusinessOpen(false)}
@@ -3091,12 +3491,12 @@ export default function KelionStage() {
                 fontSize: 20, cursor: 'pointer', opacity: 0.7,
               }}
               aria-label="Close"
-            >âœ•</button>
+            >✕</button>
           </div>
           <AdminTabBar active="business" onSelect={switchAdminTab} />
 
           {businessLoading && (
-            <div style={{ opacity: 0.55, fontSize: 14 }}>Crunching numbersâ€¦</div>
+            <div style={{ opacity: 0.55, fontSize: 14 }}>Crunching numbers…</div>
           )}
           {businessError && !businessLoading && (
             <div style={{
@@ -3109,7 +3509,7 @@ export default function KelionStage() {
           {!businessLoading && businessData && (() => {
             const revenueGbp = (businessData.ledger.revenueCents / 100).toFixed(2)
             // 50/50 split: half goes to AI vendors, half to us. This is a
-            // gross estimate â€” actual AI spend is visible on the provider
+            // gross estimate — actual AI spend is visible on the provider
             // cards. Stripe/tax fees will trim our half ~3%.
             const platformEstGbp = (businessData.ledger.revenueCents / 200).toFixed(2)
             const minutesSold = businessData.ledger.minutesSold
@@ -3117,10 +3517,10 @@ export default function KelionStage() {
             const topups = businessData.ledger.topups
             const rows = [
               { label: 'Credit top-ups', value: topups, hint: 'Stripe Checkout sessions completed' },
-              { label: 'Gross revenue', value: `Â£${revenueGbp}`, hint: 'Sum of paid Stripe sessions' },
+              { label: 'Gross revenue', value: `£${revenueGbp}`, hint: 'Sum of paid Stripe sessions' },
               { label: 'Minutes sold', value: `${minutesSold} min`, hint: 'Credits granted to users' },
               { label: 'Minutes consumed', value: `${minutesConsumed} min`, hint: 'Live conversation time used' },
-              { label: 'Platform share (est.)', value: `Â£${platformEstGbp}`, hint: '50% of gross, before Stripe fees' },
+              { label: 'Platform share (est.)', value: `£${platformEstGbp}`, hint: '50% of gross, before Stripe fees' },
             ]
             return (
               <>
@@ -3157,7 +3557,7 @@ export default function KelionStage() {
                       STRIPE BALANCE
                     </div>
                     <div style={{ fontSize: 15 }}>
-                      {businessData.stripe.balanceDisplay || 'â€”'}
+                      {businessData.stripe.balanceDisplay || '—'}
                     </div>
                     {businessData.stripe.message && (
                       <div style={{ fontSize: 11, opacity: 0.55, marginTop: 4 }}>
@@ -3172,7 +3572,7 @@ export default function KelionStage() {
         </div>
       )}
 
-      {/* Admin-only â€” AI credits dashboard drawer. One card per provider
+      {/* Admin-only — AI credits dashboard drawer. One card per provider
           showing real balance (where the provider exposes it) or a
           "configured" signal + a top-up link that deep-links into the
           provider's billing console. Clicking a card opens the top-up
@@ -3207,7 +3607,7 @@ export default function KelionStage() {
             marginBottom: 12,
           }}>
             <div style={{ fontSize: 11, opacity: 0.6, letterSpacing: '0.15em' }}>
-              ADMIN Â· AI CREDITS
+              ADMIN · AI CREDITS
             </div>
             <button
               onClick={() => setCreditsOpen(false)}
@@ -3216,12 +3616,12 @@ export default function KelionStage() {
                 fontSize: 20, cursor: 'pointer', opacity: 0.7,
               }}
               aria-label="Close"
-            >âœ•</button>
+            >✕</button>
           </div>
           <AdminTabBar active="ai" onSelect={switchAdminTab} />
 
           {creditsLoading && (
-            <div style={{ opacity: 0.55, fontSize: 14 }}>Fetching provider balancesâ€¦</div>
+            <div style={{ opacity: 0.55, fontSize: 14 }}>Fetching provider balances…</div>
           )}
           {creditsError && !creditsLoading && (
             <div style={{
@@ -3231,7 +3631,7 @@ export default function KelionStage() {
             }}>{creditsError}</div>
           )}
 
-          {/* Revenue-split panel â€” shows how much of the last 30 days of
+          {/* Revenue-split panel — shows how much of the last 30 days of
               top-up revenue is earmarked for AI provider spend vs owner
               net, and compares against the known portion of that spend
               (ElevenLabs via API; Gemini is manual). Renders above the
@@ -3243,7 +3643,7 @@ export default function KelionStage() {
               borderRadius: 12, border: '1px solid rgba(167, 139, 250, 0.25)',
               background: 'rgba(167, 139, 250, 0.05)',
               fontSize: 12, opacity: 0.6,
-            }}>Computing revenue splitâ€¦</div>
+            }}>Computing revenue split…</div>
           )}
           {!revenueSplitLoading && revenueSplitError && (
             <div style={{
@@ -3286,7 +3686,7 @@ export default function KelionStage() {
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   marginBottom: 8,
                 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600 }}>Revenue split ({pct}% â†’ AI)</div>
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>Revenue split ({pct}% → AI)</div>
                   <span style={{
                     fontSize: 10, letterSpacing: '0.1em', fontWeight: 600,
                     padding: '3px 8px', borderRadius: 999,
@@ -3300,11 +3700,11 @@ export default function KelionStage() {
                   </span>
                 </div>
                 <div style={{ fontSize: 11, opacity: 0.55, marginBottom: 10 }}>
-                  Last {revenueSplit.window?.days ?? 30} days Â· {revenueSplit.revenue?.topups ?? 0} top-ups
+                  Last {revenueSplit.window?.days ?? 30} days · {revenueSplit.revenue?.topups ?? 0} top-ups
                 </div>
-                {row('Gross revenue', revenueSplit.revenue?.grossDisplay || 'â€”', { bold: true })}
-                {row(`AI allocation (${pct}%)`, revenueSplit.allocation?.display || 'â€”', { color: '#c4b5fd' })}
-                {row('Owner net', revenueSplit.allocation?.ownerDisplay || 'â€”', { dim: true })}
+                {row('Gross revenue', revenueSplit.revenue?.grossDisplay || '—', { bold: true })}
+                {row(`AI allocation (${pct}%)`, revenueSplit.allocation?.display || '—', { color: '#c4b5fd' })}
+                {row('Owner net', revenueSplit.allocation?.ownerDisplay || '—', { dim: true })}
                 <div style={{
                   height: 1, background: 'rgba(167, 139, 250, 0.2)',
                   margin: '8px 0',
@@ -3312,18 +3712,18 @@ export default function KelionStage() {
                 <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 4 }}>Known AI spend (auto-measured):</div>
                 {row('  ElevenLabs (est.)',
                   revenueSplit.spend?.elevenlabs?.configured
-                    ? (revenueSplit.spend?.elevenlabs?.estSpendDisplay || 'â€”')
+                    ? (revenueSplit.spend?.elevenlabs?.estSpendDisplay || '—')
                     : 'not configured',
                   { dim: true })}
                 {row('  Gemini',
-                  'manual â€” open GCP Billing',
+                  'manual — open GCP Billing',
                   { dim: true })}
                 <div style={{
                   height: 1, background: 'rgba(167, 139, 250, 0.2)',
                   margin: '8px 0',
                 }} />
                 {row('Remaining AI budget',
-                  revenueSplit.delta?.display || 'â€”',
+                  revenueSplit.delta?.display || '—',
                   { bold: true, color: deltaPalette.text })}
                 <a
                   href="https://console.cloud.google.com/billing"
@@ -3338,20 +3738,20 @@ export default function KelionStage() {
                     opacity: 0.8,
                   }}
                 >
-                  Open GCP Billing dashboard â†’
+                  Open GCP Billing dashboard →
                 </a>
               </div>
             )
           })()}
 
-          {/* â”€â”€â”€â”€â”€ Grant Credits â€” refund / comp / promo. Hits
+          {/* ───── Grant Credits — refund / comp / promo. Hits
                POST /api/admin/credits/grant. Added on 2026-04-20 so
                Adrian can refund the 33 credits lost by
                contact@kelionai.app in the charge-on-open incident
                without dropping into the browser console. Negative
                minutes = clawback. Every submission creates an
                admin_grant row in the ledger tagged with the admin's
-               email for audit. â”€â”€â”€â”€â”€ */}
+               email for audit. ───── */}
           <div style={{
             marginBottom: 16, padding: 14,
             borderRadius: 14,
@@ -3401,7 +3801,7 @@ export default function KelionStage() {
                 />
                 <input
                   type="text"
-                  placeholder="note (optional â€” visible in ledger)"
+                  placeholder="note (optional — visible in ledger)"
                   value={grantNote}
                   onChange={(e) => setGrantNote(e.target.value)}
                   disabled={grantBusy}
@@ -3433,7 +3833,7 @@ export default function KelionStage() {
                   opacity: (grantBusy || !grantEmail.trim() || !grantMinutes) ? 0.55 : 1,
                 }}
               >
-                {grantBusy ? 'Grantingâ€¦' : 'Grant'}
+                {grantBusy ? 'Granting…' : 'Grant'}
               </button>
               {grantMessage && (
                 <div style={{
@@ -3452,12 +3852,12 @@ export default function KelionStage() {
             </div>
           </div>
 
-          {/* â”€â”€â”€â”€â”€ Live Usage â€” Adrian: "analiza pe consum credite in timp
+          {/* ───── Live Usage — Adrian: "analiza pe consum credite in timp
                real permanent la toti userii". Flat feed of the most
                recent ledger entries across every user, auto-refreshed
                every 5 s. Added after the 2026-04-20 charge-on-open
                incident so consumption is now observable the moment it
-               happens, not post-mortem. â”€â”€â”€â”€â”€ */}
+               happens, not post-mortem. ───── */}
           <div style={{
             marginBottom: 16, padding: 14,
             borderRadius: 14,
@@ -3493,7 +3893,7 @@ export default function KelionStage() {
               }}>{ledgerError}</div>
             )}
             {ledgerLoading && ledgerRows.length === 0 && (
-              <div style={{ fontSize: 12, opacity: 0.5 }}>Loading ledgerâ€¦</div>
+              <div style={{ fontSize: 12, opacity: 0.5 }}>Loading ledger…</div>
             )}
             {!ledgerLoading && ledgerRows.length === 0 && !ledgerError && (
               <div style={{ fontSize: 12, opacity: 0.5 }}>No transactions yet.</div>
@@ -3502,7 +3902,7 @@ export default function KelionStage() {
               // Abuse heuristic: flag any user who burned >5 credits
               // in the last 5 minutes via plain consumption. Clean
               // finish-of-session is 1 credit / 60 s, so >5/5 min
-              // means either a bug or tampering â€” exactly the fraud
+              // means either a bug or tampering — exactly the fraud
               // path that hit user Kelion on 2026-04-20.
               const now = Date.now()
               const windowMs = 5 * 60 * 1000
@@ -3532,11 +3932,11 @@ export default function KelionStage() {
                       fontSize: 12,
                     }}>
                       <div style={{ fontWeight: 700, marginBottom: 4 }}>
-                        âš  Abnormal drain in last 5 min
+                        ⚠ Abnormal drain in last 5 min
                       </div>
                       {suspects.slice(0, 3).map(([who, v]) => (
                         <div key={who} style={{ opacity: 0.9 }}>
-                          {who} â€” {v.drained} credits
+                          {who} — {v.drained} credits
                         </div>
                       ))}
                     </div>
@@ -3586,7 +3986,7 @@ export default function KelionStage() {
             })()}
           </div>
 
-          {/* PR E2 â€” auto-topup info strip. Shows the admin at a glance
+          {/* PR E2 — auto-topup info strip. Shows the admin at a glance
               whether the saved card is wired, what threshold triggers
               a refill, and when we last ran. Sits above the provider
               cards so the friendly copy on each card is consistent
@@ -3607,9 +4007,9 @@ export default function KelionStage() {
               if (!e || !e.ts) return null
               const when = new Date(e.ts).toLocaleString()
               if (e.status === 'ok') {
-                return `Ultima reÃ®ncÄƒrcare: ${id} Â· ${e.amountEur} ${String(e.currency || 'eur').toUpperCase()} Â· ${when}`
+                return `Ultima reîncărcare: ${id} · ${e.amountEur} ${String(e.currency || 'eur').toUpperCase()} · ${when}`
               }
-              return `Ultima Ã®ncercare: ${id} Â· eÈ™uatÄƒ (${e.error || 'eroare necunoscutÄƒ'}) Â· ${when}`
+              return `Ultima încercare: ${id} · eșuată (${e.error || 'eroare necunoscută'}) · ${when}`
             })()
             return (
               <div style={{
@@ -3622,13 +4022,13 @@ export default function KelionStage() {
               }}>
                 <div style={{ fontWeight: 600, marginBottom: 4 }}>
                   {armed
-                    ? `Auto-topup armat â€” sub ${thresholdPct}% cardul tÄƒu Stripe e taxat cu ${s.amountEur} ${String(s.currency || 'eur').toUpperCase()}.`
-                    : 'Auto-topup inactiv â€” leagÄƒ un card salvat Ã®n Stripe ca sÄƒ activezi.'}
+                    ? `Auto-topup armat — sub ${thresholdPct}% cardul tău Stripe e taxat cu ${s.amountEur} ${String(s.currency || 'eur').toUpperCase()}.`
+                    : 'Auto-topup inactiv — leagă un card salvat în Stripe ca să activezi.'}
                 </div>
                 <div style={{ fontSize: 12, opacity: 0.85 }}>
                   {armed
-                    ? `VerificÄƒm la fiecare deschidere a panoului. Cooldown ${s.cooldownHours || 24}h ca sÄƒ nu se Ã®ncarce de douÄƒ ori. Primim email de confirmare sau eroare.`
-                    : 'SeteazÄƒ OWNER_STRIPE_CUSTOMER_ID + OWNER_STRIPE_PAYMENT_METHOD_ID Ã®n Railway, apoi refresh. Cardul Ã®l salvezi o datÄƒ Ã®n Stripe.'}
+                    ? `Verificăm la fiecare deschidere a panoului. Cooldown ${s.cooldownHours || 24}h ca să nu se încarce de două ori. Primim email de confirmare sau eroare.`
+                    : 'Setează OWNER_STRIPE_CUSTOMER_ID + OWNER_STRIPE_PAYMENT_METHOD_ID în Railway, apoi refresh. Cardul îl salvezi o dată în Stripe.'}
                 </div>
                 {lastRunLabel && (
                   <div style={{ fontSize: 11, opacity: 0.75, marginTop: 6 }}>
@@ -3645,7 +4045,7 @@ export default function KelionStage() {
                       fontSize: 12, color: '#fde68a',
                       textDecoration: 'underline',
                     }}
-                  >Deschide Stripe â€” Customers â†’</a>
+                  >Deschide Stripe — Customers →</a>
                 )}
               </div>
             )
@@ -3660,11 +4060,11 @@ export default function KelionStage() {
               // Muted slate styling (not red) so the admin sees the state
               // at-a-glance without thinking something is broken.
               unconfigured: { bg: 'rgba(148, 163, 184, 0.12)', border: 'rgba(148, 163, 184, 0.5)', text: '#e2e8f0', label: 'NOT SET' },
-              unknown: { bg: 'rgba(148, 163, 184, 0.1)', border: 'rgba(148, 163, 184, 0.4)', text: '#cbd5e1', label: 'â€”' },
-            })[c.status] || { bg: 'rgba(148, 163, 184, 0.1)', border: 'rgba(148, 163, 184, 0.4)', text: '#cbd5e1', label: 'â€”' }
-            // PR E2 â€” friendly headline sits above the raw balance so
+              unknown: { bg: 'rgba(148, 163, 184, 0.1)', border: 'rgba(148, 163, 184, 0.4)', text: '#cbd5e1', label: '—' },
+            })[c.status] || { bg: 'rgba(148, 163, 184, 0.1)', border: 'rgba(148, 163, 184, 0.4)', text: '#cbd5e1', label: '—' }
+            // PR E2 — friendly headline sits above the raw balance so
             // admins scanning the grid read "credit suficient" /
-            // "credit aproape terminat" / "cheie lipsÄƒ" instead of
+            // "credit aproape terminat" / "cheie lipsă" instead of
             // parsing `123,456 / 500,000 chars` every time.
             const friendly = friendlyCreditStatus(c)
             const headlineColor = ({
@@ -3718,7 +4118,7 @@ export default function KelionStage() {
                 {/* Raw numbers kept small so the admin can cross-check
                     against the provider dashboard without drowning the
                     friendly headline. */}
-                {c.balanceDisplay && c.balanceDisplay !== 'â€”' && (
+                {c.balanceDisplay && c.balanceDisplay !== '—' && (
                   <div style={{ fontSize: 11, opacity: 0.6 }}>
                     {c.balanceDisplay}
                   </div>
@@ -3732,7 +4132,7 @@ export default function KelionStage() {
                   fontSize: 11, opacity: 0.55, marginTop: 8,
                   letterSpacing: '0.02em',
                 }}>
-                  Tap to open {c.kind === 'revenue' ? 'dashboard' : 'top-up'} â†’
+                  Tap to open {c.kind === 'revenue' ? 'dashboard' : 'top-up'} →
                 </div>
               </a>
             )
@@ -3744,7 +4144,7 @@ export default function KelionStage() {
         </div>
       )}
 
-      {/* Admin-only â€” Visitors drawer. Shows one row per SPA page load
+      {/* Admin-only — Visitors drawer. Shows one row per SPA page load
           (IP, country, user-agent, referer, path, user email if signed
           in, timestamp). Auto-refresh 10s. Adrian 2026-04-20: "nu vad
           buton vizite reale cine a vizitat situl, ip tara restul
@@ -3780,7 +4180,7 @@ export default function KelionStage() {
             marginBottom: 12,
           }}>
             <div style={{ fontSize: 11, opacity: 0.6, letterSpacing: '0.15em' }}>
-              ADMIN Â· VISITORS
+              ADMIN · VISITORS
             </div>
             <button
               onClick={() => setVisitorsOpen(false)}
@@ -3789,18 +4189,18 @@ export default function KelionStage() {
                 fontSize: 20, cursor: 'pointer', opacity: 0.7,
               }}
               aria-label="Close"
-            >âœ•</button>
+            >✕</button>
           </div>
           <AdminTabBar active="visitors" onSelect={switchAdminTab} />
 
-          {/* PR E4 â€” advanced analytics block (replaces the old 3-card
+          {/* PR E4 — advanced analytics block (replaces the old 3-card
               24h header). Chart + country list + device mix + funnel.
               Renders only when the new endpoint returned data; the old
               rows table below is unchanged. */}
           <VisitorsAnalyticsPanel data={visitorsAnalytics} />
 
           {visitorsLoading && (
-            <div style={{ opacity: 0.55, fontSize: 14 }}>Loading visitorsâ€¦</div>
+            <div style={{ opacity: 0.55, fontSize: 14 }}>Loading visitors…</div>
           )}
           {visitorsError && !visitorsLoading && (
             <div style={{
@@ -3818,8 +4218,8 @@ export default function KelionStage() {
           )}
 
           {/* Scrollable list of recent visits. Bots are hidden by
-              default per Adrian â€” only real visitors with as much
-              data as we have. UA is parsed into "Chrome 120 Â·
+              default per Adrian — only real visitors with as much
+              data as we have. UA is parsed into "Chrome 120 ·
               Windows 10/11" instead of dumping the raw UA string. */}
           {!visitorsLoading && visitorsRows.length > 0 && (() => {
             const realRows = visitorsRows.filter((v) => !uaIsBot(v.userAgent))
@@ -3831,7 +4231,7 @@ export default function KelionStage() {
                     fontSize: 11, opacity: 0.55, marginBottom: 6,
                     fontStyle: 'italic',
                   }}>
-                    {hiddenBots} hit{hiddenBots !== 1 ? '-uri' : ''} de boÈ›i / scanere ascunse din listÄƒ.
+                    {hiddenBots} hit{hiddenBots !== 1 ? '-uri' : ''} de boți / scanere ascunse din listă.
                   </div>
                 )}
                 <div style={{
@@ -3843,7 +4243,7 @@ export default function KelionStage() {
                     const when = v.ts ? new Date(v.ts) : null
                     const whenShort = when && !Number.isNaN(when.getTime())
                       ? when.toLocaleString('en-GB', { hour12: false })
-                      : 'â€”'
+                      : '—'
                     const browser = uaBrowser(v.userAgent)
                     const os = uaOs(v.userAgent)
                     const ref = refHost(v.referer)
@@ -3870,7 +4270,7 @@ export default function KelionStage() {
                             fontSize: 11, opacity: 0.6, letterSpacing: '0.05em',
                           }}>
                             <span style={{ marginRight: 4 }}>{flagEmoji(v.country)}</span>
-                            {v.country || '??'} Â· {v.ip || 'â€”'}
+                            {v.country || '??'} · {v.ip || '—'}
                           </div>
                         </div>
                         <div style={{ marginBottom: 2 }}>
@@ -3888,8 +4288,8 @@ export default function KelionStage() {
                           )}
                         </div>
                         <div style={{ opacity: 0.65, fontSize: 11 }}>
-                          {browser} Â· {os}
-                          {ref && <span style={{ opacity: 0.7 }}> Â· â† {ref}</span>}
+                          {browser} · {os}
+                          {ref && <span style={{ opacity: 0.7 }}> · ← {ref}</span>}
                         </div>
                       </div>
                     )
@@ -3901,13 +4301,13 @@ export default function KelionStage() {
         </div>
       )}
 
-      {/* Admin â€” Users tab. Placeholder panel for now; the unified shell
+      {/* Admin — Users tab. Placeholder panel for now; the unified shell
           gives the tab a permanent home so it doesn't drift around the
           overflow menu, and a future PR will wire up /api/admin/users
           (list, search by email, grant credits, ban, reset password,
           view ledger). Adrian 2026-04-20: "Users list, search email,
           grant credits, ban, reset password, view history". Marked
-          "nu acum" for the mutating actions â€” they land in PR E5. */}
+          "nu acum" for the mutating actions — they land in PR E5. */}
       {usersOpen && (
         <div
           onClick={() => setUsersOpen(false)}
@@ -3939,7 +4339,7 @@ export default function KelionStage() {
             marginBottom: 12,
           }}>
             <div style={{ fontSize: 11, opacity: 0.6, letterSpacing: '0.15em' }}>
-              ADMIN Â· USERS
+              ADMIN · USERS
             </div>
             <button
               onClick={() => setUsersOpen(false)}
@@ -3948,7 +4348,7 @@ export default function KelionStage() {
                 fontSize: 20, cursor: 'pointer', opacity: 0.7,
               }}
               aria-label="Close"
-            >âœ•</button>
+            >✕</button>
           </div>
           <AdminTabBar active="users" onSelect={switchAdminTab} />
 
@@ -3959,7 +4359,7 @@ export default function KelionStage() {
               onChange={(e) => setUsersQuery(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') refreshUsersList(usersQuery, usersStatus) }}
               onBlur={() => refreshUsersList(usersQuery, usersStatus)}
-              placeholder="CautÄƒ dupÄƒ email, nume sau IDâ€¦"
+              placeholder="Caută după email, nume sau ID…"
               style={{
                 flex: '1 1 180px', minWidth: 160,
                 padding: '8px 10px', borderRadius: 8,
@@ -3978,9 +4378,9 @@ export default function KelionStage() {
                 color: '#ede9fe', fontSize: 13, outline: 'none',
               }}
             >
-              <option value="all">ToÈ›i</option>
+              <option value="all">Toți</option>
               <option value="active">Activi</option>
-              <option value="banned">SuspendaÈ›i</option>
+              <option value="banned">Suspendați</option>
               <option value="admin">Admini</option>
             </select>
             <button
@@ -3994,11 +4394,11 @@ export default function KelionStage() {
                 opacity: usersLoading ? 0.5 : 1,
               }}
             >
-              {usersLoading ? 'Se Ã®ncarcÄƒâ€¦' : 'ReÃ®ncarcÄƒ'}
+              {usersLoading ? 'Se încarcă…' : 'Reîncarcă'}
             </button>
           </div>
 
-          {/* F3 â€” Duplicate accounts card. Lists every email that has
+          {/* F3 — Duplicate accounts card. Lists every email that has
               more than one user row and offers a "Merge" button per
               peer. Merging moves conversations, credits, memory, etc.
               from the chosen source row into the target and deletes
@@ -4035,7 +4435,7 @@ export default function KelionStage() {
                   opacity: dupLoading ? 0.6 : 1,
                 }}
               >
-                {dupLoading ? 'Se verificÄƒâ€¦' : 'ReÃ®ncarcÄƒ'}
+                {dupLoading ? 'Se verifică…' : 'Reîncarcă'}
               </button>
             </div>
             {dupError && (
@@ -4062,23 +4462,23 @@ export default function KelionStage() {
               }}>
                 {dupResult.ok ? (
                   <>
-                    Merge reuÈ™it: user {dupResult.sourceId} â†’ {dupResult.targetId}
+                    Merge reușit: user {dupResult.sourceId} → {dupResult.targetId}
                     {dupResult.email ? ` (${dupResult.email})` : ''}.
                     {Object.keys(dupResult.moved).length > 0 && (
                       <> Mutate: {Object.entries(dupResult.moved)
                         .filter(([, n]) => n > 0)
                         .map(([k, n]) => `${k}=${n}`)
-                        .join(', ') || 'â€”'}.</>
+                        .join(', ') || '—'}.</>
                     )}
                   </>
                 ) : (
-                  <>Merge eÈ™uat ({dupResult.sourceId} â†’ {dupResult.targetId}): {dupResult.error}</>
+                  <>Merge eșuat ({dupResult.sourceId} → {dupResult.targetId}): {dupResult.error}</>
                 )}
               </div>
             )}
             {!dupLoading && !dupError && dupGroups.length === 0 && (
               <div style={{ opacity: 0.75, fontSize: 13 }}>
-                Niciun email nu are conturi multiple â€” totul e curat.
+                Niciun email nu are conturi multiple — totul e curat.
               </div>
             )}
             {dupGroups.map((g) => {
@@ -4097,13 +4497,13 @@ export default function KelionStage() {
                   <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
                     {g.email}
                     <span style={{ opacity: 0.55, fontWeight: 400, marginLeft: 6 }}>
-                      Â· {g.count} conturi
+                      · {g.count} conturi
                     </span>
                   </div>
                   <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 8 }}>
-                    PÄƒstrÄƒm contul cel mai vechi (primul din listÄƒ) ca È›intÄƒ.
-                    Butonul "Merge â†’ {canonical ? `#${canonical.id}` : 'â€¦'}"
-                    mutÄƒ totul de pe peer pe el È™i È™terge peer-ul.
+                    Păstrăm contul cel mai vechi (primul din listă) ca țintă.
+                    Butonul "Merge → {canonical ? `#${canonical.id}` : '…'}"
+                    mută totul de pe peer pe el și șterge peer-ul.
                   </div>
                   {(g.users || []).map((u, idx) => {
                     const isCanonical = canonical && u.id === canonical.id
@@ -4127,20 +4527,20 @@ export default function KelionStage() {
                       >
                         <div style={{ minWidth: 0, flex: 1, marginRight: 8 }}>
                           <div style={{ fontWeight: 600, marginBottom: 2 }}>
-                            #{u.id} {u.name ? `Â· ${u.name}` : ''}
+                            #{u.id} {u.name ? `· ${u.name}` : ''}
                             {isCanonical && (
                               <span style={{
                                 marginLeft: 6, fontSize: 10, fontWeight: 400,
                                 color: '#bbf7d0',
                               }}>
-                                â† È›intÄƒ (se pÄƒstreazÄƒ)
+                                ← țintă (se păstrează)
                               </span>
                             )}
                           </div>
                           <div style={{ opacity: 0.6, fontSize: 11 }}>
-                            {u.google_id ? 'Google Â· ' : ''}
-                            {u.password_hash ? 'parolÄƒ Â· ' : ''}
-                            {u.stripe_customer_id ? 'Stripe Â· ' : ''}
+                            {u.google_id ? 'Google · ' : ''}
+                            {u.password_hash ? 'parolă · ' : ''}
+                            {u.stripe_customer_id ? 'Stripe · ' : ''}
                             creat {u.created_at ? new Date(u.created_at).toLocaleDateString() : '?'}
                           </div>
                         </div>
@@ -4161,7 +4561,7 @@ export default function KelionStage() {
                               whiteSpace: 'nowrap',
                             }}
                           >
-                            {busy ? 'Mergeâ€¦' : `Merge â†’ #${canonical.id}`}
+                            {busy ? 'Merge…' : `Merge → #${canonical.id}`}
                           </button>
                         )}
                       </div>
@@ -4186,7 +4586,7 @@ export default function KelionStage() {
           {usersData && (
             <div style={{ fontSize: 12, opacity: 0.65, marginBottom: 8 }}>
               {usersData.total} din {usersData.totalAll} useri
-              {usersData.query ? ` Â· filtrat dupÄƒ â€ž${usersData.query}"` : ''}
+              {usersData.query ? ` · filtrat după „${usersData.query}"` : ''}
             </div>
           )}
 
@@ -4212,19 +4612,19 @@ export default function KelionStage() {
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                    <span style={{ fontWeight: 600 }}>{u.email || '(fÄƒrÄƒ email)'}</span>
+                    <span style={{ fontWeight: 600 }}>{u.email || '(fără email)'}</span>
                     <span style={{ fontSize: 11, opacity: 0.7 }}>
                       {Number.isFinite(u.credits_balance_minutes)
                         ? `${u.credits_balance_minutes} min`
-                        : 'â€”'}
+                        : '—'}
                     </span>
                   </div>
                   <div style={{ fontSize: 11, opacity: 0.7, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    <span>{u.name || 'â€”'}</span>
+                    <span>{u.name || '—'}</span>
                     {isAdminRow && <span style={{ color: '#fde68a' }}>admin</span>}
                     {isBanned && <span style={{ color: '#fca5a5' }}>suspendat</span>}
                     {!isBanned && !isAdminRow && <span style={{ opacity: 0.75 }}>activ</span>}
-                    <span style={{ opacity: 0.55 }}>Â· id {String(u.id).slice(0, 10)}</span>
+                    <span style={{ opacity: 0.55 }}>· id {String(u.id).slice(0, 10)}</span>
                   </div>
                 </button>
               )
@@ -4236,8 +4636,8 @@ export default function KelionStage() {
             )}
           </div>
 
-          {/* User detail sub-drawer â€” overlays the list when a row is
-              clicked. Close via "â† ÃŽnapoi la listÄƒ" or by picking
+          {/* User detail sub-drawer — overlays the list when a row is
+              clicked. Close via "← Înapoi la listă" or by picking
               another row (loadUserDetail replaces state). */}
           {selectedUserId && (
             <div style={{
@@ -4253,14 +4653,14 @@ export default function KelionStage() {
                     background: 'transparent', border: 'none',
                     color: '#c4b5fd', cursor: 'pointer', fontSize: 12,
                   }}
-                >â† ÃŽnapoi la listÄƒ</button>
+                >← Înapoi la listă</button>
                 <span style={{ fontSize: 11, opacity: 0.6 }}>
                   {selectedUser?.email || selectedUserId}
                 </span>
               </div>
 
               {!selectedUser && (
-                <div style={{ opacity: 0.6, fontSize: 13 }}>Se Ã®ncarcÄƒ detaliileâ€¦</div>
+                <div style={{ opacity: 0.6, fontSize: 13 }}>Se încarcă detaliile…</div>
               )}
 
               {selectedUser && (
@@ -4270,7 +4670,7 @@ export default function KelionStage() {
                     <div><span style={{ opacity: 0.6 }}>Rol: </span>{selectedUser.role}</div>
                     <div><span style={{ opacity: 0.6 }}>Credite: </span>{selectedUser.credits_balance_minutes ?? 0} min</div>
                     <div><span style={{ opacity: 0.6 }}>Status: </span>{selectedUser.banned ? 'Suspendat' : 'Activ'}</div>
-                    <div><span style={{ opacity: 0.6 }}>Creat: </span>{selectedUser.created_at?.slice(0, 10) || 'â€”'}</div>
+                    <div><span style={{ opacity: 0.6 }}>Creat: </span>{selectedUser.created_at?.slice(0, 10) || '—'}</div>
                     <div><span style={{ opacity: 0.6 }}>Tier: </span>{selectedUser.subscription_tier || 'free'}</div>
                   </div>
 
@@ -4306,30 +4706,30 @@ export default function KelionStage() {
                       onClick={grantCreditsToSelected}
                       disabled={selectedBusy}
                       style={actionBtnStyle(selectedBusy)}
-                    >+/âˆ’ Credite</button>
+                    >+/− Credite</button>
                     {selectedUser.banned ? (
                       <button
                         onClick={() => banSelectedUser(false)}
                         disabled={selectedBusy}
                         style={actionBtnStyle(selectedBusy, '#bbf7d0', 'rgba(34,197,94,0.35)')}
-                      >ReactiveazÄƒ contul</button>
+                      >Reactivează contul</button>
                     ) : (
                       <button
                         onClick={() => banSelectedUser(true)}
                         disabled={selectedBusy || selectedUser.role === 'admin'}
                         style={actionBtnStyle(selectedBusy || selectedUser.role === 'admin', '#fecaca', 'rgba(239,68,68,0.35)')}
-                      >SuspendÄƒ contul</button>
+                      >Suspendă contul</button>
                     )}
                     <button
                       onClick={resetSelectedPassword}
                       disabled={selectedBusy}
                       style={actionBtnStyle(selectedBusy)}
-                    >ReseteazÄƒ parola</button>
+                    >Resetează parola</button>
                   </div>
 
                   {/* History panel */}
                   <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 6, letterSpacing: '0.1em' }}>
-                    ISTORIC Â· ULTIMELE {selectedHistory?.rows?.length || 0} TRANZACÈšII
+                    ISTORIC · ULTIMELE {selectedHistory?.rows?.length || 0} TRANZACȚII
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 240, overflowY: 'auto' }}>
                     {(selectedHistory?.rows || []).map((row) => (
@@ -4340,7 +4740,7 @@ export default function KelionStage() {
                         fontSize: 11,
                       }}>
                         <span style={{ opacity: 0.75 }}>
-                          {row.kind} Â· {row.created_at?.slice(0, 16)?.replace('T', ' ')}
+                          {row.kind} · {row.created_at?.slice(0, 16)?.replace('T', ' ')}
                         </span>
                         <span style={{
                           color: row.delta_minutes >= 0 ? '#bbf7d0' : '#fca5a5',
@@ -4352,7 +4752,7 @@ export default function KelionStage() {
                     ))}
                     {(!selectedHistory?.rows || selectedHistory.rows.length === 0) && (
                       <div style={{ opacity: 0.5, fontSize: 12, textAlign: 'center', padding: 10 }}>
-                        FÄƒrÄƒ tranzacÈ›ii.
+                        Fără tranzacții.
                       </div>
                     )}
                   </div>
@@ -4363,14 +4763,14 @@ export default function KelionStage() {
         </div>
       )}
 
-      {/* Admin â€” Payouts tab. Shows where the owner's half of each
+      {/* Admin — Payouts tab. Shows where the owner's half of each
           top-up ends up. Stripe already runs the automatic payout
           schedule (set once in the Stripe Dashboard); this panel is a
           read-only view into what Stripe is about to pay + a link to
           the dashboard. Future iteration (PR E3) will add the 50/50
           ledger split view and an on-demand "Instant payout" button.
           Adrian 2026-04-20: "A pot da cardul unde sa se faca payouut?"
-          â€” answered via the "Set up payout destination" link, which
+          — answered via the "Set up payout destination" link, which
           deep-links to Stripe's external-account settings. */}
       {payoutsOpen && (
         <div
@@ -4403,7 +4803,7 @@ export default function KelionStage() {
             marginBottom: 12,
           }}>
             <div style={{ fontSize: 11, opacity: 0.6, letterSpacing: '0.15em' }}>
-              ADMIN Â· PAYOUTS
+              ADMIN · PAYOUTS
             </div>
             <button
               onClick={() => setPayoutsOpen(false)}
@@ -4412,7 +4812,7 @@ export default function KelionStage() {
                 fontSize: 20, cursor: 'pointer', opacity: 0.7,
               }}
               aria-label="Close"
-            >âœ•</button>
+            >✕</button>
           </div>
           <AdminTabBar active="payouts" onSelect={switchAdminTab} />
 
@@ -4428,13 +4828,13 @@ export default function KelionStage() {
               Cum ajung banii la tine
             </div>
             <div style={{ opacity: 0.82 }}>
-              Stripe varsÄƒ automat soldul Ã®n contul/ cardul pe care l-ai
-              conectat ca "external account". Nu trebuie sÄƒ iniÈ›iezi tu
-              nimic â€” odatÄƒ configurat, fiecare top-up al unui user trece
-              prin: Stripe Checkout â†’ Stripe balance â†’ payout automat (zilnic
-              sau sÄƒptÄƒmÃ¢nal, dupÄƒ setarea ta). JumÄƒtate din fiecare top-up
-              e deja rezervatÄƒ intern pentru costurile AI (OpenAI, Groq,
-              ElevenLabs), cealaltÄƒ jumÄƒtate e profitul net.
+              Stripe varsă automat soldul în contul/ cardul pe care l-ai
+              conectat ca "external account". Nu trebuie să inițiezi tu
+              nimic — odată configurat, fiecare top-up al unui user trece
+              prin: Stripe Checkout → Stripe balance → payout automat (zilnic
+              sau săptămânal, după setarea ta). Jumătate din fiecare top-up
+              e deja rezervată intern pentru costurile AI (OpenAI, Groq,
+              ElevenLabs), cealaltă jumătate e profitul net.
             </div>
           </div>
 
@@ -4456,13 +4856,13 @@ export default function KelionStage() {
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>SeteazÄƒ destinaÈ›ia payout-urilor</span>
-              <span style={{ fontSize: 12, opacity: 0.6 }}>Stripe â†—</span>
+              <span>Setează destinația payout-urilor</span>
+              <span style={{ fontSize: 12, opacity: 0.6 }}>Stripe ↗</span>
             </div>
             <div style={{ fontSize: 11, opacity: 0.65, marginTop: 4 }}>
-              Adaugi un IBAN sau un card de debit o singurÄƒ datÄƒ. Recomandat:
-              Visa/Mastercard Debit (Revolut, Wise, Starling) pentru plÄƒÈ›i
-              instant Ã®n 30 min.
+              Adaugi un IBAN sau un card de debit o singură dată. Recomandat:
+              Visa/Mastercard Debit (Revolut, Wise, Starling) pentru plăți
+              instant în 30 min.
             </div>
           </a>
 
@@ -4483,10 +4883,10 @@ export default function KelionStage() {
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>Istoric payout-uri</span>
-              <span style={{ fontSize: 12, opacity: 0.6 }}>Stripe â†—</span>
+              <span style={{ fontSize: 12, opacity: 0.6 }}>Stripe ↗</span>
             </div>
             <div style={{ fontSize: 11, opacity: 0.65, marginTop: 4 }}>
-              Fiecare platÄƒ cÄƒtre banca/cardul tÄƒu, cu data È™i suma.
+              Fiecare plată către banca/cardul tău, cu data și suma.
             </div>
           </a>
 
@@ -4514,7 +4914,7 @@ export default function KelionStage() {
 }
 
 // Compact pill button used on the top-right action bar. Keeps a consistent
-// look with the â‹¯ overflow button â€” an accent ring appears when `active`
+// look with the ⋯ overflow button — an accent ring appears when `active`
 // so camera/screen/transcript toggles read as "on".
 
 useGLTF.preload('/kelion-rpm_e27cb94d.glb')
