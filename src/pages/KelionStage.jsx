@@ -17,7 +17,7 @@ import StudioDecor from '../components/stage/StudioDecor'
 import CameraRig from '../components/stage/CameraRig'
 import MonitorOverlay from '../components/stage/MonitorOverlay'
 import { TopBarIconButton, AdminTabBar, VisitorsAnalyticsPanel, PayoutsPanel, MenuItem, friendlyCreditStatus, uaIsBot, uaBrowser, uaOs, refHost } from '../components/stage/AdminPanels'
-import { useGeminiLive } from '../lib/geminiLive'
+import { useGeminiLive } from '../lib/geminiLive' // CACHE BUSTER: 20260426155431
 import { selectPriorTurns } from '../lib/priorTurnsSelector'
 import { useWakeWord } from '../lib/useWakeWord'
 import { useTrial } from '../lib/useTrial'
@@ -96,7 +96,7 @@ function actionBtnStyle(disabled, color, borderColor) {
   }
 }
 
-// ───── Main page ─────
+// ----- Main page -----
 export default function KelionStage() {
   // React-router navigator. Used for in-app route changes (e.g. the
   // "Contact us" menu item) so we stay inside the SPA and preserve
@@ -119,7 +119,7 @@ export default function KelionStage() {
     return () => setUIActionController(null)
   }, [navigate])
   const audioRef = useRef(null)
-  // Real client GPS (falls back to null → server uses IP-geo instead).
+  // Real client GPS (falls back to null ? server uses IP-geo instead).
   // The hook fires once on mount; if the browser remembers a previous
   // grant there is no prompt, otherwise the browser shows its standard
   // one-time permission dialog. Coords are cached in localStorage so
@@ -132,7 +132,7 @@ export default function KelionStage() {
   const { coords: clientGeo, permission: geoPermission, requestNow: requestGeo } = useClientGeo()
   // Register a geo provider so monitorStore can fall back to the user's
   // current coords when the model calls show_on_monitor({kind:'map'}) without
-  // a query (e.g. "arată-mi harta" / "show me a map" without a place name).
+  // a query (e.g. "arata-mi harta" / "show me a map" without a place name).
   const clientGeoRef = useRef(null)
   const geoPermissionRef = useRef('unknown')
   const requestGeoRef = useRef(null)
@@ -345,7 +345,7 @@ export default function KelionStage() {
   const [visitorsRows, setVisitorsRows] = useState([])
   const [visitorsStats, setVisitorsStats] = useState(null)
   // PR E4 — advanced analytics: 30-day chart, country list, device mix,
-  // login→topup→usage funnel. Fetched alongside the raw rows.
+  // login?topup?usage funnel. Fetched alongside the raw rows.
   const [visitorsAnalytics, setVisitorsAnalytics] = useState(null)
   const [visitorsLoading, setVisitorsLoading] = useState(false)
   const [visitorsError, setVisitorsError] = useState(null)
@@ -475,7 +475,7 @@ export default function KelionStage() {
   }, [installPromptEvent])
 
   // Global ESC handler — closes any open overlay / drawer so the user is
-  // never stuck with a side panel they cannot dismiss. Also closes the ⋯
+  // never stuck with a side panel they cannot dismiss. Also closes the ?
   // menu. The Buy-credits modal has its own backdrop so it also closes
   // on click-outside; this just adds keyboard parity. Covers every
   // admin-shell drawer (Business / AI / Visitors / Users / Payouts) so
@@ -523,7 +523,7 @@ export default function KelionStage() {
   // replace the scattered overflow-menu entries; Business / AI / Visitors
   // keep their existing open*() data fetchers but now share a tab bar at
   // the top. switchAdminTab is the single entry point the top-bar
-  // "Admin · ∞" button and the tab bar both call — it closes whichever
+  // "Admin · 8" button and the tab bar both call — it closes whichever
   // tab is currently visible and opens the target one, re-using the
   // existing fetcher so the data is always fresh.
   const [usersOpen, setUsersOpen] = useState(false)
@@ -559,7 +559,7 @@ export default function KelionStage() {
       if (!r.ok) throw new Error(`HTTP ${r.status}`)
       setUsersData(await r.json())
     } catch (err) {
-      setUsersError(err.message || 'Nu am putut încărca lista de useri')
+      setUsersError(err.message || 'Nu am putut încarca lista de useri')
     } finally {
       setUsersLoading(false)
     }
@@ -602,7 +602,7 @@ export default function KelionStage() {
     if (!selectedUserId || selectedBusy) return
     let reason = null
     if (banned) {
-      reason = window.prompt('Motiv suspendare (opțional):', '') || ''
+      reason = window.prompt('Motiv suspendare (op?ional):', '') || ''
     } else if (!window.confirm('Reactivezi contul?')) {
       return
     }
@@ -620,7 +620,7 @@ export default function KelionStage() {
       setSelectedResult({ ok: true, message: banned ? 'Cont suspendat' : 'Cont reactivat' })
       await Promise.all([loadUserDetail(selectedUserId), refreshUsersList()])
     } catch (err) {
-      setSelectedResult({ ok: false, error: err.message || 'Acțiunea a eșuat' })
+      setSelectedResult({ ok: false, error: err.message || 'Ac?iunea a e?uat' })
     } finally {
       setSelectedBusy(false)
     }
@@ -632,10 +632,10 @@ export default function KelionStage() {
     if (raw == null) return
     const minutes = Number(raw)
     if (!Number.isFinite(minutes) || minutes === 0) {
-      setSelectedResult({ ok: false, error: 'Introduceți un număr diferit de 0' })
+      setSelectedResult({ ok: false, error: 'Introduce?i un numar diferit de 0' })
       return
     }
-    const note = window.prompt('Notă (opțional):', '') || ''
+    const note = window.prompt('Nota (op?ional):', '') || ''
     setSelectedBusy(true)
     setSelectedResult(null)
     try {
@@ -649,11 +649,11 @@ export default function KelionStage() {
       if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`)
       setSelectedResult({
         ok: true,
-        message: `${minutes > 0 ? 'Adăugate' : 'Retrase'} ${Math.abs(Math.trunc(minutes))} minute · sold nou ${body.balance}`,
+        message: `${minutes > 0 ? 'Adaugate' : 'Retrase'} ${Math.abs(Math.trunc(minutes))} minute · sold nou ${body.balance}`,
       })
       await Promise.all([loadUserDetail(selectedUserId), refreshUsersList()])
     } catch (err) {
-      setSelectedResult({ ok: false, error: err.message || 'Acțiunea a eșuat' })
+      setSelectedResult({ ok: false, error: err.message || 'Ac?iunea a e?uat' })
     } finally {
       setSelectedBusy(false)
     }
@@ -661,7 +661,7 @@ export default function KelionStage() {
 
   const resetSelectedPassword = useCallback(async () => {
     if (!selectedUserId || selectedBusy) return
-    if (!window.confirm('Șterg parola + passkey-ul? Userul va trebui să se reloghează cu Google sau passkey nou.')) {
+    if (!window.confirm('?terg parola + passkey-ul? Userul va trebui sa se relogheaza cu Google sau passkey nou.')) {
       return
     }
     setSelectedBusy(true)
@@ -674,10 +674,10 @@ export default function KelionStage() {
       })
       const body = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`)
-      setSelectedResult({ ok: true, message: 'Parola + passkey șterse. Contactează userul.' })
+      setSelectedResult({ ok: true, message: 'Parola + passkey ?terse. Contacteaza userul.' })
       await loadUserDetail(selectedUserId)
     } catch (err) {
-      setSelectedResult({ ok: false, error: err.message || 'Acțiunea a eșuat' })
+      setSelectedResult({ ok: false, error: err.message || 'Ac?iunea a e?uat' })
     } finally {
       setSelectedBusy(false)
     }
@@ -713,7 +713,7 @@ export default function KelionStage() {
       const j = await r.json().catch(() => null)
       setDupGroups(Array.isArray(j && j.groups) ? j.groups : [])
     } catch (err) {
-      setDupError(err && err.message ? err.message : 'Nu am putut încărca conturile duplicate')
+      setDupError(err && err.message ? err.message : 'Nu am putut încarca conturile duplicate')
     } finally {
       setDupLoading(false)
     }
@@ -721,9 +721,9 @@ export default function KelionStage() {
   const mergeDuplicateUsers = useCallback(async (sourceId, targetId, email) => {
     if (sourceId == null || targetId == null) return
     const confirmMsg =
-      `Merge user ${sourceId} → ${targetId} (${email})?\n\n` +
-      'Toate conversațiile, creditele și istoricul sursei se vor muta pe țintă.\n' +
-      'Sursa va fi ștearsă. Acțiune ireversibilă.'
+      `Merge user ${sourceId} ? ${targetId} (${email})?\n\n` +
+      'Toate conversa?iile, creditele ?i istoricul sursei se vor muta pe ?inta.\n' +
+      'Sursa va fi ?tearsa. Ac?iune ireversibila.'
     if (typeof window !== 'undefined' && !window.confirm(confirmMsg)) return
     const key = `${sourceId}->${targetId}`
     setDupBusyKey(key)
@@ -747,7 +747,7 @@ export default function KelionStage() {
         sourceId,
         targetId,
         email,
-        error: err && err.message ? err.message : 'Merge eșuat',
+        error: err && err.message ? err.message : 'Merge e?uat',
       })
     } finally {
       setDupBusyKey(null)
@@ -791,7 +791,7 @@ export default function KelionStage() {
     if (payoutBusy) return
     // A confirm() keeps this honest — an instant payout cannot be
     // undone, and the Stripe fee (~1% + €0.25) is real money.
-    if (!window.confirm('Instant payout: transferă soldul disponibil pe cardul legat acum. Taxa Stripe ~1% + 0.25 EUR. Continuăm?')) {
+    if (!window.confirm('Instant payout: transfera soldul disponibil pe cardul legat acum. Taxa Stripe ~1% + 0.25 EUR. Continuam?')) {
       return
     }
     setPayoutBusy(true)
@@ -801,7 +801,7 @@ export default function KelionStage() {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
-        // Empty body → Stripe pays out the full instant-available balance.
+        // Empty body ? Stripe pays out the full instant-available balance.
         body: JSON.stringify({}),
       })
       const body = await r.json().catch(() => ({}))
@@ -882,7 +882,7 @@ export default function KelionStage() {
 
   const micMouthOpen = useLipSync(audioRef)
 
-  // ───── Text-chat TTS (server-side ElevenLabs, male native voice) ─────
+  // ----- Text-chat TTS (server-side ElevenLabs, male native voice) -----
   // Adrian: "vocea nu este elevenlab, nativa, barbateasca, voce de femeie acum".
   // Previously this path used `window.speechSynthesis` which defaults to the
   // OS voice (on Windows/Chrome that's typically a female English voice).
@@ -890,7 +890,7 @@ export default function KelionStage() {
   // with ElevenLabs (Adam — male, multilingual) or Gemini "Charon" (male)
   // and returns an audio/mpeg or audio/wav blob. We play it via an offscreen
   // <audio> element and drive the mouth from the *actual* audio amplitude
-  // via `useAudioElementLipSync` (MediaElementSource → analyzer), so the
+  // via `useAudioElementLipSync` (MediaElementSource ? analyzer), so the
   // avatar opens its mouth on vowels and closes it on pauses/consonants —
   // same envelope shape as the realtime-voice `useLipSync` path. If the
   // AudioContext can't be created (autoplay policy, older browsers) we
@@ -1011,7 +1011,7 @@ export default function KelionStage() {
   } = liveHook
   statusRef.current = status
   liveSendTextRef.current = liveSendText
-  // ── Mute mode ──────────────────────────────────────────────────────────
+  // -- Mute mode ----------------------------------------------------------
   // Activated when the user explicitly says "nu mai vorbi", "mute",
   // "fii silentios", etc. Suppresses both ElevenLabs text-TTS and the
   // Gemini Live voice gain. Deactivated on "stop", "reactiveaza", etc.
@@ -1023,9 +1023,9 @@ export default function KelionStage() {
   }, [muteMode, setVoiceMuted])
 
   // Regex patterns for mute/unmute detection (matches user messages in any mode)
-  const MUTE_RE = /\b(nu (mai )?scoate (sun[ăe]t|audio|voc[ăe]|niciun sunet)|f(ii|ă) (silențios|silenț|mut[ăe]?|tăcut|liniștit)|fără (sun[ăe]t|audio|voce)|opre[șs]te (sunet|audio|vocea)|taci complet|silent( mode)?|mute|no (sound|audio|voice output)|nu vorbis?|nu mai vorbis?)\b/i
-  const UNMUTE_RE = /\b(stop|reactivea[zz][ăa]|reactiveaz[ăa]|porneste (din nou|sunet|audio|vocea?)|unmute|activeaz[ăa] (sunet|audio|vocea?)|mai (vorbis?|scoate sunet)|vorbis?te( din nou)?)\b/i
-  const TRANSLATOR_RE = /\b(asculta?[- ]?[șs]i traduce|traduce [șs]i(?: scrie|afis?ea[zz]ă)?|interpret(ator|ează)?|mod traduc|translator mode|audio ?to ?text|transcri(e|ere)|scrie ce (aud|se aude|spun))\b/i
+  const MUTE_RE = /\b(nu (mai )?scoate (sun[ae]t|audio|voc[ae]|niciun sunet)|f(ii|a) (silen?ios|silen?|mut[ae]?|tacut|lini?tit)|fara (sun[ae]t|audio|voce)|opre[?s]te (sunet|audio|vocea)|taci complet|silent( mode)?|mute|no (sound|audio|voice output)|nu vorbis?|nu mai vorbis?)\b/i
+  const UNMUTE_RE = /\b(stop|reactivea[zz][aa]|reactiveaz[aa]|porneste (din nou|sunet|audio|vocea?)|unmute|activeaz[aa] (sunet|audio|vocea?)|mai (vorbis?|scoate sunet)|vorbis?te( din nou)?)\b/i
+  const TRANSLATOR_RE = /\b(asculta?[- ]?[?s]i traduce|traduce [?s]i(?: scrie|afis?ea[zz]a)?|interpret(ator|eaza)?|mod traduc|translator mode|audio ?to ?text|transcri(e|ere)|scrie ce (aud|se aude|spun))\b/i
 
   // Detect commands from user input (text chat) before sending.
   // Called in sendChat and in the voice turns watcher below.
@@ -1097,7 +1097,7 @@ export default function KelionStage() {
   // intrarii pe interfata pina la inchidere la logoff sau iesire
   // accidentala din aplicatie". No debounce-off, no gating on keystroke
   // or VAD — the camera is a persistent ambient sensor for as long as
-  // the stage is mounted. Manual toggle via ⋯ menu still works for users
+  // the stage is mounted. Manual toggle via ? menu still works for users
   // who explicitly turn it off.
   // F16 — camera auto-start once per mount. Runs for trial (not signed
   // in) AND signed-in users per spec ("camera este on din momentul
@@ -1171,7 +1171,7 @@ export default function KelionStage() {
       hasBeenSignedInRef.current = true
       return
     }
-    // Only stop on the signed-in → signed-out transition, not on the
+    // Only stop on the signed-in ? signed-out transition, not on the
     // initial { signedIn: false } mount state (trial users).
     if (!hasBeenSignedInRef.current) return
     if (typeof stopCamera === 'function') {
@@ -1421,19 +1421,19 @@ export default function KelionStage() {
   // only fired on voice session end — a user who only typed never built
   // any long-term memory, so every text chat started cold even when
   // signed in. Trigger the same extractor once the streaming reply
-  // finishes (chatBusy true→false) and the last message is a finalised
+  // finishes (chatBusy true?false) and the last message is a finalised
   // assistant turn. Debounced implicitly by chatBusy — further keystrokes
   // flip it true again and reset.
   const prevChatBusyRef = useRef(chatBusy)
   useEffect(() => {
     const prev = prevChatBusyRef.current
     prevChatBusyRef.current = chatBusy
-    if (!prev || chatBusy) return // only on true → false
+    if (!prev || chatBusy) return // only on true ? false
     if (!authState.signedIn) return
     const msgs = chatMessagesRef.current
     const last = msgs[msgs.length - 1]
     if (!last || last.role !== 'assistant' || !last.content || !String(last.content).trim()) return
-    // Convert {role, content} → {role, text} for the extractor API.
+    // Convert {role, content} ? {role, text} for the extractor API.
     const snapshot = msgs
       .filter((m) => m && m.role && m.content && String(m.content).trim())
       .slice(-12)
@@ -1596,7 +1596,7 @@ export default function KelionStage() {
 
   const onStageClick = useCallback(() => {
     if (menuOpen) return setMenuOpen(false)
-    // First user gesture → kick the geolocation permission prompt.
+    // First user gesture ? kick the geolocation permission prompt.
     // iOS Safari silently skips `getCurrentPosition` called outside a
     // real gesture, so the passive on-mount request in useClientGeo
     // often never shows a dialog on iPhone/iPad. Calling it from this
@@ -1628,7 +1628,7 @@ export default function KelionStage() {
     }
   }, [menuOpen, status, startVoiceWithPriorTurns, geoPermission, requestGeo, authState.signedIn, trialHud])
 
-  // ───── Wake-word "Kelion" ─────
+  // ----- Wake-word "Kelion" -----
   // Adrian: "cind zic kelion se auto porneste butonul de chat".
   // When the status is idle (no live session yet, or a previous error
   // cleared the state), run a background recogniser that listens for
@@ -1660,7 +1660,7 @@ export default function KelionStage() {
 
   return (
     <div
-      onClick={onStageClick}
+      
       style={{
         position: 'fixed', inset: 0,
         background: 'radial-gradient(ellipse at center top, #0d0b1e 0%, #05060a 70%)',
@@ -1930,7 +1930,7 @@ export default function KelionStage() {
             flexShrink: 0,
           }} title={attachedFile.name}>
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              📎 {attachedFile.name}
+              ?? {attachedFile.name}
             </span>
             <button
               type="button"
@@ -1962,7 +1962,7 @@ export default function KelionStage() {
           // value at the caret position, and call setState so React
           // renders the new text. `preventDefault` blocks any
           // duplicate insertion from the browser's default handler.
-          // Right-click → Paste from the browser menu also fires
+          // Right-click ? Paste from the browser menu also fires
           // this event, so both paths work.
           onPaste={(e) => {
             try {
@@ -2046,7 +2046,7 @@ export default function KelionStage() {
             fontSize: 16,
           }}
           aria-label="Send message"
-        >↑</button>
+        >?</button>
       </form>
 
       {/* Status pill — bottom center */}
@@ -2111,7 +2111,7 @@ export default function KelionStage() {
             ? 'Free trial is counting down. Sign in or buy credits to keep using Kelion after it expires.'
             : '15 free minutes — the timer starts on your first message or Tap-to-talk.'}
         >
-          <span aria-hidden style={{ fontSize: 13 }}>⏱</span>
+          <span aria-hidden style={{ fontSize: 13 }}>?</span>
           {!trialHud.allowed ? (
             <>Free trial used up — <button
               onClick={() => setSignInModalOpen(true)}
@@ -2128,8 +2128,8 @@ export default function KelionStage() {
       )}
 
       {/* Top-right action bar — Adrian: "panoul cu butoane e gândit
-          greșit". Simplified to: Credits/Admin pill + Sign in/out + ⋯.
-          Camera, screen, transcript, contact all moved into the ⋯
+          gre?it". Simplified to: Credits/Admin pill + Sign in/out + ?.
+          Camera, screen, transcript, contact all moved into the ?
           overflow menu. Camera also now auto-starts when the user types
           or speaks and auto-stops after idle (F15). */}
       <div
@@ -2159,7 +2159,7 @@ export default function KelionStage() {
             title="Buy credits"
             aria-label="Buy credits"
           >
-            <span style={{ fontSize: 14 }}>💳</span>
+            <span style={{ fontSize: 14 }}>??</span>
             {/* Adrian: "creditul nu trebuie sa arate minute, trebuie sa fie
                 o unitate x credite". 1 credit = 1 min of Kelion Live kept
                 internally (backend still tracks balance_minutes), but the
@@ -2186,8 +2186,8 @@ export default function KelionStage() {
             title="Admin dashboard — Business, AI credits, Visitors, Users, Payouts"
             aria-label="Open admin dashboard"
           >
-            <span style={{ fontSize: 14 }}>🛡️</span>
-            <span>Admin · ∞</span>
+            <span style={{ fontSize: 14 }}>???</span>
+            <span>Admin · 8</span>
           </button>
         )}
         <button
@@ -2227,7 +2227,7 @@ export default function KelionStage() {
           active={menuOpen}
           title="More"
           ariaLabel="More options"
-        >⋯</TopBarIconButton>
+        >?</TopBarIconButton>
       </div>
 
       {menuOpen && (
@@ -2246,7 +2246,7 @@ export default function KelionStage() {
         >
           {/* Camera / Screen share / Transcript — tools moved back into
               the overflow menu so the top bar stays clean (Adrian: "panoul
-              e gândit greșit"). Camera also now auto-starts on speech/
+              e gândit gre?it"). Camera also now auto-starts on speech/
               typing, so the explicit toggle here is for manual override. */}
           <div
             style={{
@@ -2264,16 +2264,16 @@ export default function KelionStage() {
             else { startCamera().catch(() => { /* banner surfaces the error */ }) }
             setMenuOpen(false)
           }}>
-            {cameraStream ? '📹 Turn camera off' : '📹 Turn camera on'}
+            {cameraStream ? '?? Turn camera off' : '?? Turn camera on'}
           </MenuItem>
           <MenuItem onClick={() => { screenStream ? stopScreen() : startScreen(); setMenuOpen(false) }}>
-            {screenStream ? '🖥️ Stop sharing screen' : '🖥️ Share screen'}
+            {screenStream ? '??? Stop sharing screen' : '??? Share screen'}
           </MenuItem>
           <MenuItem onClick={() => { setTranscriptOpen((v) => !v); setMenuOpen(false) }}>
-            {transcriptOpen ? '📝 Hide transcript' : '📝 Show transcript'}
+            {transcriptOpen ? '?? Hide transcript' : '?? Show transcript'}
           </MenuItem>
           <MenuItem onClick={() => { navigate('/contact'); setMenuOpen(false) }}>
-            ✉️ Contact us
+            ?? Contact us
           </MenuItem>
           <div
             style={{
@@ -2300,7 +2300,7 @@ export default function KelionStage() {
               onClick={() => { handleVoiceStyleChange(opt.key); setMenuOpen(false) }}
             >
               <span style={{ opacity: voiceStyle === opt.key ? 1 : 0.75 }}>
-                {voiceStyle === opt.key ? '● ' : '○ '}
+                {voiceStyle === opt.key ? '? ' : '? '}
                 {opt.label}
               </span>
             </MenuItem>
@@ -2382,9 +2382,7 @@ export default function KelionStage() {
               </MenuItem>
             )
           )}
-          <MenuItem onClick={() => { stop(); setMenuOpen(false) }} disabled={status === 'idle'}>
-            End chat
-          </MenuItem>
+          
           <div
             style={{
               height: 1,
@@ -2396,7 +2394,7 @@ export default function KelionStage() {
         </div>
       )}
 
-      {/* Contact moved to the top-bar as an icon (✉️) per Adrian's
+      {/* Contact moved to the top-bar as an icon (??) per Adrian's
           request — the old bottom-strip was cluttering the stage. The
           menu entry now routes via react-router `navigate('/contact')`
           so the SPA stays mounted and auth state survives the browser
@@ -2464,7 +2462,7 @@ export default function KelionStage() {
       )}
 
       {/* Transcript drawer — opt-in, has X + backdrop + ESC to close.
-          Previously the only way to close it was to re-open the ⋯ menu
+          Previously the only way to close it was to re-open the ? menu
           and pick "Hide transcript", which was not discoverable. */}
       {transcriptOpen && (
         <div
@@ -2503,7 +2501,7 @@ export default function KelionStage() {
                 fontSize: 20, cursor: 'pointer', opacity: 0.7,
               }}
               aria-label="Close transcript"
-            >✕</button>
+            >?</button>
           </div>
           {turns.length === 0 && (
             <div style={{ opacity: 0.5, fontSize: 14 }}>Conversation will appear here.</div>
@@ -2709,7 +2707,7 @@ export default function KelionStage() {
                 fontSize: 20, cursor: 'pointer', opacity: 0.7,
               }}
               aria-label="Close"
-            >✕</button>
+            >?</button>
           </div>
 
           {memoryLoading && (
@@ -2797,7 +2795,7 @@ export default function KelionStage() {
                 fontSize: 20, cursor: 'pointer', opacity: 0.7,
               }}
               aria-label="Close"
-            >✕</button>
+            >?</button>
           </div>
 
           <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
@@ -2947,7 +2945,7 @@ export default function KelionStage() {
                   fontSize: 22, cursor: 'pointer', opacity: 0.7,
                 }}
                 aria-label="Close"
-              >✕</button>
+              >?</button>
             </div>
 
             {balance != null && (
@@ -3032,8 +3030,8 @@ export default function KelionStage() {
                 borderRadius: 10, fontSize: 12, opacity: 0.85,
               }}>
                 <strong>Add Kelion to your home screen:</strong>{' '}
-                on iPhone, tap the Share button → <em>Add to Home Screen</em>.
-                On Android Chrome, tap ⋮ → <em>Install app</em>.
+                on iPhone, tap the Share button ? <em>Add to Home Screen</em>.
+                On Android Chrome, tap ? ? <em>Install app</em>.
               </div>
             )}
           </div>
@@ -3080,7 +3078,7 @@ export default function KelionStage() {
                 fontSize: 20, cursor: 'pointer', opacity: 0.7,
               }}
               aria-label="Close"
-            >✕</button>
+            >?</button>
           </div>
           <AdminTabBar active="business" onSelect={switchAdminTab} />
 
@@ -3205,7 +3203,7 @@ export default function KelionStage() {
                 fontSize: 20, cursor: 'pointer', opacity: 0.7,
               }}
               aria-label="Close"
-            >✕</button>
+            >?</button>
           </div>
           <AdminTabBar active="ai" onSelect={switchAdminTab} />
 
@@ -3275,7 +3273,7 @@ export default function KelionStage() {
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   marginBottom: 8,
                 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600 }}>Revenue split ({pct}% → AI)</div>
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>Revenue split ({pct}% ? AI)</div>
                   <span style={{
                     fontSize: 10, letterSpacing: '0.1em', fontWeight: 600,
                     padding: '3px 8px', borderRadius: 999,
@@ -3327,20 +3325,20 @@ export default function KelionStage() {
                     opacity: 0.8,
                   }}
                 >
-                  Open GCP Billing dashboard →
+                  Open GCP Billing dashboard ?
                 </a>
               </div>
             )
           })()}
 
-          {/* ───── Grant Credits — refund / comp / promo. Hits
+          {/* ----- Grant Credits — refund / comp / promo. Hits
                POST /api/admin/credits/grant. Added on 2026-04-20 so
                Adrian can refund the 33 credits lost by
                contact@kelionai.app in the charge-on-open incident
                without dropping into the browser console. Negative
                minutes = clawback. Every submission creates an
                admin_grant row in the ledger tagged with the admin's
-               email for audit. ───── */}
+               email for audit. ----- */}
           <div style={{
             marginBottom: 16, padding: 14,
             borderRadius: 14,
@@ -3441,12 +3439,12 @@ export default function KelionStage() {
             </div>
           </div>
 
-          {/* ───── Live Usage — Adrian: "analiza pe consum credite in timp
+          {/* ----- Live Usage — Adrian: "analiza pe consum credite in timp
                real permanent la toti userii". Flat feed of the most
                recent ledger entries across every user, auto-refreshed
                every 5 s. Added after the 2026-04-20 charge-on-open
                incident so consumption is now observable the moment it
-               happens, not post-mortem. ───── */}
+               happens, not post-mortem. ----- */}
           <div style={{
             marginBottom: 16, padding: 14,
             borderRadius: 14,
@@ -3521,7 +3519,7 @@ export default function KelionStage() {
                       fontSize: 12,
                     }}>
                       <div style={{ fontWeight: 700, marginBottom: 4 }}>
-                        ⚠ Abnormal drain in last 5 min
+                        ? Abnormal drain in last 5 min
                       </div>
                       {suspects.slice(0, 3).map(([who, v]) => (
                         <div key={who} style={{ opacity: 0.9 }}>
@@ -3596,9 +3594,9 @@ export default function KelionStage() {
               if (!e || !e.ts) return null
               const when = new Date(e.ts).toLocaleString()
               if (e.status === 'ok') {
-                return `Ultima reîncărcare: ${id} · ${e.amountEur} ${String(e.currency || 'eur').toUpperCase()} · ${when}`
+                return `Ultima reîncarcare: ${id} · ${e.amountEur} ${String(e.currency || 'eur').toUpperCase()} · ${when}`
               }
-              return `Ultima încercare: ${id} · eșuată (${e.error || 'eroare necunoscută'}) · ${when}`
+              return `Ultima încercare: ${id} · e?uata (${e.error || 'eroare necunoscuta'}) · ${when}`
             })()
             return (
               <div style={{
@@ -3611,13 +3609,13 @@ export default function KelionStage() {
               }}>
                 <div style={{ fontWeight: 600, marginBottom: 4 }}>
                   {armed
-                    ? `Auto-topup armat — sub ${thresholdPct}% cardul tău Stripe e taxat cu ${s.amountEur} ${String(s.currency || 'eur').toUpperCase()}.`
-                    : 'Auto-topup inactiv — leagă un card salvat în Stripe ca să activezi.'}
+                    ? `Auto-topup armat — sub ${thresholdPct}% cardul tau Stripe e taxat cu ${s.amountEur} ${String(s.currency || 'eur').toUpperCase()}.`
+                    : 'Auto-topup inactiv — leaga un card salvat în Stripe ca sa activezi.'}
                 </div>
                 <div style={{ fontSize: 12, opacity: 0.85 }}>
                   {armed
-                    ? `Verificăm la fiecare deschidere a panoului. Cooldown ${s.cooldownHours || 24}h ca să nu se încarce de două ori. Primim email de confirmare sau eroare.`
-                    : 'Setează OWNER_STRIPE_CUSTOMER_ID + OWNER_STRIPE_PAYMENT_METHOD_ID în Railway, apoi refresh. Cardul îl salvezi o dată în Stripe.'}
+                    ? `Verificam la fiecare deschidere a panoului. Cooldown ${s.cooldownHours || 24}h ca sa nu se încarce de doua ori. Primim email de confirmare sau eroare.`
+                    : 'Seteaza OWNER_STRIPE_CUSTOMER_ID + OWNER_STRIPE_PAYMENT_METHOD_ID în Railway, apoi refresh. Cardul îl salvezi o data în Stripe.'}
                 </div>
                 {lastRunLabel && (
                   <div style={{ fontSize: 11, opacity: 0.75, marginTop: 6 }}>
@@ -3634,7 +3632,7 @@ export default function KelionStage() {
                       fontSize: 12, color: '#fde68a',
                       textDecoration: 'underline',
                     }}
-                  >Deschide Stripe — Customers →</a>
+                  >Deschide Stripe — Customers ?</a>
                 )}
               </div>
             )
@@ -3653,7 +3651,7 @@ export default function KelionStage() {
             })[c.status] || { bg: 'rgba(148, 163, 184, 0.1)', border: 'rgba(148, 163, 184, 0.4)', text: '#cbd5e1', label: '—' }
             // PR E2 — friendly headline sits above the raw balance so
             // admins scanning the grid read "credit suficient" /
-            // "credit aproape terminat" / "cheie lipsă" instead of
+            // "credit aproape terminat" / "cheie lipsa" instead of
             // parsing `123,456 / 500,000 chars` every time.
             const friendly = friendlyCreditStatus(c)
             const headlineColor = ({
@@ -3721,7 +3719,7 @@ export default function KelionStage() {
                   fontSize: 11, opacity: 0.55, marginTop: 8,
                   letterSpacing: '0.02em',
                 }}>
-                  Tap to open {c.kind === 'revenue' ? 'dashboard' : 'top-up'} →
+                  Tap to open {c.kind === 'revenue' ? 'dashboard' : 'top-up'} ?
                 </div>
               </a>
             )
@@ -3778,7 +3776,7 @@ export default function KelionStage() {
                 fontSize: 20, cursor: 'pointer', opacity: 0.7,
               }}
               aria-label="Close"
-            >✕</button>
+            >?</button>
           </div>
           <AdminTabBar active="visitors" onSelect={switchAdminTab} />
 
@@ -3820,7 +3818,7 @@ export default function KelionStage() {
                     fontSize: 11, opacity: 0.55, marginBottom: 6,
                     fontStyle: 'italic',
                   }}>
-                    {hiddenBots} hit{hiddenBots !== 1 ? '-uri' : ''} de boți / scanere ascunse din listă.
+                    {hiddenBots} hit{hiddenBots !== 1 ? '-uri' : ''} de bo?i / scanere ascunse din lista.
                   </div>
                 )}
                 <div style={{
@@ -3878,7 +3876,7 @@ export default function KelionStage() {
                         </div>
                         <div style={{ opacity: 0.65, fontSize: 11 }}>
                           {browser} · {os}
-                          {ref && <span style={{ opacity: 0.7 }}> · ← {ref}</span>}
+                          {ref && <span style={{ opacity: 0.7 }}> · ? {ref}</span>}
                         </div>
                       </div>
                     )
@@ -3937,7 +3935,7 @@ export default function KelionStage() {
                 fontSize: 20, cursor: 'pointer', opacity: 0.7,
               }}
               aria-label="Close"
-            >✕</button>
+            >?</button>
           </div>
           <AdminTabBar active="users" onSelect={switchAdminTab} />
 
@@ -3948,7 +3946,7 @@ export default function KelionStage() {
               onChange={(e) => setUsersQuery(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') refreshUsersList(usersQuery, usersStatus) }}
               onBlur={() => refreshUsersList(usersQuery, usersStatus)}
-              placeholder="Caută după email, nume sau ID…"
+              placeholder="Cauta dupa email, nume sau ID…"
               style={{
                 flex: '1 1 180px', minWidth: 160,
                 padding: '8px 10px', borderRadius: 8,
@@ -3967,9 +3965,9 @@ export default function KelionStage() {
                 color: '#ede9fe', fontSize: 13, outline: 'none',
               }}
             >
-              <option value="all">Toți</option>
+              <option value="all">To?i</option>
               <option value="active">Activi</option>
-              <option value="banned">Suspendați</option>
+              <option value="banned">Suspenda?i</option>
               <option value="admin">Admini</option>
             </select>
             <button
@@ -3983,7 +3981,7 @@ export default function KelionStage() {
                 opacity: usersLoading ? 0.5 : 1,
               }}
             >
-              {usersLoading ? 'Se încarcă…' : 'Reîncarcă'}
+              {usersLoading ? 'Se încarca…' : 'Reîncarca'}
             </button>
           </div>
 
@@ -4024,7 +4022,7 @@ export default function KelionStage() {
                   opacity: dupLoading ? 0.6 : 1,
                 }}
               >
-                {dupLoading ? 'Se verifică…' : 'Reîncarcă'}
+                {dupLoading ? 'Se verifica…' : 'Reîncarca'}
               </button>
             </div>
             {dupError && (
@@ -4051,7 +4049,7 @@ export default function KelionStage() {
               }}>
                 {dupResult.ok ? (
                   <>
-                    Merge reușit: user {dupResult.sourceId} → {dupResult.targetId}
+                    Merge reu?it: user {dupResult.sourceId} ? {dupResult.targetId}
                     {dupResult.email ? ` (${dupResult.email})` : ''}.
                     {Object.keys(dupResult.moved).length > 0 && (
                       <> Mutate: {Object.entries(dupResult.moved)
@@ -4061,7 +4059,7 @@ export default function KelionStage() {
                     )}
                   </>
                 ) : (
-                  <>Merge eșuat ({dupResult.sourceId} → {dupResult.targetId}): {dupResult.error}</>
+                  <>Merge e?uat ({dupResult.sourceId} ? {dupResult.targetId}): {dupResult.error}</>
                 )}
               </div>
             )}
@@ -4090,9 +4088,9 @@ export default function KelionStage() {
                     </span>
                   </div>
                   <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 8 }}>
-                    Păstrăm contul cel mai vechi (primul din listă) ca țintă.
-                    Butonul "Merge → {canonical ? `#${canonical.id}` : '…'}"
-                    mută totul de pe peer pe el și șterge peer-ul.
+                    Pastram contul cel mai vechi (primul din lista) ca ?inta.
+                    Butonul "Merge ? {canonical ? `#${canonical.id}` : '…'}"
+                    muta totul de pe peer pe el ?i ?terge peer-ul.
                   </div>
                   {(g.users || []).map((u, idx) => {
                     const isCanonical = canonical && u.id === canonical.id
@@ -4122,13 +4120,13 @@ export default function KelionStage() {
                                 marginLeft: 6, fontSize: 10, fontWeight: 400,
                                 color: '#bbf7d0',
                               }}>
-                                ← țintă (se păstrează)
+                                ? ?inta (se pastreaza)
                               </span>
                             )}
                           </div>
                           <div style={{ opacity: 0.6, fontSize: 11 }}>
                             {u.google_id ? 'Google · ' : ''}
-                            {u.password_hash ? 'parolă · ' : ''}
+                            {u.password_hash ? 'parola · ' : ''}
                             {u.stripe_customer_id ? 'Stripe · ' : ''}
                             creat {u.created_at ? new Date(u.created_at).toLocaleDateString() : '?'}
                           </div>
@@ -4150,7 +4148,7 @@ export default function KelionStage() {
                               whiteSpace: 'nowrap',
                             }}
                           >
-                            {busy ? 'Merge…' : `Merge → #${canonical.id}`}
+                            {busy ? 'Merge…' : `Merge ? #${canonical.id}`}
                           </button>
                         )}
                       </div>
@@ -4175,7 +4173,7 @@ export default function KelionStage() {
           {usersData && (
             <div style={{ fontSize: 12, opacity: 0.65, marginBottom: 8 }}>
               {usersData.total} din {usersData.totalAll} useri
-              {usersData.query ? ` · filtrat după „${usersData.query}"` : ''}
+              {usersData.query ? ` · filtrat dupa „${usersData.query}"` : ''}
             </div>
           )}
 
@@ -4201,7 +4199,7 @@ export default function KelionStage() {
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                    <span style={{ fontWeight: 600 }}>{u.email || '(fără email)'}</span>
+                    <span style={{ fontWeight: 600 }}>{u.email || '(fara email)'}</span>
                     <span style={{ fontSize: 11, opacity: 0.7 }}>
                       {Number.isFinite(u.credits_balance_minutes)
                         ? `${u.credits_balance_minutes} min`
@@ -4226,7 +4224,7 @@ export default function KelionStage() {
           </div>
 
           {/* User detail sub-drawer — overlays the list when a row is
-              clicked. Close via "← Înapoi la listă" or by picking
+              clicked. Close via "? Înapoi la lista" or by picking
               another row (loadUserDetail replaces state). */}
           {selectedUserId && (
             <div style={{
@@ -4242,14 +4240,14 @@ export default function KelionStage() {
                     background: 'transparent', border: 'none',
                     color: '#c4b5fd', cursor: 'pointer', fontSize: 12,
                   }}
-                >← Înapoi la listă</button>
+                >? Înapoi la lista</button>
                 <span style={{ fontSize: 11, opacity: 0.6 }}>
                   {selectedUser?.email || selectedUserId}
                 </span>
               </div>
 
               {!selectedUser && (
-                <div style={{ opacity: 0.6, fontSize: 13 }}>Se încarcă detaliile…</div>
+                <div style={{ opacity: 0.6, fontSize: 13 }}>Se încarca detaliile…</div>
               )}
 
               {selectedUser && (
@@ -4295,30 +4293,30 @@ export default function KelionStage() {
                       onClick={grantCreditsToSelected}
                       disabled={selectedBusy}
                       style={actionBtnStyle(selectedBusy)}
-                    >+/− Credite</button>
+                    >+/- Credite</button>
                     {selectedUser.banned ? (
                       <button
                         onClick={() => banSelectedUser(false)}
                         disabled={selectedBusy}
                         style={actionBtnStyle(selectedBusy, '#bbf7d0', 'rgba(34,197,94,0.35)')}
-                      >Reactivează contul</button>
+                      >Reactiveaza contul</button>
                     ) : (
                       <button
                         onClick={() => banSelectedUser(true)}
                         disabled={selectedBusy || selectedUser.role === 'admin'}
                         style={actionBtnStyle(selectedBusy || selectedUser.role === 'admin', '#fecaca', 'rgba(239,68,68,0.35)')}
-                      >Suspendă contul</button>
+                      >Suspenda contul</button>
                     )}
                     <button
                       onClick={resetSelectedPassword}
                       disabled={selectedBusy}
                       style={actionBtnStyle(selectedBusy)}
-                    >Resetează parola</button>
+                    >Reseteaza parola</button>
                   </div>
 
                   {/* History panel */}
                   <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 6, letterSpacing: '0.1em' }}>
-                    ISTORIC · ULTIMELE {selectedHistory?.rows?.length || 0} TRANZACȚII
+                    ISTORIC · ULTIMELE {selectedHistory?.rows?.length || 0} TRANZAC?II
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 240, overflowY: 'auto' }}>
                     {(selectedHistory?.rows || []).map((row) => (
@@ -4341,7 +4339,7 @@ export default function KelionStage() {
                     ))}
                     {(!selectedHistory?.rows || selectedHistory.rows.length === 0) && (
                       <div style={{ opacity: 0.5, fontSize: 12, textAlign: 'center', padding: 10 }}>
-                        Fără tranzacții.
+                        Fara tranzac?ii.
                       </div>
                     )}
                   </div>
@@ -4401,7 +4399,7 @@ export default function KelionStage() {
                 fontSize: 20, cursor: 'pointer', opacity: 0.7,
               }}
               aria-label="Close"
-            >✕</button>
+            >?</button>
           </div>
           <AdminTabBar active="payouts" onSelect={switchAdminTab} />
 
@@ -4417,13 +4415,13 @@ export default function KelionStage() {
               Cum ajung banii la tine
             </div>
             <div style={{ opacity: 0.82 }}>
-              Stripe varsă automat soldul în contul/ cardul pe care l-ai
-              conectat ca "external account". Nu trebuie să inițiezi tu
-              nimic — odată configurat, fiecare top-up al unui user trece
-              prin: Stripe Checkout → Stripe balance → payout automat (zilnic
-              sau săptămânal, după setarea ta). Jumătate din fiecare top-up
-              e deja rezervată intern pentru costurile AI (OpenAI, Groq,
-              ElevenLabs), cealaltă jumătate e profitul net.
+              Stripe varsa automat soldul în contul/ cardul pe care l-ai
+              conectat ca "external account". Nu trebuie sa ini?iezi tu
+              nimic — odata configurat, fiecare top-up al unui user trece
+              prin: Stripe Checkout ? Stripe balance ? payout automat (zilnic
+              sau saptamânal, dupa setarea ta). Jumatate din fiecare top-up
+              e deja rezervata intern pentru costurile AI (OpenAI, Groq,
+              ElevenLabs), cealalta jumatate e profitul net.
             </div>
           </div>
 
@@ -4445,12 +4443,12 @@ export default function KelionStage() {
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>Setează destinația payout-urilor</span>
-              <span style={{ fontSize: 12, opacity: 0.6 }}>Stripe ↗</span>
+              <span>Seteaza destina?ia payout-urilor</span>
+              <span style={{ fontSize: 12, opacity: 0.6 }}>Stripe ?</span>
             </div>
             <div style={{ fontSize: 11, opacity: 0.65, marginTop: 4 }}>
-              Adaugi un IBAN sau un card de debit o singură dată. Recomandat:
-              Visa/Mastercard Debit (Revolut, Wise, Starling) pentru plăți
+              Adaugi un IBAN sau un card de debit o singura data. Recomandat:
+              Visa/Mastercard Debit (Revolut, Wise, Starling) pentru pla?i
               instant în 30 min.
             </div>
           </a>
@@ -4472,10 +4470,10 @@ export default function KelionStage() {
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>Istoric payout-uri</span>
-              <span style={{ fontSize: 12, opacity: 0.6 }}>Stripe ↗</span>
+              <span style={{ fontSize: 12, opacity: 0.6 }}>Stripe ?</span>
             </div>
             <div style={{ fontSize: 11, opacity: 0.65, marginTop: 4 }}>
-              Fiecare plată către banca/cardul tău, cu data și suma.
+              Fiecare plata catre banca/cardul tau, cu data ?i suma.
             </div>
           </a>
 
@@ -4503,7 +4501,9 @@ export default function KelionStage() {
 }
 
 // Compact pill button used on the top-right action bar. Keeps a consistent
-// look with the ⋯ overflow button — an accent ring appears when `active`
+// look with the ? overflow button — an accent ring appears when `active`
 // so camera/screen/transcript toggles read as "on".
 
 useGLTF.preload('/kelion-rpm_e27cb94d.glb')
+
+
