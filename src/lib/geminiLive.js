@@ -318,8 +318,15 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
         appendTurn('user', sc.inputTranscription.text, false)
         lastActivityAtRef.current = Date.now()
       }
+      // outputTranscription is Gemini's own transcript of what it said.
+      // modelTurn.parts[].text carries the same content inline. Processing
+      // both causes the assistant's reply to appear twice in the chat.
+      // We prefer outputTranscription (cleaner, post-processed by Gemini)
+      // and skip part.text when it was already handled.
+      let gotTranscript = false
       if (sc.outputTranscription?.text) {
         appendTurn('assistant', sc.outputTranscription.text, false)
+        gotTranscript = true
         lastActivityAtRef.current = Date.now()
       }
 
@@ -330,7 +337,8 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
           const bytes = bytesFromBase64(inline.data)
           enqueueAudio(bytes)
         }
-        if (part.text) {
+        // Only append text if we didn't already get it from outputTranscription
+        if (part.text && !gotTranscript) {
           appendTurn('assistant', part.text, false)
         }
       }
@@ -1206,6 +1214,18 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
     }
   }, [appendTurn, start])
 
+  // Allow the parent to clear or seed the transcript (used by history
+  // load, new-conversation, sign-out). Avoids duplicating state.
+  const clearTurns = useCallback(() => {
+    setTurns([])
+    turnActiveRef.current = { user: null, assistant: null }
+  }, [])
+  const loadTurns = useCallback((entries) => {
+    if (!Array.isArray(entries)) return
+    setTurns(entries.map(e => ({ role: e.role, text: e.text || e.content || '' })))
+    turnActiveRef.current = { user: null, assistant: null }
+  }, [])
+
   return {
     status, error, start, stop, turns, userLevel,
     // Stage 2
@@ -1215,5 +1235,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
     isBusy,
     setMuted,
     sendText,
+    clearTurns,
+    loadTurns,
   }
 }
