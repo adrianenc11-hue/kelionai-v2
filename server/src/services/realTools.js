@@ -1445,42 +1445,9 @@ function pickForcedTool(lastUserMessage) {
   return null;
 }
 
-// ──────────────────────────────────────────────────────────────────
-// Groq-powered code helpers — ADDITIVE ONLY.
-//
-// These tools route to Groq (Qwen2.5-Coder-32B / Llama 3.3 70B) when
-// `GROQ_API_KEY` is configured. They do NOT touch the chat flow: they
-// are reachable exclusively via the KELION_TOOLS function-call path so
-// the model can invoke them on demand. If the key is missing the helper
-// returns `{ ok:false, unavailable:true, error }` and the model verbalizes
-// a graceful "not configured" message. No fallback to Gemini/OpenAI — we
-// want the user (or admin) to know the feature is opt-in.
+// Groq-powered coding tools and plan_task REMOVED — Gemini Live
+// handles coding questions and multi-step planning directly.
 
-const { groqChat } = require('./groq');
-
-const SOLVE_PROBLEM_SYSTEM = [
-  'You are an expert software engineer.',
-  'Given a problem description, produce:',
-  '  1. A brief plan (1-3 bullets).',
-  '  2. A self-contained code solution in the requested language (or Python if unspecified).',
-  '  3. A short correctness + complexity note.',
-  'Keep the answer focused. No chit-chat.',
-].join('\n');
-
-const CODE_REVIEW_SYSTEM = [
-  'You are a senior code reviewer.',
-  'Review the supplied code. Output:',
-  '  - Summary (1-2 sentences).',
-  '  - Issues found (bug, perf, security, style) — each with file/line hint if visible.',
-  '  - Concrete suggestions (code snippet when useful).',
-  'Be specific. Skip praise.',
-].join('\n');
-
-const EXPLAIN_CODE_SYSTEM = [
-  'You are a patient teacher.',
-  'Explain the supplied code step-by-step in plain language suited to the requested audience.',
-  'Call out non-obvious tricks, edge cases, and invariants. Do not rewrite the code.',
-].join('\n');
 
 // ──────────────────────────────────────────────────────────────────
 // PR B — document + OCR tools. Backend-only; the LLM calls these via
