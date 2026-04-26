@@ -491,8 +491,15 @@ router.post('/', async (req, res) => {
     }
     res.write('data: [DONE]\n\n');
   } catch (err) {
-    console.error('[chat] AI error:', err.message);
-    res.write(`data: ${JSON.stringify({ error: 'AI service error. Please try again.' })}\n\n`);
+    // Surface the upstream error so operators + the client console can
+    // see exactly what Gemini rejected (model not found, schema issue,
+    // quota exceeded, …). Previously this was swallowed into a generic
+    // message, making debugging impossible.
+    const detail = err?.error?.message || err?.message || String(err);
+    const status = err?.status || err?.response?.status || null;
+    console.error('[chat] AI error:', { model, status, detail, stack: err?.stack?.slice?.(0, 500) });
+    const clientMsg = detail.length > 200 ? detail.slice(0, 200) + '…' : detail;
+    res.write(`data: ${JSON.stringify({ error: `AI error: ${clientMsg}` })}\n\n`);
   } finally {
     res.end();
   }
