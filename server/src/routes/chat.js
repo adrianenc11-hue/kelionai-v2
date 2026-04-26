@@ -399,7 +399,9 @@ router.post('/', async (req, res) => {
     Number.isFinite(Number(coords.lat)) &&
     Number.isFinite(Number(coords.lon));
 
-  try {
+  // SUSPENDED: Canal B only. Chat AI disabled.
+    return res.status(410).json({ error: "Chat suspended. Use voice (Canal B)." });
+    try {
     // ── First pass: stream with all tools ─────────────────────────
     let stream;
     try {
