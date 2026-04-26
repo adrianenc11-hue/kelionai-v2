@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "@google-cloud/text-to-speech": "^5.0.0",
+    "@google/genai": "^1.50.1",
     "@simplewebauthn/server": "^13.3.0",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
