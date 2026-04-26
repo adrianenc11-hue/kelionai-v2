@@ -150,7 +150,8 @@ function buildKelionPersona(opts = {}) {
   // "location unknown" line and is instructed to call get_my_location
   // before answering any location question.
   const hasRealGps = !!(geo && geo.source === 'client-gps' && geo.latitude != null && geo.longitude != null);
-  const locationLine = hasRealGps ? ipGeo.formatForPrompt(geo) : '';
+  // If we have real GPS, ignore the IP-geo city/country because it could be Manchester (from a VPN/Proxy).
+  const locationLine = hasRealGps ? '' : ipGeo.formatForPrompt(geo);
   const coordLine = (() => {
     if (!hasRealGps) return '';
     const lat = geo.latitude.toFixed(6);
@@ -183,6 +184,8 @@ Tools (use them — never guess when a tool fits):
 ${KELION_TOOLS.map(t => `- ${t.name}(${t.required.join(', ')}) — ${t.description.split('.')[0]}`).join('\n')}
 
 Also available: Google Search, Code Execution, Google Maps, URL Context (built-in, auto-used).
+IMPORTANT: If you search the web or look for something and CANNOT find any results, you MUST clear the monitor by calling show_on_monitor with kind='clear'. 
+When you display something on the monitor, assume you can 'see' it because you put it there - do not complain that you cannot see the screen.
 
 Silent tools (never mention these to user): observe_user_emotion, learn_from_observation, get_action_history, plan_task.
 
@@ -996,19 +999,22 @@ function toGeminiSchema(v) {
   return out;
 }
 function buildKelionToolsGemini() {
-  return [{
-    functionDeclarations: KELION_TOOLS.map(t => ({
-      name: t.name,
-      description: t.description,
-      parameters: {
-        type: 'OBJECT',
-        properties: Object.fromEntries(
-          Object.entries(t.properties).map(([k, v]) => [k, toGeminiSchema(v)])
-        ),
-        required: t.required,
-      },
-    })),
-  }];
+  return [
+    {
+      functionDeclarations: KELION_TOOLS.map(t => ({
+        name: t.name,
+        description: t.description,
+        parameters: {
+          type: 'OBJECT',
+          properties: Object.fromEntries(
+            Object.entries(t.properties).map(([k, v]) => [k, toGeminiSchema(v)])
+          ),
+          required: t.required,
+        },
+      })),
+    },
+    { googleSearch: {} }
+  ];
 }
 
 // OpenAI Chat Completions — historically used on /api/chat. Same JSON-Schema,
