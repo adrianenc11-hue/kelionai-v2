@@ -431,10 +431,10 @@ router.post('/', async (req, res) => {
     const functionCalls = [];
 
     for await (const chunk of stream) {
-      // Text content.
+      // Buffer text — don't send yet. If tools are called, only
+      // the narration pass should speak. If no tools, we send after.
       if (chunk.text) {
         textSoFar += chunk.text;
-        sseWrite(res, { content: chunk.text });
       }
 
       // Function calls.
@@ -447,6 +447,11 @@ router.post('/', async (req, res) => {
           });
         }
       }
+    }
+
+    // ── No tools: send buffered text as the only response ──────────
+    if (functionCalls.length === 0 && textSoFar) {
+      sseWrite(res, { content: `[CANAL 1 — ${model} — DIRECT, fără tools]\n` + textSoFar, _source: 'kelion-direct' });
     }
 
     // ── Execute tools if requested ─────────────────────────────────
@@ -548,9 +553,14 @@ router.post('/', async (req, res) => {
           },
         });
 
+        let narrationStarted = false;
         for await (const chunk of narrationStream) {
           if (chunk.text) {
-            sseWrite(res, { content: chunk.text });
+            if (!narrationStarted) {
+              sseWrite(res, { content: `[CANAL 2 — ${model} — NARRATION după tools]\n`, _source: 'kelion-narration' });
+              narrationStarted = true;
+            }
+            sseWrite(res, { content: chunk.text, _source: 'kelion-narration' });
           }
         }
       } catch (err2) {
@@ -574,8 +584,15 @@ router.post('/', async (req, res) => {
           contents,
           config: { systemInstruction, tools: allTools, toolConfig },
         });
+        let fbStarted = false;
         for await (const chunk of fallbackStream) {
-          if (chunk.text) sseWrite(res, { content: chunk.text });
+          if (chunk.text) {
+            if (!fbStarted) {
+              sseWrite(res, { content: `[CANAL 3 — gemini-3-flash-preview — FALLBACK]\n`, _source: 'kelion-flash' });
+              fbStarted = true;
+            }
+            sseWrite(res, { content: chunk.text, _source: 'kelion-flash' });
+          }
         }
         res.write('data: [DONE]\n\n');
         res.end();
