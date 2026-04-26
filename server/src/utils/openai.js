@@ -14,7 +14,7 @@
  *
  * Env:
  *   GEMINI_API_KEY   → required
- *   AI_MODEL         → optional override of the chat model
+ *   GEMINI_CHAT_MODEL or AI_MODEL → optional override of the chat model
  */
 let _client = null;
 
@@ -33,7 +33,7 @@ function getAI() {
 function getProvider() { return 'gemini'; }
 
 function getDefaultChatModel() {
-  return process.env.AI_MODEL || DEFAULT_GEMINI_CHAT_MODEL;
+  return process.env.AI_MODEL || process.env.GEMINI_CHAT_MODEL || DEFAULT_GEMINI_CHAT_MODEL;
 }
 
 function getOpenAI() { return getAI(); }

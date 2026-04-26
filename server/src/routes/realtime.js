@@ -1003,7 +1003,7 @@ const KELION_TOOLS = [
     description: "POST a JSON payload to a Zapier Catch Hook webhook so a Zap can automate the rest (Slack message, Sheets row, Gmail draft, etc). The URL is restricted to https://hooks.zapier.com/hooks/catch/… so the tool cannot be repurposed as a general webhook sink.",
     properties: {
       webhook_url: { type: 'string', description: "The Zapier Catch Hook URL from the Zap setup screen." },
-      payload:     { type: 'object', description: "JSON object sent as the request body (max 100 KB serialised)." },
+      payload:     { type: 'object', description: "JSON object sent as the request body (max 100 KB serialised).", properties: {} },
     },
     required: ['webhook_url'],
   },
