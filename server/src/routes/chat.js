@@ -303,17 +303,26 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ error: 'No valid messages' });
   }
 
-  // Tool declarations: custom KELION_TOOLS + Google built-in tools.
-  // The model automatically picks the right tool for each request:
-  //   • Custom function declarations (65+ tools from realtime.js)
-  //   • Google Search — real-time web search, news, grounding
-  //   • Code Execution — math, calculations, data processing
-  // When it doesn't have a custom tool, it uses Google's natively.
+  // Tool declarations: custom KELION_TOOLS + ALL verified Google built-in tools.
+  // The model automatically picks the right tool for each request.
+  // Google built-in tools are maintained by Google — auto-updated,
+  // auto-executed server-side, results integrated into the response.
+  //
+  // Custom tools (65+):  functionDeclarations from realtime.js
+  // Google Search:       real-time web search, news, fact grounding
+  // Code Execution:      math, calculations, Python execution
+  // Google Maps:         places, directions, local context
+  // URL Context:         read & analyze web pages by URL
   const customTools = buildKelionToolsGemini();
+  const GOOGLE_BUILTIN_TOOLS = [
+    { googleSearch: {} },       // Real-time web search grounding
+    { codeExecution: {} },      // Server-side Python code execution
+    { googleMaps: {} },         // Places, directions, location context
+    { urlContext: {} },         // Read & analyze web page content
+  ];
   const allTools = [
-    ...customTools,             // Custom function declarations
-    { googleSearch: {} },       // Google Search grounding
-    { codeExecution: {} },      // Server-side code execution
+    ...customTools,             // 65+ custom function declarations
+    ...GOOGLE_BUILTIN_TOOLS,    // All verified Google built-in tools
   ];
 
   // Keyword-based forced tool (only for custom tools).
