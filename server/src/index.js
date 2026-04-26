@@ -12,14 +12,12 @@ const config = require('./config');
 const { csrfSeed, csrfProtection } = require('./middleware/csrf');
 const { visitorLog } = require('./middleware/visitorLog');
 const { requireAuth } = require('./middleware/auth');
-const { checkSubscription, getPlans } = require('./middleware/subscription');
+const { getPlans } = require('./middleware/subscription');
 const { initDb } = require('./db');
 const { createReferralCode, findReferralCode, useReferralCode } = require('./db');
 const authRouter       = require('./routes/auth');
 const usersRouter      = require('./routes/users');
 const adminRouter      = require('./routes/admin');
-const chatRouter       = require('./routes/chat');
-const ttsRouter        = require('./routes/tts');
 const realtimeRouter   = require('./routes/realtime');
 const passkeyRouter    = require('./routes/passkey');
 const memoryRouter     = require('./routes/memory');
@@ -269,31 +267,6 @@ app.post('/api/referral/use', requireAuth, async (req, res) => {
 // API routes (auth required)
 app.use('/api/users', requireAuth, usersRouter);
 app.use('/api/admin', requireAuth, adminRouter);
-// Text chat is now a public endpoint that soft-authenticates (attaches
-// req.user if a JWT is present, no 401 for guests). Middleware chain:
-//   – softAuth: best-effort attach req.user
-//   – chatLimiter: per-IP rate limit (same as before)
-//   – checkSubscription: only runs for signed-in users; guests skip
-//     straight to the router where trial gating applies
-//   – chatRouter: for guests applies trial gating (shared 15-min/day
-//     IP window with Gemini Live); for users it already had req.user
-const { softAuth } = require('./middleware/optionalAuth');
-const subOnlyForUsers = checkSubscription();
-app.use('/api/chat', softAuth, chatLimiter, (req, res, next) => {
-  if (!req.user) return next();
-  return subOnlyForUsers(req, res, next);
-}, chatRouter);
-// /api/tts — Adrian: "in mod free nu se aplica vocile". Previously mounted
-// under `requireAuth`, which meant guests received a 401 and the client fell
-// back to `window.speechSynthesis` (browser default voice, female on
-// Windows). Now public via softAuth so the Charon / ElevenLabs male voice
-// plays for guests too; the trial-quota gate inside tts.js enforces the
-// shared 15-min/day IP window (same policy as /api/chat).
-const subForTtsUsers = checkSubscription();
-app.use('/api/tts', softAuth, chatLimiter, (req, res, next) => {
-  if (!req.user) return next();
-  return subForTtsUsers(req, res, next);
-}, ttsRouter);
 // Realtime router is PUBLIC in Stage 1 (no login/users/subs per product spec).
 // Rate limiting still applies to prevent abuse. Ephemeral-token endpoints only
 // hand back short-lived tokens; persona + config are baked in server-side.
