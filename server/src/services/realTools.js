@@ -2392,7 +2392,17 @@ async function toolZapierTrigger(args) {
   if (!/^https:\/\/hooks\.zapier\.com\/hooks\/catch\//i.test(url)) {
     return { ok: false, error: 'webhook_url must be a Zapier Catch Hook (https://hooks.zapier.com/hooks/catch/…)' };
   }
-  const payload = args?.payload && typeof args.payload === 'object' ? args.payload : {};
+  // Schema advertises `payload` as a JSON string (Gemini's OpenAI-compat
+  // endpoint rejects object-type params without explicit properties). Accept
+  // both a pre-parsed object and a JSON string for backward compat.
+  let payload = {};
+  if (args?.payload) {
+    if (typeof args.payload === 'string') {
+      try { payload = JSON.parse(args.payload); } catch { return { ok: false, error: 'payload is not valid JSON' }; }
+    } else if (typeof args.payload === 'object') {
+      payload = args.payload;
+    }
+  }
   let body;
   try { body = JSON.stringify(payload); }
   catch { return { ok: false, error: 'payload is not JSON-serialisable' }; }
