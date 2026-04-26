@@ -1214,6 +1214,18 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
     }
   }, [appendTurn, start])
 
+  // Allow the parent to clear or seed the transcript (used by history
+  // load, new-conversation, sign-out). Avoids duplicating state.
+  const clearTurns = useCallback(() => {
+    setTurns([])
+    turnActiveRef.current = { user: null, assistant: null }
+  }, [])
+  const loadTurns = useCallback((entries) => {
+    if (!Array.isArray(entries)) return
+    setTurns(entries.map(e => ({ role: e.role, text: e.text || e.content || '' })))
+    turnActiveRef.current = { user: null, assistant: null }
+  }, [])
+
   return {
     status, error, start, stop, turns, userLevel,
     // Stage 2
@@ -1223,5 +1235,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
     isBusy,
     setMuted,
     sendText,
+    clearTurns,
+    loadTurns,
   }
 }

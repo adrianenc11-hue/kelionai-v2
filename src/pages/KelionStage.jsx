@@ -18,7 +18,6 @@ import CameraRig from '../components/stage/CameraRig'
 import MonitorOverlay from '../components/stage/MonitorOverlay'
 import { TopBarIconButton, AdminTabBar, VisitorsAnalyticsPanel, PayoutsPanel, MenuItem, friendlyCreditStatus, uaIsBot, uaBrowser, uaOs, refHost } from '../components/stage/AdminPanels'
 import { useGeminiLive } from '../lib/geminiLive' // CACHE BUSTER: 20260426155431
-import { selectPriorTurns } from '../lib/priorTurnsSelector'
 import { useWakeWord } from '../lib/useWakeWord'
 import { useTrial } from '../lib/useTrial'
 import { useClientGeo } from '../lib/useClientGeo'
@@ -843,13 +842,8 @@ export default function KelionStage() {
     if (resolved) setVoiceStyleState(resolved)
   }, [])
 
-  // Text chat — user-typed prompts in addition to voice. Talks to
-  // /api/chat which streams assistant deltas via SSE. We keep the last
-  // ~6 turns in memory so the model has short-term context; voice and
-  // text share the same session but don't (yet) share a message log.
+  // Text input for typed messages (goes through Gemini Live WebSocket).
   const [chatInput, setChatInput] = useState('')
-  const [chatMessages, setChatMessages] = useState([]) // [{ role, content }]
-  const [chatBusy, setChatBusy] = useState(false)
   const [chatError, setChatError] = useState(null)
   // Conversation history — user-requested ("sa aiba optiune de save").
   // Signed-in users get server persistence via /api/conversations; guests
@@ -917,22 +911,19 @@ export default function KelionStage() {
   // future change widens the overlay past 50vw.
   const bottomZIndex = overlayShiftsBottom ? 50 : undefined
 
-  // Chat bubble auto-hide — Adrian: "chatul trebuie sa dispara dupa ce s-a
-  // spus ramine doar in istoric, se afiseaza doar curent ce scrie user sau
-  // avatar". We keep chatMessages as the persistent history (for context +
-  // transcript panel), but fade the on-stage bubble out after 8s of quiet
-  // so the avatar isn't cluttered. The timer resets on every new message
-  // or when streaming resumes (chatBusy).
+  // Chat bubble auto-hide — fade the on-stage bubble out after 8s of
+  // quiet so the avatar isn't cluttered. The timer resets on every new
+  // turn from the Gemini Live hook.
   const [bubbleVisible, setBubbleVisible] = useState(true)
   const bubbleHideTimerRef = useRef(null)
   useEffect(() => {
-    if (chatMessages.length === 0) { setBubbleVisible(false); return }
+    if (turns.length === 0) { setBubbleVisible(false); return }
     setBubbleVisible(true)
     if (bubbleHideTimerRef.current) clearTimeout(bubbleHideTimerRef.current)
-    if (chatBusy) return
+    if (status === 'thinking' || status === 'speaking') return
     bubbleHideTimerRef.current = setTimeout(() => setBubbleVisible(false), 8000)
     return () => { if (bubbleHideTimerRef.current) clearTimeout(bubbleHideTimerRef.current) }
-  }, [chatMessages, chatBusy])
+  }, [turns, status])
 
   // Single voice transport — Gemini Live on Vertex AI. Per Adrian's
   // single-LLM cleanup (April 2026): one LLM end-to-end (Gemini), one
@@ -968,6 +959,8 @@ export default function KelionStage() {
     // also ticks for text-chat-only guests who never touch the mic.
     trial: voiceTrial,
     sendText: liveSendText,
+    clearTurns,
+    loadTurns,
   } = liveHook
   statusRef.current = status
   liveSendTextRef.current = liveSendText
@@ -1196,73 +1189,38 @@ export default function KelionStage() {
     })
   }, [authState.signedIn])
 
-  // Auto-save new chat messages to the conversation history backend.
-  // `savedUpToRef` tracks the prefix of `chatMessages` that has already
-  // been persisted so we only POST the delta.
-  //
-  // The old implementation saved user turns incrementally while
-  // `chatBusy` was true, and held back only the streaming assistant
-  // tail. On a 4xx/5xx (session expired, 402 no-credits, 429 trial
-  // exhausted, upstream model failure) the `/api/chat` call threw
-  // before any assistant chunk arrived — but the user turn had already
-  // been POSTed and a fresh `conversations` row was already created.
-  // The error banner appeared, the empty assistant placeholder got
-  // popped in the catch handler (see sendTextMessage), and the DB was
-  // left with a "user asked X, no reply" orphan that appeared in the
-  // admin audit as 3 of 5 threads missing an assistant reply.
-  //
-  // New contract: never persist anything while chatBusy=true, and
-  // never persist a trailing user turn (the one whose reply never
-  // landed). A pair is only written after streaming completes and the
-  // last message in the transcript is an assistant turn with content.
-  // Retries by the user append a fresh user turn onto the unsaved
-  // one — both get persisted in order once a reply finally lands, so
-  // the conversation history stays faithful without producing orphans.
+  // Auto-save new turns to the conversation history backend.
+  // `savedUpToRef` tracks the prefix of `turns` that has already been
+  // persisted so we only POST the delta. We defer until the model
+  // finishes its turn (status leaves 'thinking'/'speaking') to avoid
+  // persisting partial streaming content.
   useEffect(() => {
-    // Defer until the streaming turn finishes — otherwise we'd race
-    // the SSE loop and possibly write partial assistant content.
-    if (chatBusy) return
-    const total = chatMessages.length
+    // Don't save while the model is still generating
+    if (status === 'thinking' || status === 'speaking') return
+    const total = turns.length
     const start = savedUpToRef.current
     if (total <= start) {
       if (total < start) savedUpToRef.current = total // transcript was cleared
       return
     }
-    // Trailing user turn with no assistant reply = error path. The
-    // sendTextMessage catch block drops the empty assistant
-    // placeholder, so the last slot is a user turn. Hold off on
-    // persisting anything past the previously saved cursor until the
-    // exchange completes successfully (or the user edits their input
-    // and resends, pushing a new user turn plus a real assistant
-    // reply). Skipping here prevents orphan conversations.
-    const last = chatMessages[total - 1]
-    if (!last || (last.role || 'user') === 'user') return
-    if (!last.content || !String(last.content).trim()) return
+    // Only save when the last entry is an assistant turn with content
+    const last = turns[total - 1]
+    if (!last || last.role === 'user') return
+    if (!last.text || !String(last.text).trim()) return
     let cancelled = false
     ;(async () => {
-      for (let i = start; i < chatMessages.length; i++) {
+      for (let i = start; i < turns.length; i++) {
         if (cancelled) return
-        const m = chatMessages[i]
-        if (!m || !m.content || !String(m.content).trim()) break
+        const t = turns[i]
+        if (!t || !t.text || !String(t.text).trim()) break
         try {
-          await appendConversationMessage({ role: m.role || 'user', content: m.content })
-          // IMPORTANT: advance the cursor even when the effect got
-          // cancelled mid-await. The SSE streaming path flips
-          // `chatMessages` ~30×/s, so every chunk triggers a cleanup
-          // that sets `cancelled=true` on the in-flight save. Gating
-          // the cursor update on `!cancelled` meant a message that
-          // was *successfully* persisted could still be re-sent on
-          // the next effect run — which is how the same user turn
-          // ended up in the DB 2–3 times (audit #1, orphan threads).
-          // The save is idempotent from our side: once the POST
-          // resolves, the row exists, so cursor++ is correct
-          // regardless of whether we continue iterating.
+          await appendConversationMessage({ role: t.role || 'user', content: t.text })
           savedUpToRef.current = i + 1
         } catch { /* next change will retry from the unchanged cursor */ }
       }
     })()
     return () => { cancelled = true }
-  }, [chatMessages, chatBusy])
+  }, [turns, status])
 
   // Load history list whenever the panel opens.
   const refreshHistory = useCallback(async () => {
@@ -1286,10 +1244,10 @@ export default function KelionStage() {
   const handleNewChat = useCallback(() => {
     startNewConversation()
     savedUpToRef.current = 0
-    setChatMessages([])
+    clearTurns()
     setChatError(null)
     setHistoryOpen(false)
-  }, [])
+  }, [clearTurns])
   const handleLoadHistory = useCallback(async (id) => {
     setHistoryError(null)
     try {
@@ -1300,12 +1258,12 @@ export default function KelionStage() {
       // Mark the full loaded transcript as "already saved" so the
       // auto-save effect doesn't re-append it as new turns.
       savedUpToRef.current = msgs.length
-      setChatMessages(msgs.map((m) => ({ role: m.role, content: m.content })))
+      loadTurns(msgs)
       setHistoryOpen(false)
     } catch (err) {
       setHistoryError(err.message || 'Could not load conversation')
     }
-  }, [])
+  }, [loadTurns])
   const handleDeleteHistory = useCallback(async (id) => {
     try {
       await deleteConversationApi(id)
@@ -1313,11 +1271,11 @@ export default function KelionStage() {
       if (getActiveConversationId() === id) {
         setActiveConversationId(null)
         savedUpToRef.current = 0
-        setChatMessages([])
+        clearTurns()
       }
       refreshHistory()
     }
-  }, [refreshHistory])
+  }, [refreshHistory, clearTurns])
 
   // Stage 3 — after enough user turns, if not signed in, gently open the
   // "Remember me?" prompt ONCE. Dismissed permanently per-session on close.
@@ -1334,78 +1292,24 @@ export default function KelionStage() {
     }
   }, [userTurnCount, authState.signedIn, rememberPromptOpen])
 
-  // Stage 3 — when the user ends a session, extract facts (if signed in)
-  // AND seed the text-chat transcript with the voice turns so a user
-  // who swaps from voice to text doesn't lose context.
-  // Previously the user complained that "memoria intre AI-uri nu merge":
-  // the voice hook's `turns` are a separate state from `chatMessages`, so
-  // typing a new question after a voice chat sent the model zero context.
-  // Seeding chatMessages on session end lets the next /api/chat POST
-  // ship the voice history as part of `messages` (capped at 12 there).
+  // Stage 3 — when the user ends a voice session, extract long-term
+  // memory facts (if signed in). turns[] is the single source of truth
+  // for both voice and typed messages, so no seeding is needed.
   const turnsRef = useRef(turns)
   useEffect(() => { turnsRef.current = turns }, [turns])
-  const chatMessagesRef = useRef(chatMessages)
-  useEffect(() => { chatMessagesRef.current = chatMessages }, [chatMessages])
   const prevStatusRef = useRef(status)
   useEffect(() => {
     const prev = prevStatusRef.current
     prevStatusRef.current = status
     const justEnded = (prev && prev !== 'idle' && prev !== 'error') && (status === 'idle' || status === 'error')
     if (!justEnded) return
+    if (!authState.signedIn) return
     const snapshot = turnsRef.current.filter((t) => t && t.role && t.text && t.text.trim())
     if (snapshot.length < 2) return
-    // Seed chatMessages with the voice conversation — the two UIs share a
-    // single logical thread so the user's follow-up typed question lands
-    // with the voice context still in scope.
-    if (chatMessagesRef.current.length === 0) {
-      const seeded = snapshot.slice(-12).map((t) => ({
-        role: t.role === 'assistant' ? 'assistant' : 'user',
-        content: t.text,
-      }))
-      if (seeded.length > 0) {
-        // savedUpToRef marks how many entries are already persisted to the
-        // conversation history backend; voice turns are saved separately
-        // by the voice transport, so treat them as already-saved here to
-        // avoid a duplicate POST from the text-chat autosave effect.
-        savedUpToRef.current = seeded.length
-        setChatMessages(seeded)
-      }
-    }
-    if (!authState.signedIn) return
     extractAndStore(snapshot).catch((err) => {
       console.warn('[memory extract]', err.message)
     })
   }, [status, authState.signedIn])
-
-  // Long-term memory extraction for text chat. Previously extractAndStore
-  // only fired on voice session end — a user who only typed never built
-  // any long-term memory, so every text chat started cold even when
-  // signed in. Trigger the same extractor once the streaming reply
-  // finishes (chatBusy true?false) and the last message is a finalised
-  // assistant turn. Debounced implicitly by chatBusy — further keystrokes
-  // flip it true again and reset.
-  const prevChatBusyRef = useRef(chatBusy)
-  useEffect(() => {
-    const prev = prevChatBusyRef.current
-    prevChatBusyRef.current = chatBusy
-    if (!prev || chatBusy) return // only on true ? false
-    if (!authState.signedIn) return
-    const msgs = chatMessagesRef.current
-    const last = msgs[msgs.length - 1]
-    if (!last || last.role !== 'assistant' || !last.content || !String(last.content).trim()) return
-    // Convert {role, content} ? {role, text} for the extractor API.
-    const snapshot = msgs
-      .filter((m) => m && m.role && m.content && String(m.content).trim())
-      .slice(-12)
-      .map((m) => ({
-        role: m.role === 'assistant' ? 'assistant' : 'user',
-        text: String(m.content),
-      }))
-    if (snapshot.length < 2) return
-    extractAndStore(snapshot).catch((err) => {
-      console.warn('[memory extract text]', err.message)
-    })
-  }, [chatBusy, authState.signedIn])
 
   const openMemory = useCallback(async () => {
     setMemoryOpen(true)
@@ -1465,11 +1369,11 @@ export default function KelionStage() {
     // now-signed-out guest session. Clear the active id, on-screen
     // transcript, loaded history list, and the autosave cursor.
     try { startNewConversation() } catch { /* ignore */ }
-    setChatMessages([])
+    clearTurns()
     setHistoryItems([])
     setHistoryOpen(false)
     savedUpToRef.current = 0
-  }, [])
+  }, [clearTurns])
 
   const handleForgetAll = useCallback(async () => {
     if (!authState.signedIn) return
@@ -1538,19 +1442,14 @@ export default function KelionStage() {
   }[status] || 'Kelion'
 
   // Shared entry point — tap-to-talk + wake-word both start a voice
-  // session from idle. Carry any existing text/voice transcript as
-  // `priorTurns` so Kelion continues the conversation instead of
-  // re-greeting. chatMessages is preferred because it is the cross-mode
-  // transcript (voice-end seeds it from `turns`, and any text the user
-  // typed afterward appends). When chatMessages is empty we fall back
-  // to the hook's raw `turns` so repeat taps on pure-voice users still
-  // pick up context.
+  // session from idle. Carry the existing transcript as `priorTurns`
+  // so Kelion continues the conversation instead of re-greeting.
   const startVoiceWithPriorTurns = useCallback(() => {
-    const priorTurns = selectPriorTurns(
-      chatMessagesRef.current,
-      turnsRef.current,
-    )
-    try { start(priorTurns.length > 0 ? { priorTurns } : undefined) }
+    const clean = turnsRef.current
+      .filter((t) => t && t.role && t.text && String(t.text).trim())
+      .map((t) => ({ role: t.role === 'assistant' ? 'assistant' : 'user', text: String(t.text) }))
+      .slice(-20)
+    try { start(clean.length > 0 ? { priorTurns: clean } : undefined) }
     catch (_) { /* banner surfaces failure */ }
   }, [start])
 
@@ -1689,80 +1588,10 @@ export default function KelionStage() {
       <audio ref={audioRef} autoPlay playsInline />
 
       {/* Last assistant text reply (when chatting by typing) — fades
-          above the input bar. Only the latest assistant message shows
-          so we don't clutter the stage. The bubble auto-hides 8s after
-          the reply finishes (kept in history/transcript). */}
-      {chatMessages.length > 0 && bubbleVisible && (() => {
-        const last = chatMessages[chatMessages.length - 1]
-        const userTurn = [...chatMessages].reverse().find((m) => m.role === 'user')
-        return (
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              position: 'absolute',
-              bottom: 'calc(max(32px, env(safe-area-inset-bottom)) + 110px)',
-              left: bottomLeft, transform: 'translateX(-50%)',
-              width: overlayShiftsBottom ? 'min(420px, 44vw)' : 'min(680px, 92vw)',
-              maxHeight: '42vh', overflowY: 'auto',
-              display: 'flex', flexDirection: 'column', gap: 8,
-              padding: 14,
-              borderRadius: 16,
-              background: 'rgba(10, 8, 20, 0.72)',
-              backdropFilter: 'blur(14px)',
-              border: '1px solid rgba(167, 139, 250, 0.22)',
-              color: '#ede9fe',
-              fontSize: 14, lineHeight: 1.45,
-              fontFamily: 'system-ui, -apple-system, sans-serif',
-              boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
-              zIndex: bottomZIndex,
-            }}
-          >
-            {userTurn && (
-              <div style={{
-                alignSelf: 'flex-end', maxWidth: '88%',
-                padding: '8px 12px', borderRadius: 12,
-                background: 'rgba(124, 58, 237, 0.25)',
-                border: '1px solid rgba(167, 139, 250, 0.3)',
-                fontSize: 13,
-                wordBreak: 'break-word',
-                overflowWrap: 'anywhere',
-              }}>{userTurn.content}</div>
-            )}
-            {last.role === 'assistant' && (
-              <div style={{
-                alignSelf: 'flex-start', maxWidth: '92%',
-                padding: '8px 12px', borderRadius: 12,
-                background: 'rgba(167, 139, 250, 0.08)',
-                border: '1px solid rgba(167, 139, 250, 0.18)',
-                whiteSpace: 'pre-wrap',
-                wordBreak: 'break-word',
-                overflowWrap: 'anywhere',
-              }}>
-                {last.content || (chatBusy ? 'Kelion is thinking…' : '')}
-              </div>
-            )}
-            {chatError && (
-              <div style={{
-                fontSize: 12, color: '#fecaca',
-                background: 'rgba(80, 14, 14, 0.6)',
-                padding: '6px 10px', borderRadius: 10,
-              }}>{chatError}</div>
-            )}
-          </div>
-        )
-      })()}
-
-      {/* Live voice chat bubble — mirrors the text-chat bubble above but
-          reads from `turns` (populated by useGeminiLive from the Gemini Live
-          inputTranscription / outputTranscription stream). Adrian: "logat
-          vocea e cea corecta dar nu e chat live, nu afiseaza absolut nimic
-          pe ecran". Previously the turns only rendered inside the transcript
-          panel (closed by default) — so live voice users heard Kelion but
-          saw nothing. This bubble shows the last user utterance + the
-          streaming assistant reply while a voice session is active. It is
-          hidden when the text-chat bubble is shown to avoid two overlapping
-          panels. */}
-      {status !== 'idle' && status !== 'error' && turns.length > 0 && !(chatMessages.length > 0 && bubbleVisible) && (() => {
+          {/* Chat bubble — unified, reads from turns[] (single source of truth).
+          Shows the last user utterance + the streaming assistant reply.
+          Auto-hides 8s after the last turn. */}
+      {turns.length > 0 && bubbleVisible && (() => {
         const lastAssistant = [...turns].reverse().find((t) => t.role === 'assistant')
         const lastUser = [...turns].reverse().find((t) => t.role === 'user')
         return (
@@ -1815,11 +1644,12 @@ export default function KelionStage() {
                 padding: '8px 12px',
               }}>Kelion is thinking…</div>
             )}
-            {!lastUser && !lastAssistant && status === 'listening' && (
+            {chatError && (
               <div style={{
-                alignSelf: 'center', fontSize: 13, opacity: 0.7,
-                padding: '8px 12px',
-              }}>Listening…</div>
+                fontSize: 12, color: '#fecaca',
+                background: 'rgba(80, 14, 14, 0.6)',
+                padding: '6px 10px', borderRadius: 10,
+              }}>{chatError}</div>
             )}
           </div>
         )
@@ -1864,13 +1694,13 @@ export default function KelionStage() {
         <button
           type="button"
           onClick={() => fileInputRef.current && fileInputRef.current.click()}
-          disabled={chatBusy}
+          disabled={status === 'thinking'}
           style={{
             width: 30, height: 30, borderRadius: '50%',
             background: 'rgba(167, 139, 250, 0.18)',
             border: '1px solid rgba(167, 139, 250, 0.3)',
             color: '#ede9fe',
-            cursor: chatBusy ? 'default' : 'pointer',
+            cursor: status === 'thinking' ? 'default' : 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 18, lineHeight: 1, flexShrink: 0, padding: 0,
           }}
@@ -1972,7 +1802,7 @@ export default function KelionStage() {
             }
           }}
           placeholder="Type to Kelion…"
-          disabled={chatBusy}
+          disabled={status === 'thinking'}
           autoComplete="off"
           autoCorrect="off"
           spellCheck={false}
@@ -1993,16 +1823,16 @@ export default function KelionStage() {
         />
         <button
           type="submit"
-          disabled={chatBusy || (chatInput.trim().length === 0 && !attachedFile)}
+          disabled={status === 'thinking' || (chatInput.trim().length === 0 && !attachedFile)}
           style={{
             width: 40, height: 40, borderRadius: '50%',
             background: (chatInput.trim().length === 0 && !attachedFile)
               ? 'rgba(167, 139, 250, 0.18)'
               : 'linear-gradient(135deg, #7c3aed, #a78bfa)',
             border: 'none', color: '#fff',
-            cursor: chatBusy || (chatInput.trim().length === 0 && !attachedFile) ? 'default' : 'pointer',
+            cursor: status === 'thinking' || (chatInput.trim().length === 0 && !attachedFile) ? 'default' : 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            opacity: chatBusy ? 0.6 : 1,
+            opacity: status === 'thinking' ? 0.6 : 1,
             fontSize: 16,
           }}
           aria-label="Send message"
