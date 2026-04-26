@@ -1,4 +1,4 @@
-﻿import { Canvas } from '@react-three/fiber'
+import { Canvas } from '@react-three/fiber'
 import { useGLTF, Environment, ContactShadows, Float } from '@react-three/drei'
 import * as THREE from 'three'
 import { Suspense, useState, useRef, useEffect, useMemo, useCallback } from 'react'
@@ -2049,30 +2049,43 @@ export default function KelionStage() {
         >?</button>
       </form>
 
-      {/* Status pill — bottom center */}
-      <div style={{
-        position: 'absolute', bottom: 'max(32px, env(safe-area-inset-bottom))',
-        left: bottomLeft, transform: 'translateX(-50%)',
-        display: 'flex', alignItems: 'center', gap: '10px',
-        padding: '10px 22px',
-        borderRadius: 999,
-        background: 'rgba(10, 8, 20, 0.65)',
-        backdropFilter: 'blur(12px)',
-        border: `1px solid ${STATUS_COLORS[status]}33`,
-        color: '#ede9fe',
-        fontSize: 14, fontFamily: 'system-ui, -apple-system, sans-serif',
-        letterSpacing: '0.02em',
-        pointerEvents: 'none',
-        zIndex: bottomZIndex || 50,
-      }}>
+      {/* Microphone ON/OFF Toggle — bottom center */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation()
+          if (status === 'idle' || status === 'error') {
+            startVoiceWithPriorTurns()
+          } else {
+            stop()
+          }
+        }}
+        style={{
+          position: 'absolute', bottom: 'max(32px, env(safe-area-inset-bottom))',
+          left: bottomLeft, transform: 'translateX(-50%)',
+          display: 'flex', alignItems: 'center', gap: '10px',
+          padding: '10px 24px',
+          borderRadius: 999,
+          background: (status === 'idle' || status === 'error') ? 'rgba(30, 30, 40, 0.65)' : 'linear-gradient(135deg, #7c3aed, #a78bfa)',
+          backdropFilter: 'blur(12px)',
+          border: (status === 'idle' || status === 'error') ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid #c4b5fd',
+          color: (status === 'idle' || status === 'error') ? '#9ca3af' : '#ffffff',
+          fontSize: 15, fontFamily: 'system-ui, -apple-system, sans-serif',
+          fontWeight: 600,
+          letterSpacing: '0.04em',
+          cursor: 'pointer',
+          pointerEvents: 'auto',
+          zIndex: bottomZIndex || 50,
+          boxShadow: (status === 'idle' || status === 'error') ? 'none' : '0 0 20px rgba(139, 92, 246, 0.5)',
+        }}
+        aria-label={(status === 'idle' || status === 'error') ? "Turn microphone on" : "Turn microphone off"}
+      >
         <span style={{
-          width: 8, height: 8, borderRadius: '50%',
-          background: STATUS_COLORS[status],
-          boxShadow: `0 0 12px ${STATUS_COLORS[status]}`,
-          // No pulsing animation — Adrian found the blinking tiring.
+          width: 10, height: 10, borderRadius: '50%',
+          background: (status === 'idle' || status === 'error') ? '#6b7280' : '#ffffff',
+          boxShadow: (status === 'idle' || status === 'error') ? 'none' : '0 0 8px #ffffff',
         }} />
-        {statusLabel}
-      </div>
+        {(status === 'idle' || status === 'error') ? 'OFF' : 'ON'}
+      </button>
 
       {/* Guest trial countdown — Adrian: "timer se afiseaza dreapta sus
           vizibil". Renders top-right, above the action bar, only while
