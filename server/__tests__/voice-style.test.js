@@ -46,8 +46,8 @@ describe('buildKelionPersona — minimal prompt with full tool catalog', () => {
   describe('Honesty hardening', () => {
     const prompt = buildKelionPersona({});
 
-    it('forbids invented actions', () => {
-      expect(prompt).toMatch(/Never claim you did something you did not do/);
+    it('forbids fabrication', () => {
+      expect(prompt).toMatch(/NEVER fabricate/);
     });
 
     it('licences "I do not know" explicitly', () => {
@@ -76,7 +76,7 @@ describe('buildKelionPersona — minimal prompt with full tool catalog', () => {
       expect(prompt).toMatch(/read_pdf/);
       expect(prompt).toMatch(/send_email/);
       expect(prompt).toMatch(/camera_on/);
-      expect(prompt).toMatch(/plan_task/);
+      expect(prompt).toMatch(/generate_image/);
     });
 
     it('lists key tools', () => {
@@ -87,7 +87,7 @@ describe('buildKelionPersona — minimal prompt with full tool catalog', () => {
       expect(prompt).toMatch(/get_crypto_price/);
       expect(prompt).toMatch(/play_radio/);
       expect(prompt).toMatch(/show_on_monitor/);
-      expect(prompt).toMatch(/plan_task/);
+      expect(prompt).toMatch(/generate_image/);
       expect(prompt).toMatch(/read_pdf/);
       expect(prompt).toMatch(/ocr_image/);
     });

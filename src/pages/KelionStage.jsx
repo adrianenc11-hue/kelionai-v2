@@ -1437,14 +1437,14 @@ export default function KelionStage() {
   }, [])
 
   const statusLabel = {
-    idle:       'Tap to talk',
-    requesting: 'Requesting mic…',
-    connecting: 'Connecting…',
-    listening:  'Listening',
-    thinking:   'Thinking',
-    speaking:   'Speaking',
-    error:      error || 'Error',
-  }[status] || 'Kelion'
+    idle:       'OFF',
+    requesting: 'OFF',
+    connecting: 'OFF',
+    listening:  'ON',
+    thinking:   'ON',
+    speaking:   'ON',
+    error:      error || 'OFF',
+  }[status] || 'OFF'
 
   // Shared entry point — tap-to-talk + wake-word both start a voice
   // session from idle. Carry the existing transcript as `priorTurns`

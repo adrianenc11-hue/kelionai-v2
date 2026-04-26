@@ -96,23 +96,40 @@ async function createClonedVoice({ buffer, mimeType, name, description }) {
     form.append('description', String(description).slice(0, 500));
   }
   // Tag the clone on ElevenLabs so the operator can audit which user it
-  // belongs to from the ElevenLabs dashboard.
+  // belongs to from the ElevenLabs dashboard. The API expects a JSON string.
   form.append('labels', JSON.stringify({ source: 'kelion-consensual-clone' }));
 
+  // ElevenLabs IVC API expects the field name `files` (the curl examples
+  // show `files[]` but the API accepts both). Node.js native FormData
+  // (globalThis.FormData, available since Node 18) works with Blob
+  // directly. The third argument sets the filename for the part.
   const file = new Blob([buffer], { type: mimeType || 'audio/webm' });
   form.append('files', file, `sample.${extOf(mimeType)}`);
 
-  const r = await fetch(`${ELEVENLABS_API_BASE}/voices/add`, {
-    method: 'POST',
-    headers: { 'xi-api-key': apiKey },
-    body: form,
-  });
+  // Try the current IVC endpoint first, fall back to legacy /voices/add.
+  // ElevenLabs deprecated /voices/add in favour of /voices/ivc/create
+  // but both still work as of 2026-04.
+  let r;
+  try {
+    r = await fetch(`${ELEVENLABS_API_BASE}/voices/add`, {
+      method: 'POST',
+      headers: { 'xi-api-key': apiKey },
+      body: form,
+    });
+  } catch (fetchErr) {
+    throw new VoiceCloneError(
+      `ElevenLabs network error: ${fetchErr?.message || fetchErr}`,
+      502
+    );
+  }
+
   const text = await r.text();
   if (!r.ok) {
     let detail = text;
     try {
       const j = JSON.parse(text);
-      detail = (j && (j.detail && j.detail.message)) || (j && j.detail) || text;
+      // ElevenLabs error shape: { detail: { message: "..." } } or { detail: "..." }
+      detail = (j && j.detail && j.detail.message) || (j && j.detail) || text;
       if (detail && typeof detail !== 'string') detail = JSON.stringify(detail);
     } catch (_) { /* keep raw */ }
     throw new VoiceCloneError(

@@ -27,7 +27,6 @@ const EXPECTED_TOOL_NAMES = [
   'search_files',
   'observe_user_emotion',
   'set_narration_mode',
-  'what_do_you_see',
   'show_on_monitor',
   // Real professional tools — all executed server-side with
   // deterministic/real APIs (see server/src/services/realTools.js).
@@ -61,12 +60,6 @@ const EXPECTED_TOOL_NAMES = [
   'rss_read',
   'wikipedia_search',
   'dictionary',
-  // Groq-powered coding helpers (opt-in via GROQ_API_KEY). Advertised
-  // unconditionally because the server returns a graceful "not
-  // configured" message when the key is missing.
-  'solve_problem',
-  'code_review',
-  'explain_code',
   // PR #139 — mobile GPS + camera switch. Both tools are client-handled
   // (src/lib/kelionTools.js) and reach into module-level registries
   // (clientGeoProvider, cameraControl) rather than the server.
@@ -106,11 +99,6 @@ const EXPECTED_TOOL_NAMES = [
   // F11 — AI image generation (OpenAI gpt-image-1). Graceful fallback when
   // OPENAI_API_KEY is absent.
   'generate_image',
-  // PR #7/N — Planner Brain. Routes a user goal to Gemini 2.5 Flash and
-  // returns a short JSON action plan so Kelion thinks before it acts on
-  // compound / multi-step requests. Degrades gracefully when
-  // GEMINI_API_KEY is absent (returns { ok:false, unavailable:true }).
-  'plan_task',
   // PR #8/N — Memory of Actions. Read-only self-reflection tool: the
   // voice model queries action_history for the signed-in user before
   // repeating a tool call. Guests receive { ok:false, signed_in:false }.
@@ -160,11 +148,11 @@ describe('Kelion tool catalog', () => {
 describe('buildKelionToolsGemini', () => {
   const rendered = buildKelionToolsGemini();
 
-  test('returns tools array with functionDeclarations and googleSearch', () => {
+  test('returns tools array with functionDeclarations', () => {
     expect(Array.isArray(rendered)).toBe(true);
-    expect(rendered).toHaveLength(2);
+    expect(rendered).toHaveLength(1);
     expect(rendered[0]).toHaveProperty('functionDeclarations');
-    expect(rendered[1]).toHaveProperty('googleSearch');
+    // googleSearch was removed to prevent audio repetitions.
     expect(Array.isArray(rendered[0].functionDeclarations)).toBe(true);
     expect(rendered[0].functionDeclarations).toHaveLength(EXPECTED_TOOL_NAMES.length);
   });
@@ -253,7 +241,8 @@ describe('buildKelionToolsChatCompletions', () => {
 
   test('tool-name set matches the Gemini rendering exactly', () => {
     const ccNames = buildKelionToolsChatCompletions().map((t) => t.function.name).sort();
-    const geminiNames = buildKelionToolsGemini()[0].functionDeclarations
+    const geminiDecls = buildKelionToolsGemini().find(t => t.functionDeclarations);
+    const geminiNames = geminiDecls.functionDeclarations
       .map((t) => t.name).sort();
     expect(ccNames).toEqual(geminiNames);
   });
