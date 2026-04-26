@@ -198,26 +198,12 @@ describe('PR #8 — summarizeResultForHistory', () => {
   });
 
   test('marks unavailable when the provider is missing', () => {
-    const s = summarizeResultForHistory('plan_task', {
+    const s = summarizeResultForHistory('some_tool', {
       ok: false,
       unavailable: true,
-      error: 'Planner not configured',
+      error: 'Provider not configured',
     });
     expect(s).toMatch(/unavailable/);
-  });
-
-  test('condenses plan_task into a step-count line', () => {
-    const s = summarizeResultForHistory('plan_task', {
-      ok: true,
-      summary: 'Research, confirm, email',
-      steps: [
-        { n: 1, action: 'x' },
-        { n: 2, action: 'y' },
-        { n: 3, action: 'z' },
-      ],
-    });
-    expect(s).toMatch(/planned 3 steps/);
-    expect(s).toMatch(/Research, confirm, email/);
   });
 
   test('condenses web_search into count + first hit', () => {

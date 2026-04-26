@@ -22,9 +22,9 @@
 //     OUTPUT, which is already safe to persist.
 
 const PREFERRED_KEYS = [
-  'summary',      // plan_task
+  'summary',      // generic
   'translated',   // translate
-  'result',       // calculate, solve_problem, code_review, explain_code
+  'result',       // calculate
   'expression',   // calculate
   'message',      // generic ok/fail
   'text',         // generic
@@ -56,11 +56,6 @@ function summarizeResultForHistory(toolName, result) {
   // Known shapes first — mirror the client summarizer where it helps.
   if (name === 'get_weather' && result.current && result.location?.name) {
     return `${result.location.name}: ${result.current.temperature_2m}°C`.slice(0, 300);
-  }
-  if (name === 'plan_task' && Array.isArray(result.steps)) {
-    const n = result.steps.length;
-    const head = result.summary ? ` — ${String(result.summary).slice(0, 120)}` : '';
-    return `planned ${n} step${n === 1 ? '' : 's'}${head}`.slice(0, 300);
   }
   if ((name === 'web_search' || name === 'search_academic' ||
        name === 'search_github' || name === 'search_stackoverflow')
