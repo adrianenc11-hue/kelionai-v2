@@ -543,8 +543,8 @@ router.post('/', async (req, res) => {
           contents: secondContents,
           config: {
             systemInstruction,
-            tools: allTools,
-            toolConfig,
+            // Text-only: tool results are already in contents from first pass.
+            // No tools here — just narrate the data back to the user.
           },
         });
 
