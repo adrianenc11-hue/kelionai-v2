@@ -148,6 +148,9 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
   const frameCanvasRef = useRef(null)
 
   const appendTurn = useCallback((role, delta, finalize = false) => {
+    // When a role speaks, finalize the OTHER role's bubble so they don't merge infinitely.
+    turnActiveRef.current[role === 'user' ? 'assistant' : 'user'] = null;
+    
     setTurns((prev) => {
       const active = turnActiveRef.current[role]
       if (active !== null && prev[active] && prev[active].role === role) {
@@ -333,8 +336,9 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
       }
 
       if (sc.turnComplete) {
-        turnActiveRef.current.user = null
-        turnActiveRef.current.assistant = null
+        // We no longer reset turnActiveRef.current here. Resetting on turnComplete
+        // causes tool calls (which span multiple server turns) to split the
+        // assistant's reply into multiple chat bubbles ("mai multe intrari in chat").
         if (!playbackPlayingRef.current) setStatus('listening')
       } else if (sc.generationComplete) {
         setStatus('speaking')

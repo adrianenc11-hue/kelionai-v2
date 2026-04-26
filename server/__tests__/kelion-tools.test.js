@@ -160,10 +160,11 @@ describe('Kelion tool catalog', () => {
 describe('buildKelionToolsGemini', () => {
   const rendered = buildKelionToolsGemini();
 
-  test('returns a single functionDeclarations wrapper (Gemini Live shape)', () => {
+  test('returns tools array with functionDeclarations and googleSearch', () => {
     expect(Array.isArray(rendered)).toBe(true);
-    expect(rendered).toHaveLength(1);
+    expect(rendered).toHaveLength(2);
     expect(rendered[0]).toHaveProperty('functionDeclarations');
+    expect(rendered[1]).toHaveProperty('googleSearch');
     expect(Array.isArray(rendered[0].functionDeclarations)).toBe(true);
     expect(rendered[0].functionDeclarations).toHaveLength(EXPECTED_TOOL_NAMES.length);
   });
