@@ -868,21 +868,7 @@ export default function KelionStage() {
   // so the user gets visual confirmation of the attachment. Full upload
   // + embedding support lands in a follow-up PR.
   const [attachedFile, setAttachedFile] = useState(null)
-  const fileInputRef = useRef(null)
-  // â”€â”€ Text input â†’ routed through Canal B (live WebSocket) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // Previously this was a ~300-line SSE handler talking to /api/chat.
-  // Now ALL communication goes through the single Gemini Live WebSocket.
-  const sendTextMessage = useCallback(async () => {
-    const text = chatInput.trim()
-    if (!text) return
-    // Detect mute/unmute/translator commands from user text before sending.
-    applyMuteCommand(text)
-    setChatError(null)
-    setChatInput('')
-    setAttachedFile(null)
-    // Route through the live WebSocket â€” Kelion will respond with voice.
-    await liveSendText(text)
-  }, [chatInput, liveSendText])
+  const fileInputRef = useRef(null)
 
 
   const micMouthOpen = useLipSync(audioRef)
@@ -1017,6 +1003,22 @@ export default function KelionStage() {
     // Send typed text through the live WebSocket (replaces /api/chat).
     sendText: liveSendText,
   } = liveHook
+
+
+  // â”€â”€ Text input â†’ routed through Canal B (live WebSocket) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Previously this was a ~300-line SSE handler talking to /api/chat.
+  // Now ALL communication goes through the single Gemini Live WebSocket.
+  const sendTextMessage = useCallback(async () => {
+    const text = chatInput.trim()
+    if (!text) return
+    // Detect mute/unmute/translator commands from user text before sending.
+    applyMuteCommand(text)
+    setChatError(null)
+    setChatInput('')
+    setAttachedFile(null)
+    // Route through the live WebSocket â€” Kelion will respond with voice.
+    await liveSendText(text)
+  }, [chatInput, liveSendText])
   // Keep statusRef in sync so the TTS guard (declared before this line) can
   // read the current voice-session state without a temporal dead zone.
   statusRef.current = status
