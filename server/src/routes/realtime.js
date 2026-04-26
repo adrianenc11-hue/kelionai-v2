@@ -457,8 +457,10 @@ const KELION_TOOLS = [
   },
   {
     name: 'camera_off',
-    description: "Turn the device camera OFF. Call this whenever the user says 'oprește camera', 'dezactivează camera', 'închide camera', 'turn off the camera', 'stop the camera'. No arguments.",
-    properties: {},
+    description: "Turn the device camera OFF. Call this whenever the user says 'oprește camera', 'dezactivează camera', 'închide camera', 'turn off the camera', 'stop the camera'.",
+    properties: {
+      reason: { type: 'string', description: "Optional short reason for turning off (e.g. 'user requested', 'privacy'). Logged for diagnostics." },
+    },
     required: [],
   },
   {
@@ -915,19 +917,26 @@ const KELION_TOOLS = [
   {
     name: 'get_my_credits',
     description: "Return the currently signed-in user's voice-minute balance. Use when the user asks 'how many minutes do I have left', 'ce credit am', etc. Does not reveal personal data beyond the balance.",
-    properties: {},
+    properties: {
+      format: { type: 'string', description: "Display format: 'minutes' (default) or 'seconds'. Controls how the balance is shown.", enum: ['minutes', 'seconds'] },
+    },
     required: [],
   },
   {
     name: 'get_my_usage',
-    description: "Return a short summary of the signed-in user's recent credit activity: total minutes consumed and topped up over the last 20 ledger rows, plus the 10 most recent entries (kind, delta, amount, note, timestamp). Use when the user asks 'what did I spend', 'when did I top up', etc.",
-    properties: {},
+    description: "Return a short summary of the signed-in user's recent credit activity: total minutes consumed and topped up, plus the most recent ledger entries (kind, delta, amount, note, timestamp). Use when the user asks 'what did I spend', 'when did I top up', etc.",
+    properties: {
+      limit: { type: 'integer', description: 'Max recent entries to return (1-40, default 10).' },
+      kind:  { type: 'string', description: "Optional filter by transaction kind: 'topup', 'consume', or 'all' (default).", enum: ['topup', 'consume', 'all'] },
+    },
     required: [],
   },
   {
     name: 'get_my_profile',
     description: "Return the signed-in user's id, display name, email, credits balance (minutes) and account creation date. Use only when the user explicitly asks 'what's on my profile' or 'who am I signed in as'.",
-    properties: {},
+    properties: {
+      include_email: { type: 'boolean', description: 'Whether to include the email address in the response. Default true.' },
+    },
     required: [],
   },
   {
@@ -1003,7 +1012,7 @@ const KELION_TOOLS = [
     description: "POST a JSON payload to a Zapier Catch Hook webhook so a Zap can automate the rest (Slack message, Sheets row, Gmail draft, etc). The URL is restricted to https://hooks.zapier.com/hooks/catch/… so the tool cannot be repurposed as a general webhook sink.",
     properties: {
       webhook_url: { type: 'string', description: "The Zapier Catch Hook URL from the Zap setup screen." },
-      payload:     { type: 'object', description: "JSON object sent as the request body (max 100 KB serialised).", properties: {} },
+      payload:     { type: 'string', description: "JSON-serialised object sent as the request body (max 100 KB). Pass a valid JSON string — the server parses it before forwarding to Zapier." },
     },
     required: ['webhook_url'],
   },

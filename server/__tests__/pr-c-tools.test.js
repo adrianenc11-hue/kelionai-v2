@@ -170,7 +170,8 @@ describe('user-intern tools — PR C', () => {
     const r = await toolGetMyCredits({}, { user: { id: 7 } });
     expect(r.ok).toBe(true);
     expect(r.minutes).toBe(12.5);
-    expect(r.displayMinutes).toBe('12.5 min');
+    expect(r.display).toBe('12.5 min');
+    expect(r.format).toBe('minutes');
     expect(r.low).toBe(false);
     expect(r.empty).toBe(false);
   });
