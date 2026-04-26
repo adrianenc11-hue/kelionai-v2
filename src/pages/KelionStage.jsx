@@ -3,7 +3,7 @@ import { useGLTF, Environment, ContactShadows, Float } from '@react-three/drei'
 import * as THREE from 'three'
 import { Suspense, useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useLipSync, useAudioElementLipSync } from '../lib/lipSync'
+import { useLipSync } from '../lib/lipSync'
 import { handleShowOnMonitor, setMonitorGeoProvider, subscribeMonitor } from '../lib/monitorStore'
 import { STATUS_COLORS } from '../lib/kelionStatus'
 import { subscribeComposer, getComposer, openEmailComposer, closeComposer } from '../lib/composerStore'
@@ -882,52 +882,12 @@ export default function KelionStage() {
 
   const micMouthOpen = useLipSync(audioRef)
 
-  // ----- Text-chat TTS (server-side ElevenLabs, male native voice) -----
-  // Adrian: "vocea nu este elevenlab, nativa, barbateasca, voce de femeie acum".
-  // Previously this path used `window.speechSynthesis` which defaults to the
-  // OS voice (on Windows/Chrome that's typically a female English voice).
-  // We now POST the assistant's reply to /api/tts — the server synthesizes
-  // with ElevenLabs (Adam — male, multilingual) or Gemini "Charon" (male)
-  // and returns an audio/mpeg or audio/wav blob. We play it via an offscreen
-  // <audio> element and drive the mouth from the *actual* audio amplitude
-  // via `useAudioElementLipSync` (MediaElementSource ? analyzer), so the
-  // avatar opens its mouth on vowels and closes it on pauses/consonants —
-  // same envelope shape as the realtime-voice `useLipSync` path. If the
-  // AudioContext can't be created (autoplay policy, older browsers) we
-  // fall back to the legacy 4 Hz cosine so the avatar still lip-flaps.
-  const {
-    mouthOpen: ttsMouthOpen,
-    attach: attachTtsLipSync,
-    reset: resetTtsLipSync,
-  } = useAudioElementLipSync()
-  const [ttsCosineMouth, setTtsCosineMouth] = useState(0)
-  const lastSpokenRef = useRef('')
-  const ttsRafRef = useRef(null)
-  const ttsAudioRef = useRef(null)
-  const ttsAbortRef = useRef(null)
-  // Mirror the hook's envelope into a ref so the analyzer-vs-cosine guard
-  // can read the current value without waiting for a React re-render.
-  const ttsMouthOpenRef = useRef(0)
-  useEffect(() => { ttsMouthOpenRef.current = ttsMouthOpen }, [ttsMouthOpen])
-  // statusRef and muteModeRef: declared before the TTS useEffect to avoid TDZ.
-  // Their useState counterparts live after useGeminiLive; these refs are
-  // synced via useEffect once the values are available.
+  // statusRef and muteModeRef: declared before useGeminiLive to avoid TDZ.
   const statusRef = useRef('idle')
   const muteModeRef = useRef(false)
-  useEffect(() => {
-  }, [chatMessages, chatBusy, attachTtsLipSync, resetTtsLipSync])
 
-  // Max of voice-chat lipsync, real-audio text-chat envelope, and cosine
-  // fallback feeds the avatar. When the analyser is attached, ttsMouthOpen
-  // carries the real amplitude and ttsCosineMouth stays 0; when we fall
-  // back on autoplay-blocked browsers, ttsCosineMouth drives the jaw and
-  // ttsMouthOpen stays 0 — taking the max means we always render whichever
-  // source is active without double-counting.
-  const mouthOpen = Math.max(
-    micMouthOpen || 0,
-    ttsMouthOpen || 0,
-    ttsCosineMouth || 0,
-  )
+  // Single voice source — Gemini Live WebSocket audio drives the avatar mouth.
+  const mouthOpen = micMouthOpen || 0
 
   // Track whether the half-page MonitorOverlay is currently rendered,
   // so the bottom UI (chat input bar, voice "tap to talk" pill, chat
