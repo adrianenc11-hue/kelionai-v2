@@ -1174,16 +1174,42 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
     }
   }, [])
 
+  // sendText — typed text through the live WebSocket (Canal B only).
+  const sendText = useCallback(async (text) => {
+    if (!text || typeof text !== 'string') return
+    const trimmed = text.trim()
+    if (!trimmed) return
+    appendTurn('user', trimmed, true)
+    lastActivityAtRef.current = Date.now()
+    const ws = wsRef.current
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      await start()
+      const deadline = Date.now() + 5000
+      while (Date.now() < deadline) {
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) break
+        await new Promise(r => setTimeout(r, 200))
+      }
+    }
+    const activeWs = wsRef.current
+    if (activeWs && activeWs.readyState === WebSocket.OPEN) {
+      activeWs.send(JSON.stringify({
+        clientContent: {
+          turns: [{ role: 'user', parts: [{ text: trimmed }] }],
+          turnComplete: true,
+        },
+      }))
+      setStatus('thinking')
+    }
+  }, [appendTurn, start])
+
   return {
     status, error, start, stop, turns, userLevel,
     // Stage 2
     cameraStream, screenStream, visionError,
     startCamera, stopCamera, startScreen, stopScreen,
-    // Trial countdown (null for signed-in users, object for guests).
     trial,
-    // Audit M6 — handoff double-start guard (see lib/handoffGuard.js).
     isBusy,
-    // Mute/unmute Kelion's voice output without restarting the session.
     setMuted,
+    sendText,
   }
 }
