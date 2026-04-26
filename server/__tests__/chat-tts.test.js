@@ -33,22 +33,10 @@ async function createUser() {
 }
 
 describe('POST /api/chat', () => {
-  it('returns 410 (suspended)', async () => { const s=(await request(app).post('/api/chat').send({messages:[]})).status; expect(s).toBe(410); });
+  it('returns 410 (suspended)', async () => { expect((await request(app).post('/api/chat').send({messages:[]})).status).toBe(410); });
   it('returns 410 for auth users', async () => { const {token}=await createUser(); expect((await request(app).post('/api/chat').set('Authorization',`Bearer ${token}`).send({messages:[{role:'user',content:'hello'}]})).status).toBe(410); });
 });
 
-
 describe('POST /api/tts', () => {
-  // /api/tts is now a public endpoint — guests access the Charon voice via
-  // the shared 15-min/day IP trial window (see services/trialQuota.js).
-  // Adrian: "in mod free nu se aplica vocile". The old hard-401 is gone;
-  // we assert only that the request is no longer rejected for auth reasons.
-  // Acceptable: 200 (synthesis ok), 400 (body), 429 (trial exhausted),
-  // 503 (no TTS provider), 500 (upstream provider key bad).
-  it('guests pass soft auth (no 401)',                async () => { const s=(await request(app).post('/api/tts').send({text:'hello'})).status; expect(s).not.toBe(401); expect([200,400,429,500,503]).toContain(s); });
-  it('400 empty text',                                async () => { const {token}=await createUser(); expect((await request(app).post('/api/tts').set('Authorization',`Bearer ${token}`).send({text:''})).status).toBe(400); });
-  it('400 missing text',                              async () => { const {token}=await createUser(); expect((await request(app).post('/api/tts').set('Authorization',`Bearer ${token}`).send({})).status).toBe(400); });
-  it('400 text over 2000 chars',                      async () => { const {token}=await createUser(); expect((await request(app).post('/api/tts').set('Authorization',`Bearer ${token}`).send({text:'a'.repeat(2001)})).status).toBe(400); });
-  it('200/503 with valid text',                       async () => { const {token}=await createUser(); const r=await request(app).post('/api/tts').set('Authorization',`Bearer ${token}`).send({text:'Hello world'}); expect([200,503]).toContain(r.status); });
-  it('accepts text exactly 2000 chars',               async () => { const {token}=await createUser(); const r=await request(app).post('/api/tts').set('Authorization',`Bearer ${token}`).send({text:'a'.repeat(2000)}); expect([200,503]).toContain(r.status); });
+  it('returns 410 (suspended)', async () => { expect((await request(app).post('/api/tts').send({text:'hello'})).status).toBe(410); });
 });
