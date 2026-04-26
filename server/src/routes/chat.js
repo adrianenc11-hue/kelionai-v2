@@ -70,9 +70,20 @@ Tool self-discovery rules:
 - For location questions: use Google Maps or your custom location tools.
 - For URLs/web pages: use URL Context to read and analyze them.
 - For math/calculations: use Code Execution — it runs real Python code.
-- For real-time info (news, prices, weather, facts): use Google Search.
+- For real-time info (news, prices, weather, facts): use Google Search or get_weather tool.
 - NEVER say "I don't have a tool for that" — you ALWAYS have Google Search and Code Execution as universal fallbacks.
 - Learn from every interaction: if you solved something with Google Search or Code Execution, remember the approach for next time.
+
+Camera & Vision rules:
+- When you receive an image/frame attached to a message, the user's camera IS ACTIVE and you CAN see.
+- NEVER say the camera is off or that you cannot see when you receive an image.
+- If the user asks what you see, describe the image honestly.
+- If the user did NOT ask about the image, use it as context but don't describe it unprompted.
+
+Weather & Location rules:
+- For weather questions, ALWAYS call get_weather tool or Google Search. Never guess.
+- For location questions, ALWAYS call get_my_location tool or use the GPS coordinates from the context. Never guess.
+- Never hardcode or invent location or weather data.
 
 Honesty rules:
 - Never claim you did something you did not do.
@@ -183,7 +194,7 @@ async function buildSystemInstruction(req, body) {
     if (Number.isFinite(Number(coords.accuracy)))
       ctx += ` (±${Math.round(Number(coords.accuracy))} m)`;
   } else {
-    ctx += `\n- User location: UNKNOWN. Call get_my_location if asked.`;
+    ctx += `\n- User GPS: not available yet. Use get_my_location tool to get it when needed.`;
   }
 
   // Memory
@@ -277,8 +288,8 @@ function toGeminiContents(messages, frame, frameKind) {
     }
     if (lastUserIdx >= 0) {
       const channel = frameKind === 'attachment'
-        ? '[ATTACHED IMAGE — analyze this]'
-        : '[CAMERA FRAME — ambient context, do NOT describe unless asked]';
+        ? '[ATTACHED IMAGE — the user wants you to analyze this image]'
+        : '[LIVE CAMERA FRAME — the camera IS active and you CAN see. Use as visual context. Describe only if the user asks what you see]';
 
       // Extract base64 data from data URL.
       const match = String(frame).match(/^data:([^;]+);base64,(.+)$/);
@@ -375,11 +386,12 @@ router.post('/', async (req, res) => {
   const userText = lastUserText(contents);
   const forced = pickForcedTool(userText);
 
-  // When a tool is forced, restrict to custom tools only.
-  // Otherwise AUTO mode lets the model pick from ALL tools.
+  // When a tool is forced, restrict to that specific tool.
+  // Otherwise ANY mode forces the model to ALWAYS call at least one tool.
+  // This ensures ALL answers come from real data, never from guessing.
   const toolConfig = forced
     ? { functionCallingConfig: { mode: 'ANY', allowedFunctionNames: [forced] } }
-    : { functionCallingConfig: { mode: 'AUTO' } };
+    : { functionCallingConfig: { mode: 'ANY' } };
 
   setupSSE(res);
 
@@ -531,7 +543,8 @@ router.post('/', async (req, res) => {
           contents: secondContents,
           config: {
             systemInstruction,
-            // No tools on narration pass — just text.
+            tools: allTools,
+            toolConfig,
           },
         });
 
@@ -559,7 +572,7 @@ router.post('/', async (req, res) => {
         const fallbackStream = await ai.models.generateContentStream({
           model: 'gemini-3-flash-preview',
           contents,
-          config: { systemInstruction, tools: allTools },
+          config: { systemInstruction, tools: allTools, toolConfig },
         });
         for await (const chunk of fallbackStream) {
           if (chunk.text) sseWrite(res, { content: chunk.text });
