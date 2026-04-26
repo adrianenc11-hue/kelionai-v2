@@ -189,7 +189,7 @@ Also available: Google Search, Code Execution, Google Maps, URL Context (built-i
 IMPORTANT: If you search the web or look for something and CANNOT find any results, you MUST clear the monitor by calling show_on_monitor with kind='clear'. 
 When you display something on the monitor, assume you can 'see' it because you put it there - do not complain that you cannot see the screen.
 
-Silent tools (never mention these to user): observe_user_emotion, learn_from_observation, get_action_history, plan_task.
+Silent tools (never mention these to user): observe_user_emotion, learn_from_observation, get_action_history.
 
 Vision rules:
 - Camera frames are ambient context. DO NOT describe them unless the user explicitly asks.
@@ -319,14 +319,9 @@ const KELION_TOOLS = [
     },
     required: ['enabled'],
   },
-  {
-    name: 'what_do_you_see',
-    description: "Describe what is currently visible in the user's camera. Call this ONLY when the user explicitly asks you to look (e.g. 'what do you see?', 'ce vezi?', 'can you see me?', 'describe what's in front of you', 'look at this'). The camera is kept silently on for this purpose — do NOT announce it, do NOT describe the camera unsolicited. When this tool is called the backend analyzes the current frame with Gemini Vision and returns a short description; integrate that description naturally into your spoken reply, do not read it verbatim.",
-    properties: {
-      focus: { type: 'string', description: "Optional phrase the user gave you (e.g. 'is the laptop open?', 'what color is my shirt?'). Pass it through so the vision model can focus its answer. Leave blank for a general description." },
-    },
-    required: [],
-  },
+  // what_do_you_see REMOVED — Gemini Live receives camera frames
+  // natively via realtimeInput.video and can describe them directly.
+  // No separate vision tool needed.
   {
     name: 'show_on_monitor',
     description: "Display something on the big presentation monitor in the scene behind you. Use whenever the user asks (in any language) to see / open / show / display a map, the weather, a video, an image, a Wikipedia / reference page, any web page, or to PLAY a live audio stream. Pick the right `kind` — the client resolves it to the best embed URL. Call again with a new query to swap the content on screen. For radio: first call play_radio to get the stream URL, then call show_on_monitor with kind='audio' query=<that URL> title=<station name> so the audio actually starts playing in the user's browser.",
@@ -427,16 +422,8 @@ const KELION_TOOLS = [
     },
     required: ['route'],
   },
-  {
-    name: 'plan_task',
-    description: "Produce a short, ordered action plan BEFORE you start executing a multi-step request. Call this at the TOP of any user ask that needs 3 or more real actions (research + then act, compare + then decide, collect data + open on monitor + email, etc.) — and for ANY request you are not already sure how to attack. A dedicated planner model (Gemini Flash) returns a numbered plan that names the tools you should call. Read the plan to the user in 1-2 sentences (natural language, not JSON), then execute steps one by one, narrating each action. If the planner says the goal is under-specified, ASK the user the clarifying question before touching any tool. Skip plan_task ONLY for single-shot requests where the right tool is obvious (e.g. 'what's the weather in Cluj'). When unsure, plan first.",
-    properties: {
-      goal:         { type: 'string',  description: "One-sentence restatement of the user's end goal, in the user's language." },
-      context_hint: { type: 'string',  description: "Optional short context the planner should know about (constraints, what's already been said, what failed in a previous attempt). Keep under 300 chars." },
-      max_steps:    { type: 'integer', description: 'Upper bound on plan length. 1–10; default 6.' },
-    },
-    required: ['goal'],
-  },
+  // plan_task REMOVED — Gemini Live handles multi-step planning
+  // internally without a separate planner LLM.
   {
     name: 'get_action_history',
     description: "Look up your OWN recent tool calls for the signed-in user before deciding whether to re-run one. Call this whenever the user asks 'did you already …?' / 'ai făcut deja …?', whenever you're about to repeat an action that might have just happened (send the same email twice, re-open the same page on the monitor, re-run a search you already did this session), or at the start of a follow-up ask like 'fă din nou ce ai făcut înainte'. Returns an ordered list of previous tool invocations with short result summaries. Guests get { ok:false, signed_in:false } — in that case tell the user you can only remember actions once they sign in. Never invent a history: if this tool returns 0 rows, say honestly 'I haven't done anything like that yet'.",
@@ -737,40 +724,8 @@ const KELION_TOOLS = [
     required: ['word'],
   },
 
-  // ── Groq-powered coding helpers ─────────────────────────────────
-  // Opt-in: the server only reaches Groq when `GROQ_API_KEY` is set. When
-  // the key is missing the executor returns a graceful "not configured"
-  // message instead of failing — so we can safely advertise these tools
-  // in every transport without breaking the baseline voice/text flow.
-  {
-    name: 'solve_problem',
-    description: "Solve a coding or algorithmic problem using Groq's Qwen2.5-Coder (free tier). Use when the user asks to 'write code that...', 'implement an algorithm for...', 'solve this problem: ...', or any request that needs real code generation rather than a verbal answer. Returns a plan + implementation + complexity note.",
-    properties: {
-      description: { type: 'string', description: "Plain-language problem statement." },
-      language:    { type: 'string', description: "Target language (e.g. 'python', 'javascript', 'rust'). Optional — defaults to Python." },
-    },
-    required: ['description'],
-  },
-  {
-    name: 'code_review',
-    description: "Review code and flag bugs, performance issues, security risks, and style problems. Use when the user pastes code and asks 'review this', 'is this correct', 'what's wrong with this code', 'can this be improved'. Returns a structured review.",
-    properties: {
-      code:     { type: 'string', description: "The code to review." },
-      language: { type: 'string', description: "Programming language (optional — inferred if omitted)." },
-      focus:    { type: 'string', description: "Optional focus area: 'security', 'performance', 'style', or a custom concern." },
-    },
-    required: ['code'],
-  },
-  {
-    name: 'explain_code',
-    description: "Explain a code snippet step-by-step. Use when the user asks 'what does this code do', 'explain this', 'how does this work'. Returns a plain-language walkthrough tuned to the requested audience.",
-    properties: {
-      code:     { type: 'string', description: "The code to explain." },
-      language: { type: 'string', description: "Programming language (optional)." },
-      audience: { type: 'string', description: "Target audience, e.g. 'a beginner', 'a senior engineer'. Defaults to 'an intermediate developer'." },
-    },
-    required: ['code'],
-  },
+  // Groq-powered coding tools REMOVED — Gemini Live handles coding
+  // questions directly without a secondary LLM.
   // ── PR B — documents + OCR ────────────────────────────────────────
   {
     name: 'read_pdf',
@@ -1015,7 +970,10 @@ function buildKelionToolsGemini() {
         },
       })),
     },
-    { googleSearch: {} }
+    // { googleSearch: {} } REMOVED — caused audio repetitions.
+    // Gemini's built-in grounding internally re-generates responses after
+    // searching, producing overlapping audio. Use the web_search function
+    // tool instead for controlled search without audio side-effects.
   ];
 }
 
@@ -1438,125 +1396,8 @@ router.get('/gemini-token', geminiTokenHandler);
 router.post('/gemini-token', geminiTokenHandler);
 
 
-// ──────────────────────────────────────────────────────────────────
-// On-demand vision analysis — Gemini Vision as a side-car.
-//
-// When the user says "what do you see?" during a voice session,
-// the model invokes the `what_do_you_see` tool (declared in KELION_TOOLS
-// above). The client handler in src/lib/kelionTools.js grabs the most
-// recent camera frame from the in-memory ring buffer and POSTs it here
-// as a base64 data URL. We forward the image to Gemini 2.5 Flash (cheap,
-// fast, good vision) with a short prompt and return the plain-text
-// description so the client can fold it back as a function_call_output —
-// the LLM then vocalises a natural reply.
-//
-router.post('/vision', async (req, res) => {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    return res.status(503).json({ error: 'Gemini vision not configured' });
-  }
-
-  // Reuse the same gate as /gemini-token so guests can't spam the
-  // vision endpoint outside a voice session. Signed-in non-admins need
-  // a credits balance; admin is unlimited; guests fall under the shared
-  // 15-min/day IP trial window.
-  const adminUser = await peekSignedInUser(req);
-  const isAdmin   = await isAdminUser(adminUser);
-  if (!adminUser && !isAdmin) {
-    const ip = ipGeo.clientIp(req) || req.ip || '';
-    const status = trialStatus(ip);
-    if (!status.allowed) {
-      return res.status(429).json({ error: 'Trial used up.' });
-    }
-  } else if (adminUser && !isAdmin) {
-    if (adminUser.id == null) {
-      res.clearCookie('kelion.token', { path: '/' });
-      return res.status(401).json({ error: 'Session expired.', action: 'reauth' });
-    }
-    try {
-      const balance = await getCreditsBalance(adminUser.id);
-      if (!Number.isFinite(balance) || balance <= 0) {
-        return res.status(402).json({ error: 'No credits left.', action: 'buy_credits' });
-      }
-    } catch (err) { /* fall through */ }
-  }
-
-  const frame = (req.body?.frame || '').toString();
-  const focus = (req.body?.focus || '').toString().slice(0, 200);
-  if (!frame || !frame.startsWith('data:image/')) {
-    return res.status(400).json({ error: 'Missing or malformed frame (expected data:image/* base64 URL).' });
-  }
-  // Parse "data:image/jpeg;base64,<b64>" → mimeType + b64 data.
-  const m = frame.match(/^data:([^;]+);base64,(.+)$/);
-  if (!m) {
-    return res.status(400).json({ error: 'Frame must be a base64 data URL.' });
-  }
-  const mimeType = m[1];
-  const b64 = m[2];
-  // Cap payload at ~4 MB decoded to keep the Gemini request small. The
-  // client already rescales to 480 px wide @ q=0.55 so a typical frame
-  // is well under 100 KB.
-  if (b64.length > 6 * 1024 * 1024) {
-    return res.status(413).json({ error: 'Frame too large.' });
-  }
-
-  const prompt = focus
-    ? `You are the "eyes" of a voice assistant called Kelion. The user asked: "${focus}". Answer in 1-3 short sentences, plain text, no markdown. If the requested detail is not visible, say so briefly.`
-    : 'You are the "eyes" of a voice assistant called Kelion. Describe briefly and concretely what is visible in this camera frame (who, what, where, mood). 1-3 short sentences, plain text, no markdown. If the image is too dark or blurry to tell, say so briefly.';
-
-  const model = process.env.KELION_VISION_MODEL || 'gemini-2.5-flash';
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
-
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15_000);
-    const r = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          role: 'user',
-          parts: [
-            { text: prompt },
-            { inline_data: { mime_type: mimeType, data: b64 } },
-          ],
-        }],
-        generationConfig: {
-          temperature: 0.4,
-          maxOutputTokens: 400,
-          // gemini-2.5-flash has "thinking mode" ON by default, and thinking
-          // tokens count against maxOutputTokens. For short descriptive
-          // vision calls that feed a live voice session, the model was
-          // burning the whole budget on internal thought and returning the
-          // description cut mid-sentence (e.g. "This frame shows a blue
-          // background with a"). Disable thinking so every token spent is
-          // output the user will hear.
-          thinkingConfig: { thinkingBudget: 0 },
-        },
-      }),
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
-    if (!r.ok) {
-      const txt = await r.text().catch(() => '');
-      console.warn('[realtime] vision upstream error', r.status, txt.slice(0, 200));
-      return res.status(502).json({
-        error: 'Vision upstream error',
-        description: "I can't see clearly right now. Can you describe what you'd like me to look at?",
-      });
-    }
-    const data = await r.json().catch(() => null);
-    const description = data?.candidates?.[0]?.content?.parts?.map(p => p.text).filter(Boolean).join(' ').trim()
-      || "I'm looking but I can't make out details right now.";
-    res.json({ ok: true, description });
-  } catch (err) {
-    console.warn('[realtime] vision exception', err && err.message);
-    res.status(502).json({
-      error: 'Vision call failed',
-      description: "I tried to look but the connection dropped. Let me know what you want me to focus on.",
-    });
-  }
-});
+// /vision route REMOVED — Gemini Live receives camera frames natively
+// via realtimeInput.video and can describe what it sees directly.
 
 // Stage 6 — M26: lightweight cookie-backed voice style setter.
 // Persisted 90 days as httpOnly=false (so the client can read/clear too).

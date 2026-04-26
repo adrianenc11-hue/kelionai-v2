@@ -1695,62 +1695,10 @@ async function toolOcrPassport({ url, base64 }) {
   };
 }
 
-async function toolSolveProblem(args) {
-  const description = String(args?.description || args?.problem || '').trim();
-  if (!description) return { ok: false, error: 'missing problem description' };
-  const language = String(args?.language || '').trim();
-  const prompt = language
-    ? `Problem:\n${description}\n\nImplement the solution in ${language}.`
-    : `Problem:\n${description}`;
-  const r = await groqChat([
-    { role: 'system', content: SOLVE_PROBLEM_SYSTEM },
-    { role: 'user', content: prompt },
-  ], { temperature: 0.2, maxTokens: 1800 });
-  if (!r.ok) return r;
-  return { ok: true, result: r.text, model: r.model };
-}
+// Groq-powered coding tools (toolSolveProblem, toolCodeReview,
+// toolExplainCode) and plan_task (toolPlanTask) REMOVED — Gemini Live
+// handles coding questions and multi-step planning directly.
 
-async function toolCodeReview(args) {
-  const code = String(args?.code || '').trim();
-  if (!code) return { ok: false, error: 'missing code' };
-  const focus = String(args?.focus || '').trim();
-  const language = String(args?.language || '').trim();
-  const header = [
-    language ? `Language: ${language}` : null,
-    focus ? `Focus: ${focus}` : null,
-  ].filter(Boolean).join('\n');
-  const prompt = header
-    ? `${header}\n\nCode:\n\`\`\`\n${code}\n\`\`\``
-    : `Code:\n\`\`\`\n${code}\n\`\`\``;
-  const r = await groqChat([
-    { role: 'system', content: CODE_REVIEW_SYSTEM },
-    { role: 'user', content: prompt },
-  ], { temperature: 0.1, maxTokens: 1500 });
-  if (!r.ok) return r;
-  return { ok: true, result: r.text, model: r.model };
-}
-
-async function toolExplainCode(args) {
-  const code = String(args?.code || '').trim();
-  if (!code) return { ok: false, error: 'missing code' };
-  const audience = String(args?.audience || 'an intermediate developer').trim();
-  const language = String(args?.language || '').trim();
-  // Keep the metadata lines separate from the code fence with a blank
-  // line so the model sees the same visual structure as toolCodeReview.
-  // We can't put '' inside filter(Boolean) because filter(Boolean) drops
-  // empty strings, so assemble the header and the code block separately.
-  const header = [
-    language ? `Language: ${language}` : null,
-    `Audience: ${audience}`,
-  ].filter(Boolean).join('\n');
-  const prompt = `${header}\n\nCode:\n\`\`\`\n${code}\n\`\`\``;
-  const r = await groqChat([
-    { role: 'system', content: EXPLAIN_CODE_SYSTEM },
-    { role: 'user', content: prompt },
-  ], { temperature: 0.2, maxTokens: 1500 });
-  if (!r.ok) return r;
-  return { ok: true, result: r.text, model: r.model };
-}
 
 // ──────────────────────────────────────────────────────────────────
 // PR 7/N — plan_task (Planner Brain).
@@ -2636,10 +2584,7 @@ async function executeRealTool(name, args, ctx) {
     case 'dictionary':        return toolDictionary(a);
     // ── translation ──
     case 'translate':         return toolTranslate(a);
-    // ── groq-powered coding (opt-in via GROQ_API_KEY) ──
-    case 'solve_problem':     return toolSolveProblem(a);
-    case 'code_review':       return toolCodeReview(a);
-    case 'explain_code':      return toolExplainCode(a);
+    // ── groq-powered coding + plan_task REMOVED — Gemini Live handles these ──
     // ── PR B — documents + OCR ──
     case 'read_pdf':          return toolReadPdf(a);
     case 'read_docx':         return toolReadDocx(a);
@@ -2662,8 +2607,6 @@ async function executeRealTool(name, args, ctx) {
     case 'get_my_profile':    return toolGetMyProfile(a, ctx);
     // ── F11 — image generation (gpt-image-1) ──
     case 'generate_image':    return toolGenerateImage(a);
-    // ── PR 7/N — Planner Brain (Gemini Flash) ──
-    case 'plan_task':         return toolPlanTask(a);
     // ── PR 8/N — Memory of Actions (read-only self-reflection) ──
     case 'get_action_history': return toolGetActionHistory(a, ctx);
     // ── Silent vision auto-learn — write durable observations ──
@@ -2766,31 +2709,15 @@ const REAL_TOOL_NAMES = [
   'fetch_url', 'rss_read',
   'wikipedia_search', 'dictionary',
   'translate',
-  // Groq-powered (opt-in) — safe to advertise; executor returns
-  // `{ ok:false, unavailable:true }` when GROQ_API_KEY is not set.
-  'solve_problem', 'code_review', 'explain_code',
-  // PR B — documents + OCR (pdf-parse / mammoth / tesseract.js).
-  // Inputs accept either a public HTTPS URL or a base64 blob.
+  // PR B — documents + OCR
   'read_pdf', 'read_docx', 'ocr_image', 'ocr_passport',
-  // PR C — sandboxed runners + user-intern tools.
-  // run_code needs E2B_API_KEY; get_my_* need a signed-in user passed
-  // through ctx. Both degrade gracefully when the requirement is missing.
+  // PR C — sandboxed runners + user-intern tools
   'run_regex', 'run_code', 'get_my_credits', 'get_my_usage', 'get_my_profile',
-  // PR D — communications + automations + package info.
-  // send_email / send_sms / zapier_trigger are opt-in via env keys;
-  // the ics / github / npm / pypi tools work against public APIs
-  // (GITHUB_TOKEN, if set, just raises the unauth rate limit).
+  // PR D — communications + automations + package info
   'send_email', 'send_sms', 'create_calendar_ics', 'zapier_trigger',
   'github_repo_info', 'npm_package_info', 'pypi_package_info',
-  // F11 — AI image generation (OpenAI gpt-image-1). Returns a short-lived
-  // URL that the client hands off to the avatar's stage monitor so the
-  // freshly-generated PNG shows up inline instead of via a link.
+  // F11 — image generation
   'generate_image',
-  // PR 7/N — Planner Brain. Gemini 2.5 Flash turns a user goal into a
-  // short JSON plan. Kelion can call this as a pre-flight on multi-step
-  // asks. Requires GEMINI_API_KEY; returns { ok:false, unavailable:true }
-  // when the key is missing so the voice model can degrade gracefully.
-  'plan_task',
   // PR 8/N — Memory of Actions. Read-only self-reflection: returns the
   // caller's own recent tool invocations (from action_history) so
   // Kelion can check "did I already email that?" before re-running.
@@ -2836,10 +2763,6 @@ module.exports = {
   toolDictionary,
   // translation
   toolTranslate,
-  // groq-powered
-  toolSolveProblem,
-  toolCodeReview,
-  toolExplainCode,
   // PR B — documents + OCR
   toolReadPdf,
   toolReadDocx,
@@ -2863,8 +2786,6 @@ module.exports = {
   toolPypiPackageInfo,
   // F11 — image generation
   toolGenerateImage,
-  // PR 7/N — Planner Brain
-  toolPlanTask,
   // PR 8/N — Memory of Actions
   toolGetActionHistory,
   // Silent auto-learn — observations from camera persisted to memory_items

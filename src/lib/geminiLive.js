@@ -285,6 +285,12 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
   // the shared ref) before IT had received its own setupComplete ack,
   // triggering 1007. Binding sends to the local ws keeps each session
   // talking to itself.
+  // Per-turn flag: has this assistant turn already received an
+  // outputTranscription? Persists across WS frames (unlike a local var)
+  // so that modelTurn.parts[].text arriving in a LATER frame is not
+  // appended a second time. Reset on turnComplete.
+  const turnHasTranscriptRef = useRef(false)
+
   const handleMessage = useCallback(async (raw, ws) => {
     let msg
     try { msg = JSON.parse(typeof raw === 'string' ? raw : await raw.text()) }
@@ -323,10 +329,12 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
       // both causes the assistant's reply to appear twice in the chat.
       // We prefer outputTranscription (cleaner, post-processed by Gemini)
       // and skip part.text when it was already handled.
-      let gotTranscript = false
+      // FIX: use a per-turn ref (not a per-frame local) so that
+      // outputTranscription arriving in frame N still suppresses
+      // modelTurn.parts[].text arriving in frame N+1.
       if (sc.outputTranscription?.text) {
         appendTurn('assistant', sc.outputTranscription.text, false)
-        gotTranscript = true
+        turnHasTranscriptRef.current = true
         lastActivityAtRef.current = Date.now()
       }
 
@@ -338,7 +346,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
           enqueueAudio(bytes)
         }
         // Only append text if we didn't already get it from outputTranscription
-        if (part.text && !gotTranscript) {
+        if (part.text && !turnHasTranscriptRef.current) {
           appendTurn('assistant', part.text, false)
         }
       }
@@ -347,6 +355,9 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
         // We no longer reset turnActiveRef.current here. Resetting on turnComplete
         // causes tool calls (which span multiple server turns) to split the
         // assistant's reply into multiple chat bubbles ("mai multe intrari in chat").
+        // Reset the per-turn transcript dedup flag so the NEXT turn
+        // can accept either outputTranscription or inline text again.
+        turnHasTranscriptRef.current = false
         if (!playbackPlayingRef.current) setStatus('listening')
       } else if (sc.generationComplete) {
         setStatus('speaking')
