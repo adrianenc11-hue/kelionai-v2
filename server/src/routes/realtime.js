@@ -457,9 +457,9 @@ const KELION_TOOLS = [
   },
   {
     name: 'camera_off',
-    description: "Turn the device camera OFF. Call this whenever the user says 'oprește camera', 'dezactivează camera', 'închide camera', 'turn off the camera', 'stop the camera'. No arguments.",
+    description: "Turn the device camera OFF. Call this whenever the user says 'oprește camera', 'dezactivează camera', 'închide camera', 'turn off the camera', 'stop the camera'.",
     properties: {
-      _dummy: { type: 'string', description: 'Unused. No arguments needed.' },
+      reason: { type: 'string', description: "Optional short reason for turning off (e.g. 'user requested', 'privacy'). Logged for diagnostics." },
     },
     required: [],
   },
@@ -918,15 +918,16 @@ const KELION_TOOLS = [
     name: 'get_my_credits',
     description: "Return the currently signed-in user's voice-minute balance. Use when the user asks 'how many minutes do I have left', 'ce credit am', etc. Does not reveal personal data beyond the balance.",
     properties: {
-      _dummy: { type: 'string', description: 'Unused. No arguments needed.' },
+      format: { type: 'string', description: "Display format: 'minutes' (default) or 'seconds'. Controls how the balance is shown.", enum: ['minutes', 'seconds'] },
     },
     required: [],
   },
   {
     name: 'get_my_usage',
-    description: "Return a short summary of the signed-in user's recent credit activity: total minutes consumed and topped up over the last 20 ledger rows, plus the 10 most recent entries (kind, delta, amount, note, timestamp). Use when the user asks 'what did I spend', 'when did I top up', etc.",
+    description: "Return a short summary of the signed-in user's recent credit activity: total minutes consumed and topped up, plus the most recent ledger entries (kind, delta, amount, note, timestamp). Use when the user asks 'what did I spend', 'when did I top up', etc.",
     properties: {
-      _dummy: { type: 'string', description: 'Unused. No arguments needed.' },
+      limit: { type: 'integer', description: 'Max recent entries to return (1-40, default 10).' },
+      kind:  { type: 'string', description: "Optional filter by transaction kind: 'topup', 'consume', or 'all' (default).", enum: ['topup', 'consume', 'all'] },
     },
     required: [],
   },
@@ -934,7 +935,7 @@ const KELION_TOOLS = [
     name: 'get_my_profile',
     description: "Return the signed-in user's id, display name, email, credits balance (minutes) and account creation date. Use only when the user explicitly asks 'what's on my profile' or 'who am I signed in as'.",
     properties: {
-      _dummy: { type: 'string', description: 'Unused. No arguments needed.' },
+      include_email: { type: 'boolean', description: 'Whether to include the email address in the response. Default true.' },
     },
     required: [],
   },
