@@ -1,28 +1,89 @@
 'use strict';
 
+/**
+ * /api/chat — Professional text-chat route using the native Gemini SDK.
+ *
+ * Uses @google/genai (official Google SDK) directly — NOT the OpenAI
+ * compatibility shim. This gives us:
+ *   • Native function calling with full schema support (no sanitisation)
+ *   • Native multimodal vision (inlineData, not image_url wrapper)
+ *   • Streaming via generateContentStream
+ *   • Parallel + compositional function calling
+ *   • Function call ID tracking (Gemini 3+)
+ *
+ * Model: gemini-3.1-pro-preview (configurable via GEMINI_CHAT_MODEL env).
+ * Falls back to gemini-3-flash-preview when the Pro model is unavailable.
+ *
+ * Zero hardcoded tool lists — tools come from buildKelionToolsGemini()
+ * which is the single source of truth shared with the voice path.
+ */
+
 const { Router } = require('express');
-const { getAI, getDefaultChatModel } = require('../utils/openai');
-const { getCreditsBalance, findById, listMemoryItems, setPreferredLanguage, getPreferredLanguage } = require('../db');
+const { GoogleGenAI } = require('@google/genai');
+const {
+  getCreditsBalance,
+  findById,
+  listMemoryItems,
+  setPreferredLanguage,
+  getPreferredLanguage,
+} = require('../db');
 const { isAdminEmail } = require('../middleware/subscription');
 const ipGeo = require('../services/ipGeo');
 const { trialStatus, stampTrialIfFresh } = require('../services/trialQuota');
 const { executeRealTool, pickForcedTool } = require('../services/realTools');
-const { buildKelionToolsChatCompletions, formatMemoryBlocks } = require('./realtime');
+const { buildKelionToolsGemini, formatMemoryBlocks } = require('./realtime');
 
 const router = Router();
 
+// ── Gemini client (native SDK) ─────────────────────────────────────
+let _ai = null;
+function getGemini() {
+  if (_ai) return _ai;
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) return null;
+  _ai = new GoogleGenAI({ apiKey: key });
+  return _ai;
+}
+
+// Model selection: env override → flagship pro → flash fallback.
+function getChatModel() {
+  return (
+    process.env.GEMINI_CHAT_MODEL ||
+    process.env.AI_MODEL ||
+    'gemini-3.1-pro-preview'
+  );
+}
+
+// ── System prompt ──────────────────────────────────────────────────
+// No hardcoded tool list. The model sees tools via the native
+// functionDeclarations parameter + Google built-in tools.
 const BASE_PROMPT = `You are Kelion, an AI assistant created by AE Studio, after an idea by Adrian Enciulescu. For contact: contact@kelionai.app.
 
 Detect the user's language automatically and reply in that language. Never mix languages in one response.
 
-Tools you MUST use when relevant (never guess when a tool fits):
-- show_on_monitor(kind, query, title?) — display maps, weather, video, images, web pages, or play audio on the monitor.
-- compose_email_draft(to, subject, body, cc?, bcc?, reply_to?) — open the email composer.
-- play_radio(query?, country?, language?, tag?) — find and play a live radio station, then call show_on_monitor with kind='audio'.
-- calculate(expression) — deterministic math.
-- get_weather(city or lat/lon, days) — real weather data.
-- web_search(query, limit) — live web search.
-- translate(text, to, from) — translation.
+You have access to a rich set of tools — use them whenever relevant instead of guessing.
+
+Tool self-discovery rules:
+- You have custom tools (function declarations) AND Google built-in tools (Google Search, Code Execution, Google Maps, URL Context).
+- ALWAYS check your custom tools first for any request.
+- If NO custom tool fits the request, AUTOMATICALLY use Google Search to find the answer or Code Execution to calculate/process data.
+- For location questions: use Google Maps or your custom location tools.
+- For URLs/web pages: use URL Context to read and analyze them.
+- For math/calculations: use Code Execution — it runs real Python code.
+- For real-time info (news, prices, weather, facts): use Google Search or get_weather tool.
+- NEVER say "I don't have a tool for that" — you ALWAYS have Google Search and Code Execution as universal fallbacks.
+- Learn from every interaction: if you solved something with Google Search or Code Execution, remember the approach for next time.
+
+Camera & Vision rules:
+- When you receive an image/frame attached to a message, the user's camera IS ACTIVE and you CAN see.
+- NEVER say the camera is off or that you cannot see when you receive an image.
+- If the user asks what you see, describe the image honestly.
+- If the user did NOT ask about the image, use it as context but don't describe it unprompted.
+
+Weather & Location rules:
+- For weather questions, ALWAYS call get_weather tool or Google Search. Never guess.
+- For location questions, ALWAYS call get_my_location tool or use the GPS coordinates from the context. Never guess.
+- Never hardcode or invent location or weather data.
 
 Honesty rules:
 - Never claim you did something you did not do.
@@ -32,514 +93,538 @@ Honesty rules:
 
 You have access to real-time information provided in the system context below.`;
 
-// Single source of truth for the tool catalog: realtime.js owns KELION_TOOLS
-// and the adapter below converts it to OpenAI Chat Completions shape. Kept in
-// realtime.js because the voice transports also consume it — keeping it in
-// one place (Devin Review ask on PR #133) avoids drift between text/voice.
-const CHAT_TOOLS = buildKelionToolsChatCompletions();
-
 const MAX_MESSAGE_LENGTH = 4000;
 const MAX_MESSAGES_COUNT = 40;
 
-// Adrian 2026-04-25: "default engleza e obligat sa detecteze limba user si o
-// va folosi permanent cit e logat". Once we know the user's language (from
-// their browser locale on the client, or their stored preference for signed-in
-// users), every reply must stay in that language for the rest of the session.
-// No silent revert to English on ambiguous turns. The mapping below covers the
-// languages we have explicit native-language voice prompts for; anything else
-// passes through as the BCP-47 short tag and the model is instructed to reply
-// in that language anyway.
-const LANG_NAME_BY_TAG = {
-  ro: 'Romanian',
-  en: 'English',
-  fr: 'French',
-  es: 'Spanish',
-  it: 'Italian',
-  de: 'German',
-  pt: 'Portuguese',
-  ru: 'Russian',
-  nl: 'Dutch',
-  pl: 'Polish',
-  tr: 'Turkish',
-  uk: 'Ukrainian',
-  hu: 'Hungarian',
-  cs: 'Czech',
-  el: 'Greek',
-  sv: 'Swedish',
-  no: 'Norwegian',
-  fi: 'Finnish',
-  da: 'Danish',
+// ── Language helpers ───────────────────────────────────────────────
+// All world languages (ISO 639-1). The model detects any language
+// automatically — this map provides display names for the language lock.
+const LANG_NAME = {
+  // Major global languages
+  en: 'English', zh: 'Chinese', hi: 'Hindi', es: 'Spanish',
+  fr: 'French', ar: 'Arabic', bn: 'Bengali', pt: 'Portuguese',
+  ru: 'Russian', ja: 'Japanese', de: 'German', ko: 'Korean',
+  // European languages
+  ro: 'Romanian', it: 'Italian', nl: 'Dutch', pl: 'Polish',
+  uk: 'Ukrainian', cs: 'Czech', sk: 'Slovak', hu: 'Hungarian',
+  el: 'Greek', bg: 'Bulgarian', hr: 'Croatian', sr: 'Serbian',
+  sl: 'Slovenian', bs: 'Bosnian', mk: 'Macedonian', sq: 'Albanian',
+  sv: 'Swedish', no: 'Norwegian', da: 'Danish', fi: 'Finnish',
+  et: 'Estonian', lv: 'Latvian', lt: 'Lithuanian',
+  ga: 'Irish', cy: 'Welsh', gd: 'Scottish Gaelic',
+  is: 'Icelandic', mt: 'Maltese', lb: 'Luxembourgish',
+  ca: 'Catalan', eu: 'Basque', gl: 'Galician',
+  be: 'Belarusian', hy: 'Armenian', ka: 'Georgian',
+  // Middle East & Central Asia
+  tr: 'Turkish', fa: 'Persian', he: 'Hebrew', ku: 'Kurdish',
+  az: 'Azerbaijani', uz: 'Uzbek', kk: 'Kazakh', ky: 'Kyrgyz',
+  tk: 'Turkmen', tg: 'Tajik', ps: 'Pashto', ur: 'Urdu',
+  // South & Southeast Asia
+  ta: 'Tamil', te: 'Telugu', ml: 'Malayalam', kn: 'Kannada',
+  mr: 'Marathi', gu: 'Gujarati', pa: 'Punjabi', or: 'Odia',
+  si: 'Sinhala', ne: 'Nepali', my: 'Burmese',
+  th: 'Thai', vi: 'Vietnamese', id: 'Indonesian', ms: 'Malay',
+  tl: 'Filipino', km: 'Khmer', lo: 'Lao', mn: 'Mongolian',
+  // East Asia
+  bo: 'Tibetan',
+  // Africa
+  sw: 'Swahili', am: 'Amharic', ha: 'Hausa', ig: 'Igbo',
+  yo: 'Yoruba', zu: 'Zulu', xh: 'Xhosa', af: 'Afrikaans',
+  so: 'Somali', rw: 'Kinyarwanda', sn: 'Shona', mg: 'Malagasy',
+  // Pacific & Americas
+  mi: 'Māori', sm: 'Samoan', to: 'Tongan',
+  ht: 'Haitian Creole', qu: 'Quechua', ay: 'Aymara', gn: 'Guarani',
+  // Constructed
+  eo: 'Esperanto', ia: 'Interlingua',
+  // Additional
+  la: 'Latin', yi: 'Yiddish', jv: 'Javanese', su: 'Sundanese',
 };
-function normalizeLocaleTag(raw) {
+
+function normTag(raw) {
   if (!raw || typeof raw !== 'string') return null;
-  const short = raw.toLowerCase().slice(0, 2);
-  if (!/^[a-z]{2}$/.test(short)) return null;
-  return short;
-}
-function languageNameForTag(short) {
-  if (!short) return null;
-  return LANG_NAME_BY_TAG[short] || short.toUpperCase();
+  const s = raw.toLowerCase().slice(0, 2);
+  return /^[a-z]{2}$/.test(s) ? s : null;
 }
 
+async function resolveLanguage(req, locale) {
+  let tag = normTag(locale);
+  if (!tag && req.user?.id) {
+    try { tag = await getPreferredLanguage(req.user.id); } catch (_) {}
+  }
+  if (!tag) {
+    const a = req.headers['accept-language'];
+    if (a) tag = normTag(a.split(',')[0]);
+  }
+  if (!tag) tag = 'en';
+
+  // Sync stored preference with browser locale.
+  if (req.user?.id && normTag(locale) === tag) {
+    try {
+      const stored = await getPreferredLanguage(req.user.id);
+      if (stored !== tag) {
+        await setPreferredLanguage(req.user.id, tag,
+          LANG_NAME[tag] ? `Preferred language: ${LANG_NAME[tag]}.` : null);
+      }
+    } catch (_) {}
+  }
+  return tag;
+}
+
+// ── Build system instruction ───────────────────────────────────────
+async function buildSystemInstruction(req, body) {
+  const { datetime, timezone, coords, locale } = body;
+  const geo = await ipGeo.lookup(ipGeo.clientIp(req));
+
+  let ctx = '';
+  if (datetime) {
+    const d = new Date(datetime);
+    const fmt = d.toLocaleString('en-US', {
+      weekday: 'long', year: 'numeric', month: 'long',
+      day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit',
+      timeZone: timezone || geo?.timezone || 'UTC',
+    });
+    ctx += `\n\nReal-time context:\n- Current date & time: ${fmt} (${timezone || geo?.timezone || 'UTC'})`;
+  }
+
+  const hasGps = coords &&
+    Number.isFinite(Number(coords.lat)) &&
+    Number.isFinite(Number(coords.lon));
+  if (hasGps) {
+    ctx += `\n- User GPS (real device): ${Number(coords.lat).toFixed(5)}, ${Number(coords.lon).toFixed(5)}`;
+    if (Number.isFinite(Number(coords.accuracy)))
+      ctx += ` (±${Math.round(Number(coords.accuracy))} m)`;
+  } else {
+    ctx += `\n- User GPS: not available yet. Use get_my_location tool to get it when needed.`;
+  }
+
+  // Memory
+  let mem = '';
+  if (req.user?.id) {
+    try {
+      const items = await listMemoryItems(req.user.id, 60);
+      mem = formatMemoryBlocks(items);
+    } catch (_) {}
+  }
+
+  // Language lock
+  const tag = await resolveLanguage(req, locale);
+  const name = LANG_NAME[tag] || tag.toUpperCase();
+  const lang =
+    `\n\nUser's LOCKED language: ${name} (${tag}).` +
+    `\n- Reply EXCLUSIVELY in ${name} for the entire session.` +
+    `\n- Only change if the user writes a FULL sentence in another language AND explicitly asks to switch.`;
+
+  return BASE_PROMPT + lang + ctx + mem;
+}
+
+// ── Access gating ──────────────────────────────────────────────────
+async function gateAccess(req, res) {
+  if (!req.user) {
+    const ip = ipGeo.clientIp(req) || req.ip || '';
+    const status = trialStatus(ip);
+    if (!status.allowed) {
+      const lifetime = status.reason === 'lifetime_expired';
+      res.status(429).json({
+        error: lifetime
+          ? 'Your 7-day free trial has ended. Create an account and buy credits.'
+          : 'Free trial used up today. Come back tomorrow or sign in.',
+        trial: { allowed: false, reason: status.reason || 'window_expired', remainingMs: 0 },
+      });
+      return false;
+    }
+    stampTrialIfFresh(ip, status);
+    return true;
+  }
+
+  // Admin = unlimited.
+  let admin = req.user.role === 'admin';
+  if (!admin) {
+    try {
+      const full = await findById(req.user.id);
+      admin = !!(full && (full.role === 'admin' || isAdminEmail(full.email)));
+    } catch (_) {}
+  }
+  if (admin) return true;
+
+  // Credits check.
+  try {
+    const bal = await getCreditsBalance(req.user.id);
+    if (!Number.isFinite(bal) || bal <= 0) {
+      res.status(402).json({
+        error: 'No credits left. Buy a package to keep chatting.',
+        balance_minutes: 0, action: 'buy_credits',
+      });
+      return false;
+    }
+  } catch (err) {
+    console.warn('[chat] credits check failed', err?.message);
+  }
+  return true;
+}
+
+// ── Convert client messages → Gemini Content[] ─────────────────────
+function toGeminiContents(messages, frame, frameKind) {
+  const contents = [];
+
+  for (const m of messages) {
+    if (!m || typeof m !== 'object') continue;
+    if (!['user', 'assistant'].includes(m.role)) continue;
+    const text = typeof m.content === 'string'
+      ? m.content.slice(0, MAX_MESSAGE_LENGTH) : '';
+    if (!text) continue;
+
+    contents.push({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text }],
+    });
+  }
+
+  // Attach vision frame to the last user message.
+  if (frame && contents.length > 0) {
+    // Find last user content.
+    let lastUserIdx = -1;
+    for (let i = contents.length - 1; i >= 0; i--) {
+      if (contents[i].role === 'user') { lastUserIdx = i; break; }
+    }
+    if (lastUserIdx >= 0) {
+      const channel = frameKind === 'attachment'
+        ? '[ATTACHED IMAGE — the user wants you to analyze this image]'
+        : '[LIVE CAMERA FRAME — the camera IS active and you CAN see. Use as visual context. Describe only if the user asks what you see]';
+
+      // Extract base64 data from data URL.
+      const match = String(frame).match(/^data:([^;]+);base64,(.+)$/);
+      if (match) {
+        const mimeType = match[1];
+        const data = match[2];
+        const existingParts = contents[lastUserIdx].parts;
+        contents[lastUserIdx].parts = [
+          { text: channel },
+          { inlineData: { mimeType, data } },
+          ...existingParts,
+        ];
+      }
+    }
+  }
+
+  // Trim to last N messages.
+  return contents.slice(-MAX_MESSAGES_COUNT);
+}
+
+// ── SSE helpers ────────────────────────────────────────────────────
+function setupSSE(res) {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders();
+}
+
+function sseWrite(res, obj) {
+  res.write(`data: ${JSON.stringify(obj)}\n\n`);
+}
+
+// ── Extract last user text (for pickForcedTool) ────────────────────
+function lastUserText(contents) {
+  for (let i = contents.length - 1; i >= 0; i--) {
+    if (contents[i].role !== 'user') continue;
+    for (const p of contents[i].parts) {
+      if (p.text) return p.text;
+    }
+  }
+  return '';
+}
+
+// ══════════════════════════════════════════════════════════════════
+// POST /  — main chat endpoint
+// ══════════════════════════════════════════════════════════════════
 router.post('/', async (req, res) => {
-  const { messages = [], avatar = 'kelion', frame, frameKind, datetime, timezone, coords, locale } = req.body;
-  // `frameKind` disambiguates the two visual channels:
-  //   - 'attachment' → user explicitly uploaded an image; describe / analyze
-  //     it freely.
-  //   - 'camera'     → passive webcam frame; silent-vision rules apply.
-  //   - undefined    → legacy clients; default to 'camera' (safer — keeps
-  //     the model from over-narrating).
-  const visionChannel = frameKind === 'attachment' ? 'attachment' : 'camera';
+  const { messages = [], frame, frameKind, coords } = req.body;
 
   if (!Array.isArray(messages)) {
     return res.status(400).json({ error: 'messages must be an array' });
   }
 
-  const ai = getAI();
+  const ai = getGemini();
   if (!ai) {
-    return res.status(503).json({ error: 'AI service not configured. Set GEMINI_API_KEY or OPENAI_API_KEY.' });
+    return res.status(503).json({ error: 'AI service not configured. Set GEMINI_API_KEY.' });
   }
 
-  // Gating matrix (mirrors /api/realtime):
-  //   - guest (no JWT):          15-min/day IP window, 7-day lifetime cap
-  //   - signed-in non-admin:     credits balance > 0 (402 if not)
-  //   - admin:                   unlimited, never gated
+  const allowed = await gateAccess(req, res);
+  if (!allowed) return;
+
+  const systemInstruction = await buildSystemInstruction(req, req.body);
+  const model = getChatModel();
+  const contents = toGeminiContents(messages, frame, frameKind);
+
+  if (contents.length === 0) {
+    return res.status(400).json({ error: 'No valid messages' });
+  }
+
+  // Tool declarations: custom KELION_TOOLS + ALL verified Google built-in tools.
+  // The model automatically picks the right tool for each request.
+  // Google built-in tools are maintained by Google — auto-updated,
+  // auto-executed server-side, results integrated into the response.
   //
-  // Adrian: "daca ti-ai facut user nu trebuie sa functioneze daca nu ai
-  // cumparat credit. Functioneaza free fara credit 15 min/zi, maxim 1
-  // saptamina. Dupa ce iti faci user nu functioneaza, da mesaj ca trebuie
-  // cumparat credit". Text chat goes through the same gate as voice now.
-  const isGuest = !req.user;
-  if (isGuest) {
-    const ip = ipGeo.clientIp(req) || req.ip || '';
-    const status = trialStatus(ip);
-    if (!status.allowed) {
-      // Two reasons the guest trial denies:
-      //   - window_expired: 15-min daily chunk used up, come back tomorrow
-      //   - lifetime_expired: 7 days of free access consumed, must sign up
-      // We surface `reason` so the client can swap the error message from
-      // "try again tomorrow" to "create an account to keep talking".
-      const isLifetime = status.reason === 'lifetime_expired';
-      const body = {
-        error: isLifetime
-          ? 'Your 7-day free trial has ended. Please create an account and buy credits to keep chatting with Kelion.'
-          : 'Free trial for today is used up. Come back tomorrow or sign in to continue.',
-        trial: {
-          allowed: false,
-          reason:  status.reason || 'window_expired',
-          remainingMs: 0,
-          ...(status.nextWindowMs != null ? { nextWindowMs: status.nextWindowMs } : {}),
-        },
-      };
-      return res.status(429).json(body);
-    }
-    // Stamp on the first text message — this is what kicks off the 15-min
-    // countdown for text-first users (who may never press Tap-to-talk).
-    stampTrialIfFresh(ip, status);
-  } else {
-    // Signed-in users: admin is unlimited, everyone else needs credits > 0.
-    // We skip the DB admin-email lookup when the JWT already claims the
-    // `admin` role (fast path for the vast majority of admin requests).
-    let isAdmin = req.user.role === 'admin';
-    if (!isAdmin) {
-      try {
-        const full = await findById(req.user.id);
-        isAdmin = Boolean(
-          full && (full.role === 'admin' || isAdminEmail(full.email))
-        );
-      } catch (_) { /* DB glitch — treat as non-admin; credit gate still runs */ }
-    }
-    if (!isAdmin) {
-      try {
-        const balance = await getCreditsBalance(req.user.id);
-        if (!Number.isFinite(balance) || balance <= 0) {
-          return res.status(402).json({
-            error: 'No credits left. Buy a package to keep chatting with Kelion.',
-            balance_minutes: 0,
-            action: 'buy_credits',
-          });
-        }
-      } catch (err) {
-        // DB glitch — fail open so a transient outage doesn't kill paying
-        // users' text chat. The /api/credits/consume heartbeat on voice
-        // sessions is the second line of defense.
-        console.warn('[chat] credits-balance lookup failed', err && err.message);
-      }
-    }
-  }
+  // Custom tools (65+):  functionDeclarations from realtime.js
+  // Google Search:       real-time web search, news, fact grounding
+  // Code Execution:      math, calculations, Python execution
+  // Google Maps:         places, directions, local context
+  // URL Context:         read & analyze web pages by URL
+  const customTools = buildKelionToolsGemini();
+  const GOOGLE_BUILTIN_TOOLS = [
+    { googleSearch: {} },       // Real-time web search grounding
+    { codeExecution: {} },      // Server-side Python code execution
+    { googleMaps: {} },         // Places, directions, location context
+    { urlContext: {} },         // Read & analyze web page content
+  ];
+  const allTools = [
+    ...customTools,             // 65+ custom function declarations
+    ...GOOGLE_BUILTIN_TOOLS,    // All verified Google built-in tools
+  ];
 
-  // IP-based geolocation is used ONLY for timezone fallback when the
-  // client doesn't supply one — never for the user's "where am I"
-  // answer. Adrian: "permanent trebuie sa foloseasca coordonatele gps
-  // reale ale aparatului". Putting an IP-derived city into the system
-  // prompt makes Kelion confidently lie about location (often the wrong
-  // city, sometimes the wrong country when the user is on a VPN). We
-  // surface "location unknown" instead and let the model ask the user
-  // to enable location.
-  const geo = await ipGeo.lookup(ipGeo.clientIp(req));
+  // Keyword-based forced tool (only for custom tools).
+  const userText = lastUserText(contents);
+  const forced = pickForcedTool(userText);
 
-  // Build real-time context for system prompt
-  let realtimeContext = '';
-  if (datetime) {
-    const d = new Date(datetime);
-    const formatted = d.toLocaleString('en-US', {
-      weekday: 'long', year: 'numeric', month: 'long',
-      day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit',
-      timeZone: timezone || geo?.timezone || 'UTC',
-    });
-    realtimeContext += `\n\nReal-time context:\n- Current date & time: ${formatted} (${timezone || geo?.timezone || 'UTC'})`;
-  }
-  const hasClientGps = coords && Number.isFinite(Number(coords.lat)) && Number.isFinite(Number(coords.lon));
-  if (hasClientGps) {
-    realtimeContext += `\n- User GPS coordinates (real device GPS): ${Number(coords.lat).toFixed(5)}, ${Number(coords.lon).toFixed(5)}`;
-    if (Number.isFinite(Number(coords.accuracy))) {
-      realtimeContext += ` (±${Math.round(Number(coords.accuracy))} m)`;
-    }
-  } else {
-    realtimeContext += `\n- User location: UNKNOWN. The device has not shared GPS yet. If the user asks where they are, asks for "the weather here", or any location-dependent question, call get_my_location FIRST. If get_my_location returns no coords, ask the user to tap the screen and allow location access — never invent a city, never use IP geolocation.`;
-  }
+  // When a tool is forced, restrict to that specific tool.
+  // Otherwise ANY mode forces the model to ALWAYS call at least one tool.
+  // This ensures ALL answers come from real data, never from guessing.
+  const toolConfig = forced
+    ? { functionCallingConfig: { mode: 'ANY', allowedFunctionNames: [forced] } }
+    : { functionCallingConfig: { mode: 'ANY' } };
 
-  // Long-term memory injection — mirrors the realtime (voice) path at
-  // server/src/routes/realtime.js so text chat and voice chat share the
-  // same durable facts about the signed-in user. Without this, Kelion
-  // would forget the user's name, preferences, and ongoing projects the
-  // instant they switched from voice to typing. Guests have no memory
-  // row; we silently skip the lookup.
-  // Audit M9 — share the self/other partitioning with the voice path
-  // via formatMemoryBlocks. See server/src/routes/realtime.js for the
-  // rationale; the short version is "don't let facts about Ioana land
-  // on Adrian's profile section".
-  let memorySection = '';
-  if (req.user && (Number.isFinite(req.user.id) || typeof req.user.id === 'string')) {
-    try {
-      const memoryItems = await listMemoryItems(req.user.id, 60);
-      memorySection = formatMemoryBlocks(memoryItems);
-    } catch (err) {
-      console.warn('[chat] memory load failed', err && err.message);
-    }
-  }
+  setupSSE(res);
 
-  // Locked-language resolution. Priority — current browser ALWAYS wins so a
-  // user travelling between devices sees the language of the device they are
-  // on right now, not whatever was stamped on their account at first login.
-  //   1. Browser locale forwarded by the client on every chat request
-  //      (`req.body.locale`, e.g. "ro-RO").
-  //   2. The user's stored `preferred_language` (signed-in users only) —
-  //      used as a fallback when the client did not send a locale.
-  //   3. Accept-Language header.
-  //   4. "en" — explicit final fallback.
-  //
-  // For signed-in users: keep their stored preferred_language in sync with
-  // the active browser. If the browser locale differs from what's stored,
-  // overwrite — Adrian's case (preferred_language='en' stamped at first
-  // Google sign-in, but his actual browser is ro-RO). This is the
-  // permanent fix for "default engleza e obligat sa detecteze limba user".
-  let lockedLangTag = normalizeLocaleTag(locale);
-  if (!lockedLangTag && req.user && (Number.isFinite(req.user.id) || typeof req.user.id === 'string')) {
-    try {
-      lockedLangTag = await getPreferredLanguage(req.user.id);
-    } catch (err) {
-      console.warn('[chat] read preferred_language failed', err && err.message);
-    }
-  }
-  if (!lockedLangTag) {
-    const accept = req.headers['accept-language'];
-    if (accept && typeof accept === 'string') {
-      lockedLangTag = normalizeLocaleTag(accept.split(',')[0]);
-    }
-  }
-  if (!lockedLangTag) lockedLangTag = 'en';
-
-  if (
-    req.user &&
-    (Number.isFinite(req.user.id) || typeof req.user.id === 'string') &&
-    normalizeLocaleTag(locale) === lockedLangTag
-  ) {
-    try {
-      const stored = await getPreferredLanguage(req.user.id);
-      if (stored !== lockedLangTag) {
-        const langName = languageNameForTag(lockedLangTag);
-        await setPreferredLanguage(
-          req.user.id,
-          lockedLangTag,
-          langName ? `Preferred language: ${langName}.` : null
-        );
-      }
-    } catch (err) {
-      console.warn('[chat] sync preferred_language failed', err && err.message);
-    }
-  }
-
-  const lockedLangName = languageNameForTag(lockedLangTag) || 'English';
-  const lockedLangBlock =
-    `\n\nUser's LOCKED language: ${lockedLangName} (${lockedLangTag}).` +
-    `\n- Reply EXCLUSIVELY in ${lockedLangName} for the entire session.` +
-    `\n- This overrides every other language rule. Never silently default to English.` +
-    `\n- Single English / loanword tokens ("ok", "stop", "wow", brand names) DO NOT count as a language switch — keep replying in ${lockedLangName}.` +
-    `\n- Only change language if the user writes a FULL sentence in another language AND explicitly asks you to switch ("vorbește în engleză", "speak French", "passa all'italiano"). Otherwise stay locked.`;
-
-  const systemPrompt = BASE_PROMPT + lockedLangBlock + realtimeContext + memorySection;
-  const model = getDefaultChatModel();
-
-  // Sanitize message history
-  const sanitized = messages
-    .filter(m => m && typeof m === 'object' && ['user', 'assistant'].includes(m.role))
-    .slice(-MAX_MESSAGES_COUNT)
-    .map(m => ({ role: m.role, content: typeof m.content === 'string' ? m.content.slice(0, MAX_MESSAGE_LENGTH) : '' }))
-    .filter(m => m.content.length > 0);
-
-  // If a frame is provided, attach it to the last user message as a vision
-  // input. We prepend an explicit channel label so the model can apply the
-  // right policy from the persona — describe attachments freely, stay
-  // silent on ambient camera frames. Without the label the two channels
-  // were indistinguishable to the model and it would describe whichever
-  // image was richer (typically the camera), even when the user had
-  // attached a separate file. See PR #213.
-  if (frame && sanitized.length > 0) {
-    const lastUserIdx = [...sanitized].map(m => m.role).lastIndexOf('user');
-    if (lastUserIdx !== -1) {
-      const channelLabel = visionChannel === 'attachment'
-        ? '[ATTACHED FILE — image the user explicitly uploaded for you to analyze; answer about THIS]'
-        : '[CAMERA FRAME — ambient context; do NOT describe unless the user explicitly asked about the camera/room]';
-      const userText = sanitized[lastUserIdx].content;
-      sanitized[lastUserIdx] = {
-        role: 'user',
-        content: [
-          { type: 'text', text: channelLabel },
-          { type: 'image_url', image_url: { url: frame, detail: 'low' } },
-          { type: 'text', text: userText },
-        ],
-      };
-    }
-  }
-
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache, no-transform');
-  res.setHeader('Connection', 'keep-alive');
-  // Tell upstream proxies (Cloudflare / nginx / Railway edge) not to
-  // buffer this response. Without it, the final tokens of a short
-  // SSE stream can sit in the proxy buffer until well after the
-  // client has rendered the bubble, so users see a half-sentence
-  // reply ("Ce pot face pentru" with the final "tine?" lost) before
-  // the late flush arrives — too late for the bubble to show it.
-  res.setHeader('X-Accel-Buffering', 'no');
-  res.flushHeaders();
-
-  // Stream a chat completion with tool-calling enabled. When the model emits
-  // a show_on_monitor tool_call, we forward it to the client as a
-  // `{"tool":...}` SSE frame (the client invokes handleShowOnMonitor) and
-  // then ask the model for a short confirmation reply. Two passes, but the
-  // user only sees one continuous stream: first the tool frame, then the
-  // final narration ("Here's Cluj-Napoca on the monitor.").
-  // Detect keyword-driven tool forcing from the most recent user message.
-  // When the user's question clearly calls for calculate / get_weather /
-  // web_search / translate, we set tool_choice to force the model to emit
-  // a function call instead of hallucinating a plain-text answer. Falls
-  // back to 'auto' otherwise so the model can still freely chat.
-  const lastUserText = (() => {
-    for (let i = sanitized.length - 1; i >= 0; i--) {
-      const m = sanitized[i];
-      if (m.role !== 'user') continue;
-      if (typeof m.content === 'string') return m.content;
-      if (Array.isArray(m.content)) {
-        const t = m.content.find((p) => p && p.type === 'text');
-        if (t && typeof t.text === 'string') return t.text;
-      }
-    }
-    return '';
-  })();
-  const forcedTool = pickForcedTool(lastUserText);
-
-  async function streamOnce(msgs, opts = {}) {
-    const body = {
-      model,
-      stream: true,
-      tools: CHAT_TOOLS,
-      tool_choice: opts.toolChoice || 'auto',
-      messages: msgs,
-    };
-    const stream = await ai.chat.completions.create(body);
-    let textSoFar = '';
-    const toolAcc = {}; // index -> { id, name, args }
-    let finishReason = null;
-    for await (const chunk of stream) {
-      const choice = chunk.choices && chunk.choices[0];
-      if (!choice) continue;
-      const delta = choice.delta || {};
-      if (delta.content) {
-        textSoFar += delta.content;
-        res.write(`data: ${JSON.stringify({ content: delta.content })}\n\n`);
-      }
-      if (Array.isArray(delta.tool_calls)) {
-        for (const tc of delta.tool_calls) {
-          const idx = typeof tc.index === 'number' ? tc.index : 0;
-          if (!toolAcc[idx]) toolAcc[idx] = { id: '', name: '', args: '' };
-          if (tc.id) toolAcc[idx].id = tc.id;
-          if (tc.function?.name) toolAcc[idx].name = tc.function.name;
-          if (tc.function?.arguments) toolAcc[idx].args += tc.function.arguments;
-        }
-      }
-      if (choice.finish_reason) finishReason = choice.finish_reason;
-    }
-    return { text: textSoFar, toolCalls: Object.values(toolAcc), finishReason };
-  }
+  const hasGps = coords &&
+    Number.isFinite(Number(coords.lat)) &&
+    Number.isFinite(Number(coords.lon));
 
   try {
-    const firstMsgs = [{ role: 'system', content: systemPrompt }, ...sanitized];
-    // If a keyword forces a specific tool, pass it on the first pass only —
-    // after the tool result lands, the model is free to answer in prose.
-    const firstOpts = forcedTool
-      ? { toolChoice: { type: 'function', function: { name: forcedTool } } }
-      : {};
-    const first = await streamOnce(firstMsgs, firstOpts);
+    // ── First pass: stream with all tools ─────────────────────────
+    let stream;
+    try {
+      stream = await ai.models.generateContentStream({
+        model,
+        contents,
+        config: {
+          systemInstruction,
+          tools: allTools,
+          toolConfig,
+        },
+      });
+    } catch (toolsErr) {
+      // Some model versions don't support combining all 3 tool types.
+      // Fall back to custom tools only.
+      console.warn('[chat] combined tools failed, using custom only:', toolsErr?.message);
+      stream = await ai.models.generateContentStream({
+        model,
+        contents,
+        config: {
+          systemInstruction,
+          tools: customTools,
+          toolConfig,
+        },
+      });
+    }
 
-    // Per OpenAI API (documented 2024-08-06): when `tool_choice` is set to a
-    // specific function, `finish_reason` comes back as `'stop'` not
-    // `'tool_calls'`. Devin Review BUG_0001 on PR #133 flagged this as the
-    // reason the forced-tool path was silently dropping tool calls — accept
-    // either terminator so both the auto and the forced paths work.
-    if (first.toolCalls.length > 0 && (first.finishReason === 'tool_calls' || first.finishReason === 'stop')) {
-      // Assemble the assistant tool-call turn and synthetic tool results so
-      // the second pass can produce the natural-language reply. Client-side
-      // tools (show_on_monitor) succeed optimistically; server-side tools
-      // (calculate/get_weather/web_search/translate) actually run here and
-      // their JSON results are fed back so the model's next reply is
-      // grounded in real data — not guessed.
-      const toolCallsForHistory = first.toolCalls.map((t) => ({
-        id: t.id || `call_${Math.random().toString(36).slice(2)}`,
-        type: 'function',
-        function: { name: t.name, arguments: t.args || '{}' },
+    let textSoFar = '';
+    const functionCalls = [];
+
+    for await (const chunk of stream) {
+      // Text content.
+      if (chunk.text) {
+        textSoFar += chunk.text;
+        sseWrite(res, { content: chunk.text });
+      }
+
+      // Function calls.
+      if (chunk.functionCalls && chunk.functionCalls.length > 0) {
+        for (const fc of chunk.functionCalls) {
+          functionCalls.push({
+            id: fc.id || `fc_${Math.random().toString(36).slice(2)}`,
+            name: fc.name,
+            args: fc.args || {},
+          });
+        }
+      }
+    }
+
+    // ── Execute tools if requested ─────────────────────────────────
+    if (functionCalls.length > 0) {
+      const toolCtx = {
+        user: req.user || null,
+        coords: hasGps ? {
+          lat: Number(coords.lat),
+          lon: Number(coords.lon),
+          accuracy: Number.isFinite(Number(coords.accuracy))
+            ? Number(coords.accuracy) : null,
+        } : null,
+      };
+
+      // Build the model's response with function calls for history.
+      const modelFcParts = functionCalls.map((fc) => ({
+        functionCall: { name: fc.name, args: fc.args, id: fc.id },
       }));
-      const toolMessages = [];
-      for (let i = 0; i < first.toolCalls.length; i++) {
-        const t = first.toolCalls[i];
-        const tool_call_id = toolCallsForHistory[i].id;
-        let parsed = {};
-        try { parsed = JSON.parse(t.args || '{}'); } catch (_) { /* ignore */ }
+      if (textSoFar) {
+        modelFcParts.unshift({ text: textSoFar });
+      }
 
-        if (t.name === 'show_on_monitor') {
-          // Emit the tool frame to the client — it runs handleShowOnMonitor
-          // and updates the overlay immediately, before the narration lands.
-          res.write(`data: ${JSON.stringify({ tool: t.name, arguments: parsed })}\n\n`);
-          toolMessages.push({
-            role: 'tool',
-            tool_call_id,
-            content: JSON.stringify({ ok: true, shown: parsed }),
+      const functionResponses = [];
+
+      for (const fc of functionCalls) {
+        // Client-side tools: push to browser via SSE.
+        if (fc.name === 'show_on_monitor') {
+          sseWrite(res, { tool: fc.name, arguments: fc.args });
+          functionResponses.push({
+            functionResponse: {
+              name: fc.name,
+              response: { ok: true, shown: fc.args },
+              id: fc.id,
+            },
           });
           continue;
         }
 
-        if (t.name === 'compose_email_draft') {
-          // Renderer-only: forward the draft to the client which opens the
-          // email composer modal. Nothing is delivered until the user
-          // explicitly clicks Send (which routes through send_email).
-          res.write(`data: ${JSON.stringify({ tool: t.name, arguments: parsed })}\n\n`);
-          toolMessages.push({
-            role: 'tool',
-            tool_call_id,
-            content: JSON.stringify({ ok: true, opened: 'composer:email', draft: parsed }),
+        if (fc.name === 'compose_email_draft') {
+          sseWrite(res, { tool: fc.name, arguments: fc.args });
+          functionResponses.push({
+            functionResponse: {
+              name: fc.name,
+              response: { ok: true, opened: 'composer:email', draft: fc.args },
+              id: fc.id,
+            },
           });
           continue;
         }
 
-        // Server-executed real tools. executeRealTool returns null for
-        // unrecognised names so we can distinguish "not handled here" from
-        // "tool ran and returned data". Pass user + real GPS coords via
-        // ctx so tools like get_my_credits and get_my_location can read
-        // them without going back through the request closure.
-        const ctx = {
-          user: req.user || null,
-          coords: hasClientGps ? {
-            lat: Number(coords.lat),
-            lon: Number(coords.lon),
-            accuracy: Number.isFinite(Number(coords.accuracy)) ? Number(coords.accuracy) : null,
-          } : null,
-        };
-        const result = await executeRealTool(t.name, parsed, ctx);
-        if (result != null) {
-          // Let the client echo the tool call into the UI (shows a small
-          // "Kelion used calculate(...)" chip). The rendered result is
-          // whatever the model says in the second pass; we just announce.
-          res.write(`data: ${JSON.stringify({ tool: t.name, arguments: parsed, result })}\n\n`);
-          toolMessages.push({
-            role: 'tool',
-            tool_call_id,
-            content: JSON.stringify(result).slice(0, 8000),
-          });
-          continue;
+        // Server-side real tool execution.
+        let result;
+        try {
+          result = await executeRealTool(fc.name, fc.args, toolCtx);
+        } catch (toolErr) {
+          console.warn(`[chat] tool ${fc.name} threw:`, toolErr?.message);
+          result = { ok: false, error: toolErr?.message || 'tool execution failed' };
         }
 
-        toolMessages.push({
-          role: 'tool',
-          tool_call_id,
-          content: JSON.stringify({ ok: false, error: 'unknown tool' }),
+        if (result == null) {
+          // Tool not found in custom tools — instruct model to use
+          // Google built-in tools (Search, Code Execution) as fallback.
+          // The model will automatically retry with the right Google tool.
+          result = {
+            ok: false,
+            error: `Tool "${fc.name}" is not available as a custom tool. ` +
+              'Use Google Search to find the information, or Code Execution ' +
+              'to calculate/process it. You have these built-in capabilities — use them.',
+          };
+          console.info(`[chat] unknown tool "${fc.name}" — model will auto-fallback to Google built-in tools`);
+        }
+
+        sseWrite(res, { tool: fc.name, arguments: fc.args, result });
+
+        functionResponses.push({
+          functionResponse: {
+            name: fc.name,
+            response: result,
+            id: fc.id,
+          },
         });
       }
 
-      const secondMsgs = [
-        ...firstMsgs,
-        {
-          role: 'assistant',
-          content: first.text || '',
-          tool_calls: toolCallsForHistory,
-        },
-        ...toolMessages,
+      // ── Second pass: narration from tool results ─────────────────
+      const secondContents = [
+        ...contents,
+        { role: 'model', parts: modelFcParts },
+        { role: 'user', parts: functionResponses },
       ];
-      // Second pass lets the model freely produce a final natural-language
-      // reply given the real tool results. No forced tool_choice here.
-      await streamOnce(secondMsgs, { toolChoice: 'auto' });
+
+      try {
+        const narrationStream = await ai.models.generateContentStream({
+          model,
+          contents: secondContents,
+          config: {
+            systemInstruction,
+            tools: allTools,
+            toolConfig,
+          },
+        });
+
+        for await (const chunk of narrationStream) {
+          if (chunk.text) {
+            sseWrite(res, { content: chunk.text });
+          }
+        }
+      } catch (err2) {
+        console.warn('[chat] narration pass failed:', err2?.message);
+      }
     }
+
     res.write('data: [DONE]\n\n');
   } catch (err) {
-    // Surface the upstream error so operators + the client console can
-    // see exactly what Gemini rejected (model not found, schema issue,
-    // quota exceeded, …). Previously this was swallowed into a generic
-    // message, making debugging impossible.
-    const detail = err?.error?.message || err?.message || String(err);
-    const status = err?.status || err?.response?.status || null;
-    console.error('[chat] AI error:', { model, status, detail, stack: err?.stack?.slice?.(0, 500) });
+    const detail = err?.message || String(err);
+    const code = err?.status || err?.code || null;
+    console.error('[chat] AI error:', { model, code, detail: detail.slice(0, 500) });
+
+    // If the flagship model fails (e.g. quota, unavailable), try flash.
+    if (model.includes('pro') && !req._chatRetried) {
+      req._chatRetried = true;
+      console.warn('[chat] retrying with gemini-3-flash-preview');
+      try {
+        const fallbackStream = await ai.models.generateContentStream({
+          model: 'gemini-3-flash-preview',
+          contents,
+          config: { systemInstruction, tools: allTools, toolConfig },
+        });
+        for await (const chunk of fallbackStream) {
+          if (chunk.text) sseWrite(res, { content: chunk.text });
+        }
+        res.write('data: [DONE]\n\n');
+        res.end();
+        return;
+      } catch (fbErr) {
+        console.error('[chat] fallback also failed:', fbErr?.message);
+      }
+    }
+
     const clientMsg = detail.length > 200 ? detail.slice(0, 200) + '…' : detail;
-    res.write(`data: ${JSON.stringify({ error: `AI error: ${clientMsg}` })}\n\n`);
+    sseWrite(res, { error: `AI error: ${clientMsg}` });
   } finally {
     res.end();
   }
 });
 
-// Demo endpoint
+// ══════════════════════════════════════════════════════════════════
+// POST /demo — lightweight demo (no tools, no auth, no memory)
+// ══════════════════════════════════════════════════════════════════
 router.post('/demo', async (req, res) => {
   const { messages = [] } = req.body;
   if (!Array.isArray(messages)) return res.status(400).json({ error: 'messages must be an array' });
 
-  const ai = getAI();
+  const ai = getGemini();
   if (!ai) return res.status(503).json({ error: 'AI service not configured' });
 
-  const sanitized = messages
-    .filter(m => m && typeof m === 'object' && ['user', 'assistant'].includes(m.role))
+  const contents = messages
+    .filter((m) => m && ['user', 'assistant'].includes(m.role))
     .slice(-10)
-    .map(m => ({ role: m.role, content: typeof m.content === 'string' ? m.content.slice(0, 2000) : '' }))
-    .filter(m => m.content.length > 0);
+    .map((m) => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: typeof m.content === 'string' ? m.content.slice(0, 2000) : '' }],
+    }))
+    .filter((m) => m.parts[0].text.length > 0);
 
-  const model = getDefaultChatModel();
-
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache, no-transform');
-  res.setHeader('Connection', 'keep-alive');
-  res.setHeader('X-Accel-Buffering', 'no');
-  res.flushHeaders();
-
+  setupSSE(res);
   try {
-    const stream = await ai.chat.completions.create({
-      model, stream: true,
-      messages: [{ role: 'system', content: BASE_PROMPT }, ...sanitized],
+    const stream = await ai.models.generateContentStream({
+      model: getChatModel(),
+      contents,
+      config: { systemInstruction: BASE_PROMPT },
     });
     for await (const chunk of stream) {
-      const content = chunk.choices[0]?.delta?.content;
-      if (content) res.write(`data: ${JSON.stringify({ content })}\n\n`);
+      if (chunk.text) sseWrite(res, { content: chunk.text });
     }
     res.write('data: [DONE]\n\n');
   } catch (err) {
     console.error('[chat/demo] error:', err.message);
-    res.write(`data: ${JSON.stringify({ error: 'AI service error.' })}\n\n`);
+    sseWrite(res, { error: 'AI service error.' });
   } finally {
     res.end();
   }

@@ -1773,22 +1773,16 @@ async function toolExplainCode(args) {
 // model to call it on complex requests; the persona change is in
 // realtime.js alongside the KELION_TOOLS entry.
 
-const PLAN_TASK_SYSTEM = [
+function buildPlanTaskSystem() {
+  return [
   'You are the planner of a voice-first AI assistant called Kelion.',
   '',
   'You receive a user goal plus an optional context hint and produce a',
   'short, concrete action plan that Kelion can execute step by step.',
   '',
-  'Kelion has these tool categories (examples, not exhaustive):',
-  '  • Browse / search: web_search, fetch_url, wikipedia_search, search_github, search_academic, search_stackoverflow, rss_read.',
-  '  • Information lookup: get_weather, get_forecast, get_news, get_crypto_price, get_stock_price, get_forex, currency_convert, get_air_quality, get_sun_times, get_moon_phase, get_earthquakes, dictionary, translate.',
-  '  • Geo: geocode, reverse_geocode, get_route, nearby_places, get_elevation, get_timezone, get_my_location.',
-  '  • Math / sandbox: calculate, unit_convert, run_regex, run_code.',
-  '  • Documents: read_pdf, read_docx, ocr_image, ocr_passport.',
-  '  • Communication: send_email, send_sms, create_calendar_ics, zapier_trigger.',
-  '  • Code helpers: solve_problem, code_review, explain_code.',
-  '  • Stage UI: show_on_monitor, ui_notify, ui_navigate, generate_image.',
-  '  • Camera: switch_camera, what_do_you_see, set_narration_mode.',
+  'Kelion has these tools (auto-generated, always current):',
+  '  ' + REAL_TOOL_NAMES.join(', ') + '.',
+  '  Plus Google built-in: Google Search, Code Execution, Google Maps, URL Context.',
   '',
   'Rules:',
   '  1. Output STRICT JSON, no prose, no markdown fence.',
@@ -1811,7 +1805,8 @@ const PLAN_TASK_SYSTEM = [
   '  ],',
   '  "cautions": ["..."]',
   '}',
-].join('\n');
+  ].join('\n');
+}
 
 async function toolPlanTask(args) {
   const goal = String(args?.goal || '').trim().slice(0, 2000);
@@ -1839,7 +1834,7 @@ async function toolPlanTask(args) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ role: 'user', parts: [{ text: userMsg }] }],
-        systemInstruction: { parts: [{ text: PLAN_TASK_SYSTEM }] },
+        systemInstruction: { parts: [{ text: buildPlanTaskSystem() }] },
         generationConfig: {
           temperature: 0.2,
           maxOutputTokens: 1200,
