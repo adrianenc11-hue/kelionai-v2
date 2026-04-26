@@ -70,14 +70,13 @@ describe('buildKelionPersona — minimal prompt with full tool catalog', () => {
   describe('Tool catalog completeness', () => {
     const prompt = buildKelionPersona({});
 
-    it('lists all core tool categories', () => {
-      expect(prompt).toMatch(/Data & Search/);
-      expect(prompt).toMatch(/Finance/);
-      expect(prompt).toMatch(/Geography/);
-      expect(prompt).toMatch(/Documents/);
-      expect(prompt).toMatch(/Communication/);
-      expect(prompt).toMatch(/Camera/);
-      expect(prompt).toMatch(/Planning/);
+    it('lists tools from auto-generated catalog', () => {
+      expect(prompt).toMatch(/get_weather/);
+      expect(prompt).toMatch(/geocode/);
+      expect(prompt).toMatch(/read_pdf/);
+      expect(prompt).toMatch(/send_email/);
+      expect(prompt).toMatch(/camera_on/);
+      expect(prompt).toMatch(/plan_task/);
     });
 
     it('lists key tools', () => {
