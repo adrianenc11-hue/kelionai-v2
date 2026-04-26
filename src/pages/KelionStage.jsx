@@ -869,13 +869,16 @@ export default function KelionStage() {
   // + embedding support lands in a follow-up PR.
   const [attachedFile, setAttachedFile] = useState(null)
   const fileInputRef = useRef(null)
+  const liveSendTextRef = useRef(null)
   const sendTextMessage = useCallback(async () => {
     const text = chatInput.trim()
-    if (!text && !attachedFile) return
-    if (chatBusy) return
-    // Detect mute/unmute/translator commands from user text before sending.
+    if (!text) return
     applyMuteCommand(text)
     setChatError(null)
+    setChatInput('')
+    setAttachedFile(null)
+    if (liveSendTextRef.current) await liveSendTextRef.current(text)
+    return // Canal B only — old /api/chat code below is dead
     // F2 — the paperclip attachment previously only mentioned the
     // filename + size in a bracketed note (e.g. "[attached file:
     // passport.jpg (2 KB)]"); the actual bytes never left the browser
@@ -1204,6 +1207,7 @@ export default function KelionStage() {
   const statusRef = useRef('idle')
   const muteModeRef = useRef(false)
   useEffect(() => {
+    return // Canal B only — TTS disabled, voice from WebSocket.
     if (chatBusy) return
     if (muteModeRef.current) return   // mute mode — no TTS
     const last = chatMessages[chatMessages.length - 1]
@@ -1418,10 +1422,10 @@ export default function KelionStage() {
     // pulls from the shared /api/trial/status endpoint so the timer
     // also ticks for text-chat-only guests who never touch the mic.
     trial: voiceTrial,
+    sendText: liveSendText,
   } = liveHook
-  // Keep statusRef in sync so the TTS guard (declared before this line) can
-  // read the current voice-session state without a temporal dead zone.
   statusRef.current = status
+  liveSendTextRef.current = liveSendText
   // ── Mute mode ──────────────────────────────────────────────────────────
   // Activated when the user explicitly says "nu mai vorbi", "mute",
   // "fii silentios", etc. Suppresses both ElevenLabs text-TTS and the
