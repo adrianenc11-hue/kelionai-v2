@@ -1174,6 +1174,46 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
     }
   }, [])
 
+  // sendText — inject typed text into the live WebSocket session as a
+  // user turn. This replaces the old /api/chat SSE path so ALL
+  // communication goes through a single AI channel (Canal B).
+  // If the WebSocket isn't open, we auto-start a session first.
+  const sendText = useCallback(async (text) => {
+    if (!text || typeof text !== 'string') return
+    const trimmed = text.trim()
+    if (!trimmed) return
+
+    // Show the typed text in the transcript immediately.
+    appendTurn('user', trimmed, true)
+    lastActivityAtRef.current = Date.now()
+
+    // If WS is not open, start a session first.
+    const ws = wsRef.current
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      // Session not active — start one, then send after setup.
+      // We store the pending text and send it once setupComplete fires.
+      // For simplicity, we start and wait briefly for the connection.
+      await start()
+      // Wait for WebSocket to be ready (up to 5s).
+      const deadline = Date.now() + 5000
+      while (Date.now() < deadline) {
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) break
+        await new Promise(r => setTimeout(r, 200))
+      }
+    }
+
+    const activeWs = wsRef.current
+    if (activeWs && activeWs.readyState === WebSocket.OPEN) {
+      activeWs.send(JSON.stringify({
+        clientContent: {
+          turns: [{ role: 'user', parts: [{ text: trimmed }] }],
+          turnComplete: true,
+        },
+      }))
+      setStatus('thinking')
+    }
+  }, [appendTurn, start])
+
   return {
     status, error, start, stop, turns, userLevel,
     // Stage 2
@@ -1185,5 +1225,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
     isBusy,
     // Mute/unmute Kelion's voice output without restarting the session.
     setMuted,
+    // Send typed text through the live WebSocket (replaces /api/chat).
+    sendText,
   }
 }
