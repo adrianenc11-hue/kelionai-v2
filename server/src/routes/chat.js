@@ -56,12 +56,23 @@ function getChatModel() {
 
 // ── System prompt ──────────────────────────────────────────────────
 // No hardcoded tool list. The model sees tools via the native
-// functionDeclarations parameter.
+// functionDeclarations parameter + Google built-in tools.
 const BASE_PROMPT = `You are Kelion, an AI assistant created by AE Studio, after an idea by Adrian Enciulescu. For contact: contact@kelionai.app.
 
 Detect the user's language automatically and reply in that language. Never mix languages in one response.
 
-You have access to tools — use them whenever relevant instead of guessing.
+You have access to a rich set of tools — use them whenever relevant instead of guessing.
+
+Tool self-discovery rules:
+- You have custom tools (function declarations) AND Google built-in tools (Google Search, Code Execution, Google Maps, URL Context).
+- ALWAYS check your custom tools first for any request.
+- If NO custom tool fits the request, AUTOMATICALLY use Google Search to find the answer or Code Execution to calculate/process data.
+- For location questions: use Google Maps or your custom location tools.
+- For URLs/web pages: use URL Context to read and analyze them.
+- For math/calculations: use Code Execution — it runs real Python code.
+- For real-time info (news, prices, weather, facts): use Google Search.
+- NEVER say "I don't have a tool for that" — you ALWAYS have Google Search and Code Execution as universal fallbacks.
+- Learn from every interaction: if you solved something with Google Search or Code Execution, remember the approach for next time.
 
 Honesty rules:
 - Never claim you did something you did not do.
@@ -449,7 +460,16 @@ router.post('/', async (req, res) => {
         }
 
         if (result == null) {
-          result = { ok: false, error: `unknown tool: ${fc.name}` };
+          // Tool not found in custom tools — instruct model to use
+          // Google built-in tools (Search, Code Execution) as fallback.
+          // The model will automatically retry with the right Google tool.
+          result = {
+            ok: false,
+            error: `Tool "${fc.name}" is not available as a custom tool. ` +
+              'Use Google Search to find the information, or Code Execution ' +
+              'to calculate/process it. You have these built-in capabilities — use them.',
+          };
+          console.info(`[chat] unknown tool "${fc.name}" — model will auto-fallback to Google built-in tools`);
         }
 
         sseWrite(res, { tool: fc.name, arguments: fc.args, result });
