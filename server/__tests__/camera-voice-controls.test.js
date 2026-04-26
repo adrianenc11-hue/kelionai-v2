@@ -52,10 +52,11 @@ describe('PR #199 — verbal camera controls', () => {
     expect(d).toMatch(/4k|2160|3840/);
   });
 
-  test('camera_off has no arguments', () => {
+  test('camera_off has optional reason property', () => {
     const tool = KELION_TOOLS.find((t) => t.name === 'camera_off');
     expect(tool).toBeDefined();
-    expect(Object.keys(tool.properties || {}).length).toBe(0);
+    expect(tool.properties.reason).toBeDefined();
+    expect(tool.properties.reason.type).toBe('string');
     expect((tool.required || []).length).toBe(0);
   });
 

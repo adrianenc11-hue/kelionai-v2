@@ -366,19 +366,9 @@ router.post('/', async (req, res) => {
     return res.status(503).json({ error: 'TTS not configured. Set ELEVENLABS_API_KEY (preferred) or GEMINI_API_KEY.' });
   }
 
-  // Single-LLM cleanup (2026-04): one voice for the user, period. ElevenLabs
-  // is the only spoken voice (cloned voice if the signed-in user has one,
-  // otherwise the curated native-male library voice for their language).
-  // Gemini TTS stays as a last-resort fallback if ElevenLabs is not
-  // configured at all on this deployment.
-  const providerOverride = (process.env.TTS_PROVIDER || '').toLowerCase();
-  const forceGemini      = providerOverride === 'gemini';
-  const forceElevenLabs  = providerOverride === 'elevenlabs' || providerOverride === '11labs';
-  let chosen; // 'gemini' | 'elevenlabs'
-  if (forceGemini && hasGemini) chosen = 'gemini';
-  else if (forceElevenLabs && hasElevenLabs) chosen = 'elevenlabs';
-  else if (hasElevenLabs) chosen = 'elevenlabs';
-  else chosen = 'gemini';
+  // ElevenLabs is used ONLY for voice cloning. Default TTS is Gemini.
+  // Adrian: "ElevenLabs doar pentru clonare și nimic altceva."
+  let chosen = 'gemini';
   // Frontend may send a language hint (e.g. `navigator.language`). Trust any
   // well-formed ISO 639-1 code the client supplies; otherwise auto-detect
   // from the reply text itself.

@@ -1,12 +1,8 @@
 'use strict';
 
-// Single-LLM cleanup (Adrian, 2026-04): the user hears ONE voice across
-// every reply. ElevenLabs is the primary path (cloned voice or curated
-// native male per language). Gemini TTS is the only fallback if
-// ElevenLabs isn't configured. The OpenAI TTS path was removed entirely.
-//
-// These tests lock in the priority so nobody accidentally re-introduces
-// OpenAI or demotes ElevenLabs behind Gemini.
+// TTS provider priority: Gemini is the default TTS. ElevenLabs is used
+// ONLY when the user has a cloned voice enabled. The TTS_PROVIDER env
+// override has been removed.
 
 process.env.NODE_ENV       = 'test';
 process.env.JWT_SECRET     = 'test-jwt-secret-at-least-32-chars!!';
@@ -31,7 +27,6 @@ const OG_FETCH = global.fetch;
 const ORIG_KEYS = {
   GEMINI: process.env.GEMINI_API_KEY,
   ELEVEN: process.env.ELEVENLABS_API_KEY,
-  OVERRIDE: process.env.TTS_PROVIDER,
 };
 
 function stubFetch() {
@@ -59,61 +54,37 @@ function stubFetch() {
 
 function restoreFetch() { global.fetch = OG_FETCH; }
 function restoreKeys() {
-  if (ORIG_KEYS.GEMINI   === undefined) delete process.env.GEMINI_API_KEY;     else process.env.GEMINI_API_KEY     = ORIG_KEYS.GEMINI;
-  if (ORIG_KEYS.ELEVEN   === undefined) delete process.env.ELEVENLABS_API_KEY; else process.env.ELEVENLABS_API_KEY = ORIG_KEYS.ELEVEN;
-  if (ORIG_KEYS.OVERRIDE === undefined) delete process.env.TTS_PROVIDER;       else process.env.TTS_PROVIDER       = ORIG_KEYS.OVERRIDE;
+  if (ORIG_KEYS.GEMINI === undefined) delete process.env.GEMINI_API_KEY;     else process.env.GEMINI_API_KEY     = ORIG_KEYS.GEMINI;
+  if (ORIG_KEYS.ELEVEN === undefined) delete process.env.ELEVENLABS_API_KEY; else process.env.ELEVENLABS_API_KEY = ORIG_KEYS.ELEVEN;
 }
 
 async function ttsCall() {
   return request(app).post('/api/tts').send({ text: 'hello there', lang: 'en' });
 }
 
-describe('TTS provider priority (unified voice — ElevenLabs primary)', () => {
+describe('TTS provider priority (Gemini default, ElevenLabs only for cloning)', () => {
   beforeEach(() => mockDb._reset());
   afterEach(() => {
     restoreFetch();
     restoreKeys();
   });
 
-  test('ElevenLabs wins by default when ELEVENLABS_API_KEY is set (Gemini also set)', async () => {
+  test('Gemini is the default TTS when both keys are set (no cloned voice)', async () => {
     process.env.GEMINI_API_KEY     = 'AIza-gemini-test';
     process.env.ELEVENLABS_API_KEY = 'sk-eleven-test';
-    delete process.env.TTS_PROVIDER;
-    const calls = stubFetch();
+    stubFetch();
     const r = await ttsCall();
     expect(r.status).toBe(200);
-    expect(r.headers['x-tts-provider']).toBe('elevenlabs');
-    expect(calls.some((u) => /elevenlabs\.io/.test(u))).toBe(true);
+    expect(r.headers['x-tts-provider']).toBe('gemini');
   });
 
-  test('Falls back to Gemini when ELEVENLABS_API_KEY is missing', async () => {
+  test('Gemini works when ELEVENLABS_API_KEY is missing', async () => {
     delete process.env.ELEVENLABS_API_KEY;
     process.env.GEMINI_API_KEY = 'AIza-gemini-test';
-    delete process.env.TTS_PROVIDER;
     stubFetch();
     const r = await ttsCall();
     expect(r.status).toBe(200);
     expect(r.headers['x-tts-provider']).toBe('gemini');
-  });
-
-  test('TTS_PROVIDER=gemini forces Gemini even when ElevenLabs key is set', async () => {
-    process.env.GEMINI_API_KEY     = 'AIza-gemini-test';
-    process.env.ELEVENLABS_API_KEY = 'sk-eleven-test';
-    process.env.TTS_PROVIDER       = 'gemini';
-    stubFetch();
-    const r = await ttsCall();
-    expect(r.status).toBe(200);
-    expect(r.headers['x-tts-provider']).toBe('gemini');
-  });
-
-  test('TTS_PROVIDER=elevenlabs picks ElevenLabs', async () => {
-    process.env.GEMINI_API_KEY     = 'AIza-gemini-test';
-    process.env.ELEVENLABS_API_KEY = 'sk-eleven-test';
-    process.env.TTS_PROVIDER       = 'elevenlabs';
-    stubFetch();
-    const r = await ttsCall();
-    expect(r.status).toBe(200);
-    expect(r.headers['x-tts-provider']).toBe('elevenlabs');
   });
 
   test('503 when no TTS provider is configured', async () => {

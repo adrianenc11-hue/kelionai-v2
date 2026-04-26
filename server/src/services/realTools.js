@@ -2066,16 +2066,21 @@ async function toolGetMyLocation(args, ctx) {
   return result;
 }
 
-async function toolGetMyCredits(_args, ctx) {
+async function toolGetMyCredits(args, ctx) {
   const user = ctx && ctx.user;
   if (!user || !user.id) return needSignIn();
   try {
     const db = require('../db');
     const minutes = await db.getCreditsBalance(user.id);
+    const fmt = (args && args.format === 'seconds') ? 'seconds' : 'minutes';
+    const display = fmt === 'seconds'
+      ? `${Math.round(minutes * 60)} s`
+      : `${Math.round(minutes * 10) / 10} min`;
     return {
       ok: true,
       minutes,
-      displayMinutes: `${Math.round(minutes * 10) / 10} min`,
+      format: fmt,
+      display,
       low: minutes < 2,
       empty: minutes <= 0,
     };
@@ -2084,34 +2089,36 @@ async function toolGetMyCredits(_args, ctx) {
   }
 }
 
-async function toolGetMyUsage(_args, ctx) {
+async function toolGetMyUsage(args, ctx) {
   const user = ctx && ctx.user;
   if (!user || !user.id) return needSignIn();
   try {
     const db = require('../db');
     const dbh = db.getDb ? await db.getDb() : null;
     if (!dbh) return { ok: false, error: 'db unavailable' };
-    // credit_transactions is shared between SQLite and Postgres via the
-    // abstraction that normalises params to `?`. No exported per-user
-    // helper exists yet, so we read the 20 most recent rows directly
-    // and summarise them client-side.
+    const maxRows = Math.min(40, Math.max(1, Number(args?.limit) || 20));
+    const kindFilter = (args?.kind === 'topup' || args?.kind === 'consume') ? args.kind : null;
     const rows = await dbh.all(
       `SELECT delta_minutes, amount_cents, currency, kind, note, created_at
          FROM credit_transactions
         WHERE user_id = ?
         ORDER BY created_at DESC
-        LIMIT 20`,
-      [user.id],
+        LIMIT ?`,
+      [user.id, maxRows],
     );
-    const topups   = rows.filter((r) => r.kind === 'topup');
-    const consumed = rows.filter((r) => Number(r.delta_minutes) < 0);
+    const filtered = kindFilter
+      ? rows.filter((r) => kindFilter === 'topup' ? r.kind === 'topup' : Number(r.delta_minutes) < 0)
+      : rows;
+    const topups   = filtered.filter((r) => r.kind === 'topup');
+    const consumed = filtered.filter((r) => Number(r.delta_minutes) < 0);
     const minutesConsumed = consumed.reduce((s, r) => s + Math.abs(Number(r.delta_minutes) || 0), 0);
     const minutesTopped   = topups.reduce((s, r) => s + Math.max(0, Number(r.delta_minutes) || 0), 0);
     return {
       ok: true,
       minutesConsumed,
       minutesTopped,
-      recent: rows.slice(0, 10).map((r) => ({
+      kindFilter: kindFilter || 'all',
+      recent: filtered.slice(0, Math.min(maxRows, 10)).map((r) => ({
         kind: r.kind,
         deltaMinutes: Number(r.delta_minutes) || 0,
         amountCents: r.amount_cents != null ? Number(r.amount_cents) : null,
@@ -2125,21 +2132,23 @@ async function toolGetMyUsage(_args, ctx) {
   }
 }
 
-async function toolGetMyProfile(_args, ctx) {
+async function toolGetMyProfile(args, ctx) {
   const user = ctx && ctx.user;
   if (!user || !user.id) return needSignIn();
   try {
     const db = require('../db');
     const full = await db.getUserById(user.id);
     if (!full) return { ok: false, error: 'user not found' };
-    return {
+    const includeEmail = args?.include_email !== false;
+    const result = {
       ok: true,
       id: full.id,
       name: full.name || user.name || null,
-      email: full.email || user.email || null,
       creditsMinutes: Number(full.credits_balance_minutes || 0),
       createdAt: full.created_at || null,
     };
+    if (includeEmail) result.email = full.email || user.email || null;
+    return result;
   } catch (err) {
     return { ok: false, error: err && err.message ? err.message : String(err) };
   }
@@ -2392,7 +2401,17 @@ async function toolZapierTrigger(args) {
   if (!/^https:\/\/hooks\.zapier\.com\/hooks\/catch\//i.test(url)) {
     return { ok: false, error: 'webhook_url must be a Zapier Catch Hook (https://hooks.zapier.com/hooks/catch/…)' };
   }
-  const payload = args?.payload && typeof args.payload === 'object' ? args.payload : {};
+  // Schema advertises `payload` as a JSON string (Gemini's OpenAI-compat
+  // endpoint rejects object-type params without explicit properties). Accept
+  // both a pre-parsed object and a JSON string for backward compat.
+  let payload = {};
+  if (args?.payload) {
+    if (typeof args.payload === 'string') {
+      try { payload = JSON.parse(args.payload); } catch { return { ok: false, error: 'payload is not valid JSON' }; }
+    } else if (typeof args.payload === 'object') {
+      payload = args.payload;
+    }
+  }
   let body;
   try { body = JSON.stringify(payload); }
   catch { return { ok: false, error: 'payload is not JSON-serialisable' }; }
