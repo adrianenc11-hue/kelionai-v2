@@ -916,14 +916,7 @@ export default function KelionStage() {
   // turn from the Gemini Live hook.
   const [bubbleVisible, setBubbleVisible] = useState(true)
   const bubbleHideTimerRef = useRef(null)
-  useEffect(() => {
-    if (turns.length === 0) { setBubbleVisible(false); return }
-    setBubbleVisible(true)
-    if (bubbleHideTimerRef.current) clearTimeout(bubbleHideTimerRef.current)
-    if (status === 'thinking' || status === 'speaking') return
-    bubbleHideTimerRef.current = setTimeout(() => setBubbleVisible(false), 8000)
-    return () => { if (bubbleHideTimerRef.current) clearTimeout(bubbleHideTimerRef.current) }
-  }, [turns, status])
+  // NOTE: bubbleVisible useEffect moved after useGeminiLive (needs turns + status)
 
   // Single voice transport — Gemini Live on Vertex AI. Per Adrian's
   // single-LLM cleanup (April 2026): one LLM end-to-end (Gemini), one
@@ -964,6 +957,18 @@ export default function KelionStage() {
   } = liveHook
   statusRef.current = status
   liveSendTextRef.current = liveSendText
+
+  // Chat bubble auto-hide — fade the on-stage bubble out after 8s of
+  // quiet so the avatar isn't cluttered. Placed after useGeminiLive
+  // destructuring so `turns` and `status` are in scope.
+  useEffect(() => {
+    if (turns.length === 0) { setBubbleVisible(false); return }
+    setBubbleVisible(true)
+    if (bubbleHideTimerRef.current) clearTimeout(bubbleHideTimerRef.current)
+    if (status === 'thinking' || status === 'speaking') return
+    bubbleHideTimerRef.current = setTimeout(() => setBubbleVisible(false), 8000)
+    return () => { if (bubbleHideTimerRef.current) clearTimeout(bubbleHideTimerRef.current) }
+  }, [turns, status])
   // -- Mute mode ----------------------------------------------------------
   // Activated when the user explicitly says "nu mai vorbi", "mute",
   // "fii silentios", etc. Suppresses both ElevenLabs text-TTS and the
