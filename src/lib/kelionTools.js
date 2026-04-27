@@ -62,28 +62,11 @@ const REAL_TOOL_NAMES = new Set([
   'fetch_url', 'rss_read',
   'wikipedia_search', 'dictionary',
   'translate',
-  // Groq-powered (opt-in). The server returns a graceful "not configured"
-  // message when GROQ_API_KEY is absent, so the voice UX never breaks.
-  'solve_problem', 'code_review', 'explain_code',
-  // PR 7/N — Planner Brain. Kelion calls this on compound/multi-step
-  // asks to get a short numbered plan from Gemini Flash before it
-  // starts executing real tools. Server returns a clean JSON plan;
-  // summarizeRealTool shapes it for the voice model below.
-  'plan_task',
-  // PR 8/N — Memory of Actions. Kelion reads back its own recent tool
-  // invocations for the signed-in user so it knows what it has already
-  // done this session. Server returns a compact JSON list; the
-  // summariser below renders it as numbered bullet points.
+  // PR 8/N — Memory of Actions.
   'get_action_history',
-  // Silent vision auto-learn (PR #210). Persists a private camera/voice
-  // observation about the signed-in user as a low-confidence
-  // memory_items row. Guests are a no-op server-side. Voice transports
-  // need this entry so the toolCall reaches /api/tools/execute instead
-  // of the client-side "not implemented" branch.
+  // Silent vision auto-learn (PR #210).
   'learn_from_observation',
-  // Faza A (PR #211) — global live-radio search via radio-browser.info.
-  // Without this the voice transports return "Tool not implemented"
-  // and Kelion silently fails the user when they ask for radio.
+  // Faza A — global live-radio search via radio-browser.info.
   'play_radio',
   // F11 — `generate_image` is handled specially in the runTool switch
   // below so we can side-effect the monitor; it isn't in this set.
@@ -168,16 +151,7 @@ function summarizeRealTool(name, j) {
   if (name === 'translate' && j.translated) {
     return j.translated
   }
-  if ((name === 'solve_problem' || name === 'code_review' || name === 'explain_code') && j.result) {
-    // Groq completions are already structured; keep them mostly intact but
-    // cap so we don't blow past the voice model's context on the read-back.
-    return String(j.result).slice(0, 4000)
-  }
   if (name === 'get_action_history' && Array.isArray(j.actions)) {
-    // Kelion is reading its own history. We keep each row on one line
-    // so the voice model can scan it and decide quickly whether to
-    // re-run a tool. Guest case (`signed_in === false`) is handled
-    // by the generic `ok === false` branch at the top.
     if (!j.actions.length) {
       return "No recent actions recorded yet — I haven't run anything like that this session."
     }
@@ -188,23 +162,6 @@ function summarizeRealTool(name, j) {
       return `${i + 1}. ${a.tool} [${status}]${args}${result}`
     }).join('\n')
     return `Recent actions (${j.count} total):\n${rows}`.slice(0, 4000)
-  }
-  if (name === 'plan_task' && Array.isArray(j.steps)) {
-    // Condense the planner's structured JSON into a compact speakable form
-    // the voice model can read and then walk through. We keep tool_hint
-    // inline so the model knows which tool each step should call. A final
-    // "Cautions" line surfaces anything the planner flagged as requiring
-    // user confirmation (spending, messaging, destructive actions).
-    const header = j.summary ? `Plan: ${j.summary}` : 'Plan:'
-    const body = j.steps.map((s) => {
-      const hint = s.tool_hint ? ` [${s.tool_hint}]` : ''
-      const why = s.why ? ` — ${s.why}` : ''
-      return `${s.n}. ${s.action}${hint}${why}`
-    }).join('\n')
-    const cautions = Array.isArray(j.cautions) && j.cautions.length
-      ? `\nCautions: ${j.cautions.join('; ')}`
-      : ''
-    return `${header}\n${body}${cautions}`.slice(0, 4000)
   }
   if (name === 'play_radio' && j.pick) {
     // Faza A. The voice model gets a compact line so it can confirm
@@ -352,50 +309,8 @@ export async function runTool(name, args) {
       }
       return 'narration_off'
     }
-    case 'what_do_you_see': {
-      // Hybrid voice+vision: OpenAI handles speech, Gemini Vision handles
-      // camera. The tool only fires when the user asks the avatar to look
-      // (persona gates this in the system prompt); here we pull the most
-      // recent frame from the passive buffer (openaiRealtime.js grabs one
-      // every ~1s while the camera is on) and POST it to the server,
-      // which forwards to Gemini Vision and returns plain-text description.
-      // If the camera is off or we haven't grabbed a frame yet, tell the
-      // model that so it can ask the user to turn it on instead of making
-      // up a description.
-      const frame = getLatestCameraFrame()
-      if (!frame?.dataUrl) {
-        return "Camera is off. Tell the user to tap the camera button so you can see."
-      }
-      // Stale-frame guard: if the last grab was > 30s ago (tab was
-      // backgrounded, grab loop stalled, etc.) we'd rather ask the user
-      // to verify than describe a minute-old still.
-      if (Date.now() - (frame.capturedAt || 0) > 30_000) {
-        return "My last camera frame is stale. Ask the user to move or tap the camera button again."
-      }
-      try {
-        const r = await fetch('/api/realtime/vision', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
-          credentials: 'include',
-          body: JSON.stringify({ frame: frame.dataUrl, focus: args?.focus || '' }),
-        })
-        if (!r.ok) {
-          // Surface a graceful, speakable failure — don't crash the voice
-          // turn. 429/402/401 all fall through to the same fallback text;
-          // the user is already inside a paid/authenticated voice session
-          // when this tool fires, so these are transient upstream issues.
-          let body = null
-          try { body = await r.json() } catch { /* ignore */ }
-          if (body?.description) return body.description
-          return "I can't see clearly right now. Tell the user to try again in a moment."
-        }
-        const body = await r.json().catch(() => null)
-        if (body?.description) return body.description
-        return "I looked but couldn't make out any details this time."
-      } catch (err) {
-        return "The vision link dropped just now. I can try again if the user asks."
-      }
-    }
+    // what_do_you_see REMOVED — Gemini Live receives camera frames
+    // natively via realtimeInput.video and can describe them directly.
     case 'get_my_location': {
       // Client-side GPS — on mobile this hits real GPS, on desktop the OS
       // WiFi-fused location. KelionStage registered a provider via

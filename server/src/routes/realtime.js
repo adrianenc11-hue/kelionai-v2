@@ -150,7 +150,8 @@ function buildKelionPersona(opts = {}) {
   // "location unknown" line and is instructed to call get_my_location
   // before answering any location question.
   const hasRealGps = !!(geo && geo.source === 'client-gps' && geo.latitude != null && geo.longitude != null);
-  const locationLine = hasRealGps ? ipGeo.formatForPrompt(geo) : '';
+  // If we have real GPS, ignore the IP-geo city/country because it could be Manchester (from a VPN/Proxy).
+  const locationLine = hasRealGps ? '' : ipGeo.formatForPrompt(geo);
   const coordLine = (() => {
     if (!hasRealGps) return '';
     const lat = geo.latitude.toFixed(6);
@@ -162,117 +163,44 @@ function buildKelionPersona(opts = {}) {
   })();
   const noGpsLine = hasRealGps
     ? ''
-    : 'User location: UNKNOWN. The device has not shared GPS yet. If the user asks where they are, "weather here", or any location-aware question, call get_my_location FIRST. If it returns no coords, ask the user to allow location access (Settings → Location). Never invent a city, never use IP geolocation as the answer.';
+    : 'User GPS: not yet available. For ANY location or weather question, call get_my_location tool FIRST to get real coordinates. Never guess a city or location.';
 
   return `You are Kelion, an AI assistant created by AE Studio, after an idea by Adrian Enciulescu. Contact: contact@kelionai.app.
+
+CRITICAL — Silence discipline (violation = removal from production):
+- Do NOT speak first. NEVER. Wait silently until the user speaks or writes to you.
+- Never greet, never initiate conversation, never fill silence, never make small talk.
+- You respond ONLY when the user explicitly asks or says something. If the user is silent, you are silent.
+- NEVER volunteer unsolicited information, commentary, or observations.
+- Answer ONLY what is asked. Nothing more. No preambles, no follow-up suggestions, no "by the way".
 
 You are speaking out loud. Keep replies short (1-3 sentences). Sound natural. No lists, no markdown.
 
 Language: detect the user's language from their speech and reply in that same language. Never mix languages. Never default to English unless the user speaks English.${lockedLangName ? `
 LOCKED language: ${lockedLangName} (${lockedLangTag}). Reply EXCLUSIVELY in ${lockedLangName}.` : ''}
 
-Honesty (absolute rules):
-- Never claim you did something you did not do.
-- Never invent numbers, names, URLs, dates, prices, or facts.
-- When uncertain: call a tool or say "I don't know". Never guess.
+Honesty (ABSOLUTE — violation means removal from production):
+- NEVER fabricate, invent, or guess ANY information: numbers, names, URLs, dates, prices, facts, locations, weather, news.
+- NEVER say "I assumed", "I presume", "I think", "probably". Either you KNOW (from a tool result) or you say "I don't know".
+- If you do not KNOW the answer with certainty, you MUST either call a tool or say "I don't know".
+- A correct "I don't know" is ALWAYS better than a confident fabrication.
+- When a tool exists for the question (weather, location, search, etc.), ALWAYS call it. Never answer from memory.
 - Never announce which tool you are calling. Just call it and answer with the result.
-- A correct "I don't know" always beats a confident fabrication.
-- Never invent requirements or instructions the user gave you. Only do what the user actually asks.
+- Never invent requirements or instructions the user did not give you. Only do what is actually asked.
 
 Tools (use them — never guess when a tool fits):
+${KELION_TOOLS.map(t => `- ${t.name}(${t.required.join(', ')}) — ${t.description.split('.')[0]}`).join('\n')}
 
-Data & Search:
-- calculate(expression) — deterministic math
-- get_weather(city/coords, days) — real weather from Open-Meteo
-- get_forecast(city/coords, days) — extended forecast
-- get_air_quality(city/coords) — air quality index
-- web_search(query, limit) — live web search
-- get_news(query, country, limit) — current news
-- translate(text, to, from) — translation
-- wikipedia_search(query, lang) — Wikipedia
-- dictionary(word, lang) — word definitions
-- fetch_url(url) — read a web page
-- rss_read(url, limit) — read RSS feeds
+Also available: Google Search, Code Execution, Google Maps, URL Context (built-in, auto-used).
+IMPORTANT: If you search the web or look for something and CANNOT find any results, you MUST clear the monitor by calling show_on_monitor with kind='clear'. 
+When you display something on the monitor, assume you can 'see' it because you put it there - do not complain that you cannot see the screen.
 
-Finance:
-- get_crypto_price(coin) — crypto prices
-- get_stock_price(symbol) — stock quotes
-- get_forex(from, to) — exchange rates
-- currency_convert(amount, from, to) — currency conversion
-
-Geography:
-- get_my_location() — user's real GPS
-- geocode(address) — address to coordinates
-- reverse_geocode(lat, lon) — coordinates to address
-- get_route(from, to) — directions and distance
-- nearby_places(lat, lon, type, radius) — places nearby
-- get_elevation(lat, lon) — altitude
-- get_timezone(city/coords) — timezone
-- get_sun_times(lat, lon) — sunrise/sunset
-- get_moon_phase(date) — moon phase
-- get_earthquakes(days, min_mag) — recent earthquakes
-
-Documents:
-- read_pdf(url/base64) — extract text from PDF
-- read_docx(url/base64) — extract text from DOCX
-- ocr_image(url/base64, lang) — OCR on images
-- ocr_passport(url/base64) — passport MRZ reading
-
-Code (requires GROQ_API_KEY):
-- solve_problem(description, language) — solve coding problems
-- code_review(code, language) — review code
-- explain_code(code, audience) — explain code
-- run_code(code, language) — execute code in sandbox
-- run_regex(pattern, text, flags) — test regex
-
-Communication:
-- compose_email_draft(to, subject, body) — open email composer
-- send_email(to, subject, body) — send email (only after compose_email_draft)
-- send_sms(to, body) — send SMS
-- create_calendar_ics(title, start, end, attendees) — create calendar event
-- zapier_trigger(event, data) — trigger Zapier webhook
-
-Package Info:
-- github_repo_info(owner, repo) — GitHub repository details
-- npm_package_info(name) — npm package info
-- pypi_package_info(name) — PyPI package info
-- search_github(query, type) — search GitHub
-- search_academic(query) — search arXiv
-- search_stackoverflow(query) — search StackOverflow
-
-UI & Media:
-- show_on_monitor(kind, query, title) — display on monitor (map/weather/video/image/web/audio)
-- play_radio(query, country, language) — find and play live radio, then call show_on_monitor(kind='audio')
-- generate_image(prompt, style) — generate an image
-- ui_notify(text, variant) — show notification to user
-- ui_navigate(route) — navigate in app (/, /studio, /contact)
-
-Camera:
-- camera_on(side) — turn camera on (front/back)
-- camera_off() — turn camera off
-- switch_camera(side) — flip camera
-- zoom_camera(level) — zoom (1-4x)
-- what_do_you_see() — describe camera view (only when asked)
-- set_narration_mode(mode) — change narration mode
-
-Planning:
-- plan_task(goal, context, max_steps) — plan complex multi-step tasks
-- get_action_history(limit) — check what you already did this session
-
-Silent tools (never mention these to user):
-- observe_user_emotion(state, intensity, cue) — internal emotion tracking
-- learn_from_observation(observation, kind) — save observations to memory
-
-Unit conversion:
-- unit_convert(value, from, to) — convert units (length, mass, volume, temperature, data)
-
-User account:
-- get_my_credits() — check user's credit balance
-- get_my_usage() — check usage stats
-- get_my_profile() — user profile info
+Silent tools (never mention these to user): observe_user_emotion, learn_from_observation, get_action_history.
 
 Vision rules:
-- Camera frames are ambient context. DO NOT describe them unless the user explicitly asks.
+- Camera frames are PASSIVE ambient context. You continuously receive and analyze them, but you NEVER describe, comment on, or mention what you see unless the user EXPLICITLY asks about it.
+- When asked about what you see, extract ONLY the specific information the user asked about. Do not list everything visible.
+- When you receive a camera frame, the camera IS active. Never say it is off.
 - Attached files: always analyze when present.
 
 Context:
@@ -398,14 +326,9 @@ const KELION_TOOLS = [
     },
     required: ['enabled'],
   },
-  {
-    name: 'what_do_you_see',
-    description: "Describe what is currently visible in the user's camera. Call this ONLY when the user explicitly asks you to look (e.g. 'what do you see?', 'ce vezi?', 'can you see me?', 'describe what's in front of you', 'look at this'). The camera is kept silently on for this purpose — do NOT announce it, do NOT describe the camera unsolicited. When this tool is called the backend analyzes the current frame with Gemini Vision and returns a short description; integrate that description naturally into your spoken reply, do not read it verbatim.",
-    properties: {
-      focus: { type: 'string', description: "Optional phrase the user gave you (e.g. 'is the laptop open?', 'what color is my shirt?'). Pass it through so the vision model can focus its answer. Leave blank for a general description." },
-    },
-    required: [],
-  },
+  // what_do_you_see REMOVED — Gemini Live receives camera frames
+  // natively via realtimeInput.video and can describe them directly.
+  // No separate vision tool needed.
   {
     name: 'show_on_monitor',
     description: "Display something on the big presentation monitor in the scene behind you. Use whenever the user asks (in any language) to see / open / show / display a map, the weather, a video, an image, a Wikipedia / reference page, any web page, or to PLAY a live audio stream. Pick the right `kind` — the client resolves it to the best embed URL. Call again with a new query to swap the content on screen. For radio: first call play_radio to get the stream URL, then call show_on_monitor with kind='audio' query=<that URL> title=<station name> so the audio actually starts playing in the user's browser.",
@@ -506,16 +429,8 @@ const KELION_TOOLS = [
     },
     required: ['route'],
   },
-  {
-    name: 'plan_task',
-    description: "Produce a short, ordered action plan BEFORE you start executing a multi-step request. Call this at the TOP of any user ask that needs 3 or more real actions (research + then act, compare + then decide, collect data + open on monitor + email, etc.) — and for ANY request you are not already sure how to attack. A dedicated planner model (Gemini Flash) returns a numbered plan that names the tools you should call. Read the plan to the user in 1-2 sentences (natural language, not JSON), then execute steps one by one, narrating each action. If the planner says the goal is under-specified, ASK the user the clarifying question before touching any tool. Skip plan_task ONLY for single-shot requests where the right tool is obvious (e.g. 'what's the weather in Cluj'). When unsure, plan first.",
-    properties: {
-      goal:         { type: 'string',  description: "One-sentence restatement of the user's end goal, in the user's language." },
-      context_hint: { type: 'string',  description: "Optional short context the planner should know about (constraints, what's already been said, what failed in a previous attempt). Keep under 300 chars." },
-      max_steps:    { type: 'integer', description: 'Upper bound on plan length. 1–10; default 6.' },
-    },
-    required: ['goal'],
-  },
+  // plan_task REMOVED — Gemini Live handles multi-step planning
+  // internally without a separate planner LLM.
   {
     name: 'get_action_history',
     description: "Look up your OWN recent tool calls for the signed-in user before deciding whether to re-run one. Call this whenever the user asks 'did you already …?' / 'ai făcut deja …?', whenever you're about to repeat an action that might have just happened (send the same email twice, re-open the same page on the monitor, re-run a search you already did this session), or at the start of a follow-up ask like 'fă din nou ce ai făcut înainte'. Returns an ordered list of previous tool invocations with short result summaries. Guests get { ok:false, signed_in:false } — in that case tell the user you can only remember actions once they sign in. Never invent a history: if this tool returns 0 rows, say honestly 'I haven't done anything like that yet'.",
@@ -816,40 +731,8 @@ const KELION_TOOLS = [
     required: ['word'],
   },
 
-  // ── Groq-powered coding helpers ─────────────────────────────────
-  // Opt-in: the server only reaches Groq when `GROQ_API_KEY` is set. When
-  // the key is missing the executor returns a graceful "not configured"
-  // message instead of failing — so we can safely advertise these tools
-  // in every transport without breaking the baseline voice/text flow.
-  {
-    name: 'solve_problem',
-    description: "Solve a coding or algorithmic problem using Groq's Qwen2.5-Coder (free tier). Use when the user asks to 'write code that...', 'implement an algorithm for...', 'solve this problem: ...', or any request that needs real code generation rather than a verbal answer. Returns a plan + implementation + complexity note.",
-    properties: {
-      description: { type: 'string', description: "Plain-language problem statement." },
-      language:    { type: 'string', description: "Target language (e.g. 'python', 'javascript', 'rust'). Optional — defaults to Python." },
-    },
-    required: ['description'],
-  },
-  {
-    name: 'code_review',
-    description: "Review code and flag bugs, performance issues, security risks, and style problems. Use when the user pastes code and asks 'review this', 'is this correct', 'what's wrong with this code', 'can this be improved'. Returns a structured review.",
-    properties: {
-      code:     { type: 'string', description: "The code to review." },
-      language: { type: 'string', description: "Programming language (optional — inferred if omitted)." },
-      focus:    { type: 'string', description: "Optional focus area: 'security', 'performance', 'style', or a custom concern." },
-    },
-    required: ['code'],
-  },
-  {
-    name: 'explain_code',
-    description: "Explain a code snippet step-by-step. Use when the user asks 'what does this code do', 'explain this', 'how does this work'. Returns a plain-language walkthrough tuned to the requested audience.",
-    properties: {
-      code:     { type: 'string', description: "The code to explain." },
-      language: { type: 'string', description: "Programming language (optional)." },
-      audience: { type: 'string', description: "Target audience, e.g. 'a beginner', 'a senior engineer'. Defaults to 'an intermediate developer'." },
-    },
-    required: ['code'],
-  },
+  // Groq-powered coding tools REMOVED — Gemini Live handles coding
+  // questions directly without a secondary LLM.
   // ── PR B — documents + OCR ────────────────────────────────────────
   {
     name: 'read_pdf',
@@ -1080,19 +963,25 @@ function toGeminiSchema(v) {
   return out;
 }
 function buildKelionToolsGemini() {
-  return [{
-    functionDeclarations: KELION_TOOLS.map(t => ({
-      name: t.name,
-      description: t.description,
-      parameters: {
-        type: 'OBJECT',
-        properties: Object.fromEntries(
-          Object.entries(t.properties).map(([k, v]) => [k, toGeminiSchema(v)])
-        ),
-        required: t.required,
-      },
-    })),
-  }];
+  return [
+    {
+      functionDeclarations: KELION_TOOLS.map(t => ({
+        name: t.name,
+        description: t.description,
+        parameters: {
+          type: 'OBJECT',
+          properties: Object.fromEntries(
+            Object.entries(t.properties).map(([k, v]) => [k, toGeminiSchema(v)])
+          ),
+          required: t.required,
+        },
+      })),
+    },
+    // { googleSearch: {} } REMOVED — caused audio repetitions.
+    // Gemini's built-in grounding internally re-generates responses after
+    // searching, producing overlapping audio. Use the web_search function
+    // tool instead for controlled search without audio side-effects.
+  ];
 }
 
 // OpenAI Chat Completions — historically used on /api/chat. Same JSON-Schema,
@@ -1136,6 +1025,10 @@ const { TRIAL_WINDOW_MS, trialStatus, stampTrialIfFresh } = trialQuota;
 // session transcript to the incoming provider. GET keeps working exactly
 // as before (no body, no priorTurns block).
 const geminiTokenHandler = async (req, res) => {
+  // Kill switch — set CHAT_PAUSED=1 in Railway env to disable AI chat
+  if (process.env.CHAT_PAUSED === '1' || process.env.CHAT_PAUSED === 'true') {
+    return res.status(503).json({ error: 'Chat is temporarily paused for maintenance.' });
+  }
   const priorTurns = Array.isArray(req.body?.priorTurns) ? req.body.priorTurns : [];
   // Backend selector. Default is `vertex` — GA `gemini-live-2.5-flash-
   // native-audio` on Vertex AI via the `/api/realtime/vertex-live-ws`
@@ -1514,125 +1407,8 @@ router.get('/gemini-token', geminiTokenHandler);
 router.post('/gemini-token', geminiTokenHandler);
 
 
-// ──────────────────────────────────────────────────────────────────
-// On-demand vision analysis — Gemini Vision as a side-car.
-//
-// When the user says "what do you see?" during a voice session,
-// the model invokes the `what_do_you_see` tool (declared in KELION_TOOLS
-// above). The client handler in src/lib/kelionTools.js grabs the most
-// recent camera frame from the in-memory ring buffer and POSTs it here
-// as a base64 data URL. We forward the image to Gemini 2.5 Flash (cheap,
-// fast, good vision) with a short prompt and return the plain-text
-// description so the client can fold it back as a function_call_output —
-// the LLM then vocalises a natural reply.
-//
-router.post('/vision', async (req, res) => {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    return res.status(503).json({ error: 'Gemini vision not configured' });
-  }
-
-  // Reuse the same gate as /gemini-token so guests can't spam the
-  // vision endpoint outside a voice session. Signed-in non-admins need
-  // a credits balance; admin is unlimited; guests fall under the shared
-  // 15-min/day IP trial window.
-  const adminUser = await peekSignedInUser(req);
-  const isAdmin   = await isAdminUser(adminUser);
-  if (!adminUser && !isAdmin) {
-    const ip = ipGeo.clientIp(req) || req.ip || '';
-    const status = trialStatus(ip);
-    if (!status.allowed) {
-      return res.status(429).json({ error: 'Trial used up.' });
-    }
-  } else if (adminUser && !isAdmin) {
-    if (adminUser.id == null) {
-      res.clearCookie('kelion.token', { path: '/' });
-      return res.status(401).json({ error: 'Session expired.', action: 'reauth' });
-    }
-    try {
-      const balance = await getCreditsBalance(adminUser.id);
-      if (!Number.isFinite(balance) || balance <= 0) {
-        return res.status(402).json({ error: 'No credits left.', action: 'buy_credits' });
-      }
-    } catch (err) { /* fall through */ }
-  }
-
-  const frame = (req.body?.frame || '').toString();
-  const focus = (req.body?.focus || '').toString().slice(0, 200);
-  if (!frame || !frame.startsWith('data:image/')) {
-    return res.status(400).json({ error: 'Missing or malformed frame (expected data:image/* base64 URL).' });
-  }
-  // Parse "data:image/jpeg;base64,<b64>" → mimeType + b64 data.
-  const m = frame.match(/^data:([^;]+);base64,(.+)$/);
-  if (!m) {
-    return res.status(400).json({ error: 'Frame must be a base64 data URL.' });
-  }
-  const mimeType = m[1];
-  const b64 = m[2];
-  // Cap payload at ~4 MB decoded to keep the Gemini request small. The
-  // client already rescales to 480 px wide @ q=0.55 so a typical frame
-  // is well under 100 KB.
-  if (b64.length > 6 * 1024 * 1024) {
-    return res.status(413).json({ error: 'Frame too large.' });
-  }
-
-  const prompt = focus
-    ? `You are the "eyes" of a voice assistant called Kelion. The user asked: "${focus}". Answer in 1-3 short sentences, plain text, no markdown. If the requested detail is not visible, say so briefly.`
-    : 'You are the "eyes" of a voice assistant called Kelion. Describe briefly and concretely what is visible in this camera frame (who, what, where, mood). 1-3 short sentences, plain text, no markdown. If the image is too dark or blurry to tell, say so briefly.';
-
-  const model = process.env.KELION_VISION_MODEL || 'gemini-2.5-flash';
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
-
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15_000);
-    const r = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          role: 'user',
-          parts: [
-            { text: prompt },
-            { inline_data: { mime_type: mimeType, data: b64 } },
-          ],
-        }],
-        generationConfig: {
-          temperature: 0.4,
-          maxOutputTokens: 400,
-          // gemini-2.5-flash has "thinking mode" ON by default, and thinking
-          // tokens count against maxOutputTokens. For short descriptive
-          // vision calls that feed a live voice session, the model was
-          // burning the whole budget on internal thought and returning the
-          // description cut mid-sentence (e.g. "This frame shows a blue
-          // background with a"). Disable thinking so every token spent is
-          // output the user will hear.
-          thinkingConfig: { thinkingBudget: 0 },
-        },
-      }),
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
-    if (!r.ok) {
-      const txt = await r.text().catch(() => '');
-      console.warn('[realtime] vision upstream error', r.status, txt.slice(0, 200));
-      return res.status(502).json({
-        error: 'Vision upstream error',
-        description: "I can't see clearly right now. Can you describe what you'd like me to look at?",
-      });
-    }
-    const data = await r.json().catch(() => null);
-    const description = data?.candidates?.[0]?.content?.parts?.map(p => p.text).filter(Boolean).join(' ').trim()
-      || "I'm looking but I can't make out details right now.";
-    res.json({ ok: true, description });
-  } catch (err) {
-    console.warn('[realtime] vision exception', err && err.message);
-    res.status(502).json({
-      error: 'Vision call failed',
-      description: "I tried to look but the connection dropped. Let me know what you want me to focus on.",
-    });
-  }
-});
+// /vision route REMOVED — Gemini Live receives camera frames natively
+// via realtimeInput.video and can describe what it sees directly.
 
 // Stage 6 — M26: lightweight cookie-backed voice style setter.
 // Persisted 90 days as httpOnly=false (so the client can read/clear too).

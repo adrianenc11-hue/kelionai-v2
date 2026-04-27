@@ -204,15 +204,22 @@ async function handleClientConnection(clientWs, req) {
     closeBoth(1011, 'upstream error');
   });
 
+  // Buffer early client messages that arrive while upstream is still
+  // connecting. Flushed once on the upstream 'open' event. This avoids
+  // stacking one `once('open')` listener per message which triggers
+  // MaxListenersExceededWarning when the client sends > 10 frames
+  // before the upstream handshake completes.
+  const earlyBuffer = [];
+  upstream.once('open', () => {
+    for (const { data: d, isBinary: b } of earlyBuffer) {
+      try { upstream.send(d, { binary: b }); } catch (_) { /* ignore */ }
+    }
+    earlyBuffer.length = 0;
+  });
+
   clientWs.on('message', (data, isBinary) => {
     if (upstream.readyState === WebSocket.CONNECTING) {
-      // Buffer until upstream opens. The official Gemini Live client
-      // always sends `setup` immediately after `onopen`, so we rely
-      // on the one-shot `open` event + queue anything that slips in
-      // early (shouldn't happen in practice, but defensive).
-      upstream.once('open', () => {
-        try { upstream.send(data, { binary: isBinary }); } catch (_) { /* ignore */ }
-      });
+      earlyBuffer.push({ data, isBinary });
       return;
     }
     if (upstream.readyState !== WebSocket.OPEN) return;

@@ -148,6 +148,9 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
   const frameCanvasRef = useRef(null)
 
   const appendTurn = useCallback((role, delta, finalize = false) => {
+    // When a role speaks, finalize the OTHER role's bubble so they don't merge infinitely.
+    turnActiveRef.current[role === 'user' ? 'assistant' : 'user'] = null;
+    
     setTurns((prev) => {
       const active = turnActiveRef.current[role]
       if (active !== null && prev[active] && prev[active].role === role) {
@@ -282,6 +285,12 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
   // the shared ref) before IT had received its own setupComplete ack,
   // triggering 1007. Binding sends to the local ws keeps each session
   // talking to itself.
+  // Per-turn flag: has this assistant turn already received an
+  // outputTranscription? Persists across WS frames (unlike a local var)
+  // so that modelTurn.parts[].text arriving in a LATER frame is not
+  // appended a second time. Reset on turnComplete.
+  const turnHasTranscriptRef = useRef(false)
+
   const handleMessage = useCallback(async (raw, ws) => {
     let msg
     try { msg = JSON.parse(typeof raw === 'string' ? raw : await raw.text()) }
@@ -315,8 +324,17 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
         appendTurn('user', sc.inputTranscription.text, false)
         lastActivityAtRef.current = Date.now()
       }
+      // outputTranscription is Gemini's own transcript of what it said.
+      // modelTurn.parts[].text carries the same content inline. Processing
+      // both causes the assistant's reply to appear twice in the chat.
+      // We prefer outputTranscription (cleaner, post-processed by Gemini)
+      // and skip part.text when it was already handled.
+      // FIX: use a per-turn ref (not a per-frame local) so that
+      // outputTranscription arriving in frame N still suppresses
+      // modelTurn.parts[].text arriving in frame N+1.
       if (sc.outputTranscription?.text) {
         appendTurn('assistant', sc.outputTranscription.text, false)
+        turnHasTranscriptRef.current = true
         lastActivityAtRef.current = Date.now()
       }
 
@@ -327,14 +345,19 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
           const bytes = bytesFromBase64(inline.data)
           enqueueAudio(bytes)
         }
-        if (part.text) {
+        // Only append text if we didn't already get it from outputTranscription
+        if (part.text && !turnHasTranscriptRef.current) {
           appendTurn('assistant', part.text, false)
         }
       }
 
       if (sc.turnComplete) {
-        turnActiveRef.current.user = null
-        turnActiveRef.current.assistant = null
+        // We no longer reset turnActiveRef.current here. Resetting on turnComplete
+        // causes tool calls (which span multiple server turns) to split the
+        // assistant's reply into multiple chat bubbles ("mai multe intrari in chat").
+        // Reset the per-turn transcript dedup flag so the NEXT turn
+        // can accept either outputTranscription or inline text again.
+        turnHasTranscriptRef.current = false
         if (!playbackPlayingRef.current) setStatus('listening')
       } else if (sc.generationComplete) {
         setStatus('speaking')
@@ -426,6 +449,8 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
   }, [appendTurn, enqueueAudio, clearAudioQueue])
 
   // ───── Start full pipeline ─────
+  // textOnly: true → open WS without mic (text chat). Voice (tap-to-talk)
+  // calls start() without textOnly so the mic opens as before.
   const start = useCallback(async (opts = {}) => {
     // F4 — on auto-fallback from OpenAI, KelionStage passes the current
     // session transcript so Gemini continues rather than re-greeting.
@@ -452,6 +477,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
     // can read it (handleMessage is defined outside start(), so local vars
     // declared here are not in its closure).
     translatorModeRef.current = opts.translatorMode || false
+    const textOnly = !!opts.textOnly
     // If a previous ws is still live (or in CONNECTING), tear it down
     // before opening a new one — otherwise the old handlers keep firing
     // against `wsRef.current` after we reassign it below.
@@ -468,13 +494,18 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
     // Devin Review BUG_0003 on PR #133.
     lastActivityAtRef.current = Date.now()
     try {
-      // 1. Request mic
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, sampleRate: SAMPLE_RATE_IN },
-        video: false,
-      })
-      micStreamRef.current = stream
-      startMicLevel(stream)
+      // 1. Request mic (skipped for text-only sessions — the user typed
+      //    a message, we don't want ambient mic audio creating spurious
+      //    inputTranscription entries alongside the typed text).
+      let stream = null
+      if (!textOnly) {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, sampleRate: SAMPLE_RATE_IN },
+          video: false,
+        })
+        micStreamRef.current = stream
+        startMicLevel(stream)
+      }
 
       setStatus('connecting')
 
@@ -775,37 +806,39 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
         setStatus('idle')
       }
 
-      // 4. Pipe mic → WS at 16kHz PCM16
-      if (!audioCtxRef.current) {
-        audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: SAMPLE_RATE_IN })
-      }
-      const ctx = audioCtxRef.current
-      if (ctx.state === 'suspended') ctx.resume()
+      // 4. Pipe mic → WS at 16kHz PCM16 (skipped for text-only sessions)
+      if (stream) {
+        if (!audioCtxRef.current) {
+          audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: SAMPLE_RATE_IN })
+        }
+        const ctx = audioCtxRef.current
+        if (ctx.state === 'suspended') ctx.resume()
 
-      // Load AudioWorklet for sample-accurate capture
-      try {
-        await ctx.audioWorklet.addModule('/audio-capture-worklet.js')
-      } catch (e) {
-        console.error('[geminiLive] Worklet load failed:', e)
-        throw new Error('Failed to load audio worklet')
-      }
+        // Load AudioWorklet for sample-accurate capture
+        try {
+          await ctx.audioWorklet.addModule('/audio-capture-worklet.js')
+        } catch (e) {
+          console.error('[geminiLive] Worklet load failed:', e)
+          throw new Error('Failed to load audio worklet')
+        }
 
-      const src = ctx.createMediaStreamSource(stream)
-      const node = new AudioWorkletNode(ctx, 'kelion-capture', { numberOfInputs: 1, numberOfOutputs: 0 })
-      node.port.onmessage = (e) => {
-        if (ws.readyState !== WebSocket.OPEN) return
-        const float = e.data
-        const pcm16 = floatTo16BitPCM(float)
-        const bytes = new Uint8Array(pcm16.buffer, pcm16.byteOffset, pcm16.byteLength)
-        const b64 = base64FromBytes(bytes)
-        ws.send(JSON.stringify({
-          realtimeInput: {
-            audio: { data: b64, mimeType: `audio/pcm;rate=${SAMPLE_RATE_IN}` },
-          },
-        }))
+        const src = ctx.createMediaStreamSource(stream)
+        const node = new AudioWorkletNode(ctx, 'kelion-capture', { numberOfInputs: 1, numberOfOutputs: 0 })
+        node.port.onmessage = (e) => {
+          if (ws.readyState !== WebSocket.OPEN) return
+          const float = e.data
+          const pcm16 = floatTo16BitPCM(float)
+          const bytes = new Uint8Array(pcm16.buffer, pcm16.byteOffset, pcm16.byteLength)
+          const b64 = base64FromBytes(bytes)
+          ws.send(JSON.stringify({
+            realtimeInput: {
+              audio: { data: b64, mimeType: `audio/pcm;rate=${SAMPLE_RATE_IN}` },
+            },
+          }))
+        }
+        src.connect(node)
+        workletNodeRef.current = node
       }
-      src.connect(node)
-      workletNodeRef.current = node
 
     } catch (e) {
       console.error('[geminiLive] start error', e)
@@ -1191,16 +1224,69 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
     }
   }, [])
 
+  // sendText — typed text through the live WebSocket (Canal B only).
+  // FIX: must wait for setupComplete (status === 'listening'), NOT just
+  // ws.readyState === OPEN. The WS is OPEN at onopen — BEFORE Google's
+  // setupComplete ack. Sending clientContent before setupComplete violates
+  // the Gemini Live protocol: Google silently drops the message or kills
+  // the socket with 1007. This was the root cause of "text chat doesn't
+  // reach the AI" (April 2026).
+  const sendText = useCallback(async (text) => {
+    if (!text || typeof text !== 'string') return
+    const trimmed = text.trim()
+    if (!trimmed) return
+    appendTurn('user', trimmed, true)
+    lastActivityAtRef.current = Date.now()
+    const ws = wsRef.current
+    // If no live session, start one and wait for setupComplete.
+    if (!ws || ws.readyState !== WebSocket.OPEN || statusRef.current === 'idle') {
+      await start({ textOnly: true })
+      // Poll until the session is fully initialised (setupComplete sets
+      // status to 'listening') or a terminal state is reached.
+      const deadline = Date.now() + 8000
+      while (Date.now() < deadline) {
+        const s = statusRef.current
+        if (s === 'listening') break
+        if (s === 'error' || s === 'idle') break
+        await new Promise(r => setTimeout(r, 150))
+      }
+    }
+    // Even when the session was already open, double-check that the WS is
+    // alive and that we're past setupComplete before sending.
+    const activeWs = wsRef.current
+    if (activeWs && activeWs.readyState === WebSocket.OPEN && statusRef.current === 'listening') {
+      activeWs.send(JSON.stringify({
+        clientContent: {
+          turns: [{ role: 'user', parts: [{ text: trimmed }] }],
+          turnComplete: true,
+        },
+      }))
+      setStatus('thinking')
+    }
+  }, [appendTurn, start])
+
+  // Allow the parent to clear or seed the transcript (used by history
+  // load, new-conversation, sign-out). Avoids duplicating state.
+  const clearTurns = useCallback(() => {
+    setTurns([])
+    turnActiveRef.current = { user: null, assistant: null }
+  }, [])
+  const loadTurns = useCallback((entries) => {
+    if (!Array.isArray(entries)) return
+    setTurns(entries.map(e => ({ role: e.role, text: e.text || e.content || '' })))
+    turnActiveRef.current = { user: null, assistant: null }
+  }, [])
+
   return {
     status, error, start, stop, turns, userLevel,
     // Stage 2
     cameraStream, screenStream, visionError,
     startCamera, stopCamera, startScreen, stopScreen,
-    // Trial countdown (null for signed-in users, object for guests).
     trial,
-    // Audit M6 — handoff double-start guard (see lib/handoffGuard.js).
     isBusy,
-    // Mute/unmute Kelion's voice output without restarting the session.
     setMuted,
+    sendText,
+    clearTurns,
+    loadTurns,
   }
 }

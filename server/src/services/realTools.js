@@ -1445,42 +1445,9 @@ function pickForcedTool(lastUserMessage) {
   return null;
 }
 
-// ──────────────────────────────────────────────────────────────────
-// Groq-powered code helpers — ADDITIVE ONLY.
-//
-// These tools route to Groq (Qwen2.5-Coder-32B / Llama 3.3 70B) when
-// `GROQ_API_KEY` is configured. They do NOT touch the chat flow: they
-// are reachable exclusively via the KELION_TOOLS function-call path so
-// the model can invoke them on demand. If the key is missing the helper
-// returns `{ ok:false, unavailable:true, error }` and the model verbalizes
-// a graceful "not configured" message. No fallback to Gemini/OpenAI — we
-// want the user (or admin) to know the feature is opt-in.
+// Groq-powered coding tools and plan_task REMOVED — Gemini Live
+// handles coding questions and multi-step planning directly.
 
-const { groqChat } = require('./groq');
-
-const SOLVE_PROBLEM_SYSTEM = [
-  'You are an expert software engineer.',
-  'Given a problem description, produce:',
-  '  1. A brief plan (1-3 bullets).',
-  '  2. A self-contained code solution in the requested language (or Python if unspecified).',
-  '  3. A short correctness + complexity note.',
-  'Keep the answer focused. No chit-chat.',
-].join('\n');
-
-const CODE_REVIEW_SYSTEM = [
-  'You are a senior code reviewer.',
-  'Review the supplied code. Output:',
-  '  - Summary (1-2 sentences).',
-  '  - Issues found (bug, perf, security, style) — each with file/line hint if visible.',
-  '  - Concrete suggestions (code snippet when useful).',
-  'Be specific. Skip praise.',
-].join('\n');
-
-const EXPLAIN_CODE_SYSTEM = [
-  'You are a patient teacher.',
-  'Explain the supplied code step-by-step in plain language suited to the requested audience.',
-  'Call out non-obvious tricks, edge cases, and invariants. Do not rewrite the code.',
-].join('\n');
 
 // ──────────────────────────────────────────────────────────────────
 // PR B — document + OCR tools. Backend-only; the LLM calls these via
@@ -1695,199 +1662,9 @@ async function toolOcrPassport({ url, base64 }) {
   };
 }
 
-async function toolSolveProblem(args) {
-  const description = String(args?.description || args?.problem || '').trim();
-  if (!description) return { ok: false, error: 'missing problem description' };
-  const language = String(args?.language || '').trim();
-  const prompt = language
-    ? `Problem:\n${description}\n\nImplement the solution in ${language}.`
-    : `Problem:\n${description}`;
-  const r = await groqChat([
-    { role: 'system', content: SOLVE_PROBLEM_SYSTEM },
-    { role: 'user', content: prompt },
-  ], { temperature: 0.2, maxTokens: 1800 });
-  if (!r.ok) return r;
-  return { ok: true, result: r.text, model: r.model };
-}
-
-async function toolCodeReview(args) {
-  const code = String(args?.code || '').trim();
-  if (!code) return { ok: false, error: 'missing code' };
-  const focus = String(args?.focus || '').trim();
-  const language = String(args?.language || '').trim();
-  const header = [
-    language ? `Language: ${language}` : null,
-    focus ? `Focus: ${focus}` : null,
-  ].filter(Boolean).join('\n');
-  const prompt = header
-    ? `${header}\n\nCode:\n\`\`\`\n${code}\n\`\`\``
-    : `Code:\n\`\`\`\n${code}\n\`\`\``;
-  const r = await groqChat([
-    { role: 'system', content: CODE_REVIEW_SYSTEM },
-    { role: 'user', content: prompt },
-  ], { temperature: 0.1, maxTokens: 1500 });
-  if (!r.ok) return r;
-  return { ok: true, result: r.text, model: r.model };
-}
-
-async function toolExplainCode(args) {
-  const code = String(args?.code || '').trim();
-  if (!code) return { ok: false, error: 'missing code' };
-  const audience = String(args?.audience || 'an intermediate developer').trim();
-  const language = String(args?.language || '').trim();
-  // Keep the metadata lines separate from the code fence with a blank
-  // line so the model sees the same visual structure as toolCodeReview.
-  // We can't put '' inside filter(Boolean) because filter(Boolean) drops
-  // empty strings, so assemble the header and the code block separately.
-  const header = [
-    language ? `Language: ${language}` : null,
-    `Audience: ${audience}`,
-  ].filter(Boolean).join('\n');
-  const prompt = `${header}\n\nCode:\n\`\`\`\n${code}\n\`\`\``;
-  const r = await groqChat([
-    { role: 'system', content: EXPLAIN_CODE_SYSTEM },
-    { role: 'user', content: prompt },
-  ], { temperature: 0.2, maxTokens: 1500 });
-  if (!r.ok) return r;
-  return { ok: true, result: r.text, model: r.model };
-}
-
-// ──────────────────────────────────────────────────────────────────
-// PR 7/N — plan_task (Planner Brain).
-//
-// Adrian 2026-04-20: "ma asteptam sa fie ai de soft, sa stie sa decida,
-// sa fie ca un creier. sa gestioneze tot … un creier care ia decizii,
-// apasa butoane, e clar, stie ce face".
-//
-// The live voice model (OpenAI Realtime / Gemini Live) is great at
-// turn-by-turn replies but tends to "just start doing things" on
-// multi-step asks — it skips steps, loops, or hallucinates an order
-// that breaks the first tool call. plan_task gives it an optional
-// pre-flight hop: it sends the user goal to Gemini 2.5 Flash (cheap,
-// fast, strong at structured output) and gets back a short numbered
-// plan that references Kelion's actual tool catalog. The voice model
-// can then read the plan out loud AND execute it step by step.
-//
-// This tool is ADDITIVE and UNCONDITIONAL: if it's never called the
-// existing chat/voice behaviour is unchanged. Persona nudges the
-// model to call it on complex requests; the persona change is in
-// realtime.js alongside the KELION_TOOLS entry.
-
-const PLAN_TASK_SYSTEM = [
-  'You are the planner of a voice-first AI assistant called Kelion.',
-  '',
-  'You receive a user goal plus an optional context hint and produce a',
-  'short, concrete action plan that Kelion can execute step by step.',
-  '',
-  'Kelion has these tool categories (examples, not exhaustive):',
-  '  • Browse / search: web_search, fetch_url, wikipedia_search, search_github, search_academic, search_stackoverflow, rss_read.',
-  '  • Information lookup: get_weather, get_forecast, get_news, get_crypto_price, get_stock_price, get_forex, currency_convert, get_air_quality, get_sun_times, get_moon_phase, get_earthquakes, dictionary, translate.',
-  '  • Geo: geocode, reverse_geocode, get_route, nearby_places, get_elevation, get_timezone, get_my_location.',
-  '  • Math / sandbox: calculate, unit_convert, run_regex, run_code.',
-  '  • Documents: read_pdf, read_docx, ocr_image, ocr_passport.',
-  '  • Communication: send_email, send_sms, create_calendar_ics, zapier_trigger.',
-  '  • Code helpers: solve_problem, code_review, explain_code.',
-  '  • Stage UI: show_on_monitor, ui_notify, ui_navigate, generate_image.',
-  '  • Camera: switch_camera, what_do_you_see, set_narration_mode.',
-  '',
-  'Rules:',
-  '  1. Output STRICT JSON, no prose, no markdown fence.',
-  '  2. Keep plans short: ≤ max_steps steps (default 6). Merge trivial sub-steps.',
-  '  3. Each step names an action in plain language AND an optional tool_hint',
-  '     (one of the tools above, or null if the step is "ask the user" /',
-  '     "synthesize answer"). NEVER invent a tool name that is not listed above.',
-  '  4. If the goal is impossible, under-specified, or requires info the user must',
-  '     provide (e.g. missing passwords, unknown addresses) — return a plan whose',
-  '     first step is `ask_user` with a concrete clarifying question. Do not guess.',
-  '  5. Populate `cautions` with anything Kelion should explicitly confirm before',
-  '     doing (spending money, sending messages, deleting data, long actions).',
-  '',
-  'Return shape:',
-  '{',
-  '  "summary": "one-sentence restatement of the goal in the user\'s language",',
-  '  "steps": [',
-  '    { "n": 1, "action": "...", "why": "...", "tool_hint": "web_search" | null },',
-  '    ...',
-  '  ],',
-  '  "cautions": ["..."]',
-  '}',
-].join('\n');
-
-async function toolPlanTask(args) {
-  const goal = String(args?.goal || '').trim().slice(0, 2000);
-  if (!goal) return { ok: false, error: 'missing goal' };
-  const contextHint = String(args?.context_hint || '').trim().slice(0, 2000);
-  const maxStepsRaw = Number.parseInt(args?.max_steps, 10);
-  const maxSteps = Number.isFinite(maxStepsRaw) ? Math.max(1, Math.min(10, maxStepsRaw)) : 6;
-
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    return { ok: false, unavailable: true, error: 'Planner not configured (GEMINI_API_KEY missing).' };
-  }
-
-  const model = process.env.KELION_PLANNER_MODEL || 'gemini-2.5-flash';
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
-  const userMsg = [
-    `Goal: ${goal}`,
-    contextHint ? `Context: ${contextHint}` : null,
-    `Constraints: at most ${maxSteps} steps.`,
-  ].filter(Boolean).join('\n');
-
-  try {
-    const r = await fetchWithTimeout(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ role: 'user', parts: [{ text: userMsg }] }],
-        systemInstruction: { parts: [{ text: PLAN_TASK_SYSTEM }] },
-        generationConfig: {
-          temperature: 0.2,
-          maxOutputTokens: 1200,
-          responseMimeType: 'application/json',
-          // gemini-2.5-flash thinks by default and the thinking budget
-          // eats into maxOutputTokens; disable so the whole budget is
-          // spent on the JSON plan itself.
-          thinkingConfig: { thinkingBudget: 0 },
-        },
-      }),
-    }, 15_000);
-    if (!r.ok) {
-      const txt = await r.text().catch(() => '');
-      return { ok: false, error: `planner upstream ${r.status}`, detail: txt.slice(0, 200) };
-    }
-    const data = await r.json().catch(() => null);
-    const text = data?.candidates?.[0]?.content?.parts?.map((p) => p.text).filter(Boolean).join('').trim();
-    if (!text) return { ok: false, error: 'empty planner response' };
-    let plan = null;
-    try {
-      plan = JSON.parse(text);
-    } catch {
-      // Sometimes the model still wraps the JSON in ```json fences despite
-      // responseMimeType. Strip the fences and retry once.
-      const stripped = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
-      try { plan = JSON.parse(stripped); } catch { /* fall through */ }
-    }
-    if (!plan || typeof plan !== 'object') {
-      return { ok: false, error: 'planner returned non-JSON', raw: text.slice(0, 300) };
-    }
-    const summary = String(plan.summary || '').trim().slice(0, 400);
-    const rawSteps = Array.isArray(plan.steps) ? plan.steps.slice(0, maxSteps) : [];
-    const steps = rawSteps
-      .map((s, i) => ({
-        n: Number.isFinite(Number(s?.n)) ? Number(s.n) : i + 1,
-        action: String(s?.action || '').trim().slice(0, 400),
-        why: String(s?.why || '').trim().slice(0, 400),
-        tool_hint: s?.tool_hint ? String(s.tool_hint).trim().slice(0, 60) : null,
-      }))
-      .filter((s) => s.action);
-    const cautions = Array.isArray(plan.cautions)
-      ? plan.cautions.map((c) => String(c || '').trim().slice(0, 200)).filter(Boolean).slice(0, 6)
-      : [];
-    return { ok: true, summary, steps, cautions, model };
-  } catch (err) {
-    return { ok: false, error: `planner call failed: ${err?.message || err}` };
-  }
-}
+// Groq-powered coding tools (toolSolveProblem, toolCodeReview,
+// toolExplainCode) and plan_task (toolPlanTask) REMOVED — Gemini Live
+// handles coding questions and multi-step planning directly.
 
 // ──────────────────────────────────────────────────────────────────
 // PR C — sandboxed code runner, regex tester, and user-intern tools.
@@ -2641,10 +2418,7 @@ async function executeRealTool(name, args, ctx) {
     case 'dictionary':        return toolDictionary(a);
     // ── translation ──
     case 'translate':         return toolTranslate(a);
-    // ── groq-powered coding (opt-in via GROQ_API_KEY) ──
-    case 'solve_problem':     return toolSolveProblem(a);
-    case 'code_review':       return toolCodeReview(a);
-    case 'explain_code':      return toolExplainCode(a);
+    // ── groq-powered coding + plan_task REMOVED — Gemini Live handles these ──
     // ── PR B — documents + OCR ──
     case 'read_pdf':          return toolReadPdf(a);
     case 'read_docx':         return toolReadDocx(a);
@@ -2667,8 +2441,6 @@ async function executeRealTool(name, args, ctx) {
     case 'get_my_profile':    return toolGetMyProfile(a, ctx);
     // ── F11 — image generation (gpt-image-1) ──
     case 'generate_image':    return toolGenerateImage(a);
-    // ── PR 7/N — Planner Brain (Gemini Flash) ──
-    case 'plan_task':         return toolPlanTask(a);
     // ── PR 8/N — Memory of Actions (read-only self-reflection) ──
     case 'get_action_history': return toolGetActionHistory(a, ctx);
     // ── Silent vision auto-learn — write durable observations ──
@@ -2771,31 +2543,15 @@ const REAL_TOOL_NAMES = [
   'fetch_url', 'rss_read',
   'wikipedia_search', 'dictionary',
   'translate',
-  // Groq-powered (opt-in) — safe to advertise; executor returns
-  // `{ ok:false, unavailable:true }` when GROQ_API_KEY is not set.
-  'solve_problem', 'code_review', 'explain_code',
-  // PR B — documents + OCR (pdf-parse / mammoth / tesseract.js).
-  // Inputs accept either a public HTTPS URL or a base64 blob.
+  // PR B — documents + OCR
   'read_pdf', 'read_docx', 'ocr_image', 'ocr_passport',
-  // PR C — sandboxed runners + user-intern tools.
-  // run_code needs E2B_API_KEY; get_my_* need a signed-in user passed
-  // through ctx. Both degrade gracefully when the requirement is missing.
+  // PR C — sandboxed runners + user-intern tools
   'run_regex', 'run_code', 'get_my_credits', 'get_my_usage', 'get_my_profile',
-  // PR D — communications + automations + package info.
-  // send_email / send_sms / zapier_trigger are opt-in via env keys;
-  // the ics / github / npm / pypi tools work against public APIs
-  // (GITHUB_TOKEN, if set, just raises the unauth rate limit).
+  // PR D — communications + automations + package info
   'send_email', 'send_sms', 'create_calendar_ics', 'zapier_trigger',
   'github_repo_info', 'npm_package_info', 'pypi_package_info',
-  // F11 — AI image generation (OpenAI gpt-image-1). Returns a short-lived
-  // URL that the client hands off to the avatar's stage monitor so the
-  // freshly-generated PNG shows up inline instead of via a link.
+  // F11 — image generation
   'generate_image',
-  // PR 7/N — Planner Brain. Gemini 2.5 Flash turns a user goal into a
-  // short JSON plan. Kelion can call this as a pre-flight on multi-step
-  // asks. Requires GEMINI_API_KEY; returns { ok:false, unavailable:true }
-  // when the key is missing so the voice model can degrade gracefully.
-  'plan_task',
   // PR 8/N — Memory of Actions. Read-only self-reflection: returns the
   // caller's own recent tool invocations (from action_history) so
   // Kelion can check "did I already email that?" before re-running.
@@ -2841,10 +2597,6 @@ module.exports = {
   toolDictionary,
   // translation
   toolTranslate,
-  // groq-powered
-  toolSolveProblem,
-  toolCodeReview,
-  toolExplainCode,
   // PR B — documents + OCR
   toolReadPdf,
   toolReadDocx,
@@ -2868,8 +2620,6 @@ module.exports = {
   toolPypiPackageInfo,
   // F11 — image generation
   toolGenerateImage,
-  // PR 7/N — Planner Brain
-  toolPlanTask,
   // PR 8/N — Memory of Actions
   toolGetActionHistory,
   // Silent auto-learn — observations from camera persisted to memory_items
