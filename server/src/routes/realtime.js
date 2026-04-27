@@ -1678,7 +1678,7 @@ router.post('/pipeline', async (req, res) => {
       lockedLangTag: await resolveLockedLangTag({ req, user, forcedLang }),
     });
 
-    const messages = [{ role: 'system', content: systemPrompt + '\n\nCRITICAL: You must demonstrate maximum seriousness and professionalism. NEVER fabricate, guess, or make up information. If you don\'t know something, say so honestly. Answer questions precisely and directly. Zero tolerance for hallucination or lies.' }];
+    const messages = [{ role: 'system', content: systemPrompt + '\n\nCRITICAL RULES:\n1. Maximum seriousness and professionalism at all times.\n2. NEVER fabricate, guess, or make up information. If you don\'t know something, USE YOUR TOOLS to find out.\n3. When asked about facts, news, people, places, events — ALWAYS use web_search or wikipedia_search to get real, current information. Do NOT answer from memory alone.\n4. Answer questions precisely and directly. No filler, no padding.\n5. Zero tolerance for hallucination or lies. If a tool search returns no results, say honestly that you couldn\'t find the information.\n6. You have tools: web_search, wikipedia_search, browse_web, calculate, get_weather, and many more. USE THEM proactively.' }];
     // Add conversation history
     if (Array.isArray(history)) {
       for (const h of history.slice(-20)) {
@@ -1708,7 +1708,7 @@ router.post('/pipeline', async (req, res) => {
       messages,
       tools,
       tool_choice: 'auto',
-      temperature: 0.6,
+      temperature: 0,
       max_tokens: 1024,
     });
 
@@ -1746,7 +1746,7 @@ router.post('/pipeline', async (req, res) => {
         messages,
         tools,
         tool_choice: 'auto',
-        temperature: 0.6,
+        temperature: 0,
         max_tokens: 1024,
       });
       choice = completion.choices?.[0];
