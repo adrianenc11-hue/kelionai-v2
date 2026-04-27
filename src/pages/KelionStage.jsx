@@ -601,7 +601,7 @@ export default function KelionStage() {
     if (!selectedUserId || selectedBusy) return
     let reason = null
     if (banned) {
-      reason = window.prompt('Motiv suspendare (op?ional):', '') || ''
+      reason = window.prompt('Motiv suspendare (opțional):', '') || ''
     } else if (!window.confirm('Reactivezi contul?')) {
       return
     }
@@ -631,10 +631,10 @@ export default function KelionStage() {
     if (raw == null) return
     const minutes = Number(raw)
     if (!Number.isFinite(minutes) || minutes === 0) {
-      setSelectedResult({ ok: false, error: 'Introduce?i un numar diferit de 0' })
+      setSelectedResult({ ok: false, error: 'Introduceți un numar diferit de 0' })
       return
     }
-    const note = window.prompt('Nota (op?ional):', '') || ''
+    const note = window.prompt('Nota (opțional):', '') || ''
     setSelectedBusy(true)
     setSelectedResult(null)
     try {
@@ -1925,7 +1925,7 @@ export default function KelionStage() {
             ? 'Free trial is counting down. Sign in or buy credits to keep using Kelion after it expires.'
             : '15 free minutes — the timer starts on your first message or Tap-to-talk.'}
         >
-          <span aria-hidden style={{ fontSize: 13 }}>?</span>
+          <span aria-hidden style={{ fontSize: 13 }}>⏱</span>
           {!trialHud.allowed ? (
             <>Free trial used up — <button
               onClick={() => setSignInModalOpen(true)}
@@ -1942,7 +1942,7 @@ export default function KelionStage() {
       )}
 
       {/* Top-right action bar — Adrian: "panoul cu butoane e gândit
-          gre?it". Simplified to: Credits/Admin pill + Sign in/out + ?.
+          greșit". Simplified to: Credits/Admin pill + Sign in/out + ⋯.
           Camera, screen, transcript, contact all moved into the ?
           overflow menu. Camera also now auto-starts when the user types
           or speaks and auto-stops after idle (F15). */}
@@ -2060,7 +2060,7 @@ export default function KelionStage() {
         >
           {/* Camera / Screen share / Transcript — tools moved back into
               the overflow menu so the top bar stays clean (Adrian: "panoul
-              e gândit gre?it"). Camera also now auto-starts on speech/
+              e gândit greșit"). Camera also now auto-starts on speech/
               typing, so the explicit toggle here is for manual override. */}
           <div
             style={{
@@ -2315,7 +2315,7 @@ export default function KelionStage() {
                 fontSize: 20, cursor: 'pointer', opacity: 0.7,
               }}
               aria-label="Close transcript"
-            >?</button>
+            >×</button>
           </div>
           {turns.length === 0 && (
             <div style={{ opacity: 0.5, fontSize: 14 }}>Conversation will appear here.</div>
@@ -2521,7 +2521,7 @@ export default function KelionStage() {
                 fontSize: 20, cursor: 'pointer', opacity: 0.7,
               }}
               aria-label="Close"
-            >?</button>
+            >×</button>
           </div>
 
           {memoryLoading && (
@@ -2609,7 +2609,7 @@ export default function KelionStage() {
                 fontSize: 20, cursor: 'pointer', opacity: 0.7,
               }}
               aria-label="Close"
-            >?</button>
+            >×</button>
           </div>
 
           <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
@@ -2759,7 +2759,7 @@ export default function KelionStage() {
                   fontSize: 22, cursor: 'pointer', opacity: 0.7,
                 }}
                 aria-label="Close"
-              >?</button>
+              >×</button>
             </div>
 
             {balance != null && (
@@ -2892,7 +2892,7 @@ export default function KelionStage() {
                 fontSize: 20, cursor: 'pointer', opacity: 0.7,
               }}
               aria-label="Close"
-            >?</button>
+            >×</button>
           </div>
           <AdminTabBar active="business" onSelect={switchAdminTab} />
 
@@ -3017,7 +3017,7 @@ export default function KelionStage() {
                 fontSize: 20, cursor: 'pointer', opacity: 0.7,
               }}
               aria-label="Close"
-            >?</button>
+            >×</button>
           </div>
           <AdminTabBar active="ai" onSelect={switchAdminTab} />
 
@@ -3590,7 +3590,7 @@ export default function KelionStage() {
                 fontSize: 20, cursor: 'pointer', opacity: 0.7,
               }}
               aria-label="Close"
-            >?</button>
+            >×</button>
           </div>
           <AdminTabBar active="visitors" onSelect={switchAdminTab} />
 
@@ -3749,7 +3749,7 @@ export default function KelionStage() {
                 fontSize: 20, cursor: 'pointer', opacity: 0.7,
               }}
               aria-label="Close"
-            >?</button>
+            >×</button>
           </div>
           <AdminTabBar active="users" onSelect={switchAdminTab} />
 
@@ -4213,7 +4213,7 @@ export default function KelionStage() {
                 fontSize: 20, cursor: 'pointer', opacity: 0.7,
               }}
               aria-label="Close"
-            >?</button>
+            >×</button>
           </div>
           <AdminTabBar active="payouts" onSelect={switchAdminTab} />
 
