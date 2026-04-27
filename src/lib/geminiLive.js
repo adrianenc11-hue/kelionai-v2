@@ -464,6 +464,13 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
     // If a previous ws is still live (or in CONNECTING), tear it down
     // before opening a new one — otherwise the old handlers keep firing
     // against `wsRef.current` after we reassign it below.
+    // VOICE UNIQUENESS: also hard-stop any audio still playing from the
+    // previous session. Without this, scheduled AudioBufferSourceNodes
+    // keep playing after the ws is closed, so the old voice bleeds into
+    // (or alternates with) the new session's audio. clearAudioQueue()
+    // stops all active sources and bumps the generation counter so
+    // any late-arriving chunks from the old ws are dropped on arrival.
+    clearAudioQueue()
     if (wsRef.current && wsRef.current.readyState !== WebSocket.CLOSED) {
       try { wsRef.current.close(1000, 'restart') } catch (_) { /* ignore */ }
       wsRef.current = null
@@ -1147,7 +1154,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
     setStatus('idle')
     setError(null)
     setVisionError(null)
-  }, [stopFrameSender])
+  }, [stopFrameSender, clearAudioQueue])
 
   useEffect(() => () => { stop() }, [stop])
 
