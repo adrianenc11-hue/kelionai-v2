@@ -842,4 +842,117 @@ router.post('/purge-users', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/admin/export/users.csv
+ * Download all users as CSV. Admin-only.
+ */
+router.get('/export/users.csv', async (_req, res) => {
+  try {
+    const users = await getAllUsers();
+    const header = 'id,email,name,role,subscription_tier,banned,created_at\n';
+    const esc = (v) => `"${String(v || '').replace(/"/g, '""')}"`;
+    const rows = users.map((u) =>
+      [u.id, esc(u.email), esc(u.name), u.role, u.subscription_tier, Number(u.banned) === 1 ? 'yes' : 'no', u.created_at].join(',')
+    ).join('\n');
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="kelion-users-${new Date().toISOString().slice(0,10)}.csv"`);
+    res.send(header + rows);
+  } catch (err) {
+    console.error('[admin/export/users.csv] Error:', err && err.message);
+    res.status(500).json({ error: 'Failed to export users' });
+  }
+});
+
+/**
+ * GET /api/admin/export/transactions.csv
+ * Download all credit transactions as CSV. Admin-only.
+ */
+router.get('/export/transactions.csv', async (_req, res) => {
+  try {
+    const rows = await listRecentCreditTransactions({ limit: 5000 });
+    const header = 'id,user_id,user_email,delta_minutes,kind,note,created_at\n';
+    const esc = (v) => `"${String(v || '').replace(/"/g, '""')}"`;
+    const csv = rows.map((r) =>
+      [r.id, r.user_id, esc(r.user_email || ''), r.delta_minutes, esc(r.kind), esc(r.note), r.created_at].join(',')
+    ).join('\n');
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="kelion-transactions-${new Date().toISOString().slice(0,10)}.csv"`);
+    res.send(header + csv);
+  } catch (err) {
+    console.error('[admin/export/transactions.csv] Error:', err && err.message);
+    res.status(500).json({ error: 'Failed to export transactions' });
+  }
+});
+
+/**
+ * GET /api/admin/revenue-chart?days=30
+ * Daily revenue breakdown for the admin chart.
+ * Returns: { days: [...{ date, topupMinutes, topupCents, consumeMinutes }] }
+ */
+router.get('/revenue-chart', async (req, res) => {
+  try {
+    const days = Math.min(365, Math.max(1, Number(req.query.days) || 30));
+    const since = new Date(Date.now() - days * 86400000).toISOString();
+    const db = getDb();
+    if (!db) return res.status(503).json({ error: 'db not initialized' });
+    const rows = await db.all(`
+      SELECT
+        DATE(created_at) AS date,
+        SUM(CASE WHEN delta_minutes > 0 THEN delta_minutes ELSE 0 END) AS topup_minutes,
+        SUM(CASE WHEN delta_minutes > 0 THEN COALESCE(amount_cents, 0) ELSE 0 END) AS topup_cents,
+        SUM(CASE WHEN delta_minutes < 0 THEN ABS(delta_minutes) ELSE 0 END) AS consume_minutes
+      FROM credit_transactions
+      WHERE created_at >= ?
+      GROUP BY DATE(created_at)
+      ORDER BY date ASC
+    `, [since]);
+    res.json({
+      days: (rows || []).map((r) => ({
+        date: r.date,
+        topupMinutes: Number(r.topup_minutes) || 0,
+        topupCents: Number(r.topup_cents) || 0,
+        consumeMinutes: Number(r.consume_minutes) || 0,
+      })),
+      window: { days, since },
+      ts: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error('[admin/revenue-chart] Error:', err && err.message);
+    res.status(500).json({ error: 'Failed to load revenue chart' });
+  }
+});
+
+/**
+ * GET /api/admin/live-sessions
+ * Returns currently active WebSocket sessions. Uses the global session
+ * registry maintained by the realtime route.
+ */
+router.get('/live-sessions', async (_req, res) => {
+  try {
+    // The realtime route registers active sessions in a global Map.
+    // If it's not available, return empty.
+    const sessions = global.__kelionActiveSessions || new Map();
+    const list = [];
+    for (const [id, s] of sessions) {
+      list.push({
+        sessionId: id,
+        userId: s.userId || null,
+        userEmail: s.userEmail || null,
+        ip: s.ip || null,
+        startedAt: s.startedAt || null,
+        durationMs: s.startedAt ? Date.now() - s.startedAt : 0,
+        isGuest: !s.userId,
+      });
+    }
+    res.json({
+      active: list.length,
+      sessions: list,
+      ts: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error('[admin/live-sessions] Error:', err && err.message);
+    res.status(500).json({ error: 'Failed to load live sessions' });
+  }
+});
+
 module.exports = router;
