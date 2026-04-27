@@ -1699,7 +1699,7 @@ export default function KelionStage() {
         <button
           type="button"
           onClick={() => fileInputRef.current && fileInputRef.current.click()}
-          disabled={status === 'thinking'}
+          disabled={status === 'thinking' || status === 'idle' || status === 'error'}
           style={{
             width: 30, height: 30, borderRadius: '50%',
             background: 'rgba(167, 139, 250, 0.18)',
@@ -1807,10 +1807,10 @@ export default function KelionStage() {
             }
           }}
           placeholder="Type to Kelion…"
-          disabled={status === 'thinking'}
+          disabled={status === 'thinking' || status === 'idle' || status === 'error'}
           autoComplete="off"
-          autoCorrect="off"
-          spellCheck={false}
+          autoCorrect="on"
+          spellCheck={true}
           style={{
             flex: 1,
             background: 'transparent', border: 'none', outline: 'none',
@@ -1828,7 +1828,7 @@ export default function KelionStage() {
         />
         <button
           type="submit"
-          disabled={status === 'thinking' || (chatInput.trim().length === 0 && !attachedFile)}
+          disabled={status === 'thinking' || status === 'idle' || status === 'error' || (chatInput.trim().length === 0 && !attachedFile)}
           style={{
             width: 40, height: 40, borderRadius: '50%',
             background: (chatInput.trim().length === 0 && !attachedFile)
@@ -1852,6 +1852,8 @@ export default function KelionStage() {
             startVoiceWithPriorTurns()
           } else {
             stop()
+            clearTurns()
+            savedUpToRef.current = 0
           }
         }}
         style={{
