@@ -58,6 +58,7 @@ import {
   sendTestPing,
 } from '../lib/pushClient'
 import { useEmotion } from '../lib/emotionStore'
+import { t } from '../lib/uiStrings'
 
 // Stage 6 — M26 voice-style menu presets (labels match server VOICE_STYLES).
 const VOICE_STYLE_OPTIONS = [
@@ -2087,23 +2088,23 @@ export default function KelionStage() {
               color: 'rgba(237,233,254,0.45)',
             }}
           >
-            Tools
+            {t('tools')}
           </div>
           <MenuItem onClick={() => {
             if (cameraStream) { stopCamera() }
             else { startCamera().catch(() => { /* banner surfaces the error */ }) }
             setMenuOpen(false)
           }}>
-            {cameraStream ? '📹 Turn camera off' : '📹 Turn camera on'}
+            {cameraStream ? t('cameraOff') : t('cameraOn')}
           </MenuItem>
           <MenuItem onClick={() => { screenStream ? stopScreen() : startScreen(); setMenuOpen(false) }}>
-            {screenStream ? '🖥️ Stop sharing screen' : '🖥️ Share screen'}
+            {screenStream ? t('stopScreen') : t('shareScreen')}
           </MenuItem>
           <MenuItem onClick={() => { setTranscriptOpen((v) => !v); setMenuOpen(false) }}>
-            {transcriptOpen ? '📝 Hide transcript' : '📝 Show transcript'}
+            {transcriptOpen ? t('hideTranscript') : t('showTranscript')}
           </MenuItem>
           <MenuItem onClick={() => { navigate('/contact'); setMenuOpen(false) }}>
-            ✉️ Contact us
+            {t('contactUs')}
           </MenuItem>
           <div
             style={{
@@ -2122,7 +2123,7 @@ export default function KelionStage() {
               color: 'rgba(237,233,254,0.45)',
             }}
           >
-            Voice style
+            {t('voiceStyle')}
           </div>
           {VOICE_STYLE_OPTIONS.map((opt) => (
             <MenuItem
@@ -2131,7 +2132,7 @@ export default function KelionStage() {
             >
               <span style={{ opacity: voiceStyle === opt.key ? 1 : 0.75 }}>
                 {voiceStyle === opt.key ? '? ' : '? '}
-                {opt.label}
+                {t(opt.key) || opt.label}
               </span>
             </MenuItem>
           ))}
@@ -2140,23 +2141,23 @@ export default function KelionStage() {
               and signed-in users (server). Above the auth gate so guests
               can find their saved threads too. */}
           <MenuItem onClick={() => { setHistoryOpen(true); setMenuOpen(false) }}>
-            Conversation history
+            {t('conversationHistory')}
           </MenuItem>
           <MenuItem onClick={() => { handleNewChat(); setMenuOpen(false) }}>
-            New chat
+            {t('newChat')}
           </MenuItem>
           <div style={{ height: 6 }} />
           {/* Stage 3 — memory + passkey */}
           {authState.signedIn ? (
             <>
               <MenuItem onClick={() => { openMemory(); setMenuOpen(false) }}>
-                What do you know about me?
+                {t('whatDoYouKnow')}
               </MenuItem>
               {/* Consensual voice clone — opens the multi-step modal
                   (consent + record + manage). Signed-in only; the
                   backend route is gated by requireAuth. */}
               <MenuItem onClick={() => { setVoiceCloneOpen(true); setMenuOpen(false) }}>
-                Clone my voice
+                {t('cloneMyVoice')}
               </MenuItem>
               {/* Stage 5 — proactive pings */}
               {pushState.supported && (
@@ -2166,13 +2167,13 @@ export default function KelionStage() {
                       onClick={() => { handleTestPing(); setMenuOpen(false) }}
                       disabled={pushBusy}
                     >
-                      Send a test ping
+                      {t('sendTestPing')}
                     </MenuItem>
                     <MenuItem
                       onClick={() => { handleDisablePush(); setMenuOpen(false) }}
                       disabled={pushBusy}
                     >
-                      {pushBusy ? 'Disabling pings…' : 'Disable pings'}
+                      {pushBusy ? t('disablingPings') : t('disablePings')}
                     </MenuItem>
                   </>
                 ) : (
@@ -2180,7 +2181,7 @@ export default function KelionStage() {
                     onClick={() => { handleEnablePush(); setMenuOpen(false) }}
                     disabled={pushBusy}
                   >
-                    {pushBusy ? 'Enabling pings…' : 'Enable pings'}
+                    {pushBusy ? t('enablingPings') : t('enablePings')}
                   </MenuItem>
                 )
               )}
@@ -2190,7 +2191,7 @@ export default function KelionStage() {
                   users get instructions inside the Buy-credits modal. */}
               {!installed && installPromptEvent && (
                 <MenuItem onClick={() => { handleInstall(); setMenuOpen(false) }}>
-                  Install Kelion on this device
+                  {t('installApp')}
                 </MenuItem>
               )}
               {/* Admin-only — unified dashboard. One entry that opens the
@@ -2200,7 +2201,7 @@ export default function KelionStage() {
                   "management de admin integrat intr-un singur buton"). */}
               {isAdmin && (
                 <MenuItem onClick={() => { switchAdminTab('business'); setMenuOpen(false) }}>
-                  Admin dashboard
+                  {t('adminDashboard')}
                 </MenuItem>
               )}
               {/* Sign out moved to the top-right action bar. */}
