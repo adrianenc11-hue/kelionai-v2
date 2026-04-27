@@ -38,6 +38,9 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
   const screenStreamRef = useRef(null)
   const turnActiveRef = useRef({ user: null, assistant: null })
   const processingRef = useRef(false)
+  // Rolling vision context — last 5 scene descriptions from continuous frame sender
+  const visionContextRef = useRef([])
+  const frameSenderRef = useRef(null)
 
   // ── Turn management ───────────────────────────────────────────
   const appendTurn = useCallback((role, text, forceNew = false) => {
@@ -52,34 +55,87 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
     })
   }, [])
 
-  // ── Capture camera frame ──────────────────────────────────────
+  // ── Capture camera frame (max quality) ────────────────────────
   const captureFrame = useCallback(() => {
     const stream = cameraStreamRef.current
     if (!stream) return null
     try {
-      const video = document.createElement('video')
-      video.srcObject = stream
-      video.muted = true
-      // Use existing video element if available
       const tracks = stream.getVideoTracks()
       if (!tracks.length) return null
       const settings = tracks[0].getSettings()
       const canvas = document.createElement('canvas')
-      const w = Math.min(settings.width || 640, 512)
-      const h = Math.floor((settings.height || 480) * (w / (settings.width || 640)))
+      // Full resolution — no downscaling
+      const w = settings.width || 1920
+      const h = settings.height || 1080
       canvas.width = w
       canvas.height = h
       const ctx = canvas.getContext('2d')
-      // Try to draw from any existing video element displaying this stream
       const videos = document.querySelectorAll('video')
       for (const v of videos) {
         if (v.srcObject === stream && v.videoWidth > 0) {
           ctx.drawImage(v, 0, 0, w, h)
-          return canvas.toDataURL('image/jpeg', 0.6).split(',')[1]
+          return canvas.toDataURL('image/jpeg', 0.92).split(',')[1]
         }
       }
     } catch (_) {}
     return null
+  }, [])
+
+  // ── Continuous vision stream — real-time to GPT-5.5 ────────────
+  const startFrameStream = useCallback((stream) => {
+    if (frameSenderRef.current) return
+    const video = document.createElement('video')
+    video.srcObject = stream
+    video.muted = true
+    video.playsInline = true
+    video.play().catch(() => {})
+    const canvas = document.createElement('canvas')
+    const JPEG_Q = 0.92  // max quality
+    let running = true
+    let busy = false
+
+    // Real-time loop — sends next frame immediately after previous completes
+    const sendFrame = async () => {
+      if (!running || busy) return
+      if (!video.videoWidth) { setTimeout(sendFrame, 100); return }
+      busy = true
+      try {
+        canvas.width = video.videoWidth
+        canvas.height = video.videoHeight
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(video, 0, 0)
+        const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', JPEG_Q))
+        if (!blob || !running) { busy = false; return }
+        const buf = await blob.arrayBuffer()
+        const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)))
+
+        const r = await fetch('/api/realtime/vision', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+          body: JSON.stringify({ image: b64, mimeType: 'image/jpeg' }),
+        })
+        if (r.ok) {
+          const data = await r.json()
+          if (data.description) {
+            const ctx = visionContextRef.current
+            ctx.push({ ts: Date.now(), text: data.description })
+            if (ctx.length > 10) ctx.shift()
+          }
+        }
+      } catch (_) {}
+      busy = false
+      if (running) requestAnimationFrame(() => setTimeout(sendFrame, 50))
+    }
+    sendFrame()
+    frameSenderRef.current = { stop: () => { running = false }, video }
+  }, [])
+
+  const stopFrameStream = useCallback(() => {
+    if (!frameSenderRef.current) return
+    frameSenderRef.current.stop()
+    try { frameSenderRef.current.video.pause(); frameSenderRef.current.video.srcObject = null } catch (_) {}
+    frameSenderRef.current = null
   }, [])
 
   // ── Process a single turn through the pipeline ────────────────
@@ -98,8 +154,9 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
       let history = []
       setTurns(prev => { history = prev.slice(-20); return prev })
 
-      // Capture camera frame if available
+      // Capture current camera frame + rolling vision context
       const cameraFrame = captureFrame()
+      const visionContext = visionContextRef.current.map(v => v.text).join(' | ')
 
       const lang = navigator.language || 'en-US'
       const params = new URLSearchParams({ lang })
@@ -116,6 +173,7 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
           mimeType: audioBlob.type || 'audio/webm',
           history: history.map(t => ({ role: t.role, text: t.text })),
           cameraFrame,
+          visionContext,
         }),
       })
 
@@ -368,6 +426,7 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
   // ── Stop ──────────────────────────────────────────────────────
   const stop = useCallback(() => {
     sessionActiveRef.current = false
+    stopFrameStream()
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       try { mediaRecorderRef.current.stop() } catch (_) {}
     }
@@ -388,16 +447,17 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
       try { src.pause(); src.src = '' } catch (_) {}
     }
     activeSourcesRef.current.clear()
+    visionContextRef.current = []
     setUserLevel(0)
     setStatus('idle')
     statusRef.current = 'idle'
     setError(null)
     setVisionError(null)
-  }, [])
+  }, [stopFrameStream])
 
   useEffect(() => () => { stop() }, [stop])
 
-  // ── Camera ────────────────────────────────────────────────────
+  // ── Camera (max quality, continuous live video stream) ────────
   const startCamera = useCallback(async (opts = {}) => {
     setVisionError(null)
     if (cameraStreamRef.current) return
@@ -405,26 +465,36 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
     const facing = side === 'front' ? 'user' : 'environment'
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: facing }, width: { ideal: 1280 }, height: { ideal: 720 } },
+        video: {
+          facingMode: { ideal: facing },
+          // Request maximum device capability — each device gives its best
+          width: { ideal: 4096 },
+          height: { ideal: 2160 },
+          frameRate: { ideal: 30 },
+        },
         audio: false,
       })
       cameraStreamRef.current = stream
       setCameraStream(stream)
       setCurrentFacingMode(facing)
+      // Start continuous frame stream to GPT-5.5 vision
+      startFrameStream(stream)
     } catch (e) {
       if (e.name !== 'NotAllowedError') {
         setVisionError(e.message || 'Camera failed')
       }
     }
-  }, [])
+  }, [startFrameStream])
 
   const stopCamera = useCallback(() => {
+    stopFrameStream()
     if (cameraStreamRef.current) {
       cameraStreamRef.current.getTracks().forEach(t => t.stop())
       cameraStreamRef.current = null
       setCameraStream(null)
     }
-  }, [])
+    visionContextRef.current = []
+  }, [stopFrameStream])
 
   const startScreen = useCallback(async () => {
     setVisionError(null)
@@ -509,11 +579,12 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
           'X-CSRF-Token': getCsrfToken(),
         },
         body: JSON.stringify({
-          audio: btoa('silence'), // dummy audio — server will use text from userText
+          audio: btoa('silence'),
           textOverride: trimmed,
           mimeType: 'text/plain',
           history: history.map(t => ({ role: t.role, text: t.text })),
           cameraFrame,
+          visionContext: visionContextRef.current.map(v => v.text).join(' | '),
         }),
       })
 
