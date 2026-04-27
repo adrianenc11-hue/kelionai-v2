@@ -1132,7 +1132,7 @@ const openaiTokenHandler = async (req, res) => {
           parameters: t.function.parameters,
         })),
         tool_choice: 'auto',
-        temperature: 0.85,
+        temperature: 0.6,
         max_response_output_tokens: 4096,
       }),
     });
@@ -1459,7 +1459,7 @@ const geminiTokenHandler = async (req, res) => {
           // hard-coding en-US.
           languageCode: forcedLang,
         },
-        temperature: 0.85,
+        temperature: 0.6,
       },
       systemInstruction: {
         parts: [{
@@ -1678,7 +1678,7 @@ router.post('/pipeline', async (req, res) => {
       lockedLangTag: await resolveLockedLangTag({ req, user, forcedLang }),
     });
 
-    const messages = [{ role: 'system', content: systemPrompt }];
+    const messages = [{ role: 'system', content: systemPrompt + '\n\nCRITICAL: You must demonstrate maximum seriousness and professionalism. NEVER fabricate, guess, or make up information. If you don\'t know something, say so honestly. Answer questions precisely and directly. Zero tolerance for hallucination or lies.' }];
     // Add conversation history
     if (Array.isArray(history)) {
       for (const h of history.slice(-20)) {
@@ -1708,7 +1708,7 @@ router.post('/pipeline', async (req, res) => {
       messages,
       tools,
       tool_choice: 'auto',
-      temperature: 0.85,
+      temperature: 0.6,
       max_tokens: 1024,
     });
 
@@ -1746,7 +1746,7 @@ router.post('/pipeline', async (req, res) => {
         messages,
         tools,
         tool_choice: 'auto',
-        temperature: 0.85,
+        temperature: 0.6,
         max_tokens: 1024,
       });
       choice = completion.choices?.[0];
