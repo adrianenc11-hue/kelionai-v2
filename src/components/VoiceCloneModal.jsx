@@ -23,15 +23,258 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getCsrfToken } from '../lib/api'
 
-const CONSENT_VERSION = '2026-04-20.v1'
+const CONSENT_VERSION = '2026-04-27.v2'
 const MIN_SECONDS = 30
 const TARGET_SECONDS = 60
 const MAX_SECONDS = 180
-const SAMPLE_PASSAGES = [
-  'Hi, my name is [your name] and I am recording this sample so that Kelion can speak in my voice. I give my explicit consent to this recording.',
-  'The quick brown fox jumps over the lazy dog. She sells seashells by the seashore. Peter Piper picked a peck of pickled peppers.',
-  'I understand this sample will be uploaded to ElevenLabs to create a voice clone tied only to my account, that I can delete it at any time, and that it will only be used for Kelion\'s replies to me.',
-]
+
+// ── i18n ────────────────────────────────────────────────────────────
+// Full localization for the voice clone flow. The user reads passages
+// in their own language for better voice quality and a professional UX.
+const I18N = {
+  en: {
+    title: 'Clone my voice',
+    loading: 'Loading\u2026',
+    closeLabel: 'Close',
+    consentIntro: (target) => `Kelion can speak in <strong>your own voice</strong> by uploading a short recording of you to <strong>ElevenLabs</strong> and using the voice clone only when replying to <em>you</em>. Before we record anything, please read and agree:`,
+    consentBullets: (target) => [
+      `We record ~${target} seconds of your voice in this browser, only after you click <em>Start recording</em>.`,
+      'The audio sample is uploaded to ElevenLabs, who returns a voice ID tied to your account.',
+      "The clone is used only for Kelion's replies to you \u2014 never for anyone else, never without the toggle in Manage being on.",
+      'You can delete the clone at any time. Delete removes it from ElevenLabs and from our database.',
+      'We keep an audit log (create / enable / disable / delete / synthesize) so we can prove how the clone was used.',
+    ],
+    agree1: 'I am the person whose voice is being recorded, and I consent to this recording.',
+    agree2: 'I consent to the sample being uploaded to ElevenLabs to create a voice clone tied to my Kelion account.',
+    agree3: 'I understand I can delete the clone at any time from this screen.',
+    signatureLabel: 'Type your full name as a digital signature',
+    signedAs: (email, ver) => `Signed as ${email} \u00b7 consent version ${ver}`,
+    cancel: 'Cancel',
+    continueToRecording: 'Continue to recording',
+    recordIntro: (min, target) => `Read the three passages below in a natural voice. Aim for at least <strong>${min} seconds</strong> (ideal ~${target}s). Use a quiet room and a decent microphone for best results.`,
+    recording: 'Recording\u2026',
+    captured: 'Captured',
+    ready: 'Ready',
+    back: 'Back',
+    startRecording: 'Start recording',
+    stop: 'Stop',
+    stopMinLeft: (s) => `(${s}s left to minimum)`,
+    reRecord: 'Re-record',
+    upload: 'Upload to ElevenLabs',
+    uploading: 'Uploading\u2026',
+    manageIntro: 'You have a cloned voice on file. Kelion can use it when replying to you.',
+    voiceId: 'Voice ID',
+    consented: 'Consented',
+    version: 'Version',
+    useMyVoice: "Use my voice for Kelion's replies to me",
+    deleteClone: 'Delete cloned voice',
+    working: 'Working\u2026',
+    done: 'Done',
+    deleteConfirm: 'Delete your cloned voice? This also removes it from ElevenLabs. This cannot be undone.',
+    passages: [
+      'Hi, my name is [your name] and I am recording this sample so that Kelion can speak in my voice. I give my explicit consent to this recording.',
+      'The quick brown fox jumps over the lazy dog. She sells seashells by the seashore. Peter Piper picked a peck of pickled peppers.',
+      "I understand this sample will be uploaded to ElevenLabs to create a voice clone tied only to my account, that I can delete it at any time, and that it will only be used for Kelion's replies to me.",
+    ],
+  },
+  ro: {
+    title: 'Clonează-mi vocea',
+    loading: 'Se încarcă\u2026',
+    closeLabel: 'Închide',
+    consentIntro: (target) => `Kelion poate vorbi cu <strong>vocea ta</strong> prin încărcarea unei scurte înregistrări pe <strong>ElevenLabs</strong>, folosind clona doar când îți răspunde <em>ție</em>. Înainte de a înregistra, te rugăm să citești și să fii de acord:`,
+    consentBullets: (target) => [
+      `Înregistrăm ~${target} secunde din vocea ta în acest browser, doar după ce apeși <em>Începe înregistrarea</em>.`,
+      'Eșantionul audio este încărcat pe ElevenLabs, care returnează un ID de voce legat de contul tău.',
+      'Clona este folosită doar pentru răspunsurile lui Kelion către tine \u2014 niciodată pentru altcineva.',
+      'Poți șterge clona oricând. Ștergerea o elimină din ElevenLabs și din baza noastră de date.',
+      'Păstrăm un jurnal de audit (creare / activare / dezactivare / ștergere) pentru a dovedi cum a fost folosită clona.',
+    ],
+    agree1: 'Eu sunt persoana a cărei voce este înregistrată și consimt la această înregistrare.',
+    agree2: 'Consimt ca eșantionul să fie încărcat pe ElevenLabs pentru a crea o clonă de voce legată de contul meu Kelion.',
+    agree3: 'Înțeleg că pot șterge clona oricând din acest ecran.',
+    signatureLabel: 'Tastează numele tău complet ca semnătură digitală',
+    signedAs: (email, ver) => `Semnat ca ${email} \u00b7 versiunea consimțământului ${ver}`,
+    cancel: 'Anulează',
+    continueToRecording: 'Continuă la înregistrare',
+    recordIntro: (min, target) => `Citește cele trei pasaje de mai jos cu voce naturală. Țintește minimum <strong>${min} secunde</strong> (ideal ~${target}s). Folosește o cameră liniștită și un microfon decent.`,
+    recording: 'Se înregistrează\u2026',
+    captured: 'Capturat',
+    ready: 'Pregătit',
+    back: 'Înapoi',
+    startRecording: 'Începe înregistrarea',
+    stop: 'Oprește',
+    stopMinLeft: (s) => `(încă ${s}s până la minimum)`,
+    reRecord: 'Reînregistrează',
+    upload: 'Încarcă pe ElevenLabs',
+    uploading: 'Se încarcă\u2026',
+    manageIntro: 'Ai o voce clonată pe fișier. Kelion o poate folosi când îți răspunde.',
+    voiceId: 'ID Voce',
+    consented: 'Consimțit',
+    version: 'Versiune',
+    useMyVoice: 'Folosește vocea mea pentru răspunsurile lui Kelion către mine',
+    deleteClone: 'Șterge vocea clonată',
+    working: 'Se lucrează\u2026',
+    done: 'Gata',
+    deleteConfirm: 'Ștergi vocea clonată? Aceasta o elimină și din ElevenLabs. Nu se poate anula.',
+    passages: [
+      'Bună, numele meu este [numele tău] și înregistrez acest eșantion pentru ca Kelion să poată vorbi cu vocea mea. Îmi dau consimțământul explicit pentru această înregistrare.',
+      'Vulpea cea maro și rapidă sare peste câinele leneș. Ea vinde scoici pe malul mării. Petru Piparul a adunat un pumn de ardei murați.',
+      'Înțeleg că acest eșantion va fi încărcat pe ElevenLabs pentru a crea o clonă de voce legată doar de contul meu, că o pot șterge oricând și că va fi folosită doar pentru răspunsurile lui Kelion către mine.',
+    ],
+  },
+  fr: {
+    title: 'Cloner ma voix',
+    loading: 'Chargement\u2026',
+    closeLabel: 'Fermer',
+    consentIntro: () => `Kelion peut parler avec <strong>votre propre voix</strong> en téléchargeant un court enregistrement sur <strong>ElevenLabs</strong>. Avant d'enregistrer, veuillez lire et accepter:`,
+    consentBullets: (target) => [
+      `Nous enregistrons ~${target} secondes de votre voix dans ce navigateur, uniquement après avoir cliqué sur <em>Commencer</em>.`,
+      "L'échantillon audio est envoyé à ElevenLabs, qui retourne un identifiant de voix lié à votre compte.",
+      'Le clone est utilisé uniquement pour les réponses de Kelion à vous \u2014 jamais pour quelqu\'un d\'autre.',
+      'Vous pouvez supprimer le clone à tout moment.',
+      'Nous conservons un journal d\'audit pour prouver comment le clone a été utilisé.',
+    ],
+    agree1: 'Je suis la personne dont la voix est enregistrée et je consens à cet enregistrement.',
+    agree2: "Je consens à ce que l'échantillon soit téléchargé sur ElevenLabs.",
+    agree3: 'Je comprends que je peux supprimer le clone à tout moment.',
+    signatureLabel: 'Tapez votre nom complet comme signature numérique',
+    signedAs: (email, ver) => `Signé en tant que ${email} \u00b7 version ${ver}`,
+    cancel: 'Annuler',
+    continueToRecording: "Continuer vers l'enregistrement",
+    recordIntro: (min, target) => `Lisez les trois passages ci-dessous d'une voix naturelle. Visez au moins <strong>${min} secondes</strong> (idéal ~${target}s).`,
+    recording: 'Enregistrement\u2026',
+    captured: 'Capturé',
+    ready: 'Prêt',
+    back: 'Retour',
+    startRecording: "Commencer l'enregistrement",
+    stop: 'Arrêter',
+    stopMinLeft: (s) => `(${s}s restantes)`,
+    reRecord: 'Réenregistrer',
+    upload: 'Télécharger sur ElevenLabs',
+    uploading: 'Téléchargement\u2026',
+    manageIntro: 'Vous avez une voix clonée. Kelion peut l\'utiliser pour vous répondre.',
+    voiceId: 'ID Voix',
+    consented: 'Consentement',
+    version: 'Version',
+    useMyVoice: 'Utiliser ma voix pour les réponses de Kelion',
+    deleteClone: 'Supprimer la voix clonée',
+    working: 'En cours\u2026',
+    done: 'Terminé',
+    deleteConfirm: 'Supprimer votre voix clonée? Cette action est irréversible.',
+    passages: [
+      'Bonjour, je m\'appelle [votre nom] et j\'enregistre cet échantillon pour que Kelion puisse parler avec ma voix. Je donne mon consentement explicite pour cet enregistrement.',
+      'Le renard brun rapide saute par-dessus le chien paresseux. Elle vend des coquillages sur le bord de la mer.',
+      "Je comprends que cet échantillon sera téléchargé sur ElevenLabs pour créer un clone vocal lié uniquement à mon compte, que je peux le supprimer à tout moment.",
+    ],
+  },
+  de: {
+    title: 'Meine Stimme klonen',
+    loading: 'Laden\u2026',
+    closeLabel: 'Schlie\u00dfen',
+    consentIntro: () => `Kelion kann mit <strong>Ihrer eigenen Stimme</strong> sprechen. Bitte lesen und akzeptieren Sie:`,
+    consentBullets: (target) => [
+      `Wir nehmen ~${target} Sekunden Ihrer Stimme auf, erst nach Klick auf <em>Aufnahme starten</em>.`,
+      'Die Probe wird an ElevenLabs gesendet und eine Stimm-ID erstellt.',
+      'Der Klon wird nur f\u00fcr Kelions Antworten an Sie verwendet.',
+      'Sie k\u00f6nnen den Klon jederzeit l\u00f6schen.',
+      'Wir f\u00fchren ein Audit-Protokoll.',
+    ],
+    agree1: 'Ich bin die Person, deren Stimme aufgenommen wird, und stimme zu.',
+    agree2: 'Ich stimme dem Upload zu ElevenLabs zu.',
+    agree3: 'Ich verstehe, dass ich den Klon jederzeit l\u00f6schen kann.',
+    signatureLabel: 'Geben Sie Ihren vollst\u00e4ndigen Namen als digitale Unterschrift ein',
+    signedAs: (email, ver) => `Signiert als ${email} \u00b7 Version ${ver}`,
+    cancel: 'Abbrechen',
+    continueToRecording: 'Weiter zur Aufnahme',
+    recordIntro: (min, target) => `Lesen Sie die drei Abschnitte unten nat\u00fcrlich vor. Mindestens <strong>${min} Sekunden</strong> (ideal ~${target}s).`,
+    recording: 'Aufnahme l\u00e4uft\u2026',
+    captured: 'Aufgenommen',
+    ready: 'Bereit',
+    back: 'Zur\u00fcck',
+    startRecording: 'Aufnahme starten',
+    stop: 'Stopp',
+    stopMinLeft: (s) => `(noch ${s}s)`,
+    reRecord: 'Neu aufnehmen',
+    upload: 'Zu ElevenLabs hochladen',
+    uploading: 'Hochladen\u2026',
+    manageIntro: 'Sie haben eine geklonte Stimme. Kelion kann sie f\u00fcr Antworten verwenden.',
+    voiceId: 'Stimm-ID',
+    consented: 'Zugestimmt',
+    version: 'Version',
+    useMyVoice: 'Meine Stimme f\u00fcr Kelions Antworten verwenden',
+    deleteClone: 'Geklonte Stimme l\u00f6schen',
+    working: 'Wird bearbeitet\u2026',
+    done: 'Fertig',
+    deleteConfirm: 'Geklonte Stimme l\u00f6schen? Dies kann nicht r\u00fcckg\u00e4ngig gemacht werden.',
+    passages: [
+      'Hallo, mein Name ist [Ihr Name] und ich nehme diese Probe auf, damit Kelion mit meiner Stimme sprechen kann. Ich gebe meine ausdr\u00fcckliche Zustimmung zu dieser Aufnahme.',
+      'Der schnelle braune Fuchs springt \u00fcber den faulen Hund. Sie verkauft Muscheln am Meeresufer.',
+      'Ich verstehe, dass diese Probe zu ElevenLabs hochgeladen wird und ich sie jederzeit l\u00f6schen kann.',
+    ],
+  },
+  es: {
+    title: 'Clonar mi voz',
+    loading: 'Cargando\u2026',
+    closeLabel: 'Cerrar',
+    consentIntro: () => `Kelion puede hablar con <strong>tu propia voz</strong>. Por favor lee y acepta:`,
+    consentBullets: (target) => [
+      `Grabamos ~${target} segundos de tu voz, solo despu\u00e9s de hacer clic en <em>Iniciar grabaci\u00f3n</em>.`,
+      'La muestra se env\u00eda a ElevenLabs.',
+      'El clon se usa solo para las respuestas de Kelion hacia ti.',
+      'Puedes eliminar el clon en cualquier momento.',
+      'Mantenemos un registro de auditor\u00eda.',
+    ],
+    agree1: 'Soy la persona cuya voz se graba y doy mi consentimiento.',
+    agree2: 'Consiento la carga a ElevenLabs.',
+    agree3: 'Entiendo que puedo eliminar el clon en cualquier momento.',
+    signatureLabel: 'Escribe tu nombre completo como firma digital',
+    signedAs: (email, ver) => `Firmado como ${email} \u00b7 versi\u00f3n ${ver}`,
+    cancel: 'Cancelar',
+    continueToRecording: 'Continuar a la grabaci\u00f3n',
+    recordIntro: (min, target) => `Lee los tres pasajes con voz natural. M\u00ednimo <strong>${min} segundos</strong> (ideal ~${target}s).`,
+    recording: 'Grabando\u2026',
+    captured: 'Capturado',
+    ready: 'Listo',
+    back: 'Atr\u00e1s',
+    startRecording: 'Iniciar grabaci\u00f3n',
+    stop: 'Detener',
+    stopMinLeft: (s) => `(${s}s restantes)`,
+    reRecord: 'Regrabar',
+    upload: 'Subir a ElevenLabs',
+    uploading: 'Subiendo\u2026',
+    manageIntro: 'Tienes una voz clonada. Kelion puede usarla para responderte.',
+    voiceId: 'ID de Voz',
+    consented: 'Consentimiento',
+    version: 'Versi\u00f3n',
+    useMyVoice: 'Usar mi voz para las respuestas de Kelion',
+    deleteClone: 'Eliminar voz clonada',
+    working: 'Trabajando\u2026',
+    done: 'Hecho',
+    deleteConfirm: '\u00bfEliminar tu voz clonada? Esto no se puede deshacer.',
+    passages: [
+      'Hola, mi nombre es [tu nombre] y estoy grabando esta muestra para que Kelion pueda hablar con mi voz. Doy mi consentimiento expl\u00edcito.',
+      'El r\u00e1pido zorro marr\u00f3n salta sobre el perro perezoso. Ella vende conchas en la orilla del mar.',
+      'Entiendo que esta muestra se subir\u00e1 a ElevenLabs y que puedo eliminarla en cualquier momento.',
+    ],
+  },
+}
+
+function detectLang() {
+  const nav = (typeof navigator !== 'undefined' && navigator.language) || 'en'
+  const short = nav.split('-')[0].toLowerCase()
+  return I18N[short] ? short : 'en'
+}
+
+function t(key, ...args) {
+  const lang = detectLang()
+  const val = I18N[lang]?.[key] ?? I18N.en[key]
+  return typeof val === 'function' ? val(...args) : val
+}
+
+function passages() {
+  const lang = detectLang()
+  return (I18N[lang]?.passages ?? I18N.en.passages)
+}
 
 function pickMimeType() {
   if (typeof MediaRecorder === 'undefined') return null
@@ -302,7 +545,7 @@ export default function VoiceCloneModal({ open, onClose, userEmail, userName }) 
   }, [])
 
   const deleteClone = useCallback(async () => {
-    if (!window.confirm('Delete your cloned voice? This also removes it from ElevenLabs. This cannot be undone.')) return
+    if (!window.confirm(t('deleteConfirm'))) return
     setBusy(true); setError(null)
     try {
       const r = await fetch('/api/voice/clone', {
@@ -351,7 +594,7 @@ export default function VoiceCloneModal({ open, onClose, userEmail, userName }) 
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>Clone my voice</h2>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>{t('title')}</h2>
           <button
             type="button"
             onClick={() => { if (!recording && !busy) onClose && onClose() }}
@@ -361,7 +604,7 @@ export default function VoiceCloneModal({ open, onClose, userEmail, userName }) 
               border: 'none', fontSize: 22, cursor: recording || busy ? 'not-allowed' : 'pointer',
               lineHeight: 1, padding: 4,
             }}
-            aria-label="Close"
+            aria-label={t('closeLabel')}
           >×</button>
         </div>
 
@@ -376,45 +619,38 @@ export default function VoiceCloneModal({ open, onClose, userEmail, userName }) 
         )}
 
         {step === 'loading' && (
-          <div style={{ padding: 16 }}>Loading…</div>
+          <div style={{ padding: 16 }}>{t('loading')}</div>
         )}
 
         {step === 'error' && (
           <div style={{ padding: 12 }}>
-            <button type="button" onClick={onClose} style={primaryBtn}>Close</button>
+            <button type="button" onClick={onClose} style={primaryBtn}>{t('closeLabel')}</button>
           </div>
         )}
 
         {step === 'consent' && (
           <>
-            <p style={{ marginTop: 0 }}>
-              Kelion can speak in <strong>your own voice</strong> by uploading a short
-              recording of you to <strong>ElevenLabs</strong> and using the voice
-              clone only when replying to <em>you</em>. Before we record anything,
-              please read and agree:
-            </p>
+            <p style={{ marginTop: 0 }} dangerouslySetInnerHTML={{ __html: t('consentIntro', TARGET_SECONDS) }} />
             <ul style={{ paddingLeft: 18, margin: '8px 0 16px' }}>
-              <li>We record ~{TARGET_SECONDS} seconds of your voice in this browser, only after you click <em>Start recording</em>.</li>
-              <li>The audio sample is uploaded to ElevenLabs, who returns a voice ID tied to your account.</li>
-              <li>The clone is used only for Kelion's replies to you — never for anyone else, never without the toggle in Manage being on.</li>
-              <li>You can delete the clone at any time. Delete removes it from ElevenLabs and from our database.</li>
-              <li>We keep an audit log (create / enable / disable / delete / synthesize) so we can prove how the clone was used.</li>
+              {t('consentBullets', TARGET_SECONDS).map((b, i) => (
+                <li key={i} dangerouslySetInnerHTML={{ __html: b }} />
+              ))}
             </ul>
             <label style={checkboxRow}>
               <input type="checkbox" checked={agree1} onChange={(e) => setAgree1(e.target.checked)} />
-              I am the person whose voice is being recorded, and I consent to this recording.
+              {t('agree1')}
             </label>
             <label style={checkboxRow}>
               <input type="checkbox" checked={agree2} onChange={(e) => setAgree2(e.target.checked)} />
-              I consent to the sample being uploaded to ElevenLabs to create a voice clone tied to my Kelion account.
+              {t('agree2')}
             </label>
             <label style={checkboxRow}>
               <input type="checkbox" checked={agree3} onChange={(e) => setAgree3(e.target.checked)} />
-              I understand I can delete the clone at any time from this screen.
+              {t('agree3')}
             </label>
             <div style={{ marginTop: 12 }}>
               <label style={{ display: 'block', fontSize: 12, opacity: 0.8, marginBottom: 4 }}>
-                Type your full name as a digital signature
+                {t('signatureLabel')}
               </label>
               <input
                 type="text"
@@ -425,19 +661,19 @@ export default function VoiceCloneModal({ open, onClose, userEmail, userName }) 
               />
               {userEmail && (
                 <div style={{ fontSize: 11, opacity: 0.6, marginTop: 4 }}>
-                  Signed as {userEmail} · consent version {CONSENT_VERSION}
+                  {t('signedAs', userEmail, CONSENT_VERSION)}
                 </div>
               )}
             </div>
             <div style={btnRow}>
-              <button type="button" onClick={onClose} style={secondaryBtn} disabled={busy}>Cancel</button>
+              <button type="button" onClick={onClose} style={secondaryBtn} disabled={busy}>{t('cancel')}</button>
               <button
                 type="button"
                 onClick={() => setStep('record')}
                 disabled={!canConsent}
                 style={{ ...primaryBtn, opacity: canConsent ? 1 : 0.5 }}
               >
-                Continue to recording
+                {t('continueToRecording')}
               </button>
             </div>
           </>
@@ -445,13 +681,9 @@ export default function VoiceCloneModal({ open, onClose, userEmail, userName }) 
 
         {step === 'record' && (
           <>
-            <p style={{ marginTop: 0 }}>
-              Read the three passages below in a natural voice. Aim for at least
-              {' '}<strong>{MIN_SECONDS} seconds</strong>{' '} (ideal ~{TARGET_SECONDS}s).
-              Use a quiet room and a decent microphone for best results.
-            </p>
+            <p style={{ marginTop: 0 }} dangerouslySetInnerHTML={{ __html: t('recordIntro', MIN_SECONDS, TARGET_SECONDS) }} />
             <ol style={{ paddingLeft: 18, margin: '0 0 16px' }}>
-              {SAMPLE_PASSAGES.map((p, i) => (
+              {passages().map((p, i) => (
                 <li key={i} style={{ marginBottom: 6 }}>{p}</li>
               ))}
             </ol>
@@ -469,7 +701,7 @@ export default function VoiceCloneModal({ open, onClose, userEmail, userName }) 
                   boxShadow: recording ? '0 0 10px #ef4444' : 'none',
                   marginRight: 8, verticalAlign: 'middle',
                 }} />
-                {recording ? 'Recording…' : sampleBlob ? 'Captured' : 'Ready'}
+                {recording ? t('recording') : sampleBlob ? t('captured') : t('ready')}
               </span>
               <span style={{ fontVariantNumeric: 'tabular-nums' }}>
                 {fmt(elapsed)} / {fmt(MAX_SECONDS)}
@@ -477,14 +709,14 @@ export default function VoiceCloneModal({ open, onClose, userEmail, userName }) 
             </div>
             {!recording && !sampleBlob && (
               <div style={btnRow}>
-                <button type="button" onClick={() => setStep('consent')} style={secondaryBtn}>Back</button>
-                <button type="button" onClick={startRecording} style={primaryBtn}>Start recording</button>
+                <button type="button" onClick={() => setStep('consent')} style={secondaryBtn}>{t('back')}</button>
+                <button type="button" onClick={startRecording} style={primaryBtn}>{t('startRecording')}</button>
               </div>
             )}
             {recording && (
               <div style={btnRow}>
                 <button type="button" onClick={stopRecording} style={primaryBtn}>
-                  Stop {elapsed < MIN_SECONDS && `(${MIN_SECONDS - elapsed}s left to minimum)`}
+                  {t('stop')} {elapsed < MIN_SECONDS && t('stopMinLeft', MIN_SECONDS - elapsed)}
                 </button>
               </div>
             )}
@@ -493,7 +725,7 @@ export default function VoiceCloneModal({ open, onClose, userEmail, userName }) 
                 <audio src={sampleUrl} controls style={{ width: '100%', marginBottom: 12 }} />
                 <div style={btnRow}>
                   <button type="button" onClick={resetRecording} style={secondaryBtn} disabled={busy}>
-                    Re-record
+                    {t('reRecord')}
                   </button>
                   <button
                     type="button"
@@ -501,7 +733,7 @@ export default function VoiceCloneModal({ open, onClose, userEmail, userName }) 
                     disabled={busy || elapsed < MIN_SECONDS}
                     style={{ ...primaryBtn, opacity: (busy || elapsed < MIN_SECONDS) ? 0.5 : 1 }}
                   >
-                    {busy ? 'Uploading…' : 'Upload to ElevenLabs'}
+                    {busy ? t('uploading') : t('upload')}
                   </button>
                 </div>
               </>
@@ -512,19 +744,19 @@ export default function VoiceCloneModal({ open, onClose, userEmail, userName }) 
         {step === 'manage' && (
           <>
             <p style={{ marginTop: 0 }}>
-              You have a cloned voice on file. Kelion can use it when replying to you.
+              {t('manageIntro')}
             </p>
             <div style={{
               background: 'rgba(167, 139, 250, 0.08)',
               border: '1px solid rgba(167, 139, 250, 0.22)',
               borderRadius: 10, padding: '10px 12px', marginBottom: 12, fontSize: 13,
             }}>
-              <div><strong>Voice ID:</strong> <code style={{ opacity: 0.8 }}>{existing && existing.voiceId}</code></div>
+              <div><strong>{t('voiceId')}:</strong> <code style={{ opacity: 0.8 }}>{existing && existing.voiceId}</code></div>
               {existing && existing.consentAt && (
-                <div><strong>Consented:</strong> {new Date(existing.consentAt).toLocaleString()}</div>
+                <div><strong>{t('consented')}:</strong> {new Date(existing.consentAt).toLocaleString()}</div>
               )}
               {existing && existing.consentVersion && (
-                <div><strong>Version:</strong> {existing.consentVersion}</div>
+                <div><strong>{t('version')}:</strong> {existing.consentVersion}</div>
               )}
             </div>
             <label style={{ ...checkboxRow, marginBottom: 12 }}>
@@ -534,13 +766,13 @@ export default function VoiceCloneModal({ open, onClose, userEmail, userName }) 
                 onChange={(e) => toggleEnabled(e.target.checked)}
                 disabled={busy}
               />
-              Use my voice for Kelion's replies to me
+              {t('useMyVoice')}
             </label>
             <div style={btnRow}>
               <button type="button" onClick={deleteClone} style={destructiveBtn} disabled={busy}>
-                {busy ? 'Working…' : 'Delete cloned voice'}
+                {busy ? t('working') : t('deleteClone')}
               </button>
-              <button type="button" onClick={onClose} style={primaryBtn}>Done</button>
+              <button type="button" onClick={onClose} style={primaryBtn}>{t('done')}</button>
             </div>
           </>
         )}
