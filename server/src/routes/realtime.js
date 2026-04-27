@@ -1116,7 +1116,7 @@ const geminiTokenHandler = async (req, res) => {
   let trial = null;
   if (isGuest && !isAdmin) {
     const ip = ipGeo.clientIp(req) || req.ip || '';
-    const status = trialStatus(ip);
+    const status = await trialStatus(ip);
     if (!status.allowed) {
       const isLifetime = status.reason === 'lifetime_expired';
       return res.status(429).json({
@@ -1131,7 +1131,7 @@ const geminiTokenHandler = async (req, res) => {
         },
       });
     }
-    stampTrialIfFresh(ip, status);
+    await stampTrialIfFresh(ip, status);
     trial = {
       allowed:     true,
       remainingMs: status.remainingMs,

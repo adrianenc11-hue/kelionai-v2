@@ -11,58 +11,78 @@
 //                      15 min/zi, maxim 1 saptamina". After the week is
 //                      up the user MUST create an account + buy credits.
 //
-// Adrian's flow:
-//   - First request from an IP → firstEverStampAt + firstStampAt = now.
-//     15-min countdown starts.
-//   - Fresh daily request (24h after firstStampAt): cooldown elapsed →
-//     we reset firstStampAt ONLY if we're still within the 7-day
-//     lifetime window. That gives the user another 15-min chunk today.
-//   - Day 8+: trialStatus() returns { allowed:false, reason:'lifetime_expired' }
-//     until the user signs in (skips this helper entirely) or 7 days
-//     pass without any use (in which case the entry gets evicted by
-//     evictExpired() and the IP is fresh again).
-//
-// State: in-memory Map<ip, { firstEverStampAt, firstStampAt }>.
-// Single-instance assumption: Railway currently runs one process so
-// the map is sufficient. When we scale to N instances this must move
-// to Redis / a database table keyed on IP.
+// State: PostgreSQL `trial_usage` table with in-memory LRU cache.
+// The DB is the source of truth — the cache avoids a DB round-trip on
+// every WebSocket frame / TTS call. Cache entries are refreshed from DB
+// on first access per IP, then kept in sync by stampTrialIfFresh().
 //
 // Signed-in users (admin or paying) are not subject to this helper
 // at all; callers check isGuest first and only invoke us for
 // unauthenticated IPs.
 
+const { getDb } = require('../db');
+
 const TRIAL_WINDOW_MS   = 15 * 60 * 1000;            // 15 min per day
 const TRIAL_COOLDOWN_MS = 24 * 60 * 60 * 1000;       // 24 h between windows
 const TRIAL_LIFETIME_MS = 7 * 24 * 60 * 60 * 1000;   // 7 days total guest access per IP
-// Hard cap to prevent unbounded growth (Copilot review pr-74). Entries
-// past the lifetime window are evicted by trialStatus() on read, but a
-// stream of unique IPs that never re-visit would never hit that path.
-// When we exceed MAX_ENTRIES we drop the oldest firstEverStampAt.
-const MAX_ENTRIES = 50_000;
+const MAX_CACHE = 10_000;
 
-// ip -> { firstEverStampAt: number, firstStampAt: number }
-const trialUsage = new Map();
+// In-memory LRU cache: ip -> { firstEverStampAt, firstStampAt }
+const cache = new Map();
 
-// Adrian wants the 7-day cap to be HARD ("maxim 1 saptamina"). After the
-// lifetime window elapses the IP must stay blocked — we do NOT auto-evict
-// it just because the week is up, otherwise a guest could wait 7 days and
-// get a brand new 7-day trial, defeating the cap. Memory pressure is
-// handled by enforceCap() (LRU at MAX_ENTRIES entries).
-function evictExpired(_now) {
-  // Intentional no-op. Kept as a named hook so future callers (e.g. a
-  // diagnostic "reset-my-trial" admin endpoint) have a single choke point.
+function enforceCache() {
+  if (cache.size <= MAX_CACHE) return;
+  const excess = cache.size - MAX_CACHE;
+  const it = cache.keys();
+  for (let i = 0; i < excess; i++) {
+    const k = it.next().value;
+    if (k !== undefined) cache.delete(k);
+  }
 }
 
-function enforceCap() {
-  if (trialUsage.size <= MAX_ENTRIES) return;
-  // Maps preserve insertion order. Drop the oldest entries until we're
-  // back under the cap. Safe because we only insert on first stamp and
-  // refresh daily chunks in-place — so oldest == most-expired.
-  const excess = trialUsage.size - MAX_ENTRIES;
-  const it = trialUsage.keys();
-  for (let i = 0; i < excess; i += 1) {
-    const k = it.next().value;
-    if (k !== undefined) trialUsage.delete(k);
+// Load from DB into cache if not already cached.
+async function loadFromDb(ip) {
+  if (cache.has(ip)) return cache.get(ip);
+  const db = getDb();
+  if (!db) return null;
+  try {
+    const row = await db.get(
+      'SELECT first_ever_stamp_at, first_stamp_at FROM trial_usage WHERE ip = ?',
+      ip,
+    );
+    if (row) {
+      const rec = {
+        firstEverStampAt: Number(row.first_ever_stamp_at),
+        firstStampAt: Number(row.first_stamp_at),
+      };
+      cache.set(ip, rec);
+      enforceCache();
+      return rec;
+    }
+  } catch (e) {
+    console.error('[trialQuota] DB read failed, falling back to fresh:', e.message);
+  }
+  return null;
+}
+
+// Save to DB + cache.
+async function saveToDb(ip, rec) {
+  cache.set(ip, rec);
+  enforceCache();
+  const db = getDb();
+  if (!db) return;
+  try {
+    // Upsert: INSERT OR REPLACE for SQLite, ON CONFLICT for Postgres.
+    // The db wrapper normalises this via run().
+    await db.run(
+      `INSERT OR REPLACE INTO trial_usage (ip, first_ever_stamp_at, first_stamp_at)
+       VALUES (?, ?, ?)`,
+      ip, rec.firstEverStampAt, rec.firstStampAt,
+    );
+  } catch (e) {
+    console.error('[trialQuota] DB write failed:', e.message);
+    // Cache still has the record — next deploy will lose it but that's
+    // better than crashing the request.
   }
 }
 
@@ -70,14 +90,8 @@ function enforceCap() {
 // mutating the store. Callers render a countdown from this and then
 // optionally call stampTrialIfFresh() to mark the start of the
 // 15-minute window on the first real interaction.
-//
-// Shape:
-//   { allowed: true,  remainingMs, fresh: bool, lifetimeRemainingMs }
-//   { allowed: false, reason: 'window_expired',   remainingMs: 0, nextWindowMs }
-//   { allowed: false, reason: 'lifetime_expired', remainingMs: 0, lifetimeRemainingMs: 0 }
-function trialStatus(ip) {
+async function trialStatus(ip) {
   if (!ip) {
-    // Defensive: no IP means we can't track reliably → allow.
     return {
       allowed: true,
       remainingMs: TRIAL_WINDOW_MS,
@@ -86,7 +100,7 @@ function trialStatus(ip) {
     };
   }
   const now = Date.now();
-  const rec = trialUsage.get(ip);
+  const rec = await loadFromDb(ip);
   if (!rec) {
     return {
       allowed: true,
@@ -96,27 +110,22 @@ function trialStatus(ip) {
     };
   }
 
-  // Lifetime check first: if the 7-day window since the very first stamp
-  // has elapsed, the IP is permanently blocked until the MAX_ENTRIES LRU
-  // eventually evicts it under memory pressure. This is Adrian's "maxim
-  // 1 saptamina" cap — after a week of free access the guest MUST sign
-  // in + buy credits to keep using Kelion from this IP.
+  // Lifetime check: 7-day cap.
   const sinceEver = now - rec.firstEverStampAt;
   if (sinceEver >= TRIAL_LIFETIME_MS) {
     return {
-      allowed:             false,
-      reason:              'lifetime_expired',
-      remainingMs:         0,
+      allowed: false,
+      reason: 'lifetime_expired',
+      remainingMs: 0,
       lifetimeRemainingMs: 0,
-      fresh:               false,
+      fresh: false,
     };
   }
   const lifetimeRemainingMs = TRIAL_LIFETIME_MS - sinceEver;
 
   const sinceFirst = now - rec.firstStampAt;
   if (sinceFirst >= TRIAL_COOLDOWN_MS) {
-    // Daily cooldown is up and we're still within the 7-day lifetime —
-    // start a fresh 15-min window.
+    // Daily cooldown elapsed, still within 7-day lifetime.
     return {
       allowed: true,
       remainingMs: TRIAL_WINDOW_MS,
@@ -126,46 +135,39 @@ function trialStatus(ip) {
   }
   if (sinceFirst < TRIAL_WINDOW_MS) {
     return {
-      allowed:             true,
-      remainingMs:         TRIAL_WINDOW_MS - sinceFirst,
+      allowed: true,
+      remainingMs: TRIAL_WINDOW_MS - sinceFirst,
       lifetimeRemainingMs,
-      fresh:               false,
+      fresh: false,
     };
   }
   return {
-    allowed:             false,
-    reason:              'window_expired',
-    remainingMs:         0,
-    nextWindowMs:        TRIAL_COOLDOWN_MS - sinceFirst,
+    allowed: false,
+    reason: 'window_expired',
+    remainingMs: 0,
+    nextWindowMs: TRIAL_COOLDOWN_MS - sinceFirst,
     lifetimeRemainingMs,
-    fresh:               false,
+    fresh: false,
   };
 }
 
-// stampTrialIfFresh(ip, status) — call this AFTER trialStatus() when
-// we've decided to let the request through and it's the first time we
-// see this IP (either brand new, or the daily cooldown elapsed). No-op
-// if the IP is already stamped within the current window.
-function stampTrialIfFresh(ip, status) {
+// stampTrialIfFresh(ip, status) — persist the trial start.
+async function stampTrialIfFresh(ip, status) {
   if (!ip || !status.fresh) return;
   const now = Date.now();
-  const existing = trialUsage.get(ip);
+  const existing = cache.get(ip) || (await loadFromDb(ip));
   if (existing) {
-    // Daily refresh inside the 7-day lifetime — keep firstEverStampAt,
-    // reset firstStampAt to now for a new 15-min chunk.
+    // Daily refresh — keep firstEverStampAt, reset firstStampAt.
     existing.firstStampAt = now;
+    await saveToDb(ip, existing);
   } else {
-    trialUsage.set(ip, { firstEverStampAt: now, firstStampAt: now });
+    await saveToDb(ip, { firstEverStampAt: now, firstStampAt: now });
   }
-  // Opportunistic sweep on writes — cheap when the map is small and
-  // keeps it bounded under adversarial unique-IP load (Copilot review).
-  if (trialUsage.size > MAX_ENTRIES / 2) evictExpired(now);
-  enforceCap();
 }
 
-// Test / diagnostic helper — wipe everything. Not wired to any route.
+// Test helper.
 function _resetForTest() {
-  trialUsage.clear();
+  cache.clear();
 }
 
 module.exports = {
