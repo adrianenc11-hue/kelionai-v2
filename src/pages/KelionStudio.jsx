@@ -28,6 +28,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Editor } from '@monaco-editor/react'
+import { t } from '../lib/uiStrings'
 import ensureMonaco from '../lib/monacoSetup'
 import {
   listWorkspaces,
@@ -79,14 +80,14 @@ function FileTree({ files, activePath, onSelect, onCreate, onDelete, busy }) {
   return (
     <div style={styles.fileTree}>
       <div style={styles.fileTreeHeader}>
-        <span style={styles.fileTreeHeaderLabel}>Files ({files.length})</span>
+        <span style={styles.fileTreeHeaderLabel}>{t('files')} ({files.length})</span>
         <button
           type="button"
           disabled={busy}
           onClick={() => setAdding((v) => !v)}
           style={styles.iconButton}
           title="New file"
-        >+ New</button>
+        >{t('newFile')}</button>
       </div>
 
       {adding && (
@@ -101,13 +102,13 @@ function FileTree({ files, activePath, onSelect, onCreate, onDelete, busy }) {
               if (e.key === 'Escape') { setAdding(false); setNewName('') }
             }}
           />
-          <button type="submit" style={styles.primaryButton} disabled={!newName.trim()}>Create</button>
+          <button type="submit" style={styles.primaryButton} disabled={!newName.trim()}>{t('create')}</button>
         </form>
       )}
 
       <ul style={styles.fileList}>
         {files.length === 0 && (
-          <li style={styles.fileTreeEmpty}>No files yet — click "+ New" to add one.</li>
+          <li style={styles.fileTreeEmpty}>{t('noFilesYet')}</li>
         )}
         {files.map((f) => (
           <li
@@ -155,7 +156,7 @@ function RunPanel({ onRun, running, lastRun }) {
           onClick={() => onRun({ installFirst })}
           style={{ ...styles.runButton, ...(running ? styles.runButtonBusy : {}) }}
         >
-          {running ? '…running' : '▶ Run'}
+          {running ? t('running') : t('run')}
         </button>
         <label style={styles.checkboxLabel}>
           <input
@@ -163,7 +164,7 @@ function RunPanel({ onRun, running, lastRun }) {
             checked={installFirst}
             onChange={(e) => setInstallFirst(e.target.checked)}
           />
-          install deps first (requirements.txt)
+          {t('installDeps')}
         </label>
         {lastRun?.duration_ms != null && (
           <span style={styles.runDuration}>{Math.round(lastRun.duration_ms)} ms</span>
@@ -171,7 +172,7 @@ function RunPanel({ onRun, running, lastRun }) {
       </div>
 
       <div style={styles.runOutput}>
-        {!lastRun && <div style={styles.runOutputEmpty}>Click "Run" to execute this project in an ephemeral sandbox.</div>}
+        {!lastRun && <div style={styles.runOutputEmpty}>{t('runPrompt')}</div>}
 
         {lastRun?.pip && (
           <RunBlock title="pip install" block={lastRun.pip} />
@@ -193,7 +194,7 @@ function RunBlock({ title, block }) {
   return (
     <div style={styles.runBlock}>
       <div style={{ ...styles.runBlockHeader, color: ok ? '#86efac' : '#fca5a5' }}>
-        {ok ? '✓' : '✗'} {title}{block?.timed_out ? ' — timed out' : ` — exit ${code}`}
+        {ok ? '✓' : '✗'} {title}{block?.timed_out ? ` — ${t('timedOut')}` : ` — exit ${code}`}
       </div>
       {block?.stdout ? (
         <pre style={styles.runPre}>{block.stdout}</pre>
@@ -384,7 +385,7 @@ export default function KelionStudio() {
 
   const handleCreateWorkspace = useCallback(async () => {
     // eslint-disable-next-line no-alert
-    const name = window.prompt('New project name:', `Project ${workspaces.length + 1}`)
+    const name = window.prompt(t('newProjectName'), `Project ${workspaces.length + 1}`)
     if (!name) return
     try {
       const { workspace } = await createWorkspace(name)
@@ -400,7 +401,7 @@ export default function KelionStudio() {
     if (!activeId) return
     const current = workspaces.find((w) => w.id === activeId)
     // eslint-disable-next-line no-alert
-    const name = window.prompt('Rename project:', current?.name || '')
+    const name = window.prompt(t('renameProject'), current?.name || '')
     if (!name || name === current?.name) return
     try {
       await renameWorkspace(activeId, name)
@@ -415,7 +416,7 @@ export default function KelionStudio() {
     if (!activeId) return
     const current = workspaces.find((w) => w.id === activeId)
     // eslint-disable-next-line no-alert
-    if (!window.confirm(`Delete project "${current?.name}"? This cannot be undone.`)) return
+    if (!window.confirm(`${t('deleteConfirm')} "${current?.name}"? ${t('cannotUndo')}`)) return
     try {
       await deleteWorkspace(activeId)
       const remaining = workspaces.filter((w) => w.id !== activeId)
@@ -429,7 +430,7 @@ export default function KelionStudio() {
         setContent('')
       }
       refreshUsage()
-      toast(setToastMsg, 'success', 'Project deleted')
+      toast(setToastMsg, 'success', t('projectDeleted'))
     } catch (err) {
       toast(setToastMsg, 'error', err.message || 'Delete failed')
     }
@@ -512,14 +513,14 @@ export default function KelionStudio() {
   }, [activeId, dirty, activePath, content])
 
   const monacoLanguage = useMemo(() => languageForPath(activePath), [activePath])
-  const savingLabel = saving ? 'Saving…' : dirty ? 'Unsaved' : 'Saved'
+  const savingLabel = saving ? t('savingDots') : dirty ? t('unsaved') : t('saved')
 
   return (
     <div style={styles.page}>
       <header style={styles.header}>
         <div style={styles.brand}>
-          <a href="/" style={styles.brandLink} title="Back to Kelion">‹ Kelion</a>
-          <span style={styles.brandTitle}>Studio</span>
+          <a href="/" style={styles.brandLink} title={t('backToKelion')}>{t('backToKelion')}</a>
+          <span style={styles.brandTitle}>{t('studioTitle')}</span>
         </div>
 
         <div style={styles.toolbar}>
@@ -534,9 +535,9 @@ export default function KelionStudio() {
             ))}
             {workspaces.length === 0 && <option value="">—</option>}
           </select>
-          <button type="button" onClick={handleCreateWorkspace} style={styles.secondaryButton}>+ New</button>
-          <button type="button" onClick={handleRenameWorkspace} style={styles.secondaryButton} disabled={!activeId}>Rename</button>
-          <button type="button" onClick={handleDeleteWorkspace} style={styles.dangerButton} disabled={!activeId}>Delete</button>
+          <button type="button" onClick={handleCreateWorkspace} style={styles.secondaryButton}>{t('newProject')}</button>
+          <button type="button" onClick={handleRenameWorkspace} style={styles.secondaryButton} disabled={!activeId}>{t('rename')}</button>
+          <button type="button" onClick={handleDeleteWorkspace} style={styles.dangerButton} disabled={!activeId}>{t('delete')}</button>
           <span style={styles.saveStatus}>{savingLabel}</span>
         </div>
 
@@ -576,7 +577,7 @@ export default function KelionStudio() {
               />
             ) : (
               <div style={styles.editorEmpty}>
-                {loading ? 'Loading Studio…' : 'Pick or create a file on the left.'}
+                {loading ? t('loadingStudio') : t('pickOrCreate')}
               </div>
             )}
           </div>
