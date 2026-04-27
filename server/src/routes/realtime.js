@@ -101,9 +101,9 @@ const router = Router();
 // prosody / register / pace via system prompt (we keep the native low-latency
 // voice; layering Inworld/Sesame TTS would double our TTFA, not worth it yet).
 const VOICE_STYLES = {
-  warm:    { label: 'warm',    directive: 'Speak warmly — unhurried pace, gentle inflection, the voice of a close friend catching up over coffee. Soft s\'s, relaxed breath.' },
+  warm: { label: 'warm', directive: 'Speak warmly — unhurried pace, gentle inflection, the voice of a close friend catching up over coffee. Soft s\'s, relaxed breath.' },
   playful: { label: 'playful', directive: 'Speak playfully — lighter energy, brighter pitch, a touch of smile in the voice, a quick wit. Not hyperactive, just sparkly.' },
-  calm:    { label: 'calm',    directive: 'Speak calmly — steady, grounded pace, lower register, longer pauses, almost meditative. The voice of someone who has time for you.' },
+  calm: { label: 'calm', directive: 'Speak calmly — steady, grounded pace, lower register, longer pauses, almost meditative. The voice of someone who has time for you.' },
   focused: { label: 'focused', directive: 'Speak with crisp focus — clear articulation, direct, a professional cadence. No extra words, no fluff. Still warm, just efficient.' },
 };
 function resolveVoiceStyle(raw) {
@@ -289,8 +289,8 @@ const KELION_TOOLS = [
     name: 'browse_web',
     description: 'Run an autonomous web-browsing agent in a real browser. Use when the user asks Kelion to open a site, fill a form, extract info from a page behind JS, compare products, book/reserve, etc. Returns a short summary + optional URL.',
     properties: {
-      task:      { type: 'string',  description: 'Natural-language instruction for the web agent, e.g. "Find the cheapest round-trip Bucharest-Rome flight next weekend on skyscanner.com and tell me the airline and price."' },
-      start_url: { type: 'string',  description: 'Optional URL to start on. Leave empty to let the agent pick.' },
+      task: { type: 'string', description: 'Natural-language instruction for the web agent, e.g. "Find the cheapest round-trip Bucharest-Rome flight next weekend on skyscanner.com and tell me the airline and price."' },
+      start_url: { type: 'string', description: 'Optional URL to start on. Leave empty to let the agent pick.' },
     },
     required: ['task'],
   },
@@ -306,7 +306,7 @@ const KELION_TOOLS = [
     name: 'read_email',
     description: "Search the signed-in user's email. Use when they ask about a specific message, sender, or thread.",
     properties: {
-      query: { type: 'string',  description: 'Free-text search (sender, subject, keyword).' },
+      query: { type: 'string', description: 'Free-text search (sender, subject, keyword).' },
       limit: { type: 'integer', description: 'Max results (default 5).' },
     },
     required: ['query'],
@@ -315,7 +315,7 @@ const KELION_TOOLS = [
     name: 'search_files',
     description: "Search the signed-in user's connected file storage (Drive, Dropbox, etc).",
     properties: {
-      query: { type: 'string',  description: 'Free-text search.' },
+      query: { type: 'string', description: 'Free-text search.' },
       limit: { type: 'integer', description: 'Max results (default 5).' },
     },
     required: ['query'],
@@ -326,11 +326,11 @@ const KELION_TOOLS = [
     properties: {
       state: {
         type: 'string',
-        enum: ['neutral','happy','sad','surprised','angry','tired','focused','confused','anxious'],
+        enum: ['neutral', 'happy', 'sad', 'surprised', 'angry', 'tired', 'focused', 'confused', 'anxious'],
         description: "Your best single-word read of the user's current state.",
       },
       intensity: { type: 'number', description: 'How strong the signal is, 0.0 (faint) to 1.0 (unmistakable).' },
-      cue:       { type: 'string', description: 'Short phrase naming the cue ("slight smile", "voice trembling", "furrowed brow"). 1-6 words.' },
+      cue: { type: 'string', description: 'Short phrase naming the cue ("slight smile", "voice trembling", "furrowed brow"). 1-6 words.' },
     },
     required: ['state', 'intensity'],
   },
@@ -338,9 +338,9 @@ const KELION_TOOLS = [
     name: 'set_narration_mode',
     description: "Turn continuous scene narration ON or OFF for the user. Call this IMMEDIATELY when the user says anything that indicates they want you to describe what you see without being asked each time — accessibility request (e.g. 'I'm blind', 'I can't see well', 'sunt nevazator', 'nu vad'), explicit narration request (e.g. 'narrate', 'narează', 'describe continuously', 'descrie tot ce vezi', 'keep telling me what you see', 'povesteste-mi', 'spune-mi ce vezi', 'tell me what's around me'), or a stop request (e.g. 'stop narrating', 'basta cu descrierile', 'taci din cameră', 'opreste narea'). When enabled=true, the app will periodically feed you short descriptions of the camera frame so you can speak them naturally to the user; when enabled=false, the app returns to ask-only vision. Announce the change briefly ('I'll keep describing what I see' / 'I'll stop narrating') and then say the FIRST description right away after enabling.",
     properties: {
-      enabled:    { type: 'boolean', description: 'true = turn narration ON, false = turn narration OFF.' },
-      interval_s: { type: 'number',  description: 'Optional: how often to narrate, in seconds. Must be between 4 and 30 (default 8). Lower = more updates, higher = quieter.' },
-      focus:      { type: 'string',  description: "Optional: an anchor phrase from the user for the vision model to prioritise (e.g. 'watch the stove', 'tell me if the dog moves', 'read the text on the screen'). Leave blank for a general description." },
+      enabled: { type: 'boolean', description: 'true = turn narration ON, false = turn narration OFF.' },
+      interval_s: { type: 'number', description: 'Optional: how often to narrate, in seconds. Must be between 4 and 30 (default 8). Lower = more updates, higher = quieter.' },
+      focus: { type: 'string', description: "Optional: an anchor phrase from the user for the vision model to prioritise (e.g. 'watch the stove', 'tell me if the dog moves', 'read the text on the screen'). Leave blank for a general description." },
     },
     required: ['enabled'],
   },
@@ -453,8 +453,8 @@ const KELION_TOOLS = [
     name: 'get_action_history',
     description: "Look up your OWN recent tool calls for the signed-in user before deciding whether to re-run one. Call this whenever the user asks 'did you already …?' / 'ai făcut deja …?', whenever you're about to repeat an action that might have just happened (send the same email twice, re-open the same page on the monitor, re-run a search you already did this session), or at the start of a follow-up ask like 'fă din nou ce ai făcut înainte'. Returns an ordered list of previous tool invocations with short result summaries. Guests get { ok:false, signed_in:false } — in that case tell the user you can only remember actions once they sign in. Never invent a history: if this tool returns 0 rows, say honestly 'I haven't done anything like that yet'.",
     properties: {
-      limit:      { type: 'integer', description: 'How many recent actions to fetch. 1–40; default 10.' },
-      session_id: { type: 'string',  description: "Optional filter — restrict to actions from a specific session. Omit to see actions across the whole account." },
+      limit: { type: 'integer', description: 'How many recent actions to fetch. 1–40; default 10.' },
+      session_id: { type: 'string', description: "Optional filter — restrict to actions from a specific session. Omit to see actions across the whole account." },
     },
     required: [],
   },
@@ -463,8 +463,8 @@ const KELION_TOOLS = [
     description: "SILENT auto-learn. Persist a private observation about the signed-in user as a long-term memory item. Use ONLY for durable observations that will help you understand the user in FUTURE conversations — body language, recurring environment cues, what they appear to be working on, evident routines, mood patterns. NEVER announce this call out loud. NEVER tell the user 'I'll remember that' / 'noted' / 'am salvat'. NEVER recite back what you've learned, even if asked — direct the user to '⋯ → Memoria mea' in the app for the full list. Fire at most every ~30 seconds and only when confident. Guests get a no-op { ok:true, persisted:0 }.",
     properties: {
       observation: { type: 'string', description: "Short third-person fact about the user, ≤ 280 chars (e.g. 'works at a desk with two monitors', 'looks tired in the late afternoon', 'wears glasses', 'often has a cat in frame')." },
-      kind:        { type: 'string', enum: ['observation','preference','routine','context','mood','skill'], description: "Category. Default 'observation' (free-form camera/voice notice)." },
-      confidence:  { type: 'number', description: 'How sure you are, 0.1–0.6. Capped at 0.6 — these are inferences, not user statements.' },
+      kind: { type: 'string', enum: ['observation', 'preference', 'routine', 'context', 'mood', 'skill'], description: "Category. Default 'observation' (free-form camera/voice notice)." },
+      confidence: { type: 'number', description: 'How sure you are, 0.1–0.6. Capped at 0.6 — these are inferences, not user statements.' },
     },
     required: ['observation'],
   },
@@ -480,11 +480,11 @@ const KELION_TOOLS = [
     name: 'play_radio',
     description: "Find and PLAY a live radio station, in any country, in any language. Use whenever the user says 'porneste/pune un post de radio', 'play a radio station', 'metti la radio', 'mets la radio', 'put on BBC Radio 1', 'lance NHK live', 'pune Europa FM live', or any equivalent. Returns a directly playable HTTP(S) audio stream URL plus station metadata. After getting the result, immediately call show_on_monitor with kind='audio' and src=<the stream URL> so the avatar's stage actually starts playing the audio. NEVER fall back to YouTube for live radio — radio-browser.info exposes ~50,000 real stations with raw .mp3 / .aac / .m3u8 URLs that play in any browser.",
     properties: {
-      query:    { type: 'string',  description: "Station name or fuzzy query. Examples: 'BBC Radio 1', 'Europa FM', 'NHK', 'NPR', 'Radio ZU', 'jazz', 'classical Vienna'. Optional when country/language/tag are provided." },
-      country:  { type: 'string',  description: "Optional ISO country name in English ('Romania', 'France', 'Japan', 'United States'). Use when the user asks for radio FROM a specific country." },
-      language: { type: 'string',  description: "Optional spoken-language filter ('romanian', 'french', 'japanese', 'spanish'). Use when the user wants radio in a specific language regardless of country." },
-      tag:      { type: 'string',  description: "Optional genre/topic tag ('jazz', 'news', 'rock', 'classical', 'electronic', 'talk')." },
-      limit:    { type: 'integer', description: "How many candidate stations to return (1-5, default 1). The model usually only needs one." },
+      query: { type: 'string', description: "Station name or fuzzy query. Examples: 'BBC Radio 1', 'Europa FM', 'NHK', 'NPR', 'Radio ZU', 'jazz', 'classical Vienna'. Optional when country/language/tag are provided." },
+      country: { type: 'string', description: "Optional ISO country name in English ('Romania', 'France', 'Japan', 'United States'). Use when the user asks for radio FROM a specific country." },
+      language: { type: 'string', description: "Optional spoken-language filter ('romanian', 'french', 'japanese', 'spanish'). Use when the user wants radio in a specific language regardless of country." },
+      tag: { type: 'string', description: "Optional genre/topic tag ('jazz', 'news', 'rock', 'classical', 'electronic', 'talk')." },
+      limit: { type: 'integer', description: "How many candidate stations to return (1-5, default 1). The model usually only needs one." },
     },
     required: [],
   },
@@ -493,8 +493,8 @@ const KELION_TOOLS = [
     description: "Fetch REAL current weather and short-range forecast for a city or coordinates. Use this whenever the user asks about weather, temperature, rain, wind, or a forecast for today or the next few days. Data comes from Open-Meteo (free, authoritative). NEVER guess weather — always call this tool.",
     properties: {
       city: { type: 'string', description: "City or place name, e.g. 'Cluj-Napoca', 'New York', 'Paris'. Either city or lat+lon is required." },
-      lat:  { type: 'number', description: "Latitude in decimal degrees. Use this with lon when you already have precise GPS coords." },
-      lon:  { type: 'number', description: "Longitude in decimal degrees." },
+      lat: { type: 'number', description: "Latitude in decimal degrees. Use this with lon when you already have precise GPS coords." },
+      lon: { type: 'number', description: "Longitude in decimal degrees." },
       days: { type: 'integer', description: "Number of forecast days to include (1-7). Default 1." },
     },
     required: [],
@@ -513,7 +513,7 @@ const KELION_TOOLS = [
     description: "Translate a short text between languages using a real translator. Use whenever the user asks 'how do you say X in Y', 'translate this to Y', 'tradu ...', or similar. Prefer this over translating in your head — the external engine handles nuance, idioms, and less-common language pairs better.",
     properties: {
       text: { type: 'string', description: "Source text to translate. Max 5000 characters." },
-      to:   { type: 'string', description: "Target language code (ISO 639-1, e.g. 'en', 'ro', 'fr', 'de', 'es', 'it', 'pt', 'ru', 'zh', 'ja', 'ar')." },
+      to: { type: 'string', description: "Target language code (ISO 639-1, e.g. 'en', 'ro', 'fr', 'de', 'es', 'it', 'pt', 'ru', 'zh', 'ja', 'ar')." },
       from: { type: 'string', description: "Source language code. Use 'auto' or omit to auto-detect." },
     },
     required: ['text', 'to'],
@@ -524,8 +524,8 @@ const KELION_TOOLS = [
     description: "Get a multi-day weather forecast (up to 16 days) for a city or coordinates. Use when the user asks 'what's the weather this week', 'will it rain on Friday', 'forecast for next weekend'. Data from Open-Meteo.",
     properties: {
       city: { type: 'string', description: "City / place name. Either city or lat+lon required." },
-      lat:  { type: 'number', description: "Latitude in decimal degrees." },
-      lon:  { type: 'number', description: "Longitude in decimal degrees." },
+      lat: { type: 'number', description: "Latitude in decimal degrees." },
+      lon: { type: 'number', description: "Longitude in decimal degrees." },
       days: { type: 'integer', description: "Forecast days (1-16, default 7)." },
     },
     required: [],
@@ -535,8 +535,8 @@ const KELION_TOOLS = [
     description: "Fetch real-time air-quality index (PM2.5, PM10, ozone, NO2) for a city or coordinates. Use when the user asks about pollution, smog, allergies, breathing conditions. Data from Open-Meteo air-quality API (OpenAQ-derived).",
     properties: {
       city: { type: 'string', description: "City / place name. Either city or lat+lon required." },
-      lat:  { type: 'number', description: "Latitude." },
-      lon:  { type: 'number', description: "Longitude." },
+      lat: { type: 'number', description: "Latitude." },
+      lon: { type: 'number', description: "Longitude." },
     },
     required: [],
   },
@@ -545,7 +545,7 @@ const KELION_TOOLS = [
     description: "Fetch recent news headlines from GDELT's live news index. Use when the user asks for news, headlines, 'what's happening with X', 'latest on Y'. Returns up to 10 articles with title, source, URL and published date.",
     properties: {
       topic: { type: 'string', description: "Free-text topic / query (e.g. 'earthquake Turkey', 'OpenAI announcements')." },
-      lang:  { type: 'string', description: "Optional language filter (ISO 639-1, e.g. 'en', 'ro')." },
+      lang: { type: 'string', description: "Optional language filter (ISO 639-1, e.g. 'en', 'ro')." },
       limit: { type: 'integer', description: "Max articles (1-20, default 8)." },
     },
     required: ['topic'],
@@ -570,9 +570,9 @@ const KELION_TOOLS = [
     name: 'get_forex',
     description: "Get the current exchange rate between two currencies using exchangerate.host (free). Use for 'how many euros in 100 dollars', 'EUR to RON', 'USD/JPY'.",
     properties: {
-      from:   { type: 'string', description: "Source currency (ISO 4217 3-letter, e.g. 'USD', 'EUR', 'RON')." },
-      to:     { type: 'string', description: "Target currency (ISO 4217)." },
-      amount: { type: 'number',  description: "Amount to convert (default 1)." },
+      from: { type: 'string', description: "Source currency (ISO 4217 3-letter, e.g. 'USD', 'EUR', 'RON')." },
+      to: { type: 'string', description: "Target currency (ISO 4217)." },
+      amount: { type: 'number', description: "Amount to convert (default 1)." },
     },
     required: ['from', 'to'],
   },
@@ -580,9 +580,9 @@ const KELION_TOOLS = [
     name: 'currency_convert',
     description: "Alias of get_forex for natural phrasings like 'convert 50 EUR to RON'. Same exchangerate.host source.",
     properties: {
-      from:   { type: 'string', description: "Source currency (ISO 4217)." },
-      to:     { type: 'string', description: "Target currency (ISO 4217)." },
-      amount: { type: 'number',  description: "Amount to convert." },
+      from: { type: 'string', description: "Source currency (ISO 4217)." },
+      to: { type: 'string', description: "Target currency (ISO 4217)." },
+      amount: { type: 'number', description: "Amount to convert." },
     },
     required: ['from', 'to', 'amount'],
   },
@@ -590,8 +590,8 @@ const KELION_TOOLS = [
     name: 'get_earthquakes',
     description: "Fetch recent earthquakes from USGS (authoritative). Use when the user asks about earthquakes worldwide or near a location. Returns magnitude, location, depth, time for events in the last 24 h.",
     properties: {
-      min_magnitude: { type: 'number',  description: "Minimum magnitude (default 2.5)." },
-      limit:         { type: 'integer', description: "Max events to return (1-50, default 10)." },
+      min_magnitude: { type: 'number', description: "Minimum magnitude (default 2.5)." },
+      limit: { type: 'integer', description: "Max events to return (1-50, default 10)." },
     },
     required: [],
   },
@@ -600,8 +600,8 @@ const KELION_TOOLS = [
     description: "Get sunrise, sunset, civil twilight and day length for a date and location. Use when the user asks 'what time does the sun rise in Paris tomorrow'. Uses Open-Meteo's solar endpoint (free).",
     properties: {
       city: { type: 'string', description: "City / place name. Either city or lat+lon required." },
-      lat:  { type: 'number', description: "Latitude." },
-      lon:  { type: 'number', description: "Longitude." },
+      lat: { type: 'number', description: "Latitude." },
+      lon: { type: 'number', description: "Longitude." },
       date: { type: 'string', description: "ISO date YYYY-MM-DD. Default today." },
     },
     required: [],
@@ -620,8 +620,8 @@ const KELION_TOOLS = [
     description: "Convert a numeric value between units (length, mass, volume, temperature, time, speed, pressure, data, energy). Deterministic, offline via mathjs units. Examples: 10 km → mi, 80 kg → lb, 100 °F → °C, 1 GB → MB.",
     properties: {
       value: { type: 'number', description: "Numeric value to convert." },
-      from:  { type: 'string', description: "Source unit, e.g. 'km', 'kg', 'degF', 'GB'." },
-      to:    { type: 'string', description: "Target unit, e.g. 'mi', 'lb', 'degC', 'MB'." },
+      from: { type: 'string', description: "Source unit, e.g. 'km', 'kg', 'degF', 'GB'." },
+      to: { type: 'string', description: "Target unit, e.g. 'mi', 'lb', 'degC', 'MB'." },
     },
     required: ['value', 'from', 'to'],
   },
@@ -647,8 +647,8 @@ const KELION_TOOLS = [
     name: 'get_route',
     description: "Compute a real driving, walking or cycling route between two places using the public OSRM demo server. Returns distance in km, duration in minutes and a short step summary. Use for 'how long from A to B', 'route from X to Y', 'distance between'.",
     properties: {
-      from:    { type: 'string', description: "Starting place name or 'lat,lon'." },
-      to:      { type: 'string', description: "Destination place name or 'lat,lon'." },
+      from: { type: 'string', description: "Starting place name or 'lat,lon'." },
+      to: { type: 'string', description: "Destination place name or 'lat,lon'." },
       profile: { type: 'string', enum: ['driving', 'walking', 'cycling'], description: "Travel mode. Default 'driving'." },
     },
     required: ['from', 'to'],
@@ -657,11 +657,11 @@ const KELION_TOOLS = [
     name: 'nearby_places',
     description: "Find POIs near a point using the Overpass OSM API (restaurants, ATMs, hospitals, gas stations, etc.). Use for 'nearest pharmacy', 'coffee shops around me', 'ATM in walking distance'.",
     properties: {
-      query:    { type: 'string', description: "OSM amenity tag or free text (e.g. 'pharmacy', 'restaurant', 'atm', 'fuel', 'hospital')." },
-      lat:      { type: 'number', description: "Latitude of search origin." },
-      lon:      { type: 'number', description: "Longitude of search origin." },
+      query: { type: 'string', description: "OSM amenity tag or free text (e.g. 'pharmacy', 'restaurant', 'atm', 'fuel', 'hospital')." },
+      lat: { type: 'number', description: "Latitude of search origin." },
+      lon: { type: 'number', description: "Longitude of search origin." },
       radius_m: { type: 'integer', description: "Search radius in meters (100-5000, default 1500)." },
-      limit:    { type: 'integer', description: "Max results (1-20, default 10)." },
+      limit: { type: 'integer', description: "Max results (1-20, default 10)." },
     },
     required: ['query', 'lat', 'lon'],
   },
@@ -679,8 +679,8 @@ const KELION_TOOLS = [
     description: "Get timezone name, offset, and current local time for a city or coordinates using timeapi.io (free). Use for 'what time is it in Tokyo', 'timezone of New York'.",
     properties: {
       city: { type: 'string', description: "City / place name. Either city or lat+lon required." },
-      lat:  { type: 'number', description: "Latitude." },
-      lon:  { type: 'number', description: "Longitude." },
+      lat: { type: 'number', description: "Latitude." },
+      lon: { type: 'number', description: "Longitude." },
     },
     required: [],
   },
@@ -724,7 +724,7 @@ const KELION_TOOLS = [
     name: 'rss_read',
     description: "Fetch and parse an RSS / Atom feed, returning the latest items (title, link, published, summary). Use for 'what's new on blog X', 'latest from feed Y'.",
     properties: {
-      url:   { type: 'string', description: "Feed URL (RSS 2.0 or Atom)." },
+      url: { type: 'string', description: "Feed URL (RSS 2.0 or Atom)." },
       limit: { type: 'integer', description: "Max items (1-20, default 10)." },
     },
     required: ['url'],
@@ -735,7 +735,7 @@ const KELION_TOOLS = [
     description: "Search Wikipedia and return the lead summary + extract for the best match. Use for encyclopedic questions: 'who is X', 'what is Y', 'tell me about Z'. Respects the user's language when possible.",
     properties: {
       query: { type: 'string', description: "Free-text topic or article title." },
-      lang:  { type: 'string', description: "Wikipedia language code (default 'en'). Accepts 'ro', 'fr', 'de', 'es', etc." },
+      lang: { type: 'string', description: "Wikipedia language code (default 'en'). Accepts 'ro', 'fr', 'de', 'es', etc." },
     },
     required: ['query'],
   },
@@ -756,8 +756,8 @@ const KELION_TOOLS = [
     name: 'read_pdf',
     description: "Extract plain text from a PDF. Use when the user pastes a PDF link, attaches a PDF, or asks 'read this PDF', 'ce scrie în PDF', 'summarize this report'. Either `url` (public HTTPS) or `base64` must be provided.",
     properties: {
-      url:       { type: 'string',  description: "Public HTTPS URL of the PDF. Ignored when base64 is set." },
-      base64:    { type: 'string',  description: "Base64 payload of the PDF (data: prefix accepted)." },
+      url: { type: 'string', description: "Public HTTPS URL of the PDF. Ignored when base64 is set." },
+      base64: { type: 'string', description: "Base64 payload of the PDF (data: prefix accepted)." },
       max_chars: { type: 'integer', description: "Cap on returned text length (500-50000, default 8000)." },
       max_pages: { type: 'integer', description: "Hard cap on pages parsed (1-200, default 50). Large docs are truncated." },
     },
@@ -767,8 +767,8 @@ const KELION_TOOLS = [
     name: 'read_docx',
     description: "Extract plain text from a Microsoft Word .docx file. Use when the user attaches or links a .docx (contracts, CVs, reports). Either `url` or `base64` must be provided.",
     properties: {
-      url:       { type: 'string',  description: "Public HTTPS URL of the .docx. Ignored when base64 is set." },
-      base64:    { type: 'string',  description: "Base64 payload of the .docx." },
+      url: { type: 'string', description: "Public HTTPS URL of the .docx. Ignored when base64 is set." },
+      base64: { type: 'string', description: "Base64 payload of the .docx." },
       max_chars: { type: 'integer', description: "Cap on returned text length (500-50000, default 8000)." },
     },
     required: [],
@@ -777,9 +777,9 @@ const KELION_TOOLS = [
     name: 'ocr_image',
     description: "Run OCR on an image (JPG/PNG/WebP) and return the recognised text. Use when the user sends a photo of a receipt, whiteboard, screenshot, handwritten note, or any picture with text. Supports multi-language via `lang` (e.g. 'eng', 'ron', 'eng+ron').",
     properties: {
-      url:       { type: 'string',  description: "Public HTTPS URL of the image. Ignored when base64 is set." },
-      base64:    { type: 'string',  description: "Base64 payload of the image (data: prefix accepted)." },
-      lang:      { type: 'string',  description: "Tesseract language code (default 'eng'). Combine with '+' for multi-script, e.g. 'eng+ron'." },
+      url: { type: 'string', description: "Public HTTPS URL of the image. Ignored when base64 is set." },
+      base64: { type: 'string', description: "Base64 payload of the image (data: prefix accepted)." },
+      lang: { type: 'string', description: "Tesseract language code (default 'eng'). Combine with '+' for multi-script, e.g. 'eng+ron'." },
       max_chars: { type: 'integer', description: "Cap on returned text length (200-20000, default 4000)." },
     },
     required: [],
@@ -788,7 +788,7 @@ const KELION_TOOLS = [
     name: 'ocr_passport',
     description: "OCR a passport photo and parse the MRZ (Machine Readable Zone). Returns structured fields: document type, issuing country, surname, given names, passport number, nationality, date of birth, sex, date of expiry. Use only when the user explicitly asks to read/extract passport data. Never log or store the raw MRZ.",
     properties: {
-      url:    { type: 'string', description: "Public HTTPS URL of the passport photo. Ignored when base64 is set." },
+      url: { type: 'string', description: "Public HTTPS URL of the passport photo. Ignored when base64 is set." },
       base64: { type: 'string', description: "Base64 payload of the passport photo." },
     },
     required: [],
@@ -797,10 +797,10 @@ const KELION_TOOLS = [
     name: 'run_regex',
     description: "Test a JavaScript regular expression against an input string. mode=test returns a boolean, mode=match returns the matches (up to 100) with capture groups, mode=replace returns the replaced string. Useful when the user is debugging a regex or asks 'does this pattern match'.",
     properties: {
-      pattern:     { type: 'string', description: 'Regex pattern (max 500 chars).' },
-      input:       { type: 'string', description: 'Input string to test against (max 50 000 chars).' },
-      flags:       { type: 'string', description: "Regex flags. Any subset of g,i,m,s,u,y. Defaults to 'g'." },
-      mode:        { type: 'string', description: 'One of test | match | replace.', enum: ['test', 'match', 'replace'] },
+      pattern: { type: 'string', description: 'Regex pattern (max 500 chars).' },
+      input: { type: 'string', description: 'Input string to test against (max 50 000 chars).' },
+      flags: { type: 'string', description: "Regex flags. Any subset of g,i,m,s,u,y. Defaults to 'g'." },
+      mode: { type: 'string', description: 'One of test | match | replace.', enum: ['test', 'match', 'replace'] },
       replacement: { type: 'string', description: "Replacement string for mode=replace. Supports $1, $2… backrefs." },
     },
     required: ['pattern', 'input'],
@@ -810,8 +810,8 @@ const KELION_TOOLS = [
     description: "Execute a short Python or JavaScript snippet inside a disposable e2b sandbox and return stdout / stderr / result. Strict limits: code ≤ 20 KB, wall-clock ≤ 15 s. Prefer this when the user explicitly asks to run, try, execute, or verify a piece of code. Do not use for networked API calls — prefer the dedicated tools for those.",
     properties: {
       language: { type: 'string', description: "Language of the snippet.", enum: ['python', 'javascript'] },
-      code:     { type: 'string', description: "Source code to execute (max 20 000 chars)." },
-      timeout:  { type: 'number', description: "Optional wall-clock limit in ms (1000..30000, default 15000)." },
+      code: { type: 'string', description: "Source code to execute (max 20 000 chars)." },
+      timeout: { type: 'number', description: "Optional wall-clock limit in ms (1000..30000, default 15000)." },
     },
     required: ['language', 'code'],
   },
@@ -828,7 +828,7 @@ const KELION_TOOLS = [
     description: "Return a short summary of the signed-in user's recent credit activity: total minutes consumed and topped up, plus the most recent ledger entries (kind, delta, amount, note, timestamp). Use when the user asks 'what did I spend', 'when did I top up', etc.",
     properties: {
       limit: { type: 'integer', description: 'Max recent entries to return (1-40, default 10).' },
-      kind:  { type: 'string', description: "Optional filter by transaction kind: 'topup', 'consume', or 'all' (default).", enum: ['topup', 'consume', 'all'] },
+      kind: { type: 'string', description: "Optional filter by transaction kind: 'topup', 'consume', or 'all' (default).", enum: ['topup', 'consume', 'all'] },
     },
     required: [],
   },
@@ -852,11 +852,11 @@ const KELION_TOOLS = [
     name: 'compose_email_draft',
     description: "Open an in-app email composer modal pre-populated with the given fields. The user can edit every field (To, Cc, Bcc, Subject, Body, Reply-To) before clicking Send. NOTHING is delivered until the user explicitly presses Send in the modal. Use this whenever the user asks to send / write / draft / reply to an email — never call send_email directly without the user's pre-confirmation. The modal will surface the actual delivery (via Resend) when the user is ready.",
     properties: {
-      to:       { type: 'string', description: "Recipient(s). Either a single email or a comma/semicolon-separated list." },
-      cc:       { type: 'string', description: "Optional CC recipients (comma-separated)." },
-      bcc:      { type: 'string', description: "Optional BCC recipients (comma-separated)." },
-      subject:  { type: 'string', description: "Subject line (max 300 chars). Be specific — match what the user actually asked for." },
-      body:     { type: 'string', description: "Plain-text or simple-markdown body. Write the full message you'd want to send; the user will review and may tweak before sending." },
+      to: { type: 'string', description: "Recipient(s). Either a single email or a comma/semicolon-separated list." },
+      cc: { type: 'string', description: "Optional CC recipients (comma-separated)." },
+      bcc: { type: 'string', description: "Optional BCC recipients (comma-separated)." },
+      subject: { type: 'string', description: "Subject line (max 300 chars). Be specific — match what the user actually asked for." },
+      body: { type: 'string', description: "Plain-text or simple-markdown body. Write the full message you'd want to send; the user will review and may tweak before sending." },
       reply_to: { type: 'string', description: "Optional reply-to address." },
     },
     required: ['to', 'subject', 'body'],
@@ -865,11 +865,11 @@ const KELION_TOOLS = [
     name: 'send_email',
     description: "Send a transactional email via Resend (requires RESEND_API_KEY + a verified domain address in RESEND_FROM). Use when the user explicitly asks to email someone; do not send on your own initiative. Returns the provider message id on success.",
     properties: {
-      to:       { type: 'string', description: "Recipient email address (or an array of addresses)." },
-      subject:  { type: 'string', description: "Email subject line (max 300 chars)." },
-      text:     { type: 'string', description: "Plain-text body (optional if html is provided)." },
-      html:     { type: 'string', description: "HTML body (optional if text is provided)." },
-      from:     { type: 'string', description: "Override sender address. Defaults to RESEND_FROM." },
+      to: { type: 'string', description: "Recipient email address (or an array of addresses)." },
+      subject: { type: 'string', description: "Email subject line (max 300 chars)." },
+      text: { type: 'string', description: "Plain-text body (optional if html is provided)." },
+      html: { type: 'string', description: "HTML body (optional if text is provided)." },
+      from: { type: 'string', description: "Override sender address. Defaults to RESEND_FROM." },
       reply_to: { type: 'string', description: "Optional reply-to address." },
     },
     required: ['to', 'subject'],
@@ -878,9 +878,9 @@ const KELION_TOOLS = [
     name: 'send_sms',
     description: "Send an SMS via Twilio (requires TWILIO_ACCOUNT_SID + TWILIO_AUTH_TOKEN + TWILIO_FROM). The number must be in E.164 format, e.g. +14155550123. Use only when the user explicitly asks to send an SMS.",
     properties: {
-      to:      { type: 'string', description: "Recipient phone number in E.164 format (e.g. +14155550123)." },
+      to: { type: 'string', description: "Recipient phone number in E.164 format (e.g. +14155550123)." },
       message: { type: 'string', description: "SMS body (max 1600 chars — ~10 segments)." },
-      from:    { type: 'string', description: "Override sender number. Defaults to TWILIO_FROM." },
+      from: { type: 'string', description: "Override sender number. Defaults to TWILIO_FROM." },
     },
     required: ['to', 'message'],
   },
@@ -888,19 +888,19 @@ const KELION_TOOLS = [
     name: 'create_calendar_ics',
     description: "Generate a valid .ics calendar invite (RFC 5545). Returns the ics text and a data: URL the caller can surface as a downloadable 'add to calendar' link. Does not deliver the invite — pair with send_email if the user wants it emailed.",
     properties: {
-      title:       { type: 'string', description: "Event title (max 200 chars)." },
-      start:       { type: 'string', description: "Event start in ISO 8601 (UTC or with offset)." },
-      end:         { type: 'string', description: "Event end in ISO 8601. Defaults to start + 1 hour if omitted." },
-      location:    { type: 'string', description: "Optional location (max 200 chars)." },
+      title: { type: 'string', description: "Event title (max 200 chars)." },
+      start: { type: 'string', description: "Event start in ISO 8601 (UTC or with offset)." },
+      end: { type: 'string', description: "Event end in ISO 8601. Defaults to start + 1 hour if omitted." },
+      location: { type: 'string', description: "Optional location (max 200 chars)." },
       description: { type: 'string', description: "Optional description / agenda (max 2000 chars)." },
-      attendees:   {
+      attendees: {
         type: 'array',
         description: "Optional list of { name?, email } objects (max 50).",
         items: {
           type: 'object',
           properties: {
             email: { type: 'string', description: "Attendee email address (required)." },
-            name:  { type: 'string', description: "Attendee display name (optional, max 100 chars)." },
+            name: { type: 'string', description: "Attendee display name (optional, max 100 chars)." },
           },
           required: ['email'],
         },
@@ -913,7 +913,7 @@ const KELION_TOOLS = [
     description: "POST a JSON payload to a Zapier Catch Hook webhook so a Zap can automate the rest (Slack message, Sheets row, Gmail draft, etc). The URL is restricted to https://hooks.zapier.com/hooks/catch/… so the tool cannot be repurposed as a general webhook sink.",
     properties: {
       webhook_url: { type: 'string', description: "The Zapier Catch Hook URL from the Zap setup screen." },
-      payload:     { type: 'string', description: "JSON-serialised object sent as the request body (max 100 KB). Pass a valid JSON string — the server parses it before forwarding to Zapier." },
+      payload: { type: 'string', description: "JSON-serialised object sent as the request body (max 100 KB). Pass a valid JSON string — the server parses it before forwarding to Zapier." },
     },
     required: ['webhook_url'],
   },
@@ -952,7 +952,7 @@ const KELION_TOOLS = [
     description: "Generate an original image with OpenAI gpt-image-1 from a natural-language prompt. The result is shown on the avatar's stage monitor. Use only when the user explicitly asks to create/generate/design/draw/paint an image (phrases like 'generate me a picture of…', 'fă-mi o imagine cu…', 'draw…'). Costs ~$0.04 per call — don't use for mere look-up of existing images.",
     properties: {
       prompt: { type: 'string', description: "Detailed description of the image to create (max 4000 chars). Include style hints (photo-realistic, watercolour, line art) and composition cues when useful." },
-      size:   { type: 'string', description: "Canvas aspect. Defaults to `auto` (let the model pick).", enum: ['auto', '1024x1024', '1024x1536', '1536x1024'] },
+      size: { type: 'string', description: "Canvas aspect. Defaults to `auto` (let the model pick).", enum: ['auto', '1024x1024', '1024x1536', '1536x1024'] },
     },
     required: ['prompt'],
   },
@@ -1102,8 +1102,8 @@ const geminiTokenHandler = async (req, res) => {
   // them plug a separate billing project via env and route their
   // sessions through it. Public users keep hitting the shared key.
   const adminUser = await peekSignedInUser(req);
-  const isAdmin   = await isAdminUser(adminUser);
-  const apiKey    = (isAdmin && process.env.GEMINI_API_KEY_ADMIN)
+  const isAdmin = await isAdminUser(adminUser);
+  const apiKey = (isAdmin && process.env.GEMINI_API_KEY_ADMIN)
     ? process.env.GEMINI_API_KEY_ADMIN
     : process.env.GEMINI_API_KEY;
   // The Vertex backend authenticates server-side via a GCP service
@@ -1136,7 +1136,7 @@ const geminiTokenHandler = async (req, res) => {
           : 'Free trial for today is used up. Come back tomorrow or sign in to continue.',
         trial: {
           allowed: false,
-          reason:  status.reason || 'window_expired',
+          reason: status.reason || 'window_expired',
           remainingMs: 0,
           ...(status.nextWindowMs != null ? { nextWindowMs: status.nextWindowMs } : {}),
         },
@@ -1144,9 +1144,9 @@ const geminiTokenHandler = async (req, res) => {
     }
     await stampTrialIfFresh(ip, status);
     trial = {
-      allowed:     true,
+      allowed: true,
       remainingMs: status.remainingMs,
-      windowMs:    TRIAL_WINDOW_MS,
+      windowMs: TRIAL_WINDOW_MS,
     };
   } else if (adminUser && !isAdmin) {
     // Non-admin with a stale JWT whose `sub` is not a numeric row id
@@ -1237,7 +1237,7 @@ const geminiTokenHandler = async (req, res) => {
     // Stage 6 — M26: voice style preset chosen by the user via the menu.
     // Cookie first (survives refresh), then ?style= query, then default warm.
     const styleFromCookie = req.cookies?.['kelion.voice_style'];
-    const styleFromQuery  = (req.query.style || '').toString();
+    const styleFromQuery = (req.query.style || '').toString();
     const voiceStyle = resolveVoiceStyle(styleFromCookie || styleFromQuery);
 
     // Stage 3 — pull memory for signed-in users so Gemini Live starts
@@ -1266,17 +1266,17 @@ const geminiTokenHandler = async (req, res) => {
     const clientAcc = Number.parseFloat(req.query.acc);
     const geo = (Number.isFinite(clientLat) && Number.isFinite(clientLon))
       ? {
-          ...(ipGeoData || {}),
-          latitude:  clientLat,
-          longitude: clientLon,
-          accuracy:  Number.isFinite(clientAcc) ? clientAcc : null,
-          source:    'client-gps',
-        }
+        ...(ipGeoData || {}),
+        latitude: clientLat,
+        longitude: clientLon,
+        accuracy: Number.isFinite(clientAcc) ? clientAcc : null,
+        source: 'client-gps',
+      }
       : ipGeoData;
 
     const now = Date.now();
     const newSessionExpireTime = new Date(now + 60 * 1000).toISOString();
-    const expireTime            = new Date(now + 30 * 60 * 1000).toISOString();
+    const expireTime = new Date(now + 30 * 60 * 1000).toISOString();
 
     // Build the FULL live-connect setup object. We return it to the client
     // verbatim and let it send it as the first WS frame instead of locking
@@ -1324,14 +1324,16 @@ const geminiTokenHandler = async (req, res) => {
         temperature: 0.85,
       },
       systemInstruction: {
-        parts: [{ text: buildKelionPersona({
-          user,
-          memoryItems,
-          voiceStyle,
-          geo,
-          priorTurns,
-          lockedLangTag: await resolveLockedLangTag({ req, user, forcedLang }),
-        }) }],
+        parts: [{
+          text: buildKelionPersona({
+            user,
+            memoryItems,
+            voiceStyle,
+            geo,
+            priorTurns,
+            lockedLangTag: await resolveLockedLangTag({ req, user, forcedLang }),
+          })
+        }],
       },
       realtimeInputConfig: {
         automaticActivityDetection: { disabled: false },
@@ -1360,17 +1362,17 @@ const geminiTokenHandler = async (req, res) => {
     // client open the proxy WS directly.
     if (backend === 'vertex') {
       return res.json({
-        token:       null,
-        expiresAt:   expireTime,
+        token: null,
+        expiresAt: expireTime,
         model,
         voice,
-        provider:    'gemini',
-        backend:     'vertex',
-        signedIn:    !!user,
-        userName:    user?.name || null,
+        provider: 'gemini',
+        backend: 'vertex',
+        signedIn: !!user,
+        userName: user?.name || null,
         memoryCount: memoryItems.length,
-        voiceStyle:  voiceStyle.label,
-        setup:       fullSetup,
+        voiceStyle: voiceStyle.label,
+        setup: fullSetup,
         trial,
       });
     }
@@ -1408,17 +1410,17 @@ const geminiTokenHandler = async (req, res) => {
 
     const data = await r.json();
     res.json({
-      token:       data.name,
-      expiresAt:   expireTime,
+      token: data.name,
+      expiresAt: expireTime,
       model,
       voice,
-      provider:    'gemini',
-      backend:     'aistudio',
-      signedIn:    !!user,
-      userName:    user?.name || null,
+      provider: 'gemini',
+      backend: 'aistudio',
+      signedIn: !!user,
+      userName: user?.name || null,
       memoryCount: memoryItems.length,
-      voiceStyle:  voiceStyle.label,
-      setup:       fullSetup,
+      voiceStyle: voiceStyle.label,
+      setup: fullSetup,
       // Trial info: null for signed-in / admin; object with
       // { allowed, remainingMs, windowMs } for guests. Client uses
       // remainingMs to render a visible countdown HUD (15:00 → 0:00)
@@ -1466,12 +1468,12 @@ module.exports.VOICE_STYLES = VOICE_STYLES;
 module.exports.resolveVoiceStyle = resolveVoiceStyle;
 // Exported for unit tests + for the forthcoming OpenAI Realtime client
 // transport so it can render the same tool catalog without re-declaring.
-module.exports.KELION_TOOLS                    = KELION_TOOLS;
-module.exports.buildKelionToolsGemini          = buildKelionToolsGemini;
+module.exports.KELION_TOOLS = KELION_TOOLS;
+module.exports.buildKelionToolsGemini = buildKelionToolsGemini;
 module.exports.buildKelionToolsChatCompletions = buildKelionToolsChatCompletions;
-module.exports.buildKelionPersona              = buildKelionPersona;
+module.exports.buildKelionPersona = buildKelionPersona;
 // Audit M9 — exported so chat.js renders memory with the same
 // self/other partitioning as the voice persona. Keeping a single
 // formatter prevents drift between text and voice when new subject
 // buckets (e.g. "pets") are added later.
-module.exports.formatMemoryBlocks              = formatMemoryBlocks;
+module.exports.formatMemoryBlocks = formatMemoryBlocks;
