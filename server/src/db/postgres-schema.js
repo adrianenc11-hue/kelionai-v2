@@ -251,4 +251,12 @@ CREATE TABLE IF NOT EXISTS credits_consume_state (
   updated_at       BIGINT NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_credits_consume_state_updated ON credits_consume_state(updated_at);
+
+CREATE TABLE IF NOT EXISTS trial_usage (
+  ip TEXT PRIMARY KEY,
+  first_ever_stamp_at BIGINT NOT NULL,
+  first_stamp_at BIGINT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_trial_usage_first_ever ON trial_usage(first_ever_stamp_at);
 `;

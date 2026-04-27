@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 
 const path = require('path');
 const fs = require('fs');
@@ -458,6 +458,18 @@ async function initDb() {
   // GC helper index — eviction scans by `updated_at` to drop rows
   // that haven't touched /consume in > TTL.
   await db.exec('CREATE INDEX IF NOT EXISTS idx_credits_consume_state_updated ON credits_consume_state(updated_at)');
+
+  // Trial quota — persistent IP-based guest trial tracking.
+  // Previously in-memory (Map), now in DB so data survives deploys.
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS trial_usage (
+      ip TEXT PRIMARY KEY,
+      first_ever_stamp_at INTEGER NOT NULL,
+      first_stamp_at INTEGER NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  await db.exec('CREATE INDEX IF NOT EXISTS idx_trial_usage_first_ever ON trial_usage(first_ever_stamp_at)');
 
   return db;
 }

@@ -35,7 +35,7 @@ const {
 
 const router = Router();
 
-router.get('/status', (req, res) => {
+router.get('/status', async (req, res) => {
   // Anyone with a valid JWT — admin OR regular — is not subject to the
   // guest trial, so we don't need the admin DB lookup here (Copilot
   // review pr-74): `applicable: false` is identical for both.
@@ -52,7 +52,7 @@ router.get('/status', (req, res) => {
     });
   }
   const ip = ipGeo.clientIp(req) || req.ip || '';
-  const status = trialStatus(ip);
+  const status = await trialStatus(ip);
   return res.json({
     applicable:   true,
     allowed:      status.allowed,
