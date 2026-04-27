@@ -1602,7 +1602,7 @@ router.post('/vision', async (req, res) => {
 
     const r = await client.chat.completions.create({
       model: getDefaultChatModel(),
-      max_tokens: 200,
+      max_completion_tokens: 200,
       messages: [{
         role: 'user',
         content: [
@@ -1709,7 +1709,7 @@ router.post('/pipeline', async (req, res) => {
       tools,
       tool_choice: 'auto',
       temperature: 0,
-      max_tokens: 1024,
+      max_completion_tokens: 1024,
     });
 
     let choice = completion.choices?.[0];
@@ -1744,7 +1744,7 @@ router.post('/pipeline', async (req, res) => {
         tools,
         tool_choice: 'auto',
         temperature: 0,
-        max_tokens: 1024,
+        max_completion_tokens: 1024,
       });
       choice = completion.choices?.[0];
     }
