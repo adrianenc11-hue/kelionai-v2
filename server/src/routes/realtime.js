@@ -1037,6 +1037,17 @@ function buildKelionToolsChatCompletions() {
 // isAdminUser / peekSignedInUser now come from ../middleware/optionalAuth.
 const { TRIAL_WINDOW_MS, trialStatus, stampTrialIfFresh } = trialQuota;
 
+// Live session registry — admin dashboard reads this to show who's online.
+if (!global.__kelionActiveSessions) global.__kelionActiveSessions = new Map();
+const activeSessions = global.__kelionActiveSessions;
+// Auto-expire stale entries (sessions that didn't close cleanly).
+setInterval(() => {
+  const cutoff = Date.now() - 35 * 60 * 1000; // 35 min max session
+  for (const [id, s] of activeSessions) {
+    if (s.startedAt < cutoff) activeSessions.delete(id);
+  }
+}, 60_000).unref();
+
 // F4 — both token endpoints accept an optional POST body with
 //   { priorTurns: [{ role: 'user' | 'assistant', text: string }, …] }
 // so the auto-fallback path in KelionStage can transfer the current
@@ -1414,6 +1425,17 @@ const geminiTokenHandler = async (req, res) => {
       // and auto-stops the session when it hits zero.
       trial,
     });
+
+    // Register active session for admin live-sessions.
+    const sid = data.name || `s-${Date.now()}`;
+    activeSessions.set(sid, {
+      userId: user?.id || null,
+      userEmail: user?.email || null,
+      ip: ipGeo.clientIp(req) || req.ip || '',
+      startedAt: Date.now(),
+    });
+    // Auto-remove after 30 min (max session duration).
+    setTimeout(() => activeSessions.delete(sid), 30 * 60 * 1000).unref();
   } catch (err) {
     console.error('[realtime] Gemini error:', err.message);
     res.status(500).json({ error: 'Failed to create Gemini live session' });

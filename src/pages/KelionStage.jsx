@@ -16,7 +16,7 @@ import Halo from '../components/stage/Halo'
 import StudioDecor from '../components/stage/StudioDecor'
 import CameraRig from '../components/stage/CameraRig'
 import MonitorOverlay from '../components/stage/MonitorOverlay'
-import { TopBarIconButton, AdminTabBar, VisitorsAnalyticsPanel, PayoutsPanel, MenuItem, friendlyCreditStatus, uaIsBot, uaBrowser, uaOs, refHost } from '../components/stage/AdminPanels'
+import { TopBarIconButton, AdminTabBar, VisitorsAnalyticsPanel, PayoutsPanel, MenuItem, friendlyCreditStatus, uaIsBot, uaBrowser, uaOs, refHost, RevenueChart, LiveSessionsPanel, ExportButtons } from '../components/stage/AdminPanels'
 import { useGeminiLive } from '../lib/geminiLive' // CACHE BUSTER: 20260426155431
 import { useWakeWord } from '../lib/useWakeWord'
 import { useTrial } from '../lib/useTrial'
@@ -517,6 +517,26 @@ export default function KelionStage() {
       setBusinessLoading(false)
     }
   }, [])
+
+  // Admin — Revenue chart + live sessions (fetched alongside business).
+  const [revenueData, setRevenueData] = useState(null)
+  const [liveSessionsData, setLiveSessionsData] = useState(null)
+  const fetchRevenueAndSessions = useCallback(async () => {
+    try {
+      const [revR, sessR] = await Promise.all([
+        fetch('/api/admin/revenue-chart?days=30', { credentials: 'include' }),
+        fetch('/api/admin/live-sessions', { credentials: 'include' }),
+      ])
+      if (revR.ok) setRevenueData(await revR.json())
+      if (sessR.ok) setLiveSessionsData(await sessR.json())
+    } catch (_) { /* best effort */ }
+  }, [])
+  useEffect(() => {
+    if (!businessOpen || !isAdmin) return
+    fetchRevenueAndSessions()
+    const iv = setInterval(fetchRevenueAndSessions, 15_000) // refresh every 15s
+    return () => clearInterval(iv)
+  }, [businessOpen, isAdmin, fetchRevenueAndSessions])
 
   // PR E1 — unified admin shell. Two new tab panels (Users, Payouts)
   // replace the scattered overflow-menu entries; Business / AI / Visitors
@@ -2966,6 +2986,10 @@ export default function KelionStage() {
               </>
             )
           })()}
+          {/* Revenue chart + Live sessions + Export */}
+          <RevenueChart data={revenueData} />
+          <LiveSessionsPanel data={liveSessionsData} loading={businessLoading} />
+          <ExportButtons />
         </div>
       )}
 
