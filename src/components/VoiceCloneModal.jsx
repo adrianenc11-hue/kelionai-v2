@@ -22,6 +22,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getCsrfToken } from '../lib/api'
+import ALL_PASSAGES from './voiceClonePassages'
 
 const CONSENT_VERSION = '2026-04-27.v2'
 const MIN_SECONDS = 30
@@ -272,8 +273,9 @@ function t(key, ...args) {
 }
 
 function passages() {
-  const lang = detectLang()
-  return (I18N[lang]?.passages ?? I18N.en.passages)
+  const nav = (typeof navigator !== 'undefined' && navigator.language) || 'en'
+  const short = nav.split('-')[0].toLowerCase()
+  return ALL_PASSAGES[short] || ALL_PASSAGES.en
 }
 
 function pickMimeType() {
