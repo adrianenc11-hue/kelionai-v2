@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { t } from '../lib/uiStrings'
 
 // Kelion — standard contact page.
 // Form fields: name, email, department (select), subject, message.
@@ -9,14 +10,14 @@ import { Link } from 'react-router-dom'
 // in a server-side POST later without changing the UI.
 
 const DEPARTMENTS = [
-  { key: 'general',      label: 'General inquiry' },
-  { key: 'support',      label: 'Technical support' },
-  { key: 'billing',      label: 'Billing & subscriptions' },
-  { key: 'sales',        label: 'Sales & demos' },
-  { key: 'partnerships', label: 'Partnerships' },
-  { key: 'press',        label: 'Press & media' },
-  { key: 'careers',      label: 'Careers' },
-  { key: 'privacy',      label: 'Privacy & data requests' },
+  { key: 'general',      i18nKey: 'generalInquiry' },
+  { key: 'support',      i18nKey: 'technicalSupport' },
+  { key: 'billing',      i18nKey: 'billingAndSubs' },
+  { key: 'sales',        i18nKey: 'salesAndDemos' },
+  { key: 'partnerships', i18nKey: 'partnerships' },
+  { key: 'press',        i18nKey: 'pressAndMedia' },
+  { key: 'careers',      i18nKey: 'careers' },
+  { key: 'privacy',      i18nKey: 'privacyAndData' },
 ]
 
 const CONTACT_EMAIL = 'contact@kelionai.app'
@@ -58,7 +59,7 @@ export default function ContactPage() {
   const [message, setMessage] = useState('')
 
   const deptLabel = useMemo(
-    () => DEPARTMENTS.find((d) => d.key === department)?.label || 'General inquiry',
+    () => t(DEPARTMENTS.find((d) => d.key === department)?.i18nKey || 'generalInquiry'),
     [department],
   )
 
@@ -115,7 +116,7 @@ export default function ContactPage() {
             marginBottom: 24,
           }}
         >
-          ← Back to Kelion
+          {t('backToKelionFull')}
         </Link>
 
         <h1 style={{
@@ -124,7 +125,7 @@ export default function ContactPage() {
           letterSpacing: '-0.01em',
           margin: '0 0 8px',
         }}>
-          Contact us
+          {t('contactTitle')}
         </h1>
         <p style={{
           color: 'rgba(237, 233, 254, 0.6)',
@@ -132,9 +133,7 @@ export default function ContactPage() {
           lineHeight: 1.55,
           margin: '0 0 28px',
         }}>
-          Tell us what you need and we'll route it to the right team.
-          We usually reply within one business day. For urgent account
-          issues, email us directly at{' '}
+          {t('contactSubtitle')}{' '}
           <a
             href={`mailto:${CONTACT_EMAIL}`}
             style={{ color: '#a78bfa', textDecoration: 'none' }}
@@ -157,7 +156,7 @@ export default function ContactPage() {
           }}
         >
           <div>
-            <InputLabel>Your name</InputLabel>
+            <InputLabel>{t('yourName')}</InputLabel>
             <input
               type="text"
               value={name}
@@ -169,7 +168,7 @@ export default function ContactPage() {
           </div>
 
           <div>
-            <InputLabel>Email <span style={{ color: '#f87171' }}>*</span></InputLabel>
+            <InputLabel>{t('emailLabel')} <span style={{ color: '#f87171' }}>*</span></InputLabel>
             <input
               type="email"
               value={email}
@@ -182,7 +181,7 @@ export default function ContactPage() {
           </div>
 
           <div>
-            <InputLabel>Department</InputLabel>
+            <InputLabel>{t('department')}</InputLabel>
             <select
               value={department}
               onChange={(e) => setDepartment(e.target.value)}
@@ -190,29 +189,29 @@ export default function ContactPage() {
             >
               {DEPARTMENTS.map((d) => (
                 <option key={d.key} value={d.key} style={{ background: '#1a1130' }}>
-                  {d.label}
+                  {t(d.i18nKey)}
                 </option>
               ))}
             </select>
           </div>
 
           <div>
-            <InputLabel>Subject</InputLabel>
+            <InputLabel>{t('subject')}</InputLabel>
             <input
               type="text"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
-              placeholder="Short summary (optional)"
+              placeholder={t('subjectPlaceholder')}
               style={inputStyle}
             />
           </div>
 
           <div>
-            <InputLabel>Message <span style={{ color: '#f87171' }}>*</span></InputLabel>
+            <InputLabel>{t('message')} <span style={{ color: '#f87171' }}>*</span></InputLabel>
             <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              placeholder="How can we help?"
+              placeholder={t('messagePlaceholder')}
               rows={6}
               style={{ ...inputStyle, resize: 'vertical', minHeight: 120, lineHeight: 1.5 }}
               required
@@ -244,7 +243,7 @@ export default function ContactPage() {
             }}
             onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)' }}
           >
-            Send message
+            {t('sendMessage')}
           </button>
 
           <p style={{
@@ -253,8 +252,7 @@ export default function ContactPage() {
             lineHeight: 1.5,
             margin: 0,
           }}>
-            Submitting will open your email app pre-filled with your message.
-            If nothing happens, email us directly at {CONTACT_EMAIL}.
+            {t('submitHint')} {CONTACT_EMAIL}.
           </p>
         </form>
       </div>
