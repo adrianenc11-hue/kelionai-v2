@@ -1022,9 +1022,146 @@ function buildKelionToolsChatCompletions() {
 }
 
 // ──────────────────────────────────────────────────────────────────
-// OpenAI Realtime endpoint REMOVED in single-LLM cleanup (2026-04).
-// The chat surface (text + voice) runs exclusively on Gemini.
+// OpenAI Realtime — ephemeral session token with Kelion config.
+// Uses gpt-realtime-1.5 (optimised for voice, low-latency, tool use).
+// Same gating matrix as Gemini: guest trial / credits / admin bypass.
 // ──────────────────────────────────────────────────────────────────
+const openaiTokenHandler = async (req, res) => {
+  const openaiKey = process.env.OPENAI_API_KEY;
+  if (!openaiKey) {
+    return res.status(503).json({ error: 'OPENAI_API_KEY not configured' });
+  }
+
+  const priorTurns = Array.isArray(req.body?.priorTurns) ? req.body.priorTurns : [];
+  const adminUser  = await peekSignedInUser(req);
+  const isAdmin    = await isAdminUser(adminUser);
+  const isGuest    = !adminUser;
+
+  // ── Gating (same rules as Gemini) ────────────────────────────────
+  let trial = null;
+  if (isGuest && !isAdmin) {
+    const ip     = ipGeo.clientIp(req) || req.ip || '';
+    const status = await trialStatus(ip);
+    if (!status.allowed) {
+      const isLifetime = status.reason === 'lifetime_expired';
+      return res.status(429).json({
+        error: isLifetime
+          ? 'Your 7-day free trial has ended. Please create an account and buy credits to keep talking to Kelion.'
+          : 'Free trial for today is used up. Come back tomorrow or sign in to continue.',
+        trial: { allowed: false, reason: status.reason || 'window_expired', remainingMs: 0 },
+      });
+    }
+    await stampTrialIfFresh(ip, status);
+    trial = { allowed: true, remainingMs: status.remainingMs, windowMs: TRIAL_WINDOW_MS };
+  } else if (adminUser && !isAdmin) {
+    if (adminUser.id == null) {
+      res.clearCookie('kelion.token', { path: '/' });
+      return res.status(401).json({ error: 'Session expired. Please sign in again.', action: 'reauth' });
+    }
+    try {
+      const balance = await getCreditsBalance(adminUser.id);
+      if (!Number.isFinite(balance) || balance <= 0) {
+        return res.status(402).json({ error: 'No credits left. Buy a package to keep talking to Kelion.', balance_minutes: 0, action: 'buy_credits' });
+      }
+    } catch (err) {
+      console.warn('[openai-token] credits-balance lookup failed', err && err.message);
+    }
+  }
+
+  try {
+    // ── Context build (memory + geo + persona) ───────────────────────
+    const user = adminUser;
+    let memoryItems = [];
+    if (user && (Number.isFinite(user.id) || typeof user.id === 'string')) {
+      try { memoryItems = await listMemoryItems(user.id, 60); }
+      catch (err) { console.warn('[openai-token] memory load failed', err.message); }
+    }
+    const ipGeoData  = await ipGeo.lookup(ipGeo.clientIp(req));
+    const clientLat  = Number.parseFloat(req.query.lat);
+    const clientLon  = Number.parseFloat(req.query.lon);
+    const clientAcc  = Number.parseFloat(req.query.acc);
+    const geo = (Number.isFinite(clientLat) && Number.isFinite(clientLon))
+      ? { ...(ipGeoData || {}), latitude: clientLat, longitude: clientLon, accuracy: Number.isFinite(clientAcc) ? clientAcc : null, source: 'client-gps' }
+      : ipGeoData;
+
+    const browserLang   = (req.query.lang || 'en-US').toString().slice(0, 16);
+    const forcedLang    = (process.env.KELION_FORCE_LANG || browserLang).toString().slice(0, 16);
+    const styleFromCookie = req.cookies?.['kelion.voice_style'];
+    const styleFromQuery  = (req.query.style || '').toString();
+    const voiceStyle      = resolveVoiceStyle(styleFromCookie || styleFromQuery);
+
+    const systemPrompt = buildKelionPersona({
+      user, memoryItems, voiceStyle, geo, priorTurns,
+      lockedLangTag: await resolveLockedLangTag({ req, user, forcedLang }),
+    });
+
+    // OpenAI Realtime voice — `alloy` is a neutral male voice that best
+    // matches the Kelion avatar. Override via OPENAI_REALTIME_VOICE env.
+    const voice = process.env.OPENAI_REALTIME_VOICE || 'alloy';
+    const model = process.env.OPENAI_REALTIME_MODEL  || 'gpt-realtime-1.5';
+
+    // Mint an ephemeral session token (60-second TTL, single-use).
+    // The client exchanges this for a WebSocket connection to the
+    // OpenAI Realtime API directly from the browser — no proxy needed.
+    const r = await fetch('https://api.openai.com/v1/realtime/sessions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openaiKey}`,
+        'Content-Type':  'application/json',
+        'OpenAI-Beta':   'realtime=v1',
+      },
+      body: JSON.stringify({
+        model,
+        voice,
+        modalities: ['audio', 'text'],
+        instructions: systemPrompt,
+        input_audio_format:  'pcm16',
+        output_audio_format: 'pcm16',
+        input_audio_transcription: { model: 'gpt-4o-mini-transcribe' },
+        turn_detection: {
+          type: 'server_vad',
+          threshold: 0.5,
+          prefix_padding_ms: 300,
+          silence_duration_ms: 500,
+        },
+        tools: buildKelionToolsChatCompletions().map(t => ({
+          type: 'function',
+          name: t.function.name,
+          description: t.function.description,
+          parameters: t.function.parameters,
+        })),
+        tool_choice: 'auto',
+        temperature: 0.85,
+        max_response_output_tokens: 4096,
+      }),
+    });
+
+    if (!r.ok) {
+      const err = await r.text();
+      console.error('[openai-token] session creation failed:', r.status, err.slice(0, 1000));
+      return res.status(500).json({ error: 'Failed to create OpenAI Realtime session' });
+    }
+
+    const data = await r.json();
+    return res.json({
+      clientSecret: data.client_secret,
+      model,
+      voice,
+      provider:    'openai',
+      signedIn:    !!user,
+      userName:    user?.name || null,
+      memoryCount: memoryItems.length,
+      voiceStyle:  voiceStyle.label,
+      trial,
+    });
+
+  } catch (err) {
+    console.error('[openai-token] error:', err.message);
+    return res.status(500).json({ error: 'Failed to create OpenAI Realtime session' });
+  }
+};
+router.get('/openai-live-token',  openaiTokenHandler);
+router.post('/openai-live-token', openaiTokenHandler);
 
 // ──────────────────────────────────────────────────────────────────
 // Gemini Live — ephemeral token with Kelion config BAKED IN.
@@ -1446,9 +1583,48 @@ const geminiTokenHandler = async (req, res) => {
 router.get('/gemini-token', geminiTokenHandler);
 router.post('/gemini-token', geminiTokenHandler);
 
+// ──────────────────────────────────────────────────────────────────
+// /vision — GPT-5.5 camera frame description.
+// The OpenAI Realtime API doesn't accept native video frames, so the
+// client captures JPEG frames and POSTs them here. GPT-5.5 describes
+// the scene in 1-2 sentences, and the client injects that description
+// back into the realtime session as a user message.
+// ──────────────────────────────────────────────────────────────────
+router.post('/vision', async (req, res) => {
+  const { image, mimeType } = req.body || {};
+  if (!image) return res.status(400).json({ error: 'No image provided' });
 
-// /vision route REMOVED — Gemini Live receives camera frames natively
-// via realtimeInput.video and can describe what it sees directly.
+  try {
+    const { getOpenAI, getDefaultChatModel } = require('../utils/openai');
+    const client = getOpenAI();
+    if (!client) return res.status(503).json({ error: 'OPENAI_API_KEY not configured' });
+
+    const r = await client.chat.completions.create({
+      model: getDefaultChatModel(),
+      max_tokens: 200,
+      messages: [{
+        role: 'user',
+        content: [
+          {
+            type: 'text',
+            text: 'Describe what you see in this camera frame in 1-2 concise sentences. Focus on people, objects, actions, and environment. Be factual and brief.',
+          },
+          {
+            type: 'image_url',
+            image_url: { url: `data:${mimeType || 'image/jpeg'};base64,${image}` },
+          },
+        ],
+      }],
+    });
+
+    const description = r.choices?.[0]?.message?.content || '';
+    return res.json({ ok: true, description });
+  } catch (err) {
+    console.error('[vision] GPT-5.5 error:', err.message);
+    return res.status(500).json({ error: 'Vision processing failed' });
+  }
+});
+
 
 // Stage 6 — M26: lightweight cookie-backed voice style setter.
 // Persisted 90 days as httpOnly=false (so the client can read/clear too).

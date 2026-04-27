@@ -17,7 +17,7 @@ import StudioDecor from '../components/stage/StudioDecor'
 import CameraRig from '../components/stage/CameraRig'
 import MonitorOverlay from '../components/stage/MonitorOverlay'
 import { TopBarIconButton, AdminTabBar, VisitorsAnalyticsPanel, PayoutsPanel, MenuItem, friendlyCreditStatus, uaIsBot, uaBrowser, uaOs, refHost, RevenueChart, LiveSessionsPanel, ExportButtons } from '../components/stage/AdminPanels'
-import { useGeminiLive } from '../lib/geminiLive' // CACHE BUSTER: 20260426155431
+import { useOpenAIRealtime } from '../lib/openaiRealtime'
 import { useWakeWord } from '../lib/useWakeWord'
 import { useTrial } from '../lib/useTrial'
 import { useClientGeo } from '../lib/useClientGeo'
@@ -939,12 +939,11 @@ export default function KelionStage() {
   const bubbleHideTimerRef = useRef(null)
   // NOTE: bubbleVisible useEffect moved after useGeminiLive (needs turns + status)
 
-  // Single voice transport — Gemini Live on Vertex AI. Per Adrian's
-  // single-LLM cleanup (April 2026): one LLM end-to-end (Gemini), one
-  // voice the user hears (ElevenLabs native per detected language).
-  // The dual-provider scaffold (OpenAI Realtime + auto-fallback) and
-  // every escape hatch around it were removed.
-  const liveHook = useGeminiLive({
+  // Voice transport — OpenAI Realtime (gpt-realtime-1.5) for voice,
+  // GPT-5.5 for vision and text chat. Camera frames are sent to
+  // /api/realtime/vision (GPT-5.5) and descriptions injected back
+  // into the realtime session.
+  const liveHook = useOpenAIRealtime({
     audioRef,
     coords: clientGeo,
     onBalanceUpdate: (minutes) => setBalance(minutes),
