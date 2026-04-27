@@ -1724,14 +1724,11 @@ router.post('/pipeline', async (req, res) => {
         let args = {};
         try { args = JSON.parse(tc.function.arguments || '{}'); } catch {}
         toolCalls.push({ name: tc.function.name, args });
-        // Execute tool server-side (for tools that can run on server)
-        // Client-side tools return a placeholder
-        let result = { status: 'executed_client_side' };
+        // Execute tool server-side via the real tool dispatcher
+        let result = { status: 'tool_not_found' };
         try {
-          const { executeServerTool } = require('../services/realTools');
-          if (typeof executeServerTool === 'function') {
-            result = await executeServerTool(tc.function.name, args, { user, req });
-          }
+          const { executeRealTool } = require('../services/realTools');
+          result = await executeRealTool(tc.function.name, args);
         } catch (err) {
           result = { error: err.message };
         }
