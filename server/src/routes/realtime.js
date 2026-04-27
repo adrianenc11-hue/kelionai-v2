@@ -1033,10 +1033,8 @@ const { TRIAL_WINDOW_MS, trialStatus, stampTrialIfFresh } = trialQuota;
 // session transcript to the incoming provider. GET keeps working exactly
 // as before (no body, no priorTurns block).
 const geminiTokenHandler = async (req, res) => {
-  // Kill switch — set CHAT_PAUSED=1 in Railway env to disable AI chat
-  if (process.env.CHAT_PAUSED === '1' || process.env.CHAT_PAUSED === 'true') {
-    return res.status(503).json({ error: 'Chat is temporarily paused for maintenance.' });
-  }
+
+
   const priorTurns = Array.isArray(req.body?.priorTurns) ? req.body.priorTurns : [];
   // Backend selector. Default is `vertex` — GA `gemini-live-2.5-flash-
   // native-audio` on Vertex AI via the `/api/realtime/vertex-live-ws`
