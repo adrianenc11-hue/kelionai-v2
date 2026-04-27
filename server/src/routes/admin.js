@@ -955,4 +955,45 @@ router.get('/live-sessions', async (_req, res) => {
   }
 });
 
+// ─── Provider Balance Watchdog ──────────────────────────────
+// Every 30 minutes, checks AI provider balances. If any drop
+// below $5, pushes an alert to all admin push subscriptions.
+const LOW_BALANCE_THRESHOLD_USD = 5;
+const WATCHDOG_INTERVAL_MS = 30 * 60 * 1000; // 30 min
+
+let _lastAlertMap = {}; // provider → timestamp of last alert
+
+async function checkProviderBalances() {
+  try {
+    const cards = await getAllCredits();
+    const { sendAdminAlert } = require('./push');
+    for (const card of cards) {
+      if (!card.configured) continue;
+      if (card.balance == null || card.balance === 'unknown') continue;
+      const bal = parseFloat(card.balance);
+      if (isNaN(bal)) continue;
+      // Only alert once per provider per hour.
+      const lastAlert = _lastAlertMap[card.provider] || 0;
+      if (bal < LOW_BALANCE_THRESHOLD_USD && Date.now() - lastAlert > 60 * 60 * 1000) {
+        _lastAlertMap[card.provider] = Date.now();
+        console.warn(`[watchdog] Low balance: ${card.provider} = $${bal.toFixed(2)}`);
+        await sendAdminAlert({
+          title: `⚠️ Low credit: ${card.provider}`,
+          body: `Balance: $${bal.toFixed(2)} (threshold: $${LOW_BALANCE_THRESHOLD_USD}). Top up now.`,
+          url: card.topUpUrl || '/',
+        });
+      }
+    }
+  } catch (err) {
+    // Best-effort — don't crash the server if the watchdog fails.
+    console.error('[watchdog] Provider balance check error:', err.message);
+  }
+}
+
+// Start watchdog after a 60s boot delay (let DB + providers init).
+setTimeout(() => {
+  checkProviderBalances();
+  setInterval(checkProviderBalances, WATCHDOG_INTERVAL_MS).unref();
+}, 60_000).unref();
+
 module.exports = router;
