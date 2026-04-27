@@ -1,4 +1,4 @@
-﻿// Admin panel components extracted from KelionStage.jsx.
+// Admin panel components extracted from KelionStage.jsx.
 // These are used by the admin dashboard overlay inside the main stage.
 
 function TopBarIconButton({ children, onClick, disabled, active, title, ariaLabel }) {
@@ -666,5 +666,154 @@ function MenuItem({ children, onClick, disabled }) {
   )
 }
 
+// Revenue chart — dual-line sparkline showing topup vs consume per day.
+function RevenueChart({ data }) {
+  if (!data || !Array.isArray(data.days) || data.days.length === 0) {
+    return <div style={{ fontSize: 12, opacity: 0.5, padding: 12 }}>Nu sunt date de revenue încă.</div>
+  }
+  const days = data.days
+  const w = 600, h = 100, pad = 4
+  const maxT = Math.max(1, ...days.map((d) => d.topupMinutes))
+  const maxC = Math.max(1, ...days.map((d) => d.consumeMinutes))
+  const maxY = Math.max(maxT, maxC)
 
-export { TopBarIconButton, AdminTabBar, VisitorsAnalyticsPanel, PayoutsPanel, MenuItem, friendlyCreditStatus, uaIsBot, uaBrowser, uaOs, refHost }
+  const makePath = (arr, key) => {
+    const pts = arr.map((d, i) => {
+      const x = pad + (arr.length > 1 ? (i / (arr.length - 1)) * (w - 2 * pad) : w / 2)
+      const y = h - pad - ((d[key] / maxY) * (h - 2 * pad))
+      return [x, y]
+    })
+    return pts.map((p, i) => (i === 0 ? `M${p[0]},${p[1]}` : `L${p[0]},${p[1]}`)).join(' ')
+  }
+
+  const card = {
+    padding: '12px 14px', borderRadius: 10,
+    background: 'rgba(167, 139, 250, 0.06)',
+    border: '1px solid rgba(167, 139, 250, 0.2)',
+    marginBottom: 12,
+  }
+  const label = { fontSize: 10, opacity: 0.6, letterSpacing: '0.1em' }
+
+  // KPI cards
+  const totalTopup = days.reduce((s, d) => s + d.topupMinutes, 0)
+  const totalConsume = days.reduce((s, d) => s + d.consumeMinutes, 0)
+  const totalRevenue = days.reduce((s, d) => s + d.topupCents, 0)
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+        <div style={card}>
+          <div style={label}>VENIT {data.window?.days || 30}Z</div>
+          <div style={{ fontSize: 22, fontWeight: 600 }}>£{(totalRevenue / 100).toFixed(2)}</div>
+        </div>
+        <div style={card}>
+          <div style={label}>MIN VÂNDUTE</div>
+          <div style={{ fontSize: 22, fontWeight: 600, color: '#34d399' }}>{totalTopup}</div>
+        </div>
+        <div style={card}>
+          <div style={label}>MIN CONSUMATE</div>
+          <div style={{ fontSize: 22, fontWeight: 600, color: '#f472b6' }}>{totalConsume}</div>
+        </div>
+      </div>
+      <div style={card}>
+        <div style={{ ...label, marginBottom: 4 }}>TOPUP vs CONSUM / ZI · {data.window?.days || 30} ZILE</div>
+        <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ width: '100%', height: 100 }}>
+          <path d={makePath(days, 'topupMinutes')} fill="none" stroke="#34d399" strokeWidth="2" />
+          <path d={makePath(days, 'consumeMinutes')} fill="none" stroke="#f472b6" strokeWidth="2" />
+        </svg>
+        <div style={{ display: 'flex', gap: 16, fontSize: 11, marginTop: 4 }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ width: 10, height: 3, background: '#34d399', display: 'inline-block' }} /> Topup
+          </span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ width: 10, height: 3, background: '#f472b6', display: 'inline-block' }} /> Consum
+          </span>
+          <span style={{ marginLeft: 'auto', opacity: 0.5 }}>
+            {days[0]?.date || ''} → {days[days.length - 1]?.date || 'azi'}
+          </span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Live sessions panel — shows who's online right now.
+function LiveSessionsPanel({ data, loading }) {
+  if (loading && !data) return <div style={{ fontSize: 12, opacity: 0.5, padding: 12 }}>Se încarcă sesiuni live…</div>
+  if (!data) return null
+
+  const card = {
+    padding: '12px 14px', borderRadius: 10,
+    background: 'rgba(16, 185, 129, 0.06)',
+    border: '1px solid rgba(16, 185, 129, 0.2)',
+    marginBottom: 12,
+  }
+
+  const fmtDuration = (ms) => {
+    const mins = Math.floor(ms / 60000)
+    const secs = Math.floor((ms % 60000) / 1000)
+    return `${mins}:${String(secs).padStart(2, '0')}`
+  }
+
+  return (
+    <div style={card}>
+      <div style={{ fontSize: 10, opacity: 0.6, letterSpacing: '0.1em', marginBottom: 8 }}>
+        SESIUNI LIVE · {data.active || 0} ACTIVE
+      </div>
+      {(!data.sessions || data.sessions.length === 0) ? (
+        <div style={{ fontSize: 12, opacity: 0.5 }}>Nimeni online acum.</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {data.sessions.map((s, i) => (
+            <div key={s.sessionId || i} style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              fontSize: 12, padding: '6px 0',
+              borderTop: i > 0 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+            }}>
+              <span style={{
+                width: 8, height: 8, borderRadius: '50%',
+                background: '#10b981', display: 'inline-block',
+                boxShadow: '0 0 6px #10b981',
+              }} />
+              <span style={{ flex: 1 }}>
+                {s.userEmail || (s.isGuest ? 'Guest' : 'Unknown')}
+              </span>
+              <span style={{ opacity: 0.6, fontVariantNumeric: 'tabular-nums' }}>
+                {fmtDuration(s.durationMs)}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Export buttons — CSV download for users and transactions.
+function ExportButtons() {
+  const download = (path) => {
+    const a = document.createElement('a')
+    a.href = path
+    a.download = ''
+    a.click()
+  }
+  const btn = {
+    padding: '8px 14px', borderRadius: 8,
+    background: 'rgba(167, 139, 250, 0.12)',
+    border: '1px solid rgba(167, 139, 250, 0.3)',
+    color: '#ede9fe', fontSize: 12, cursor: 'pointer',
+    transition: 'background 0.15s',
+  }
+  return (
+    <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+      <button style={btn} onClick={() => download('/api/admin/export/users.csv')}>
+        📥 Export Useri CSV
+      </button>
+      <button style={btn} onClick={() => download('/api/admin/export/transactions.csv')}>
+        📥 Export Tranzacții CSV
+      </button>
+    </div>
+  )
+}
+
+export { TopBarIconButton, AdminTabBar, VisitorsAnalyticsPanel, PayoutsPanel, MenuItem, friendlyCreditStatus, uaIsBot, uaBrowser, uaOs, refHost, RevenueChart, LiveSessionsPanel, ExportButtons }
