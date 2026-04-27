@@ -2213,7 +2213,7 @@ export default function KelionStage() {
           ) : (
             supportsPasskey() && (
               <MenuItem onClick={() => { setRememberPromptOpen(true); setMenuOpen(false) }}>
-                Remember me
+                {t('rememberMe')}
               </MenuItem>
             )
           )}
