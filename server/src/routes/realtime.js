@@ -1708,7 +1708,6 @@ router.post('/pipeline', async (req, res) => {
       messages,
       tools,
       tool_choice: 'auto',
-      temperature: 0,
       max_completion_tokens: 1024,
     });
 
@@ -1743,7 +1742,6 @@ router.post('/pipeline', async (req, res) => {
         messages,
         tools,
         tool_choice: 'auto',
-        temperature: 0,
         max_completion_tokens: 1024,
       });
       choice = completion.choices?.[0];
