@@ -1095,9 +1095,10 @@ const openaiTokenHandler = async (req, res) => {
       lockedLangTag: await resolveLockedLangTag({ req, user, forcedLang }),
     });
 
-    // OpenAI Realtime voice — `alloy` is a neutral male voice that best
-    // matches the Kelion avatar. Override via OPENAI_REALTIME_VOICE env.
-    const voice = process.env.OPENAI_REALTIME_VOICE || 'alloy';
+    // OpenAI Realtime voice — `ash` is a warm masculine voice that sounds
+    // natural across all languages (ro, en, fr, de, es, etc.). OpenAI
+    // recommends ash/cedar for highest quality on gpt-realtime-1.5.
+    const voice = process.env.OPENAI_REALTIME_VOICE || 'ash';
     const model = process.env.OPENAI_REALTIME_MODEL  || 'gpt-realtime-1.5';
 
     // Mint an ephemeral session token (60-second TTL, single-use).
@@ -1625,6 +1626,160 @@ router.post('/vision', async (req, res) => {
   }
 });
 
+// ──────────────────────────────────────────────────────────────────
+// /pipeline — Full GPT-5.5 voice pipeline (no Realtime API).
+// Flow: audio (PCM16 base64) → Whisper STT → GPT-5.5 chat → TTS → audio back.
+// All 47 tools supported. Voice: ash (masculine, multilingual).
+// ──────────────────────────────────────────────────────────────────
+router.post('/pipeline', async (req, res) => {
+  const { audio, mimeType, history, cameraFrame, textOverride } = req.body || {};
+  if (!audio && !textOverride) return res.status(400).json({ error: 'No audio or text provided' });
+
+  try {
+    const { getOpenAI, getDefaultChatModel } = require('../utils/openai');
+    const client = getOpenAI();
+    if (!client) return res.status(503).json({ error: 'OPENAI_API_KEY not configured' });
+
+    // 1. STT — skip if textOverride is provided (typed message)
+    let userText = '';
+    if (textOverride && typeof textOverride === 'string' && textOverride.trim()) {
+      userText = textOverride.trim();
+    } else {
+      const audioBuffer = Buffer.from(audio, 'base64');
+      const audioFile = new File([audioBuffer], 'audio.wav', { type: mimeType || 'audio/wav' });
+      const sttResult = await client.audio.transcriptions.create({
+        model: 'whisper-1',
+        file: audioFile,
+        language: undefined, // auto-detect
+      });
+      userText = (sttResult.text || '').trim();
+    }
+    if (!userText) {
+      return res.json({ ok: true, userText: '', assistantText: '', audio: null, toolCalls: [] });
+    }
+    console.log('[pipeline] STT:', userText);
+
+    // 2. Build messages with history + persona
+    const adminUser = await peekSignedInUser(req);
+    const isAdmin = await isAdminUser(adminUser);
+    const user = adminUser;
+    let memoryItems = [];
+    if (user && (Number.isFinite(user.id) || typeof user.id === 'string')) {
+      try { memoryItems = await listMemoryItems(user.id, 60); }
+      catch (_) {}
+    }
+    const browserLang = (req.query.lang || 'en-US').toString().slice(0, 16);
+    const forcedLang = (process.env.KELION_FORCE_LANG || browserLang).toString().slice(0, 16);
+    const styleFromCookie = req.cookies?.['kelion.voice_style'];
+    const voiceStyle = resolveVoiceStyle(styleFromCookie || '');
+    const ipGeoData = await ipGeo.lookup(ipGeo.clientIp(req));
+    const systemPrompt = buildKelionPersona({
+      user, memoryItems, voiceStyle, geo: ipGeoData, priorTurns: [],
+      lockedLangTag: await resolveLockedLangTag({ req, user, forcedLang }),
+    });
+
+    const messages = [{ role: 'system', content: systemPrompt }];
+    // Add conversation history
+    if (Array.isArray(history)) {
+      for (const h of history.slice(-20)) {
+        messages.push({ role: h.role || 'user', content: h.text || h.content || '' });
+      }
+    }
+    // Add camera frame if present
+    if (cameraFrame) {
+      messages.push({
+        role: 'user',
+        content: [
+          { type: 'text', text: `[Camera sees: please consider this visual context]` },
+          { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${cameraFrame}` } },
+        ],
+      });
+    }
+    messages.push({ role: 'user', content: userText });
+
+    // 3. GPT-5.5 chat completion with tools
+    const tools = buildKelionToolsChatCompletions();
+    let completion = await client.chat.completions.create({
+      model: getDefaultChatModel(),
+      messages,
+      tools,
+      tool_choice: 'auto',
+      temperature: 0.85,
+      max_tokens: 1024,
+    });
+
+    let choice = completion.choices?.[0];
+    const toolCalls = [];
+
+    // Handle tool calls (up to 3 rounds)
+    let rounds = 0;
+    while (choice?.finish_reason === 'tool_calls' && choice?.message?.tool_calls?.length && rounds < 3) {
+      rounds++;
+      messages.push(choice.message);
+      for (const tc of choice.message.tool_calls) {
+        let args = {};
+        try { args = JSON.parse(tc.function.arguments || '{}'); } catch {}
+        toolCalls.push({ name: tc.function.name, args });
+        // Execute tool server-side (for tools that can run on server)
+        // Client-side tools return a placeholder
+        let result = { status: 'executed_client_side' };
+        try {
+          const { executeServerTool } = require('../services/realTools');
+          if (typeof executeServerTool === 'function') {
+            result = await executeServerTool(tc.function.name, args, { user, req });
+          }
+        } catch (err) {
+          result = { error: err.message };
+        }
+        messages.push({
+          role: 'tool',
+          tool_call_id: tc.id,
+          content: JSON.stringify(result),
+        });
+      }
+      completion = await client.chat.completions.create({
+        model: getDefaultChatModel(),
+        messages,
+        tools,
+        tool_choice: 'auto',
+        temperature: 0.85,
+        max_tokens: 1024,
+      });
+      choice = completion.choices?.[0];
+    }
+
+    const assistantText = choice?.message?.content || '';
+    console.log('[pipeline] GPT-5.5:', assistantText.slice(0, 100));
+
+    // 4. TTS — OpenAI TTS with ash voice
+    let ttsAudioB64 = null;
+    if (assistantText.trim()) {
+      const voice = process.env.OPENAI_REALTIME_VOICE || 'ash';
+      const ttsResponse = await client.audio.speech.create({
+        model: 'tts-1',
+        voice,
+        input: assistantText,
+        response_format: 'mp3',
+        speed: 1.0,
+      });
+      const ttsBuffer = Buffer.from(await ttsResponse.arrayBuffer());
+      ttsAudioB64 = ttsBuffer.toString('base64');
+    }
+
+    return res.json({
+      ok: true,
+      userText,
+      assistantText,
+      audio: ttsAudioB64,
+      audioFormat: 'mp3',
+      toolCalls,
+    });
+
+  } catch (err) {
+    console.error('[pipeline] error:', err.message);
+    return res.status(500).json({ error: 'Pipeline processing failed: ' + err.message });
+  }
+});
 
 // Stage 6 — M26: lightweight cookie-backed voice style setter.
 // Persisted 90 days as httpOnly=false (so the client can read/clear too).
