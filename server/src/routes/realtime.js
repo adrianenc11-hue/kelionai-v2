@@ -1632,7 +1632,7 @@ router.post('/vision', async (req, res) => {
 // All 47 tools supported. Voice: ash (masculine, multilingual).
 // ──────────────────────────────────────────────────────────────────
 router.post('/pipeline', async (req, res) => {
-  const { audio, mimeType, history, cameraFrame, textOverride } = req.body || {};
+  const { audio, mimeType, history, cameraFrame, textOverride, visionContext } = req.body || {};
   if (!audio && !textOverride) return res.status(400).json({ error: 'No audio or text provided' });
 
   try {
@@ -1685,12 +1685,16 @@ router.post('/pipeline', async (req, res) => {
         messages.push({ role: h.role || 'user', content: h.text || h.content || '' });
       }
     }
-    // Add camera frame if present
+    // Add live vision context (rolling scene descriptions from continuous stream)
+    if (visionContext && typeof visionContext === 'string' && visionContext.trim()) {
+      messages.push({ role: 'user', content: `[Live camera feed observations: ${visionContext}]` });
+    }
+    // Add camera frame if present (high-res snapshot with this turn)
     if (cameraFrame) {
       messages.push({
         role: 'user',
         content: [
-          { type: 'text', text: `[Camera sees: please consider this visual context]` },
+          { type: 'text', text: `[Current camera frame — analyze this visual]` },
           { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${cameraFrame}` } },
         ],
       });
