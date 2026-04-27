@@ -1699,7 +1699,7 @@ export default function KelionStage() {
         <button
           type="button"
           onClick={() => fileInputRef.current && fileInputRef.current.click()}
-          disabled={status === 'thinking'}
+          disabled={status === 'thinking' || status === 'idle' || status === 'error'}
           style={{
             width: 30, height: 30, borderRadius: '50%',
             background: 'rgba(167, 139, 250, 0.18)',
@@ -1725,7 +1725,7 @@ export default function KelionStage() {
             flexShrink: 0,
           }} title={attachedFile.name}>
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              ?? {attachedFile.name}
+              📎 {attachedFile.name}
             </span>
             <button
               type="button"
@@ -1807,10 +1807,10 @@ export default function KelionStage() {
             }
           }}
           placeholder="Type to Kelion…"
-          disabled={status === 'thinking'}
+          disabled={status === 'thinking' || status === 'idle' || status === 'error'}
           autoComplete="off"
-          autoCorrect="off"
-          spellCheck={false}
+          autoCorrect="on"
+          spellCheck={true}
           style={{
             flex: 1,
             background: 'transparent', border: 'none', outline: 'none',
@@ -1828,7 +1828,7 @@ export default function KelionStage() {
         />
         <button
           type="submit"
-          disabled={status === 'thinking' || (chatInput.trim().length === 0 && !attachedFile)}
+          disabled={status === 'thinking' || status === 'idle' || status === 'error' || (chatInput.trim().length === 0 && !attachedFile)}
           style={{
             width: 40, height: 40, borderRadius: '50%',
             background: (chatInput.trim().length === 0 && !attachedFile)
@@ -1841,7 +1841,7 @@ export default function KelionStage() {
             fontSize: 16,
           }}
           aria-label="Send message"
-        >?</button>
+        >↑</button>
       </form>
 
       {/* Microphone ON/OFF Toggle — bottom center */}
@@ -1852,6 +1852,8 @@ export default function KelionStage() {
             startVoiceWithPriorTurns()
           } else {
             stop()
+            clearTurns()
+            savedUpToRef.current = 0
           }
         }}
         style={{
@@ -1967,7 +1969,7 @@ export default function KelionStage() {
             title="Buy credits"
             aria-label="Buy credits"
           >
-            <span style={{ fontSize: 14 }}>??</span>
+            <span style={{ fontSize: 14 }}>💳</span>
             {/* Adrian: "creditul nu trebuie sa arate minute, trebuie sa fie
                 o unitate x credite". 1 credit = 1 min of Kelion Live kept
                 internally (backend still tracks balance_minutes), but the
@@ -1994,7 +1996,7 @@ export default function KelionStage() {
             title="Admin dashboard — Business, AI credits, Visitors, Users, Payouts"
             aria-label="Open admin dashboard"
           >
-            <span style={{ fontSize: 14 }}>???</span>
+            <span style={{ fontSize: 14 }}>🛡️</span>
             <span>Admin · 8</span>
           </button>
         )}
@@ -2035,7 +2037,7 @@ export default function KelionStage() {
           active={menuOpen}
           title="More"
           ariaLabel="More options"
-        >?</TopBarIconButton>
+        >⋯</TopBarIconButton>
       </div>
 
       {menuOpen && (
@@ -2072,16 +2074,16 @@ export default function KelionStage() {
             else { startCamera().catch(() => { /* banner surfaces the error */ }) }
             setMenuOpen(false)
           }}>
-            {cameraStream ? '?? Turn camera off' : '?? Turn camera on'}
+            {cameraStream ? '📹 Turn camera off' : '📹 Turn camera on'}
           </MenuItem>
           <MenuItem onClick={() => { screenStream ? stopScreen() : startScreen(); setMenuOpen(false) }}>
-            {screenStream ? '??? Stop sharing screen' : '??? Share screen'}
+            {screenStream ? '🖥️ Stop sharing screen' : '🖥️ Share screen'}
           </MenuItem>
           <MenuItem onClick={() => { setTranscriptOpen((v) => !v); setMenuOpen(false) }}>
-            {transcriptOpen ? '?? Hide transcript' : '?? Show transcript'}
+            {transcriptOpen ? '📝 Hide transcript' : '📝 Show transcript'}
           </MenuItem>
           <MenuItem onClick={() => { navigate('/contact'); setMenuOpen(false) }}>
-            ?? Contact us
+            ✉️ Contact us
           </MenuItem>
           <div
             style={{
