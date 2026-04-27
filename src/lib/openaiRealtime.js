@@ -1,8 +1,6 @@
-// GPT-5.5 Full Pipeline voice client hook.
-// Drop-in replacement for useGeminiLive — same interface.
-// Voice pipeline: Mic → MediaRecorder → /api/realtime/pipeline
-//   (Whisper STT → GPT-5.5 chat + tools → OpenAI TTS ash) → audio playback
-// Vision: GPT-5.5 via camera frames sent with each pipeline call.
+// OpenAI Realtime WebRTC client — same technology as ChatGPT voice mode.
+// Real-time bidirectional audio via WebRTC, events via data channel.
+// Drop-in replacement for the old REST pipeline hook.
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { runTool } from './kelionTools'
@@ -24,25 +22,28 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
 
   const statusRef = useRef('idle')
   const startInFlightRef = useRef(false)
+  const pcRef = useRef(null)           // RTCPeerConnection
+  const dcRef = useRef(null)           // data channel
   const micStreamRef = useRef(null)
-  const mediaRecorderRef = useRef(null)
-  const audioChunksRef = useRef([])
   const sessionActiveRef = useRef(false)
   const creditsIntervalRef = useRef(null)
   const lastActivityAtRef = useRef(Date.now())
   const trialTimeoutRef = useRef(null)
-  const outputGainRef = useRef(null)
-  const playbackCtxRef = useRef(null)
-  const activeSourcesRef = useRef(new Set())
   const cameraStreamRef = useRef(null)
   const screenStreamRef = useRef(null)
   const turnActiveRef = useRef({ user: null, assistant: null })
-  const processingRef = useRef(false)
-  // Rolling vision context — last 5 scene descriptions from continuous frame sender
-  const visionContextRef = useRef([])
+  const audioElRef = useRef(null)      // playback <audio> element
+  const meterCtxRef = useRef(null)
+  const analyserRef = useRef(null)
+  const micLevelRafRef = useRef(null)
+  // Pending tool calls accumulator — function_call_arguments arrive in
+  // deltas; we accumulate per call_id and dispatch on .done.
+  const pendingToolArgsRef = useRef({})
+  // Vision: continuous frame sender for camera
   const frameSenderRef = useRef(null)
+  const visionContextRef = useRef([])
 
-  // ── Turn management ───────────────────────────────────────────
+  // ── Turn management ────────────────────────────────────────────
   const appendTurn = useCallback((role, text, forceNew = false) => {
     setTurns(prev => {
       const last = prev[prev.length - 1]
@@ -55,277 +56,161 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
     })
   }, [])
 
-  // ── Capture camera frame (max quality) ────────────────────────
-  const captureFrame = useCallback(() => {
-    const stream = cameraStreamRef.current
-    if (!stream) return null
-    try {
-      const tracks = stream.getVideoTracks()
-      if (!tracks.length) return null
-      const settings = tracks[0].getSettings()
-      const canvas = document.createElement('canvas')
-      // Full resolution — no downscaling
-      const w = settings.width || 1920
-      const h = settings.height || 1080
-      canvas.width = w
-      canvas.height = h
-      const ctx = canvas.getContext('2d')
-      const videos = document.querySelectorAll('video')
-      for (const v of videos) {
-        if (v.srcObject === stream && v.videoWidth > 0) {
-          ctx.drawImage(v, 0, 0, w, h)
-          return canvas.toDataURL('image/jpeg', 0.92).split(',')[1]
-        }
-      }
-    } catch (_) {}
-    return null
-  }, [])
-
-  // ── Continuous vision stream — real-time to GPT-5.5 ────────────
-  const startFrameStream = useCallback((stream) => {
-    if (frameSenderRef.current) return
-    const video = document.createElement('video')
-    video.srcObject = stream
-    video.muted = true
-    video.playsInline = true
-    video.play().catch(() => {})
-    const canvas = document.createElement('canvas')
-    const JPEG_Q = 0.92  // max quality
-    let running = true
-    let busy = false
-
-    // Real-time loop — sends next frame immediately after previous completes
-    const sendFrame = async () => {
-      if (!running || busy) return
-      if (!video.videoWidth) { setTimeout(sendFrame, 100); return }
-      busy = true
-      try {
-        canvas.width = video.videoWidth
-        canvas.height = video.videoHeight
-        const ctx = canvas.getContext('2d')
-        ctx.drawImage(video, 0, 0)
-        const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', JPEG_Q))
-        if (!blob || !running) { busy = false; return }
-        const buf = await blob.arrayBuffer()
-        const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)))
-
-        const r = await fetch('/api/realtime/vision', {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
-          body: JSON.stringify({ image: b64, mimeType: 'image/jpeg' }),
-        })
-        if (r.ok) {
-          const data = await r.json()
-          if (data.description) {
-            const ctx = visionContextRef.current
-            ctx.push({ ts: Date.now(), text: data.description })
-            if (ctx.length > 10) ctx.shift()
-          }
-        }
-      } catch (_) {}
-      busy = false
-      if (running) requestAnimationFrame(() => setTimeout(sendFrame, 50))
+  // ── Mic level meter (halo reactivity) ──────────────────────────
+  const startMicLevel = useCallback((stream) => {
+    if (!meterCtxRef.current) {
+      meterCtxRef.current = new (window.AudioContext || window.webkitAudioContext)()
     }
-    sendFrame()
-    frameSenderRef.current = { stop: () => { running = false }, video }
+    const ctx = meterCtxRef.current
+    const src = ctx.createMediaStreamSource(stream)
+    const analyser = ctx.createAnalyser()
+    analyser.fftSize = 256
+    src.connect(analyser)
+    analyserRef.current = analyser
+    const data = new Uint8Array(analyser.frequencyBinCount)
+    const tick = () => {
+      if (!analyserRef.current) return
+      analyserRef.current.getByteFrequencyData(data)
+      let sum = 0
+      for (let i = 0; i < 24; i++) sum += data[i]
+      const v = Math.max(0, Math.min(1, (sum / 24 - 20) / 100))
+      setUserLevel(v)
+      micLevelRafRef.current = requestAnimationFrame(tick)
+    }
+    tick()
   }, [])
 
-  const stopFrameStream = useCallback(() => {
-    if (!frameSenderRef.current) return
-    frameSenderRef.current.stop()
-    try { frameSenderRef.current.video.pause(); frameSenderRef.current.video.srcObject = null } catch (_) {}
-    frameSenderRef.current = null
-  }, [])
+  // ── Data channel event handler ─────────────────────────────────
+  const handleDCMessage = useCallback(async (event) => {
+    let msg
+    try { msg = JSON.parse(event.data) } catch { return }
 
-  // ── Process a single turn through the pipeline ────────────────
-  const processTurn = useCallback(async (audioBlob) => {
-    if (processingRef.current) return
-    processingRef.current = true
-    setStatus('thinking')
-    statusRef.current = 'thinking'
+    const type = msg.type || ''
 
-    try {
-      // Convert blob to base64
-      const arrayBuf = await audioBlob.arrayBuffer()
-      const b64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuf)))
+    // User started/stopped speaking (server VAD)
+    if (type === 'input_audio_buffer.speech_started') {
+      lastActivityAtRef.current = Date.now()
+      setStatus('listening')
+      statusRef.current = 'listening'
+      return
+    }
+    if (type === 'input_audio_buffer.speech_stopped') {
+      setStatus('thinking')
+      statusRef.current = 'thinking'
+      return
+    }
 
-      // Get conversation history for context
-      let history = []
-      setTurns(prev => { history = prev.slice(-20); return prev })
-
-      // Capture current camera frame + rolling vision context
-      const cameraFrame = captureFrame()
-      const visionContext = visionContextRef.current.map(v => v.text).join(' | ')
-
-      const lang = navigator.language || 'en-US'
-      const params = new URLSearchParams({ lang })
-
-      const r = await fetch('/api/realtime/pipeline?' + params.toString(), {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-Token': getCsrfToken(),
-        },
-        body: JSON.stringify({
-          audio: b64,
-          mimeType: audioBlob.type || 'audio/webm',
-          history: history.map(t => ({ role: t.role, text: t.text })),
-          cameraFrame,
-          visionContext,
-        }),
-      })
-
-      if (!r.ok) {
-        const body = await r.json().catch(() => ({}))
-        throw new Error(body.error || `HTTP ${r.status}`)
+    // User speech transcription
+    if (type === 'conversation.item.input_audio_transcription.completed') {
+      const text = msg.transcript || ''
+      if (text.trim()) {
+        appendTurn('user', text.trim(), true)
+        lastActivityAtRef.current = Date.now()
       }
+      return
+    }
 
-      const data = await r.json()
-
-      // Add user turn
-      if (data.userText) {
-        appendTurn('user', data.userText, true)
-      }
-
-      // Execute client-side tool calls
-      if (data.toolCalls && data.toolCalls.length) {
-        for (const tc of data.toolCalls) {
-          try { await runTool(tc.name, tc.args) } catch (_) {}
-        }
-      }
-
-      // Add assistant turn
-      if (data.assistantText) {
-        appendTurn('assistant', data.assistantText, true)
-      }
-
-      // Play audio response
-      if (data.audio) {
+    // Assistant audio transcript (streaming)
+    if (type === 'response.audio_transcript.delta') {
+      const delta = msg.delta || ''
+      if (delta) {
+        appendTurn('assistant', delta, false)
+        lastActivityAtRef.current = Date.now()
         setStatus('speaking')
         statusRef.current = 'speaking'
-        await playMP3(data.audio)
+      }
+      return
+    }
+
+    // Assistant audio transcript done
+    if (type === 'response.audio_transcript.done') {
+      return
+    }
+
+    // Assistant text (non-audio) response
+    if (type === 'response.text.delta') {
+      const delta = msg.delta || ''
+      if (delta) appendTurn('assistant', delta, false)
+      return
+    }
+
+    // Function call arguments accumulate
+    if (type === 'response.function_call_arguments.delta') {
+      const callId = msg.call_id || ''
+      if (!pendingToolArgsRef.current[callId]) pendingToolArgsRef.current[callId] = { name: '', args: '' }
+      pendingToolArgsRef.current[callId].args += (msg.delta || '')
+      return
+    }
+
+    // Function call ready to execute
+    if (type === 'response.function_call_arguments.done') {
+      const callId = msg.call_id || ''
+      const name = msg.name || pendingToolArgsRef.current[callId]?.name || ''
+      const argsStr = msg.arguments || pendingToolArgsRef.current[callId]?.args || '{}'
+      delete pendingToolArgsRef.current[callId]
+
+      let args = {}
+      try { args = JSON.parse(argsStr) } catch {}
+
+      appendTurn('assistant', `[tool: ${name}]`, true)
+
+      // Execute tool
+      let result = { error: 'tool not found' }
+      try { result = await runTool(name, args) } catch (err) {
+        result = { error: err.message || 'tool failed' }
       }
 
-    } catch (err) {
-      console.error('[pipeline] error:', err)
-      setError(err.message || 'Pipeline failed')
-    } finally {
-      processingRef.current = false
+      // Send tool result back via data channel
+      const dc = dcRef.current
+      if (dc && dc.readyState === 'open') {
+        dc.send(JSON.stringify({
+          type: 'conversation.item.create',
+          item: {
+            type: 'function_call_output',
+            call_id: callId,
+            output: JSON.stringify(result),
+          },
+        }))
+        dc.send(JSON.stringify({ type: 'response.create' }))
+      }
+      return
+    }
+
+    // Response output item added — capture function name for pending args
+    if (type === 'response.output_item.added') {
+      const item = msg.item || {}
+      if (item.type === 'function_call' && item.call_id) {
+        pendingToolArgsRef.current[item.call_id] = { name: item.name || '', args: '' }
+      }
+      return
+    }
+
+    // Response done
+    if (type === 'response.done') {
       if (sessionActiveRef.current) {
         setStatus('listening')
         statusRef.current = 'listening'
       }
-    }
-  }, [appendTurn, captureFrame])
-
-  // ── Play MP3 audio ────────────────────────────────────────────
-  const playMP3 = useCallback(async (b64) => {
-    return new Promise((resolve) => {
-      const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0))
-      const blob = new Blob([bytes], { type: 'audio/mp3' })
-      const url = URL.createObjectURL(blob)
-      const audio = new Audio(url)
-
-      // Drive lipsync via audioRef
-      if (audioRef?.current) {
-        try {
-          audioRef.current.src = url
-          audioRef.current.play().catch(() => {})
-        } catch (_) {}
-      }
-
-      audio.volume = outputGainRef.current?.value ?? 1
-      audio.onended = () => {
-        URL.revokeObjectURL(url)
-        resolve()
-      }
-      audio.onerror = () => {
-        URL.revokeObjectURL(url)
-        resolve()
-      }
-      activeSourcesRef.current.add(audio)
-      audio.play().catch(() => resolve())
-    })
-  }, [audioRef])
-
-  // ── VAD — voice activity detection via energy ─────────────────
-  const setupVAD = useCallback((stream) => {
-    const audioCtx = new AudioContext()
-    const source = audioCtx.createMediaStreamSource(stream)
-    const analyser = audioCtx.createAnalyser()
-    analyser.fftSize = 1024
-    source.connect(analyser)
-    const data = new Float32Array(analyser.fftSize)
-
-    let speaking = false
-    let silenceStart = 0
-    const SILENCE_THRESHOLD = 0.01
-    const SILENCE_DURATION = 1200 // ms of silence before processing
-
-    // Also set up MediaRecorder
-    const recorder = new MediaRecorder(stream, {
-      mimeType: MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-        ? 'audio/webm;codecs=opus'
-        : 'audio/webm',
-    })
-    mediaRecorderRef.current = recorder
-    audioChunksRef.current = []
-
-    recorder.ondataavailable = (e) => {
-      if (e.data.size > 0) audioChunksRef.current.push(e.data)
+      return
     }
 
-    recorder.onstop = () => {
-      if (audioChunksRef.current.length > 0 && sessionActiveRef.current) {
-        const blob = new Blob(audioChunksRef.current, { type: recorder.mimeType })
-        audioChunksRef.current = []
-        processTurn(blob)
-      }
+    // Session created/updated — connection is live
+    if (type === 'session.created' || type === 'session.updated') {
+      setStatus('listening')
+      statusRef.current = 'listening'
+      return
     }
 
-    // VAD loop
-    const checkVAD = () => {
-      if (!sessionActiveRef.current) return
-      analyser.getFloatTimeDomainData(data)
-      let energy = 0
-      for (let i = 0; i < data.length; i++) energy += data[i] * data[i]
-      energy = Math.sqrt(energy / data.length)
-      setUserLevel(energy)
-
-      if (energy > SILENCE_THRESHOLD) {
-        lastActivityAtRef.current = Date.now()
-        if (!speaking) {
-          speaking = true
-          // Start recording
-          if (recorder.state === 'inactive' && !processingRef.current) {
-            audioChunksRef.current = []
-            try { recorder.start() } catch (_) {}
-          }
-        }
-        silenceStart = 0
-      } else {
-        if (speaking) {
-          if (!silenceStart) silenceStart = Date.now()
-          if (Date.now() - silenceStart > SILENCE_DURATION) {
-            speaking = false
-            silenceStart = 0
-            // Stop recording → triggers onstop → processTurn
-            if (recorder.state === 'recording') {
-              try { recorder.stop() } catch (_) {}
-            }
-          }
-        }
-      }
-      requestAnimationFrame(checkVAD)
+    // Errors
+    if (type === 'error') {
+      console.error('[openai-rtc] error:', msg.error)
+      const errMsg = msg.error?.message || 'Realtime error'
+      setError(errMsg)
+      return
     }
-    requestAnimationFrame(checkVAD)
+  }, [appendTurn])
 
-    return audioCtx
-  }, [processTurn])
-
-  // ── Credits heartbeat ─────────────────────────────────────────
+  // ── Credits heartbeat ──────────────────────────────────────────
   const startCreditsHeartbeat = useCallback(() => {
     if (creditsIntervalRef.current) return
     const tick = async () => {
@@ -352,16 +237,84 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
     creditsIntervalRef.current = setInterval(tick, 60000)
   }, [])
 
-  // ── Start ─────────────────────────────────────────────────────
+  // ── Stop ───────────────────────────────────────────────────────
+  const stop = useCallback(() => {
+    sessionActiveRef.current = false
+
+    // Close data channel
+    if (dcRef.current) {
+      try { dcRef.current.close() } catch (_) {}
+      dcRef.current = null
+    }
+
+    // Close peer connection
+    if (pcRef.current) {
+      try { pcRef.current.close() } catch (_) {}
+      pcRef.current = null
+    }
+
+    // Stop mic
+    if (micStreamRef.current) {
+      micStreamRef.current.getTracks().forEach(t => t.stop())
+      micStreamRef.current = null
+    }
+
+    // Stop playback
+    if (audioElRef.current) {
+      try { audioElRef.current.pause(); audioElRef.current.srcObject = null } catch (_) {}
+    }
+
+    // Stop mic level meter
+    if (micLevelRafRef.current) cancelAnimationFrame(micLevelRafRef.current)
+    analyserRef.current = null
+    if (meterCtxRef.current) {
+      try { meterCtxRef.current.close() } catch (_) {}
+      meterCtxRef.current = null
+    }
+
+    // Stop camera/screen
+    stopFrameStream()
+    if (cameraStreamRef.current) {
+      cameraStreamRef.current.getTracks().forEach(t => t.stop())
+      cameraStreamRef.current = null
+      setCameraStream(null)
+    }
+    if (screenStreamRef.current) {
+      screenStreamRef.current.getTracks().forEach(t => t.stop())
+      screenStreamRef.current = null
+      setScreenStream(null)
+    }
+
+    // Clear timers
+    if (trialTimeoutRef.current) {
+      clearTimeout(trialTimeoutRef.current)
+      trialTimeoutRef.current = null
+    }
+    if (creditsIntervalRef.current) {
+      clearInterval(creditsIntervalRef.current)
+      creditsIntervalRef.current = null
+    }
+
+    pendingToolArgsRef.current = {}
+    visionContextRef.current = []
+    setUserLevel(0)
+    setStatus('idle')
+    statusRef.current = 'idle'
+    setError(null)
+    setVisionError(null)
+  }, [])
+
+  // ── Start — WebRTC connection to OpenAI Realtime ───────────────
   const start = useCallback(async (opts = {}) => {
     if (startInFlightRef.current) return
     startInFlightRef.current = true
     setError(null)
     setStatus('requesting')
     statusRef.current = 'requesting'
+    lastActivityAtRef.current = Date.now()
 
     try {
-      // Check trial/credits by hitting the token endpoint
+      // 1. Get ephemeral token from our server
       const lang = navigator.language || 'en-US'
       const params = new URLSearchParams({ lang })
       if (coords) {
@@ -380,109 +333,262 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
         throw new Error(body.error || `HTTP ${tokenRes.status}`)
       }
       const tokenData = await tokenRes.json()
+      const ephemeralKey = tokenData.clientSecret?.value || tokenData.clientSecret
+      const model = tokenData.model || 'gpt-4o-realtime-preview-2024-12-17'
+
+      if (!ephemeralKey) throw new Error('No ephemeral key returned')
+
+      // Trial handling
       if (tokenData.trial) {
-        setTrial({
-          active: true,
-          remainingMs: tokenData.trial.remainingMs,
-          expiresAt: Date.now() + tokenData.trial.remainingMs,
-        })
+        const remainingMs = Math.max(0, Number(tokenData.trial.remainingMs) || 0)
+        setTrial({ active: true, remainingMs, expiresAt: Date.now() + remainingMs })
         if (trialTimeoutRef.current) clearTimeout(trialTimeoutRef.current)
         trialTimeoutRef.current = setTimeout(() => {
           stop()
           setError('Free trial for today is used up. Sign in or come back tomorrow.')
-        }, tokenData.trial.remainingMs)
+        }, remainingMs)
       } else {
         setTrial(null)
       }
 
-      // Start mic if not text-only
+      setStatus('connecting')
+      statusRef.current = 'connecting'
+
+      // 2. Create RTCPeerConnection
+      const pc = new RTCPeerConnection()
+      pcRef.current = pc
+
+      // 3. Handle incoming audio from OpenAI
+      if (!audioElRef.current) {
+        audioElRef.current = document.createElement('audio')
+        audioElRef.current.autoplay = true
+      }
+      const audioEl = audioElRef.current
+
+      pc.ontrack = (event) => {
+        audioEl.srcObject = event.streams[0]
+        audioEl.play().catch(() => {})
+        // Connect to audioRef for lipsync
+        if (audioRef?.current) {
+          audioRef.current.srcObject = event.streams[0]
+          audioRef.current.muted = true
+          audioRef.current.play().catch(() => {})
+        }
+      }
+
+      // 4. Create data channel for events
+      const dc = pc.createDataChannel('oai-events')
+      dcRef.current = dc
+
+      dc.addEventListener('open', () => {
+        console.log('[openai-rtc] data channel open')
+      })
+      dc.addEventListener('message', handleDCMessage)
+
+      // 5. Add microphone audio (skip for text-only)
       if (!opts.textOnly) {
         const micStream = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true },
+          audio: {
+            channelCount: 1,
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            sampleRate: 24000,
+          },
         })
         micStreamRef.current = micStream
-        setupVAD(micStream)
+        const audioTrack = micStream.getAudioTracks()[0]
+        pc.addTrack(audioTrack, micStream)
+        startMicLevel(micStream)
+      } else {
+        // Text-only: add a silent audio track (WebRTC requires at least one)
+        const ctx = new AudioContext()
+        const oscillator = ctx.createOscillator()
+        const dst = ctx.createMediaStreamDestination()
+        oscillator.connect(dst)
+        oscillator.start()
+        const silentTrack = dst.stream.getAudioTracks()[0]
+        // Mute it
+        silentTrack.enabled = false
+        pc.addTrack(silentTrack, dst.stream)
       }
+
+      // 6. SDP exchange — create offer, send to OpenAI, get answer
+      const offer = await pc.createOffer()
+      await pc.setLocalDescription(offer)
+
+      const sdpResponse = await fetch(`https://api.openai.com/v1/realtime?model=${encodeURIComponent(model)}`, {
+        method: 'POST',
+        body: offer.sdp,
+        headers: {
+          'Authorization': `Bearer ${ephemeralKey}`,
+          'Content-Type': 'application/sdp',
+        },
+      })
+
+      if (!sdpResponse.ok) {
+        const errText = await sdpResponse.text()
+        throw new Error(`SDP exchange failed: ${sdpResponse.status} ${errText.slice(0, 200)}`)
+      }
+
+      const answerSdp = await sdpResponse.text()
+      await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp })
 
       sessionActiveRef.current = true
 
-      // Start credits heartbeat if signed in
-      if (tokenData.signedIn) {
-        startCreditsHeartbeat()
+      // Monitor connection state
+      pc.onconnectionstatechange = () => {
+        const state = pc.connectionState
+        if (state === 'connected') {
+          setStatus('listening')
+          statusRef.current = 'listening'
+          // Start credits heartbeat
+          if (tokenData.signedIn) startCreditsHeartbeat()
+        }
+        if (state === 'disconnected' || state === 'failed' || state === 'closed') {
+          if (sessionActiveRef.current) {
+            sessionActiveRef.current = false
+            setStatus('idle')
+            statusRef.current = 'idle'
+          }
+        }
       }
 
-      setStatus('listening')
-      statusRef.current = 'listening'
-
     } catch (err) {
+      console.error('[openai-rtc] start error:', err)
       setError(err.message || 'Failed to start')
       setStatus('error')
       statusRef.current = 'error'
     } finally {
       startInFlightRef.current = false
     }
-  }, [coords, setupVAD, startCreditsHeartbeat])
-
-  // ── Stop ──────────────────────────────────────────────────────
-  const stop = useCallback(() => {
-    sessionActiveRef.current = false
-    stopFrameStream()
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-      try { mediaRecorderRef.current.stop() } catch (_) {}
-    }
-    mediaRecorderRef.current = null
-    if (micStreamRef.current) {
-      micStreamRef.current.getTracks().forEach(t => t.stop())
-      micStreamRef.current = null
-    }
-    if (trialTimeoutRef.current) {
-      clearTimeout(trialTimeoutRef.current)
-      trialTimeoutRef.current = null
-    }
-    if (creditsIntervalRef.current) {
-      clearInterval(creditsIntervalRef.current)
-      creditsIntervalRef.current = null
-    }
-    for (const src of activeSourcesRef.current) {
-      try { src.pause(); src.src = '' } catch (_) {}
-    }
-    activeSourcesRef.current.clear()
-    visionContextRef.current = []
-    setUserLevel(0)
-    setStatus('idle')
-    statusRef.current = 'idle'
-    setError(null)
-    setVisionError(null)
-  }, [stopFrameStream])
+  }, [coords, handleDCMessage, startMicLevel, startCreditsHeartbeat, stop, audioRef])
 
   useEffect(() => () => { stop() }, [stop])
 
-  // ── Camera (max quality, continuous live video stream) ────────
+  // ── sendText — typed message through the data channel ──────────
+  const sendText = useCallback(async (text) => {
+    if (!text || typeof text !== 'string') return
+    const trimmed = text.trim()
+    if (!trimmed) return
+    appendTurn('user', trimmed, true)
+    lastActivityAtRef.current = Date.now()
+
+    // If no session, start one first
+    if (!sessionActiveRef.current || !dcRef.current) {
+      await start({ textOnly: true })
+      // Wait for data channel to open
+      const deadline = Date.now() + 8000
+      while (Date.now() < deadline) {
+        if (dcRef.current && dcRef.current.readyState === 'open') break
+        if (statusRef.current === 'error') break
+        await new Promise(r => setTimeout(r, 150))
+      }
+    }
+
+    const dc = dcRef.current
+    if (!dc || dc.readyState !== 'open') {
+      setError('Connection not ready')
+      return
+    }
+
+    // Send text message via data channel
+    dc.send(JSON.stringify({
+      type: 'conversation.item.create',
+      item: {
+        type: 'message',
+        role: 'user',
+        content: [{ type: 'input_text', text: trimmed }],
+      },
+    }))
+    dc.send(JSON.stringify({ type: 'response.create' }))
+    setStatus('thinking')
+    statusRef.current = 'thinking'
+  }, [appendTurn, start])
+
+  // ── Camera ─────────────────────────────────────────────────────
+  // Vision frames go to /api/realtime/vision (GPT-5.5) since WebRTC
+  // audio-only model doesn't accept video tracks.
+  const startFrameStream = useCallback((stream) => {
+    if (frameSenderRef.current) return
+    const video = document.createElement('video')
+    video.srcObject = stream
+    video.muted = true
+    video.playsInline = true
+    video.play().catch(() => {})
+    const canvas = document.createElement('canvas')
+    let running = true
+    let busy = false
+
+    // 2fps continuous vision stream — professional quality, with back-pressure.
+    // If a request is still in-flight, the next frame is skipped (not queued).
+    const FRAME_INTERVAL = 500 // 2fps
+    const sendFrame = async () => {
+      if (!running || busy) return
+      if (!video.videoWidth) return
+      busy = true
+      try {
+        const scale = Math.min(1, 1024 / video.videoWidth)
+        canvas.width = Math.floor(video.videoWidth * scale)
+        canvas.height = Math.floor(video.videoHeight * scale)
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+        const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.78))
+        if (!blob || !running) { busy = false; return }
+        const buf = await blob.arrayBuffer()
+        // Safe base64 encoding (no stack overflow)
+        const bytes = new Uint8Array(buf)
+        let binary = ''
+        const chunk = 0x8000
+        for (let i = 0; i < bytes.length; i += chunk) {
+          binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk))
+        }
+        const b64 = btoa(binary)
+
+        const r = await fetch('/api/realtime/vision', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+          body: JSON.stringify({ image: b64, mimeType: 'image/jpeg' }),
+        })
+        if (r.ok) {
+          const data = await r.json()
+          if (data.description) {
+            visionContextRef.current.push(data.description)
+            if (visionContextRef.current.length > 10) visionContextRef.current.shift()
+          }
+        }
+      } catch (_) {}
+      busy = false
+    }
+    const intervalId = setInterval(sendFrame, FRAME_INTERVAL)
+    sendFrame()
+    frameSenderRef.current = { stop: () => { running = false }, video }
+  }, [])
+
+  const stopFrameStream = useCallback(() => {
+    if (!frameSenderRef.current) return
+    frameSenderRef.current.stop()
+    try { frameSenderRef.current.video.pause(); frameSenderRef.current.video.srcObject = null } catch (_) {}
+    frameSenderRef.current = null
+  }, [])
+
   const startCamera = useCallback(async (opts = {}) => {
     setVisionError(null)
     if (cameraStreamRef.current) return
-    const side = opts.side || 'back'
-    const facing = side === 'front' ? 'user' : 'environment'
+    const facing = (opts.side === 'front' || opts.facingMode === 'user') ? 'user' : 'environment'
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: facing },
-          // Request maximum device capability — each device gives its best
-          width: { ideal: 4096 },
-          height: { ideal: 2160 },
-          frameRate: { ideal: 30 },
-        },
+        video: { facingMode: { ideal: facing }, width: { ideal: 1920 }, height: { ideal: 1080 } },
         audio: false,
       })
       cameraStreamRef.current = stream
       setCameraStream(stream)
       setCurrentFacingMode(facing)
-      // Start continuous frame stream to GPT-5.5 vision
       startFrameStream(stream)
     } catch (e) {
-      if (e.name !== 'NotAllowedError') {
-        setVisionError(e.message || 'Camera failed')
-      }
+      if (e.name !== 'NotAllowedError') setVisionError(e.message || 'Camera failed')
+      throw e
     }
   }, [startFrameStream])
 
@@ -522,17 +628,19 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
     }
   }, [])
 
-  // Camera controller
+  // Camera controller for voice tools
   useEffect(() => {
     if (!active) return undefined
     setCameraController({
       start: (opts) => startCamera(opts),
       stop: () => stopCamera(),
-      getTrack: () => {
+      restart: (opts) => startCamera(opts),
+      getFacingMode: () => 'user',
+      getActiveTrack: () => {
         const src = cameraStreamRef.current
         if (src && typeof src.getVideoTracks === 'function') {
           const tracks = src.getVideoTracks()
-          return tracks && tracks[0] ? tracks[0] : null
+          return tracks?.[0] || null
         }
         return null
       },
@@ -541,82 +649,12 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
   }, [active, startCamera, stopCamera])
 
   const isBusy = useCallback(() => {
-    return startInFlightRef.current || processingRef.current
+    return startInFlightRef.current || (pcRef.current && pcRef.current.connectionState === 'connecting')
   }, [])
 
   const setMuted = useCallback((muted) => {
-    if (!outputGainRef.current) outputGainRef.current = { value: muted ? 0 : 1 }
-    else outputGainRef.current.value = muted ? 0 : 1
+    if (audioElRef.current) audioElRef.current.muted = muted
   }, [])
-
-  // ── sendText — typed message through the pipeline ─────────────
-  const sendText = useCallback(async (text) => {
-    if (!text || typeof text !== 'string') return
-    const trimmed = text.trim()
-    if (!trimmed) return
-    appendTurn('user', trimmed, true)
-    lastActivityAtRef.current = Date.now()
-
-    // If not started, start first
-    if (!sessionActiveRef.current) {
-      await start({ textOnly: true })
-    }
-
-    setStatus('thinking')
-    statusRef.current = 'thinking'
-
-    try {
-      let history = []
-      setTurns(prev => { history = prev.slice(-20); return prev })
-      const cameraFrame = captureFrame()
-      const lang = navigator.language || 'en-US'
-
-      const r = await fetch('/api/realtime/pipeline?' + new URLSearchParams({ lang }).toString(), {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-Token': getCsrfToken(),
-        },
-        body: JSON.stringify({
-          audio: btoa('silence'),
-          textOverride: trimmed,
-          mimeType: 'text/plain',
-          history: history.map(t => ({ role: t.role, text: t.text })),
-          cameraFrame,
-          visionContext: visionContextRef.current.map(v => v.text).join(' | '),
-        }),
-      })
-
-      if (!r.ok) {
-        const body = await r.json().catch(() => ({}))
-        throw new Error(body.error || `HTTP ${r.status}`)
-      }
-
-      const data = await r.json()
-
-      if (data.toolCalls && data.toolCalls.length) {
-        for (const tc of data.toolCalls) {
-          try { await runTool(tc.name, tc.args) } catch (_) {}
-        }
-      }
-
-      if (data.assistantText) {
-        appendTurn('assistant', data.assistantText, true)
-      }
-
-      if (data.audio) {
-        setStatus('speaking')
-        statusRef.current = 'speaking'
-        await playMP3(data.audio)
-      }
-    } catch (err) {
-      setError(err.message || 'Failed')
-    } finally {
-      setStatus('listening')
-      statusRef.current = 'listening'
-    }
-  }, [appendTurn, start, captureFrame, playMP3])
 
   const clearTurns = useCallback(() => {
     setTurns([])
