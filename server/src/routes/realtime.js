@@ -1132,7 +1132,7 @@ const openaiTokenHandler = async (req, res) => {
           parameters: t.function.parameters,
         })),
         tool_choice: 'auto',
-        temperature: 0.85,
+        temperature: 0.6,
         max_response_output_tokens: 4096,
       }),
     });
@@ -1459,7 +1459,7 @@ const geminiTokenHandler = async (req, res) => {
           // hard-coding en-US.
           languageCode: forcedLang,
         },
-        temperature: 0.85,
+        temperature: 0.6,
       },
       systemInstruction: {
         parts: [{
@@ -1632,7 +1632,7 @@ router.post('/vision', async (req, res) => {
 // All 47 tools supported. Voice: ash (masculine, multilingual).
 // ──────────────────────────────────────────────────────────────────
 router.post('/pipeline', async (req, res) => {
-  const { audio, mimeType, history, cameraFrame, textOverride } = req.body || {};
+  const { audio, mimeType, history, cameraFrame, textOverride, visionContext } = req.body || {};
   if (!audio && !textOverride) return res.status(400).json({ error: 'No audio or text provided' });
 
   try {
@@ -1678,19 +1678,23 @@ router.post('/pipeline', async (req, res) => {
       lockedLangTag: await resolveLockedLangTag({ req, user, forcedLang }),
     });
 
-    const messages = [{ role: 'system', content: systemPrompt }];
+    const messages = [{ role: 'system', content: systemPrompt + '\n\nCRITICAL RULES:\n1. Maximum seriousness and professionalism at all times.\n2. NEVER fabricate, guess, or make up information. If you don\'t know something, USE YOUR TOOLS to find out.\n3. When asked about facts, news, people, places, events — ALWAYS use web_search or wikipedia_search to get real, current information. Do NOT answer from memory alone.\n4. Answer questions precisely and directly. No filler, no padding.\n5. Zero tolerance for hallucination or lies. If a tool search returns no results, say honestly that you couldn\'t find the information.\n6. You have tools: web_search, wikipedia_search, browse_web, calculate, get_weather, and many more. USE THEM proactively.' }];
     // Add conversation history
     if (Array.isArray(history)) {
       for (const h of history.slice(-20)) {
         messages.push({ role: h.role || 'user', content: h.text || h.content || '' });
       }
     }
-    // Add camera frame if present
+    // Add live vision context (rolling scene descriptions from continuous stream)
+    if (visionContext && typeof visionContext === 'string' && visionContext.trim()) {
+      messages.push({ role: 'user', content: `[Live camera feed observations: ${visionContext}]` });
+    }
+    // Add camera frame if present (high-res snapshot with this turn)
     if (cameraFrame) {
       messages.push({
         role: 'user',
         content: [
-          { type: 'text', text: `[Camera sees: please consider this visual context]` },
+          { type: 'text', text: `[Current camera frame — analyze this visual]` },
           { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${cameraFrame}` } },
         ],
       });
@@ -1704,7 +1708,7 @@ router.post('/pipeline', async (req, res) => {
       messages,
       tools,
       tool_choice: 'auto',
-      temperature: 0.85,
+      temperature: 0,
       max_tokens: 1024,
     });
 
@@ -1720,14 +1724,11 @@ router.post('/pipeline', async (req, res) => {
         let args = {};
         try { args = JSON.parse(tc.function.arguments || '{}'); } catch {}
         toolCalls.push({ name: tc.function.name, args });
-        // Execute tool server-side (for tools that can run on server)
-        // Client-side tools return a placeholder
-        let result = { status: 'executed_client_side' };
+        // Execute tool server-side via the real tool dispatcher
+        let result = { status: 'tool_not_found' };
         try {
-          const { executeServerTool } = require('../services/realTools');
-          if (typeof executeServerTool === 'function') {
-            result = await executeServerTool(tc.function.name, args, { user, req });
-          }
+          const { executeRealTool } = require('../services/realTools');
+          result = await executeRealTool(tc.function.name, args);
         } catch (err) {
           result = { error: err.message };
         }
@@ -1742,7 +1743,7 @@ router.post('/pipeline', async (req, res) => {
         messages,
         tools,
         tool_choice: 'auto',
-        temperature: 0.85,
+        temperature: 0,
         max_tokens: 1024,
       });
       choice = completion.choices?.[0];
