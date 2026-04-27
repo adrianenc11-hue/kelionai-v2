@@ -1095,9 +1095,10 @@ const openaiTokenHandler = async (req, res) => {
       lockedLangTag: await resolveLockedLangTag({ req, user, forcedLang }),
     });
 
-    // OpenAI Realtime voice — `alloy` is a neutral male voice that best
-    // matches the Kelion avatar. Override via OPENAI_REALTIME_VOICE env.
-    const voice = process.env.OPENAI_REALTIME_VOICE || 'alloy';
+    // OpenAI Realtime voice — `ash` is a warm masculine voice that sounds
+    // natural across all languages (ro, en, fr, de, es, etc.). OpenAI
+    // recommends ash/cedar for highest quality on gpt-realtime-1.5.
+    const voice = process.env.OPENAI_REALTIME_VOICE || 'ash';
     const model = process.env.OPENAI_REALTIME_MODEL  || 'gpt-realtime-1.5';
 
     // Mint an ephemeral session token (60-second TTL, single-use).
