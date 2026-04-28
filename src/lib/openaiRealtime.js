@@ -19,6 +19,7 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
   const [screenStream, setScreenStream] = useState(null)
   const [visionError, setVisionError] = useState(null)
   const [trial, setTrial] = useState(null)
+  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true)
 
   const statusRef = useRef('idle')
   const startInFlightRef = useRef(false)
@@ -42,6 +43,10 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
   // Vision: continuous frame sender for camera
   const frameSenderRef = useRef(null)
   const visionContextRef = useRef([])
+  // Offline message queue — persisted in localStorage so messages survive
+  // page reloads during network outages.
+  const offlineQueueRef = useRef([])
+  const OFFLINE_QUEUE_KEY = 'kelion_offline_queue'
 
   // ── Turn management ────────────────────────────────────────────
   const appendTurn = useCallback((role, text, forceNew = false) => {
@@ -436,16 +441,48 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
 
       sessionActiveRef.current = true
 
-      // Monitor connection state
+      // ── Auto-reconnect on disconnection ──────────────────────────
+      // Mobile networks frequently drop — reconnect automatically up to
+      // 3 times with exponential backoff so the user doesn't notice
+      // brief coverage gaps.
+      let reconnectAttempts = 0
+      const MAX_RECONNECT = 3
+      let reconnectTimer = null
+
       pc.onconnectionstatechange = () => {
         const state = pc.connectionState
         if (state === 'connected') {
+          reconnectAttempts = 0  // reset on success
           setStatus('listening')
           statusRef.current = 'listening'
-          // Start credits heartbeat
           if (tokenData.signedIn) startCreditsHeartbeat()
         }
-        if (state === 'disconnected' || state === 'failed' || state === 'closed') {
+        if (state === 'disconnected' || state === 'failed') {
+          if (!sessionActiveRef.current) return
+
+          if (reconnectAttempts < MAX_RECONNECT) {
+            reconnectAttempts++
+            const delay = Math.min(2000 * Math.pow(2, reconnectAttempts - 1), 10000)
+            setStatus('reconnecting')
+            statusRef.current = 'reconnecting'
+            setError(`Connection lost. Reconnecting (${reconnectAttempts}/${MAX_RECONNECT})...`)
+            console.warn(`[openai-rtc] disconnected, retry ${reconnectAttempts}/${MAX_RECONNECT} in ${delay}ms`)
+
+            if (reconnectTimer) clearTimeout(reconnectTimer)
+            reconnectTimer = setTimeout(() => {
+              stop()
+              start(opts).catch(() => {})
+            }, delay)
+          } else {
+            // Give up after MAX_RECONNECT attempts
+            sessionActiveRef.current = false
+            setStatus('idle')
+            statusRef.current = 'idle'
+            setError('Connection lost. Please check your internet and try again.')
+          }
+        }
+        if (state === 'closed') {
+          if (reconnectTimer) clearTimeout(reconnectTimer)
           if (sessionActiveRef.current) {
             sessionActiveRef.current = false
             setStatus('idle')
@@ -465,6 +502,81 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
   }, [coords, handleDCMessage, startMicLevel, startCreditsHeartbeat, stop, audioRef])
 
   useEffect(() => () => { stop() }, [stop])
+
+  // ── Offline / Online detection ──────────────────────────────────
+  // Detect network state changes and auto-sync queued messages.
+  useEffect(() => {
+    // Load persisted offline queue on mount
+    try {
+      const saved = localStorage.getItem(OFFLINE_QUEUE_KEY)
+      if (saved) offlineQueueRef.current = JSON.parse(saved)
+    } catch (_) {}
+
+    const handleOnline = () => {
+      setIsOnline(true)
+      setError(null)
+      console.log('[kelion] Back online — flushing offline queue')
+      // Auto-reconnect WebRTC if session was active
+      if (statusRef.current === 'offline' || statusRef.current === 'reconnecting') {
+        start().catch(() => {})
+      }
+      // Flush queued text messages
+      flushOfflineQueue()
+    }
+    const handleOffline = () => {
+      setIsOnline(false)
+      setStatus('offline')
+      statusRef.current = 'offline'
+      setError('You are offline. Messages will be sent when connection returns.')
+      console.warn('[kelion] Went offline')
+    }
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [start])
+
+  // Persist offline queue to localStorage
+  const saveOfflineQueue = useCallback((queue) => {
+    offlineQueueRef.current = queue
+    try { localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue)) } catch (_) {}
+  }, [])
+
+  // Flush queued messages once back online
+  const flushOfflineQueue = useCallback(async () => {
+    const queue = [...offlineQueueRef.current]
+    if (!queue.length) return
+    saveOfflineQueue([])
+    for (const msg of queue) {
+      try {
+        // Re-send via sendText (will be defined below)
+        const history = turns.map(t => ({ role: t.role, text: t.text })).slice(-20)
+        const r = await fetch('/api/realtime/pipeline', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+          body: JSON.stringify({
+            textOverride: msg.text,
+            history,
+            visionContext: visionContextRef.current.join('; '),
+          }),
+        })
+        if (r.ok) {
+          const data = await r.json()
+          if (data.assistantText) appendTurn('assistant', data.assistantText, true)
+        }
+      } catch (err) {
+        console.warn('[kelion] offline flush failed for:', msg.text, err.message)
+        // Put it back in queue if still offline
+        if (!navigator.onLine) {
+          saveOfflineQueue([...offlineQueueRef.current, msg])
+          break
+        }
+      }
+    }
+  }, [turns, appendTurn, saveOfflineQueue])
 
   // ── sendText — typed message through the REST pipeline ──────────
   const sendText = useCallback(async (text) => {
@@ -513,12 +625,23 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
       }
     } catch (err) {
       console.error('[openai-rtc] sendText error:', err)
+      // If offline or network error → queue the message for later sync
+      if (!navigator.onLine || err.name === 'TypeError') {
+        const queue = [...offlineQueueRef.current, { text: trimmed, ts: Date.now() }]
+        saveOfflineQueue(queue)
+        setError(`Offline — message queued (${queue.length} pending). Will send when connected.`)
+        setStatus('offline')
+        statusRef.current = 'offline'
+        return
+      }
       setError(err.message || 'Chat failed')
     } finally {
-      setStatus(sessionActiveRef.current ? 'listening' : 'idle')
-      statusRef.current = sessionActiveRef.current ? 'listening' : 'idle'
+      if (statusRef.current !== 'offline') {
+        setStatus(sessionActiveRef.current ? 'listening' : 'idle')
+        statusRef.current = sessionActiveRef.current ? 'listening' : 'idle'
+      }
     }
-  }, [appendTurn, turns, audioRef])
+  }, [appendTurn, turns, audioRef, saveOfflineQueue])
 
   // ── Camera ─────────────────────────────────────────────────────
   // Vision frames go to /api/realtime/vision (GPT-5.5) since WebRTC
@@ -757,5 +880,7 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
     sendText,
     clearTurns,
     loadTurns,
+    isOnline,
+    pendingMessages: offlineQueueRef.current.length,
   }
 }
