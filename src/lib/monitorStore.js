@@ -15,7 +15,7 @@ const STORAGE_KEY = 'kelion.monitor.v1';
 const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 const state = {
-  kind: null,        // 'map' | 'weather' | 'video' | 'image' | 'wiki' | 'web' | 'audio' | null
+  kind: null,        // 'map' | 'weather' | 'image' | 'wiki' | 'web' | 'audio' | null
   src: null,         // string — final URL (iframe), image URL, or audio stream URL
   title: null,       // short label shown above the frame
   embedType: 'iframe', // 'iframe' | 'image' | 'external' | 'audio'
@@ -52,7 +52,7 @@ export const EXTERNAL_ONLY_HOSTS = new Set([
 const NON_EMBEDDABLE_HOST_SUFFIXES = [
   'google.com',
   'google.co.uk',
-  'youtube.com',   // main site (our /embed/... path still works separately)
+  // youtube.com removed (2026-04-28) — YouTube integration dropped.
   'facebook.com',
   'instagram.com',
   'twitter.com',
@@ -287,65 +287,7 @@ async function queueGeocodeUpgrade(kind, query) {
   }
 }
 
-// F10 — Async YouTube search upgrade. Called fire-and-forget from the
-// sync resolveMonitor('video', query) branch. When the server has
-// YOUTUBE_API_KEY set, `/api/youtube/search` returns a videoId that's
-// guaranteed embeddable; we then swap the external search card for a
-// real inline /embed/<id> iframe so the avatar plays the video for
-// real. We track the most recent query so a fast double-call ("show me
-// jazz" → "show me rock") doesn't let a late reply from the earlier
-// query overwrite the latest state. Silent on 404 (key not set) — the
-// external card stays.
-let lastYouTubeQuery = 0;
-async function queueYouTubeUpgrade(query) {
-  if (typeof window === 'undefined' || !window.fetch) return;
-  const q = (query || '').toString().trim();
-  if (!q) return;
-  const token = ++lastYouTubeQuery;
-  try {
-    const url = `/api/youtube/search?q=${encodeURIComponent(q)}`;
-    const r = await fetch(url, { credentials: 'same-origin' });
-    if (token !== lastYouTubeQuery) return; // superseded by a newer call
-    if (r.status === 404) return;            // key not configured
-    if (r.status === 204) return;            // no embeddable results
-    if (!r.ok) return;
-    const data = await r.json();
-    if (!data || !data.videoId) return;
-    if (token !== lastYouTubeQuery) return;
-    if (state.kind !== 'video') return;      // user opened something else
-    setState({
-      kind: 'video',
-      src: buildYouTubeEmbedUrl(data.videoId),
-      title: data.title ? `Video — ${data.title}` : `Video`,
-      embedType: 'iframe',
-    });
-  } catch {
-    /* Network hiccup / AbortError — external card stays, user still gets
-       a playable fallback. Not worth surfacing an error. */
-  }
-}
-
-// Build a YouTube /embed/<id> URL with the params needed for reliable
-// cross-browser inline autoplay. `autoplay=1` alone is silently blocked
-// by Chrome / Safari for cross-origin iframes without prior media
-// engagement on youtube.com — the player loads but sits on the thumbnail
-// with a manual play button, which was the user-reported "player defect
-// nu ruleaza youtube". Browsers DO allow autoplay when `mute=1` is
-// present, so we default to muted autoplay; the user taps the player
-// (or its unmute control) to bring sound on. `playsinline=1` keeps
-// mobile Safari from forcing fullscreen, `rel=0` and `modestbranding=1`
-// trim the end-screen clutter so the avatar's stage stays clean.
-function buildYouTubeEmbedUrl(videoId) {
-  const id = encodeURIComponent(String(videoId || ''));
-  const params = new URLSearchParams({
-    autoplay: '1',
-    mute: '1',
-    playsinline: '1',
-    rel: '0',
-    modestbranding: '1',
-  });
-  return `https://www.youtube.com/embed/${id}?${params.toString()}`;
-}
+// YouTube integration removed (2026-04-28).
 
 function safeUrl(u) {
   if (!u || typeof u !== 'string') return null;
@@ -462,51 +404,7 @@ function resolveMonitor(kind, query) {
       };
     }
 
-    case 'video': {
-      if (!q) return null;
-      // If the user gave a full YouTube URL, extract the id and embed it.
-      // Many uploaders disable embedding; nothing we can do about individual
-      // refusals, but this path still works for the vast majority of videos.
-      const ytMatch = q.match(/(?:v=|youtu\.be\/|shorts\/)([A-Za-z0-9_-]{6,})/);
-      if (ytMatch) {
-        const id = ytMatch[1];
-        return {
-          kind: 'video',
-          src: buildYouTubeEmbedUrl(id),
-          title: `Video`,
-          embedType: 'iframe',
-        };
-      }
-      // If a YouTube playlist id is present (`list=PLxxxx`), embed the
-      // playlist directly — that embed still works (unlike listType=search).
-      const plMatch = q.match(/[?&]list=([A-Za-z0-9_-]{10,})/);
-      if (plMatch) {
-        const listId = plMatch[1];
-        return {
-          kind: 'video',
-          // Playlists use the same autoplay-muted params — Chrome /
-          // Safari block unmuted cross-origin autoplay just like they
-          // do for single videos. User taps the player to unmute.
-          src: `https://www.youtube.com/embed/videoseries?list=${encodeURIComponent(listId)}&autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1`,
-          title: `Playlist`,
-          embedType: 'iframe',
-        };
-      }
-      // Free-text query fallback. YouTube deprecated the
-      // `embed?listType=search&list=…` API years ago — that URL now
-      // returns player Error 153. We render an external search card
-      // synchronously so the user always gets something clickable, and
-      // in parallel kick off `/api/youtube/search` which (when
-      // YOUTUBE_API_KEY is set) upgrades the state in-place to a real
-      // inline `/embed/<videoId>` iframe so the avatar genuinely plays
-      // the video on its stage monitor instead of showing a link.
-      const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`;
-      // Fire-and-forget upgrade — safe inside `getMonitorState` because
-      // setState() publishes to listeners via notify() and the UI
-      // re-renders with the inline iframe the moment the server replies.
-      queueYouTubeUpgrade(q);
-      return { kind: 'video', src: url, title: `Video — ${q}`, embedType: 'external' };
-    }
+    // case 'video' removed (2026-04-28) — YouTube integration dropped.
 
     case 'image': {
       if (!q) return null;

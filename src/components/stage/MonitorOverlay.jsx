@@ -1,4 +1,4 @@
-﻿import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { subscribeMonitor, handleShowOnMonitor, EXTERNAL_ONLY_HOSTS } from '../../lib/monitorStore'
 
 export function externalCardCopy(m) {
@@ -7,18 +7,7 @@ export function externalCardCopy(m) {
   let host = ''
   try { host = new URL(src).hostname.toLowerCase() } catch { /* ignore */ }
 
-  // kind='video' never hits the WebVM hosts — it's always YouTube (or
-  // another video host we don't have a bespoke embed for yet). Phrase it
-  // as "open search results" because that's what the URL actually is on
-  // the free-text path (YouTube search page).
-  if (m && m.kind === 'video') {
-    return {
-      icon: '▶',
-      headline: title,
-      body: 'YouTube blocks the search embed, so the video can\'t play inline. Open the results page in a new tab to watch.',
-      ctaLabel: 'Open search results in new tab',
-    }
-  }
+  // video kind removed (2026-04-28) — YouTube integration dropped.
 
   // WebVM / CheerpX / JSLinux / v86 — these *legitimately* need cross-
   // origin isolation and we cannot render them in-app. Keep the specific
@@ -139,7 +128,7 @@ function MonitorOverlay() {
   // fixed at the bottom of the viewport, so a 55vh bottom-sheet used to
   // overlap the composer — users couldn't type or send while a map /
   // video was on screen (audit #5). Anchoring to the top keeps the
-  // composer area clear and matches how Google Maps / YouTube handle
+  // composer area clear and matches how Google Maps handles
   // split-view on mobile.
   const mobileStyle = {
     position: 'fixed',

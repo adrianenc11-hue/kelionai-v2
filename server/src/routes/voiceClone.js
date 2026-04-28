@@ -48,7 +48,7 @@ const MAX_AUDIO_BASE64_CHARS = Math.ceil(MAX_SAMPLE_BYTES / 3) * 4 + 64;
 // changes (adds a new use, changes retention, etc). Stored on every
 // accepted clone so we can prove which exact version of the text the
 // user agreed to.
-const CONSENT_VERSION = '2026-04-20.v1';
+const CONSENT_VERSION = '2026-04-27.v2';
 
 function ipOf(req)      { return ipGeo.clientIp(req) || req.ip || null; }
 function uaOf(req)      { return (req.get && req.get('user-agent')) || null; }

@@ -9,6 +9,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { runTool } from './kelionTools'
 import { setCameraController, setCurrentFacingMode } from './cameraControl'
 import { getCsrfToken } from './api'
+import { subscribeNarrationMode, getNarrationMode } from './narrationMode'
 
 const SAMPLE_RATE_IN = 16000   // Gemini Live expects 16kHz PCM16 mic
 const SAMPLE_RATE_OUT = 24000  // Gemini Live returns 24kHz PCM16 audio
@@ -1157,6 +1158,56 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
   }, [stopFrameSender, clearAudioQueue])
 
   useEffect(() => () => { stop() }, [stop])
+
+  // ───── Narration loop (accessibility — visually-impaired users) ─────
+  // When set_narration_mode is enabled (via the voice tool), periodically
+  // inject a short text prompt into the live WebSocket asking the model to
+  // describe what it sees from the camera frames it is already receiving.
+  // Gemini Live sees the video track natively — we just need to nudge it
+  // with a text turn on a timer so it speaks the description out loud.
+  const narrationTimerRef = useRef(null)
+  useEffect(() => {
+    if (!active) return undefined
+    const clearNarrationTimer = () => {
+      if (narrationTimerRef.current) {
+        clearInterval(narrationTimerRef.current)
+        narrationTimerRef.current = null
+      }
+    }
+    const startNarrationLoop = (snap) => {
+      clearNarrationTimer()
+      if (!snap.enabled) return
+      const intervalMs = snap.intervalMs || 8000
+      narrationTimerRef.current = setInterval(() => {
+        const ws = wsRef.current
+        if (!ws || ws.readyState !== WebSocket.OPEN) return
+        if (statusRef.current !== 'listening') return
+        const focus = snap.focus
+          ? `Focus on: ${snap.focus}. `
+          : ''
+        const prompt = `${focus}Describe briefly what you see right now from the camera. Be natural, concise (2-3 sentences). Mention any changes since your last description.`
+        try {
+          ws.send(JSON.stringify({
+            clientContent: {
+              turns: [{ role: 'user', parts: [{ text: prompt }] }],
+              turnComplete: true,
+            },
+          }))
+        } catch (_) { /* best-effort */ }
+      }, intervalMs)
+    }
+    // Subscribe to narration mode changes
+    const unsub = subscribeNarrationMode((snap) => {
+      startNarrationLoop(snap)
+    })
+    // Check initial state
+    const initial = getNarrationMode()
+    if (initial.enabled) startNarrationLoop(initial)
+    return () => {
+      clearNarrationTimer()
+      unsub()
+    }
+  }, [active])
 
   // Register the camera controller so the `switch_camera` / camera_on /
   // camera_off / zoom_camera voice tools can drive this hook. Only the
