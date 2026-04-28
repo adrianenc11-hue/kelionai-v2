@@ -2420,14 +2420,26 @@ let visionRevenueTableCreated = false;
 
 async function ensureVisionRevenueTable() {
   if (visionRevenueTableCreated) return;
-  await db.run(`
-    CREATE TABLE IF NOT EXISTS vision_revenue (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL,
-      revenue_minutes REAL NOT NULL,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
+  const isPg = db && db._isPg;
+  if (isPg) {
+    await db.run(`
+      CREATE TABLE IF NOT EXISTS vision_revenue (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        revenue_minutes DOUBLE PRECISION NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+  } else {
+    await db.run(`
+      CREATE TABLE IF NOT EXISTS vision_revenue (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        revenue_minutes REAL NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+  }
   visionRevenueTableCreated = true;
 }
 
