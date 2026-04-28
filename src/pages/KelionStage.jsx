@@ -1579,7 +1579,21 @@ export default function KelionStage() {
         shadows={{ type: THREE.VSMShadowMap }}
         camera={{ position: [0, 0.2, 4.2], fov: 36 }}
         dpr={[1, 2]}
-        gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, outputColorSpace: THREE.SRGBColorSpace }}
+        gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, outputColorSpace: THREE.SRGBColorSpace, powerPreference: 'low-power' }}
+        onCreated={({ gl }) => {
+          // Handle WebGL context loss gracefully — prevent the crash
+          // that takes down the entire React tree via ErrorBoundary.
+          const canvas = gl.domElement
+          if (canvas) {
+            canvas.addEventListener('webglcontextlost', (e) => {
+              e.preventDefault()
+              console.warn('[kelion] WebGL context lost — will restore when browser recovers')
+            })
+            canvas.addEventListener('webglcontextrestored', () => {
+              console.log('[kelion] WebGL context restored')
+            })
+          }
+        }}
       >
         <color attach="background" args={['#05060a']} />
         <fog attach="fog" args={['#080614', 5.5, 12]} />

@@ -3,11 +3,16 @@ import { Component } from 'react'
 /**
  * React Error Boundary — catches render errors in child components
  * and shows a friendly fallback UI instead of a white screen.
+ *
+ * Auto-retries after 3 seconds so transient WebGL context-loss
+ * crashes recover without manual intervention. The user can also
+ * click "Reload Page" immediately.
  */
 export default class ErrorBoundary extends Component {
   constructor(props) {
     super(props)
     this.state = { hasError: false, error: null }
+    this._retryTimer = null
   }
 
   static getDerivedStateFromError(error) {
@@ -16,6 +21,15 @@ export default class ErrorBoundary extends Component {
 
   componentDidCatch(error, info) {
     console.error('[ErrorBoundary]', error, info.componentStack)
+    // Auto-retry after 3s for transient errors (WebGL context loss etc.)
+    if (this._retryTimer) clearTimeout(this._retryTimer)
+    this._retryTimer = setTimeout(() => {
+      this.setState({ hasError: false, error: null })
+    }, 3000)
+  }
+
+  componentWillUnmount() {
+    if (this._retryTimer) clearTimeout(this._retryTimer)
   }
 
   render() {
@@ -38,8 +52,11 @@ export default class ErrorBoundary extends Component {
             }}>
               Something went wrong
             </h2>
-            <p style={{ color: '#888', fontSize: '15px', lineHeight: '1.6', margin: '0 0 24px' }}>
+            <p style={{ color: '#888', fontSize: '15px', lineHeight: '1.6', margin: '0 0 8px' }}>
               An unexpected error occurred. This might be a temporary issue with your browser or graphics driver.
+            </p>
+            <p style={{ color: '#666', fontSize: '13px', lineHeight: '1.5', margin: '0 0 24px' }}>
+              Retrying automatically…
             </p>
             <button
               onClick={() => window.location.reload()}
