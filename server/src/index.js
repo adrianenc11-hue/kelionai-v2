@@ -457,6 +457,13 @@ if (require.main === module) {
   httpServer.listen(PORT, () => {
     console.log(`[kelion-api] Server listening on port ${PORT} (${config.nodeEnv})`);
     console.log(`[kelion-api] CORS origins: ${config.corsOrigins.join(', ')}`);
+    // Auto-enable all required Google Cloud APIs (idempotent, fire-and-forget)
+    try {
+      const { enableAllGoogleApis } = require('./services/googleApiEnabler');
+      enableAllGoogleApis().catch((err) =>
+        console.warn('[googleApiEnabler] Non-fatal error:', err.message)
+      );
+    } catch { /* module not available — skip silently */ }
   });
 }
 
