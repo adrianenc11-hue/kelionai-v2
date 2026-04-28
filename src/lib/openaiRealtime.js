@@ -782,6 +782,14 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
             visionContextRef.current.push(data.description)
             if (visionContextRef.current.length > 10) visionContextRef.current.shift()
           }
+        } else if (r.status === 429) {
+          // Rate limited — back off to 1 frame every 5 seconds
+          console.warn('[vision] rate limited (429), backing off to 5s interval')
+          if (currentInterval < 5000) {
+            currentInterval = 5000
+            clearInterval(intervalId)
+            intervalId = setInterval(sendFrame, currentInterval)
+          }
         } else if (r.status === 402) {
           // Out of credits — stop vision completely (camera light off)
           console.warn('[vision] credits exhausted, stopping camera')
