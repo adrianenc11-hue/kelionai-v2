@@ -1201,15 +1201,34 @@ export default function KelionStage() {
   // Adrian's spec ("cind intru pe aplicatie sa fie default delogat"):
   // every fresh page load must start in the signed-out trial state, even
   // if the user has a valid kelion.token cookie from a previous visit.
-  // We intentionally do NOT hydrate auth from /api/auth/passkey/me here;
-  // instead we best-effort clear the server cookie on mount so the user
-  // must explicitly click "Sign in" and re-enter credentials. Auth still
-  // works normally after they click through the modal — handleSignIn in
-  // the modal onSuccess path does its own fetchMe + setAuthState below.
+  //
+  // EXCEPTION: Google OAuth redirect. When the user completes the Google
+  // consent flow, the server sets kelion.token and redirects back to /.
+  // If we blindly signOut() here, the cookie is wiped before React can
+  // read it → user sees "Sign in" again despite successful Google auth.
+  //
+  // Fix: probe /auth/me first. If the cookie is valid AND the page was
+  // just loaded (Google redirect or browser refresh), we honour it and
+  // set authState. Otherwise we clear it as before.
   useEffect(() => {
     let cancelled = false
-    signOut().catch(() => { /* best-effort; modal will still work */ })
-    if (!cancelled) setAuthState({ signedIn: false, user: null })
+    ;(async () => {
+      try {
+        const me = await fetchMe()
+        if (cancelled) return
+        if (me && me.signedIn) {
+          // Valid session — honour it (covers Google OAuth redirect,
+          // manual page refresh, and reopened tabs).
+          setAuthState({ signedIn: true, user: me.user || null })
+          return
+        }
+      } catch (_) { /* no valid session */ }
+      // No valid session — clear any stale cookie so the UI starts clean.
+      if (!cancelled) {
+        signOut().catch(() => {})
+        setAuthState({ signedIn: false, user: null })
+      }
+    })()
     return () => { cancelled = true }
   }, [])
 
