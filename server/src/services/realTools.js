@@ -508,7 +508,38 @@ async function toolTranslate({ text, to, from }) {
   const target = (to || '').toString().toLowerCase().slice(0, 5) || 'en';
   const source = (from || 'auto').toString().toLowerCase().slice(0, 5) || 'auto';
 
-  // Prefer DeepL when a key is available — higher quality, esp. for EU langs.
+  // Priority 1: Google Cloud Translation API (professional, 500K chars/mo free)
+  const googleApiKey = process.env.GOOGLE_API_KEY;
+  if (googleApiKey) {
+    try {
+      const r = await fetchWithTimeout('https://translation.googleapis.com/language/translate/v2', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          q: src,
+          target,
+          source: source === 'auto' ? undefined : source,
+          key: googleApiKey,
+          format: 'text',
+        }),
+      });
+      if (r.ok) {
+        const data = await r.json();
+        const t0 = data?.data?.translations?.[0];
+        if (t0) {
+          return {
+            ok: true,
+            translated: t0.translatedText,
+            detectedSource: (t0.detectedSourceLanguage || source).toLowerCase(),
+            target,
+            source: 'google-translate',
+          };
+        }
+      }
+    } catch (_) { /* fall through to DeepL */ }
+  }
+
+  // Priority 2: DeepL — higher quality for EU languages.
   const deeplKey = process.env.DEEPL_API_KEY;
   if (deeplKey) {
     try {
