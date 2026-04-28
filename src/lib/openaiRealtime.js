@@ -531,12 +531,40 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
     video.playsInline = true
     video.play().catch(() => {})
     const canvas = document.createElement('canvas')
+    // Second canvas for motion detection (lower res)
+    const motionCanvas = document.createElement('canvas')
+    motionCanvas.width = 64
+    motionCanvas.height = 48
     let running = true
     let busy = false
+    let prevPixels = null
 
-    // 4fps continuous vision stream — max quality, with back-pressure.
-    // If a request is still in-flight, the next frame is skipped (not queued).
-    const FRAME_INTERVAL = 250 // 4fps
+    // Dynamic FPS: 1fps when static, 4fps when motion detected.
+    // Saves ~75% API cost during static scenes.
+    const FPS_STATIC = 1000   // 1fps
+    const FPS_ACTIVE = 250    // 4fps
+    const MOTION_THRESHOLD = 8 // pixel diff % to trigger active mode
+    let currentInterval = FPS_STATIC
+    let motionCooldown = 0     // frames of inactivity before dropping to 1fps
+
+    function detectMotion(ctx) {
+      const mCtx = motionCanvas.getContext('2d')
+      mCtx.drawImage(video, 0, 0, 64, 48)
+      const data = mCtx.getImageData(0, 0, 64, 48).data
+      if (!prevPixels) { prevPixels = new Uint8Array(data); return true }
+      let diffCount = 0
+      const totalPixels = 64 * 48
+      for (let i = 0; i < data.length; i += 16) { // sample every 4th pixel
+        const diff = Math.abs(data[i] - prevPixels[i]) +
+                     Math.abs(data[i+1] - prevPixels[i+1]) +
+                     Math.abs(data[i+2] - prevPixels[i+2])
+        if (diff > 60) diffCount++
+      }
+      prevPixels = new Uint8Array(data)
+      const pct = (diffCount / (totalPixels / 4)) * 100
+      return pct > MOTION_THRESHOLD
+    }
+
     const sendFrame = async () => {
       if (!running || busy) return
       if (!video.videoWidth) return
@@ -547,6 +575,24 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
         canvas.height = Math.floor(video.videoHeight * scale)
         const ctx = canvas.getContext('2d')
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+
+        // Motion detection — adjust FPS dynamically
+        const hasMotion = detectMotion(ctx)
+        if (hasMotion) {
+          motionCooldown = 12 // stay at 4fps for ~3 sec after last motion
+          if (currentInterval !== FPS_ACTIVE) {
+            currentInterval = FPS_ACTIVE
+            clearInterval(intervalId)
+            intervalId = setInterval(sendFrame, currentInterval)
+          }
+        } else if (motionCooldown > 0) {
+          motionCooldown--
+        } else if (currentInterval !== FPS_STATIC) {
+          currentInterval = FPS_STATIC
+          clearInterval(intervalId)
+          intervalId = setInterval(sendFrame, currentInterval)
+        }
+
         const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.78))
         if (!blob || !running) { busy = false; return }
         const buf = await blob.arrayBuffer()
@@ -583,9 +629,9 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
       } catch (_) {}
       busy = false
     }
-    const intervalId = setInterval(sendFrame, FRAME_INTERVAL)
+    let intervalId = setInterval(sendFrame, currentInterval)
     sendFrame()
-    frameSenderRef.current = { stop: () => { running = false }, video }
+    frameSenderRef.current = { stop: () => { running = false; clearInterval(intervalId) }, video }
   }, [])
 
   const stopFrameStream = useCallback(() => {
