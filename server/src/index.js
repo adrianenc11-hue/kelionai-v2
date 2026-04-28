@@ -151,6 +151,17 @@ const chatLimiter = (process.env.NODE_ENV === 'test') ? (req, res, next) => next
   message: { error: 'Rate limit exceeded for AI services. Please wait a moment.' },
 });
 
+// Dedicated limiter for vision frames — the camera sends up to 4fps
+// (240 req/min) which instantly exhausts the 20 req/min chatLimiter.
+// 300 req/min gives headroom for dynamic-FPS mode without abuse risk.
+const visionLimiter = (process.env.NODE_ENV === 'test') ? (req, res, next) => next() : rateLimit({
+  windowMs: 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Vision rate limit exceeded. Please reduce camera frame rate.' },
+});
+
 // Skip JSON parsing on the Stripe webhook so signature verification in
 // /api/credits/webhook can read the raw body. Everything else goes
 // through the normal JSON parser. Use req.path (no query string) so a
@@ -270,6 +281,10 @@ app.use('/api/admin', requireAuth, adminRouter);
 // Realtime router is PUBLIC in Stage 1 (no login/users/subs per product spec).
 // Rate limiting still applies to prevent abuse. Ephemeral-token endpoints only
 // hand back short-lived tokens; persona + config are baked in server-side.
+//
+// Vision frames are high-frequency (up to 4fps) and need their own limiter;
+// mount the vision path FIRST so it matches before the chatLimiter catch-all.
+app.post('/api/realtime/vision', visionLimiter, realtimeRouter);
 app.use('/api/realtime', chatLimiter, realtimeRouter);
 
 // Trial status — public endpoint the client polls to drive the top-right
