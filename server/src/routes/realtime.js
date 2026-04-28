@@ -1594,6 +1594,10 @@ router.post('/gemini-token', geminiTokenHandler);
 router.post('/vision', async (req, res) => {
   const { image, mimeType, timeContext } = req.body || {};
   if (!image) return res.status(400).json({ error: 'No image provided' });
+  // Reject tiny images that GPT-5.5 will reject anyway (saves an API call).
+  if (typeof image !== 'string' || image.length < 200) {
+    return res.status(400).json({ error: 'Image too small or invalid' });
+  }
 
   try {
     const { getOpenAI, getDefaultChatModel } = require('../utils/openai');
@@ -1627,6 +1631,12 @@ router.post('/vision', async (req, res) => {
     const description = r.choices?.[0]?.message?.content || '';
     return res.json({ ok: true, description });
   } catch (err) {
+    // 400 = bad image from client (too small, unsupported format) — warn, not error.
+    const is400 = err.status === 400 || (err.message && err.message.includes('400'));
+    if (is400) {
+      console.warn('[vision] client sent invalid image:', err.message?.slice(0, 200));
+      return res.status(400).json({ error: 'Invalid image. Please make sure your image is valid.' });
+    }
     console.error('[vision] GPT-5.5 error:', err.message);
     return res.status(500).json({ error: 'Vision processing failed' });
   }
