@@ -523,7 +523,7 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
   // ── Camera ─────────────────────────────────────────────────────
   // Vision frames go to /api/realtime/vision (GPT-5.5) since WebRTC
   // audio-only model doesn't accept video tracks.
-  const startFrameStream = useCallback((stream) => {
+  const startFrameStream = useCallback((stream, visionMode) => {
     if (frameSenderRef.current) return
     const video = document.createElement('video')
     video.srcObject = stream
@@ -539,12 +539,15 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
     let busy = false
     let prevPixels = null
 
-    // Dynamic FPS: 1fps when static, 4fps when motion detected.
-    // Saves ~75% API cost during static scenes.
+    // Vision modes:
+    //   'eco'     → fixed 1fps, no motion detection (cheapest)
+    //   'premium' → fixed 4fps continuous (best quality)
+    //   default   → dynamic FPS via motion detection (balanced)
+    const MODE = visionMode || 'dynamic'
     const FPS_STATIC = 1000   // 1fps
     const FPS_ACTIVE = 250    // 4fps
     const MOTION_THRESHOLD = 8 // pixel diff % to trigger active mode
-    let currentInterval = FPS_STATIC
+    let currentInterval = MODE === 'premium' ? FPS_ACTIVE : FPS_STATIC
     let motionCooldown = 0     // frames of inactivity before dropping to 1fps
 
     function detectMotion(ctx) {
@@ -577,21 +580,23 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
         const ctx = canvas.getContext('2d')
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
 
-        // Motion detection — adjust FPS dynamically
-        const hasMotion = detectMotion(ctx)
-        if (hasMotion) {
-          motionCooldown = 12 // stay at 4fps for ~3 sec after last motion
-          if (currentInterval !== FPS_ACTIVE) {
-            currentInterval = FPS_ACTIVE
+        // Motion detection — adjust FPS dynamically (skip if eco/premium)
+        if (MODE === 'dynamic') {
+          const hasMotion = detectMotion(ctx)
+          if (hasMotion) {
+            motionCooldown = 12 // stay at 4fps for ~3 sec after last motion
+            if (currentInterval !== FPS_ACTIVE) {
+              currentInterval = FPS_ACTIVE
+              clearInterval(intervalId)
+              intervalId = setInterval(sendFrame, currentInterval)
+            }
+          } else if (motionCooldown > 0) {
+            motionCooldown--
+          } else if (currentInterval !== FPS_STATIC) {
+            currentInterval = FPS_STATIC
             clearInterval(intervalId)
             intervalId = setInterval(sendFrame, currentInterval)
           }
-        } else if (motionCooldown > 0) {
-          motionCooldown--
-        } else if (currentInterval !== FPS_STATIC) {
-          currentInterval = FPS_STATIC
-          clearInterval(intervalId)
-          intervalId = setInterval(sendFrame, currentInterval)
         }
 
         const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.78))
@@ -660,7 +665,7 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
       cameraStreamRef.current = stream
       setCameraStream(stream)
       setCurrentFacingMode(facing)
-      startFrameStream(stream)
+      startFrameStream(stream, opts.visionMode || 'dynamic')
     } catch (e) {
       if (e.name !== 'NotAllowedError') setVisionError(e.message || 'Camera failed')
       throw e
