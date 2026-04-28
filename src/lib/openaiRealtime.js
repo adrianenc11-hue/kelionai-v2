@@ -20,6 +20,8 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
   const [visionError, setVisionError] = useState(null)
   const [trial, setTrial] = useState(null)
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true)
+  // Network quality: 'high' (4G/WiFi), 'medium' (3G), 'low' (2G/slow)
+  const [networkQuality, setNetworkQuality] = useState('high')
 
   const statusRef = useRef('idle')
   const startInFlightRef = useRef(false)
@@ -47,6 +49,30 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
   // page reloads during network outages.
   const offlineQueueRef = useRef([])
   const OFFLINE_QUEUE_KEY = 'kelion_offline_queue'
+
+  // ── Network quality detector ─────────────────────────────────
+  // Uses Navigator.connection API to detect effective network type
+  // and adapt behavior (vision FPS, voice vs text-only).
+  useEffect(() => {
+    const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection
+    if (!conn) return // API not supported (Firefox/Safari) — assume high
+
+    const update = () => {
+      const type = conn.effectiveType // '4g' | '3g' | '2g' | 'slow-2g'
+      const downlink = conn.downlink || 10 // Mbps
+      let quality = 'high'
+      if (type === '2g' || type === 'slow-2g' || downlink < 0.5) {
+        quality = 'low'
+      } else if (type === '3g' || downlink < 2) {
+        quality = 'medium'
+      }
+      setNetworkQuality(quality)
+      console.log(`[kelion] Network: ${type}, ${downlink} Mbps → quality=${quality}`)
+    }
+    update()
+    conn.addEventListener('change', update)
+    return () => conn.removeEventListener('change', update)
+  }, [])
 
   // ── Turn management ────────────────────────────────────────────
   const appendTurn = useCallback((role, text, forceNew = false) => {
@@ -884,5 +910,6 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
     loadTurns,
     isOnline,
     pendingMessages: offlineQueueRef.current.length,
+    networkQuality,
   }
 }
