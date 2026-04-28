@@ -27,7 +27,7 @@ const toolsRouter      = require('./routes/tools');
 const pushRouter       = require('./routes/push');
 const creditsRouter    = require('./routes/credits');
 const diagRouter       = require('./routes/diag');
-const youtubeRouter    = require('./routes/youtube');
+// YouTube removed (2026-04-28) — was causing constant errors and API quota issues.
 const generatedImagesRouter = require('./routes/generatedImages');
 const voiceCloneRouter = require('./routes/voiceClone');
 const { attachVertexLiveProxy } = require('./routes/vertexLiveProxy');
@@ -113,7 +113,7 @@ app.use(
         mediaSrc:   ["'self'", "blob:"],
         workerSrc:  ["'self'", "blob:"],
         // Allow cross-origin iframes for the <MonitorOverlay/>: Google Maps
-        // embed, wttr.in, Wikipedia, YouTube, LoremFlickr and friends. Without
+        // embed, wttr.in, Wikipedia, LoremFlickr and friends. Without
         // an explicit frameSrc they fall back to defaultSrc 'self' and the
         // browser renders a blank CSP-error frame (the "pagina alba cu err"
         // bug). `https:` covers every HTTPS embed target we rely on.
@@ -305,13 +305,7 @@ app.use('/api/studio', requireAuth, studioRouter);
 // and MCP endpoints self-check for a signed-in user inside the handler.
 app.use('/api/tools', chatLimiter, toolsRouter);
 
-// F10 — YouTube Data API v3 search wrapper. Public (no auth) so the
-// stage monitor can resolve `show_on_monitor('video', query)` into an
-// embeddable video id inline. Rate-limited under chatLimiter like the
-// other public monitor helpers. Gracefully 404s when YOUTUBE_API_KEY
-// is not configured; the client then falls back to the external
-// search card shipped in PR #160.
-app.use('/api/youtube', chatLimiter, youtubeRouter);
+// YouTube route removed (2026-04-28) — constant API errors.
 
 // F11 — short-lived PNG serving for `generate_image` tool. The route
 // lives outside chatLimiter because it's a pure GET by opaque UUID;

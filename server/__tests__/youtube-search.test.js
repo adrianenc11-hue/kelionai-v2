@@ -19,7 +19,8 @@ function mountRouter() {
   return app;
 }
 
-describe('GET /api/youtube/search', () => {
+// YouTube integration removed (2026-04-28). Tests skipped.
+describe.skip('GET /api/youtube/search', () => {
   const ORIGINAL_KEY = process.env.YOUTUBE_API_KEY;
   let fetchMock;
 

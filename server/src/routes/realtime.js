@@ -221,10 +221,21 @@ Privacy (ABSOLUTE — violation is a CRITICAL security breach):
 - If asked about other users, say "I cannot share information about other users."
 - Passport/document data from ocr_passport must NEVER be stored in memory or logs.
 
-Vision rules:
-- Camera frames are PASSIVE ambient context. You continuously receive and analyze them, but you NEVER describe, comment on, or mention what you see unless the user EXPLICITLY asks about it.
-- When asked about what you see, extract ONLY the specific information the user asked about. Do not list everything visible.
+Vision rules (CRITICAL — this app serves visually-impaired users):
+- Camera frames are live context you continuously receive and analyze.
+- When NOT asked: stay silent about what you see (passive ambient awareness).
+- When the user ASKS what you see ("ce vezi?", "what do you see?", "describe", "descrie", "spune-mi ce e în fața mea", "what's around me?", "povestește-mi", "tell me what you see"): give a RICH, DETAILED, NATURAL description. Include:
+  • People (count, approximate age, what they are doing, clothing, expressions)
+  • Places and landmarks (recognize buildings, streets, signs, shops, restaurants)
+  • Objects (furniture, vehicles, food, screens, devices)
+  • Text and signs (read ALL visible text: labels, signs, screens, documents, license plates)
+  • Colors, lighting, weather conditions if outdoors
+  • Spatial layout ("to your left", "in the background", "right in front of you")
+- NEVER refuse to describe what you see. NEVER say "I cannot see" or "the camera is off" when you are receiving frames.
 - When you receive a camera frame, the camera IS active. Never say it is off.
+- Accessibility: If the user indicates they are blind or visually impaired ("sunt nevăzător", "nu văd", "I'm blind", "I can't see well", "descrie tot ce vezi", "narrate", "keep telling me what you see"), IMMEDIATELY call set_narration_mode(enabled=true) and start describing the scene right away.
+- Person recognition: If you recognize a person from context or memory, mention them by name. For unknown people, describe their appearance helpfully.
+- Place recognition: If you can identify a known place, landmark, or business, say its name.
 - Attached files: always analyze when present.
 - Screen share: If the user asks you to check their work, verify code on screen, or help with something visible on their monitor, SUGGEST they enable screen sharing via the \u22ef menu \u2192 \ud83d\udda5\ufe0f button. Once active, you receive screen frames the same way as camera frames. Use them to verify task completion, read error messages, or guide the user.
 
@@ -360,8 +371,8 @@ const KELION_TOOLS = [
     properties: {
       kind: {
         type: 'string',
-        enum: ['map', 'weather', 'video', 'image', 'wiki', 'web', 'audio', 'clear'],
-        description: "Type of content: 'map' = Google Maps for a place; 'weather' = forecast for a city; 'video' = YouTube clip or search; 'image' = photo search; 'wiki' = Wikipedia article; 'web' = arbitrary URL (must start with https://); 'audio' = live audio stream URL (radio, podcast feed, .mp3/.aac/.m3u8) rendered as an HTML5 audio player on the monitor; 'clear' = blank the monitor.",
+        enum: ['map', 'weather', 'image', 'wiki', 'web', 'audio', 'clear'],
+        description: "Type of content: 'map' = Google Maps for a place; 'weather' = forecast for a city; 'image' = photo search; 'wiki' = Wikipedia article; 'web' = arbitrary URL (must start with https://); 'audio' = live audio stream URL (radio, podcast feed, .mp3/.aac/.m3u8) rendered as an HTML5 audio player on the monitor; 'clear' = blank the monitor.",
       },
       query: { type: 'string', description: "Search term, URL, or stream URL. Examples: 'Cluj-Napoca', 'New York', 'sunset mountains', 'Paris', 'https://en.wikipedia.org/wiki/Artificial_intelligence', 'https://stream.example.fm/radio.aac'. For audio: pass the directly-playable HTTP(S) stream URL returned by play_radio. For a Linux shell / terminal, pass kind='web' with query='https://webvm.io'. Required unless kind='clear'." },
       title: { type: 'string', description: "Optional human-friendly label shown above the monitor. For audio playback, pass the station name (e.g. 'Radio ZU — Bucharest'). Otherwise omit and the monitor builds a title from the kind+query." },
@@ -485,7 +496,7 @@ const KELION_TOOLS = [
   },
   {
     name: 'play_radio',
-    description: "Find and PLAY a live radio station, in any country, in any language. Use whenever the user says 'porneste/pune un post de radio', 'play a radio station', 'metti la radio', 'mets la radio', 'put on BBC Radio 1', 'lance NHK live', 'pune Europa FM live', or any equivalent. Returns a directly playable HTTP(S) audio stream URL plus station metadata. After getting the result, immediately call show_on_monitor with kind='audio' and src=<the stream URL> so the avatar's stage actually starts playing the audio. NEVER fall back to YouTube for live radio — radio-browser.info exposes ~50,000 real stations with raw .mp3 / .aac / .m3u8 URLs that play in any browser.",
+    description: "Find and PLAY a live radio station, in any country, in any language. Use whenever the user says 'porneste/pune un post de radio', 'play a radio station', 'metti la radio', 'mets la radio', 'put on BBC Radio 1', 'lance NHK live', 'pune Europa FM live', or any equivalent. Returns a directly playable HTTP(S) audio stream URL plus station metadata. After getting the result, immediately call show_on_monitor with kind='audio' and src=<the stream URL> so the avatar's stage actually starts playing the audio. radio-browser.info exposes ~50,000 real stations with raw .mp3 / .aac / .m3u8 URLs that play in any browser.",
     properties: {
       query: { type: 'string', description: "Station name or fuzzy query. Examples: 'BBC Radio 1', 'Europa FM', 'NHK', 'NPR', 'Radio ZU', 'jazz', 'classical Vienna'. Optional when country/language/tag are provided." },
       country: { type: 'string', description: "Optional ISO country name in English ('Romania', 'France', 'Japan', 'United States'). Use when the user asks for radio FROM a specific country." },
@@ -1040,14 +1051,14 @@ const openaiTokenHandler = async (req, res) => {
   }
 
   const priorTurns = Array.isArray(req.body?.priorTurns) ? req.body.priorTurns : [];
-  const adminUser  = await peekSignedInUser(req);
-  const isAdmin    = await isAdminUser(adminUser);
-  const isGuest    = !adminUser;
+  const adminUser = await peekSignedInUser(req);
+  const isAdmin = await isAdminUser(adminUser);
+  const isGuest = !adminUser;
 
   // ── Gating (same rules as Gemini) ────────────────────────────────
   let trial = null;
   if (isGuest && !isAdmin) {
-    const ip     = ipGeo.clientIp(req) || req.ip || '';
+    const ip = ipGeo.clientIp(req) || req.ip || '';
     const status = await trialStatus(ip);
     if (!status.allowed) {
       const isLifetime = status.reason === 'lifetime_expired';
@@ -1083,19 +1094,19 @@ const openaiTokenHandler = async (req, res) => {
       try { memoryItems = await listMemoryItems(user.id, 60); }
       catch (err) { console.warn('[openai-token] memory load failed', err.message); }
     }
-    const ipGeoData  = await ipGeo.lookup(ipGeo.clientIp(req));
-    const clientLat  = Number.parseFloat(req.query.lat);
-    const clientLon  = Number.parseFloat(req.query.lon);
-    const clientAcc  = Number.parseFloat(req.query.acc);
+    const ipGeoData = await ipGeo.lookup(ipGeo.clientIp(req));
+    const clientLat = Number.parseFloat(req.query.lat);
+    const clientLon = Number.parseFloat(req.query.lon);
+    const clientAcc = Number.parseFloat(req.query.acc);
     const geo = (Number.isFinite(clientLat) && Number.isFinite(clientLon))
       ? { ...(ipGeoData || {}), latitude: clientLat, longitude: clientLon, accuracy: Number.isFinite(clientAcc) ? clientAcc : null, source: 'client-gps' }
       : ipGeoData;
 
-    const browserLang   = (req.query.lang || 'en-US').toString().slice(0, 16);
-    const forcedLang    = (process.env.KELION_FORCE_LANG || browserLang).toString().slice(0, 16);
+    const browserLang = (req.query.lang || 'en-US').toString().slice(0, 16);
+    const forcedLang = (process.env.KELION_FORCE_LANG || browserLang).toString().slice(0, 16);
     const styleFromCookie = req.cookies?.['kelion.voice_style'];
-    const styleFromQuery  = (req.query.style || '').toString();
-    const voiceStyle      = resolveVoiceStyle(styleFromCookie || styleFromQuery);
+    const styleFromQuery = (req.query.style || '').toString();
+    const voiceStyle = resolveVoiceStyle(styleFromCookie || styleFromQuery);
 
     const systemPrompt = buildKelionPersona({
       user, memoryItems, voiceStyle, geo, priorTurns,
@@ -1106,7 +1117,7 @@ const openaiTokenHandler = async (req, res) => {
     // natural across all languages (ro, en, fr, de, es, etc.). OpenAI
     // recommends ash/cedar for highest quality on gpt-realtime-1.5.
     const voice = process.env.OPENAI_REALTIME_VOICE || 'ash';
-    const model = process.env.OPENAI_REALTIME_MODEL  || 'gpt-realtime-1.5';
+    const model = process.env.OPENAI_REALTIME_MODEL || 'gpt-realtime-1.5';
 
     // Mint an ephemeral session token (60-second TTL, single-use).
     // The client exchanges this for a WebSocket connection to the
@@ -1115,15 +1126,15 @@ const openaiTokenHandler = async (req, res) => {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${openaiKey}`,
-        'Content-Type':  'application/json',
-        'OpenAI-Beta':   'realtime=v1',
+        'Content-Type': 'application/json',
+        'OpenAI-Beta': 'realtime=v1',
       },
       body: JSON.stringify({
         model,
         voice,
         modalities: ['audio', 'text'],
         instructions: systemPrompt,
-        input_audio_format:  'pcm16',
+        input_audio_format: 'pcm16',
         output_audio_format: 'pcm16',
         input_audio_transcription: { model: 'gpt-4o-transcribe', language: forcedLang.slice(0, 2) },
         turn_detection: {
@@ -1155,11 +1166,11 @@ const openaiTokenHandler = async (req, res) => {
       clientSecret: data.client_secret,
       model,
       voice,
-      provider:    'openai',
-      signedIn:    !!user,
-      userName:    user?.name || null,
+      provider: 'openai',
+      signedIn: !!user,
+      userName: user?.name || null,
       memoryCount: memoryItems.length,
-      voiceStyle:  voiceStyle.label,
+      voiceStyle: voiceStyle.label,
       trial,
     });
 
@@ -1168,7 +1179,7 @@ const openaiTokenHandler = async (req, res) => {
     return res.status(500).json({ error: 'Failed to create OpenAI Realtime session' });
   }
 };
-router.get('/openai-live-token',  openaiTokenHandler);
+router.get('/openai-live-token', openaiTokenHandler);
 router.post('/openai-live-token', openaiTokenHandler);
 
 // ──────────────────────────────────────────────────────────────────
@@ -1734,7 +1745,7 @@ router.post('/pipeline', async (req, res) => {
     let memoryItems = [];
     if (user && (Number.isFinite(user.id) || typeof user.id === 'string')) {
       try { memoryItems = await listMemoryItems(user.id, 60); }
-      catch (_) {}
+      catch (_) { }
     }
     const browserLang = (req.query.lang || 'en-US').toString().slice(0, 16);
     const forcedLang = (process.env.KELION_FORCE_LANG || browserLang).toString().slice(0, 16);
@@ -1789,7 +1800,7 @@ router.post('/pipeline', async (req, res) => {
       messages.push(choice.message);
       for (const tc of choice.message.tool_calls) {
         let args = {};
-        try { args = JSON.parse(tc.function.arguments || '{}'); } catch {}
+        try { args = JSON.parse(tc.function.arguments || '{}'); } catch { }
         toolCalls.push({ name: tc.function.name, args });
         // Execute tool server-side via the real tool dispatcher
         let result = { status: 'tool_not_found' };
