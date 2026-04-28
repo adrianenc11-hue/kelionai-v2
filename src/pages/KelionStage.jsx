@@ -2106,13 +2106,26 @@ export default function KelionStage() {
           >
             {t('tools')}
           </div>
-          <MenuItem onClick={() => {
-            if (cameraStream) { stopCamera() }
-            else { startCamera().catch(() => { /* banner surfaces the error */ }) }
-            setMenuOpen(false)
-          }}>
-            {cameraStream ? t('cameraOff') : t('cameraOn')}
-          </MenuItem>
+          {cameraStream ? (
+            <MenuItem onClick={() => { stopCamera(); setMenuOpen(false) }}>
+              {t('cameraOff')}
+            </MenuItem>
+          ) : (
+            <>
+              <MenuItem onClick={() => {
+                startCamera({ visionMode: 'eco' }).catch(() => {})
+                setMenuOpen(false)
+              }}>
+                {t('visionEco')}
+              </MenuItem>
+              <MenuItem onClick={() => {
+                startCamera({ visionMode: 'premium' }).catch(() => {})
+                setMenuOpen(false)
+              }}>
+                {t('visionPremium')}
+              </MenuItem>
+            </>
+          )}
           <MenuItem onClick={() => { screenStream ? stopScreen() : startScreen(); setMenuOpen(false) }}>
             {screenStream ? t('stopScreen') : t('shareScreen')}
           </MenuItem>
