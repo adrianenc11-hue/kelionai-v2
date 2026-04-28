@@ -1231,15 +1231,23 @@ export default function KelionStage() {
     // Only save when the last entry is an assistant turn with content
     const last = turns[total - 1]
     if (!last || last.role === 'user') return
-    if (!last.text || !String(last.text).trim()) return
+    // Accept text OR transcript (voice turns may only have transcript)
+    const lastContent = last.text || last.transcript || ''
+    if (!String(lastContent).trim()) return
     let cancelled = false
     ;(async () => {
       for (let i = start; i < turns.length; i++) {
         if (cancelled) return
         const t = turns[i]
-        if (!t || !t.text || !String(t.text).trim()) break
+        // Use text, fall back to transcript for voice turns
+        const content = t?.text || t?.transcript || ''
+        if (!t || !String(content).trim()) {
+          // Skip empty turns but DON'T break — keep processing later ones
+          savedUpToRef.current = i + 1
+          continue
+        }
         try {
-          await appendConversationMessage({ role: t.role || 'user', content: t.text })
+          await appendConversationMessage({ role: t.role || 'user', content: String(content).trim() })
           savedUpToRef.current = i + 1
         } catch { /* next change will retry from the unchanged cursor */ }
       }
