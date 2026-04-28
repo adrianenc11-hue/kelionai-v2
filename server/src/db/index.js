@@ -2127,6 +2127,9 @@ module.exports = {
   MAX_STUDIO_NAME_LEN,
   MAX_STUDIO_PATH_LEN,
   __getStudioWriteQueuesSizeForTests,
+  // Vision revenue tracking
+  logVisionRevenue,
+  getVisionRevenue,
 };
 
 // ─── Stage 5 helpers ────────────────────────────────────────────────
@@ -2404,5 +2407,52 @@ async function getCreditRevenueSummary(sinceDays = 30) {
     minutesSold: Number(row?.minutes_sold || 0),
     minutesConsumed: Number(row?.minutes_consumed || 0),
     revenueCents: Number(row?.revenue_cents || 0),
+  };
+}
+
+// ─── Vision Revenue Tracking ──────────────────────────────────────
+// Tracks the 30% markup on vision consumption as platform revenue.
+// Each time 1 minute is deducted from a user for vision frames,
+// 0.3 minutes is logged here as revenue (the margin between what
+// the user pays and the raw API cost).
+
+let visionRevenueTableCreated = false;
+
+async function ensureVisionRevenueTable() {
+  if (visionRevenueTableCreated) return;
+  await db.run(`
+    CREATE TABLE IF NOT EXISTS vision_revenue (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      revenue_minutes REAL NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  visionRevenueTableCreated = true;
+}
+
+async function logVisionRevenue(userId, revenueMinutes) {
+  await ensureVisionRevenueTable();
+  await db.run(
+    'INSERT INTO vision_revenue (user_id, revenue_minutes) VALUES (?, ?)',
+    [userId, revenueMinutes]
+  );
+}
+
+async function getVisionRevenue(sinceDays = 30) {
+  await ensureVisionRevenueTable();
+  const since = new Date(Date.now() - sinceDays * 86400000).toISOString();
+  const row = await db.get(
+    `SELECT
+       COUNT(*) AS events,
+       COALESCE(SUM(revenue_minutes), 0) AS total_revenue_minutes
+     FROM vision_revenue
+     WHERE created_at > ?`,
+    [since]
+  );
+  return {
+    sinceDays,
+    events: Number(row?.events || 0),
+    totalRevenueMinutes: Number(row?.total_revenue_minutes || 0),
   };
 }

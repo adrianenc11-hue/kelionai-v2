@@ -1,7 +1,7 @@
 'use strict';
 
 const { Router } = require('express');
-const { listMemoryItems, getCreditsBalance, addCreditsTransaction, setPreferredLanguage, getPreferredLanguage } = require('../db');
+const { listMemoryItems, getCreditsBalance, addCreditsTransaction, setPreferredLanguage, getPreferredLanguage, logVisionRevenue } = require('../db');
 
 // Adrian 2026-04-25: "default engleza e obligat sa detecteze limba user si o
 // va folosi permanent cit e logat". Mirror of the table in chat.js — keep in
@@ -1653,6 +1653,7 @@ router.post('/vision', async (req, res) => {
 
     // Deduct credits AFTER successful API call (not before).
     // Track frames per user; deduct 1 minute every FRAMES_PER_MINUTE frames.
+    // Of the 1 minute deducted, 30% (0.3 min) is platform revenue (markup).
     if (user && user.id && !admin) {
       const key = `vision_frames_${user.id}`;
       if (!global.visionFrameCounters) global.visionFrameCounters = {};
@@ -1663,8 +1664,13 @@ router.post('/vision', async (req, res) => {
           userId: user.id,
           deltaMinutes: -1,
           kind: 'vision',
-          note: `Vision: ${FRAMES_PER_MINUTE} frames analyzed`,
+          note: `Vision: ${FRAMES_PER_MINUTE} frames analyzed (incl. 30% markup)`,
         }).catch(err => console.warn('[vision] credit deduction failed:', err.message));
+
+        // Log 30% markup as platform revenue
+        logVisionRevenue(user.id, 0.3).catch(err =>
+          console.warn('[vision] revenue log failed:', err.message)
+        );
       }
     }
 

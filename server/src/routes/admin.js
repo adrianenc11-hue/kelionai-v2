@@ -17,6 +17,7 @@ const {
   listCreditTransactions,
   findDuplicateUsers,
   mergeUsers,
+  getVisionRevenue,
 } = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { getAllCredits, probeStripe, buildRevenueSplit } = require('../services/aiCredits');
@@ -82,6 +83,26 @@ router.get('/business', async (req, res) => {
   } catch (err) {
     console.error('[admin/business] Error:', err && err.message);
     res.status(500).json({ error: 'Failed to load business metrics' });
+  }
+});
+
+/**
+ * GET /api/admin/vision-revenue
+ * Vision markup revenue — shows how much the 30% markup has earned.
+ * Query: ?days=30 (default)
+ */
+router.get('/vision-revenue', async (req, res) => {
+  try {
+    const days = Math.min(365, Math.max(1, Number(req.query.days) || 30));
+    const revenue = await getVisionRevenue(days);
+    res.json({
+      ...revenue,
+      markupPercent: 30,
+      ts: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error('[admin/vision-revenue] Error:', err && err.message);
+    res.status(500).json({ error: 'Failed to load vision revenue' });
   }
 });
 
