@@ -1118,12 +1118,12 @@ const openaiTokenHandler = async (req, res) => {
         instructions: systemPrompt,
         input_audio_format:  'pcm16',
         output_audio_format: 'pcm16',
-        input_audio_transcription: { model: 'gpt-4o-mini-transcribe' },
+        input_audio_transcription: { model: 'gpt-4o-transcribe' },
         turn_detection: {
           type: 'server_vad',
-          threshold: 0.5,
-          prefix_padding_ms: 300,
-          silence_duration_ms: 500,
+          threshold: 0.45,
+          prefix_padding_ms: 500,
+          silence_duration_ms: 800,
         },
         tools: buildKelionToolsChatCompletions().map(t => ({
           type: 'function',
