@@ -402,8 +402,28 @@ async function toolWebSearch({ query, limit }) {
   if (!q) return { ok: false, error: 'missing query' };
   const n = Math.max(1, Math.min(10, Number.parseInt(limit, 10) || 5));
 
-  // Tavily preferred when a key is present — AI-optimized search with
-  // summarization + URLs. Falls through to Serper, then DuckDuckGo.
+  // Priority 0: Google Custom Search API (requires GOOGLE_API_KEY + GOOGLE_CSE_ID)
+  const googleSearchKey = process.env.GOOGLE_API_KEY;
+  const googleCseId = process.env.GOOGLE_CSE_ID;
+  if (googleSearchKey && googleCseId) {
+    try {
+      const url = `https://www.googleapis.com/customsearch/v1?key=${googleSearchKey}&cx=${googleCseId}&q=${encodeURIComponent(q)}&num=${n}`;
+      const r = await fetchWithTimeout(url);
+      if (r.ok) {
+        const data = await r.json();
+        const items = Array.isArray(data.items) ? data.items.slice(0, n) : [];
+        return {
+          ok: true,
+          query: q,
+          results: items.map((o) => ({ title: o.title, url: o.link, snippet: o.snippet })),
+          totalResults: data.searchInformation?.totalResults || null,
+          source: 'google-custom-search',
+        };
+      }
+    } catch (_) { /* fall through to Tavily */ }
+  }
+
+  // Priority 1: Tavily — AI-optimized search with summarization + URLs.
   const tavilyKey = process.env.TAVILY_API_KEY;
   if (tavilyKey) {
     try {
@@ -967,10 +987,45 @@ async function toolGetRoute({ from, to, mode, profile: profileArg }) {
   const a = await resolveCoord(from);
   const b = await resolveCoord(to);
   if (!a || !b) return { ok: false, error: `could not resolve ${a ? 'destination' : 'origin'}` };
-  // Accept both `mode` and `profile` — catalog uses `profile`.
-  const profile = { driving: 'driving', car: 'driving', walking: 'foot', walk: 'foot', cycling: 'bike', bike: 'bike' }[
-    (mode || profileArg || 'driving').toString().toLowerCase()
-  ] || 'driving';
+  const rawMode = (mode || profileArg || 'driving').toString().toLowerCase();
+
+  // Priority 1: Google Directions API (real-time traffic, transit, accurate)
+  const googleKey = process.env.GOOGLE_API_KEY;
+  if (googleKey) {
+    const googleMode = { driving: 'driving', car: 'driving', walking: 'walking', walk: 'walking', cycling: 'bicycling', bike: 'bicycling', transit: 'transit' }[rawMode] || 'driving';
+    try {
+      const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${a.latitude},${a.longitude}&destination=${b.latitude},${b.longitude}&mode=${googleMode}&language=ro&key=${googleKey}`;
+      const r = await fetchWithTimeout(url);
+      if (r.ok) {
+        const data = await r.json();
+        if (data.status === 'OK' && data.routes && data.routes[0]) {
+          const route = data.routes[0];
+          const leg = route.legs[0];
+          const steps = (leg.steps || []).slice(0, 10).map(s => ({
+            instruction: (s.html_instructions || '').replace(/<[^>]+>/g, ''),
+            distance: s.distance?.text,
+            duration: s.duration?.text,
+          }));
+          return {
+            ok: true,
+            from: { ...a, address: leg.start_address },
+            to: { ...b, address: leg.end_address },
+            mode: googleMode,
+            distance_km: +(leg.distance.value / 1000).toFixed(2),
+            distance_text: leg.distance.text,
+            duration_min: +(leg.duration.value / 60).toFixed(1),
+            duration_text: leg.duration.text,
+            duration_in_traffic: leg.duration_in_traffic?.text || null,
+            steps,
+            source: 'google-directions',
+          };
+        }
+      }
+    } catch (_) { /* fall through to OSRM */ }
+  }
+
+  // Fallback: OSRM (free, no key needed)
+  const profile = { driving: 'driving', car: 'driving', walking: 'foot', walk: 'foot', cycling: 'bike', bike: 'bike' }[rawMode] || 'driving';
   try {
     const url = `https://router.project-osrm.org/route/v1/${profile}/${a.longitude},${a.latitude};${b.longitude},${b.latitude}?overview=false&alternatives=false&steps=false`;
     const r = await fetchWithTimeout(url);
