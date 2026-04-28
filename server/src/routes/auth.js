@@ -399,4 +399,29 @@ router.put('/me/language', requireAuth, async (req, res) => {
   }
 });
 
+/**
+ * GET /auth/google/mcp-callback
+ * OAuth callback for MCP (Calendar/Gmail/Drive) integration.
+ * Exchanges code for tokens, stores per-user, redirects back.
+ */
+router.get('/google/mcp-callback', async (req, res) => {
+  try {
+    const { code, state } = req.query;
+    if (!code || !state) {
+      return res.redirect(`${config.appBaseUrl}?mcp_error=missing_code`);
+    }
+    const userId = parseInt(state, 10);
+    if (!Number.isFinite(userId)) {
+      return res.redirect(`${config.appBaseUrl}?mcp_error=invalid_state`);
+    }
+    const googleMcp = require('../services/googleMcp');
+    await googleMcp.exchangeCode(code, userId);
+    console.log(`[mcp] Google connected for user ${userId}`);
+    return res.redirect(`${config.appBaseUrl}?mcp_connected=true`);
+  } catch (err) {
+    console.error('[mcp] OAuth callback error:', err.message);
+    return res.redirect(`${config.appBaseUrl}?mcp_error=${encodeURIComponent(err.message)}`);
+  }
+});
+
 module.exports = router;

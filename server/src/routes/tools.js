@@ -106,12 +106,12 @@ router.post('/browser/browse', async (req, res) => {
   }
 
   const maxSteps = Math.min(Number(process.env.BROWSER_USE_MAX_STEPS) || 25, 50);
-  const base = process.env.BROWSER_USE_API_BASE || 'https://api.cloud.browser-use.com';
+  const base = process.env.BROWSER_USE_API_BASE || 'https://api.browser-use.com';
   try {
     // Kick off the task
-    const createResp = await fetch(`${base}/api/v1/run-task`, {
+    const createResp = await fetch(`${base}/api/v3/run-task`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      headers: { 'X-Browser-Use-API-Key': apiKey, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         task: start_url ? `${task}\n\nStart at: ${start_url}` : task,
         max_steps: maxSteps,
@@ -135,8 +135,8 @@ router.post('/browser/browse', async (req, res) => {
     let result = null;
     while (Date.now() < deadline) {
       await new Promise((r) => setTimeout(r, 2_000));
-      const st = await fetch(`${base}/api/v1/task/${taskId}/status`, {
-        headers: { Authorization: `Bearer ${apiKey}` },
+      const st = await fetch(`${base}/api/v3/task/${taskId}/status`, {
+        headers: { 'X-Browser-Use-API-Key': apiKey },
       });
       if (!st.ok) continue;
       const j = await st.json();
@@ -163,46 +163,78 @@ router.post('/browser/browse', async (req, res) => {
   }
 });
 
-// ─── MCP skeleton (M21) ───────────────────────────────────────────
-// These are STUBS for now. When the user connects a calendar/email/files
-// provider (Google, Microsoft, Apple) via MCP, the integration module writes
-// a per-user MCP client config in the DB and these endpoints route through it.
-// Until then, we return "not connected" so Kelion tells the user the truth.
-function mcpUnavailable(kind) {
-  return {
-    ok: false,
-    unavailable: true,
-    error: `I can see ${kind} once you connect it. Ask Adrian to enable MCP integrations and you'll get a prompt to link your account.`,
-  };
-}
+// ─── MCP — Google Calendar / Gmail / Drive ─────────────────────────
+// Uses per-user OAuth tokens stored in DB. When a user hasn't connected
+// Google yet, we return a connect URL they can visit.
+const googleMcp = require('../services/googleMcp');
 
 router.post('/mcp/calendar', async (req, res) => {
   const user = await peekUser(req);
   if (!user) {
-    return res.status(200).json({ ok: false, error: "I can only read your calendar when you're signed in with a passkey." });
+    return res.status(200).json({ ok: false, error: "I can only read your calendar when you're signed in." });
   }
-  // TODO(Stage 4+): look up user's MCP config and forward to the
-  // calendar MCP server. For now, skeleton.
-  if (!process.env.MCP_ENABLED) return res.status(200).json(mcpUnavailable('your calendar'));
-  return res.status(200).json({ ok: false, error: 'MCP calendar not configured yet.' });
+  if (!process.env.MCP_ENABLED) return res.status(200).json({ ok: false, unavailable: true, error: 'MCP integrations are not enabled on this server.' });
+  
+  const connected = await googleMcp.hasGoogleConnection(user.id);
+  if (!connected) {
+    const url = googleMcp.getConnectUrl(user.id);
+    return res.status(200).json({ ok: false, error: `Your Google account is not connected yet. Visit this link to connect: ${url}`, connectUrl: url });
+  }
+  
+  try {
+    const { maxResults, timeMin, timeMax } = req.body || {};
+    const result = await googleMcp.listCalendarEvents(user.id, { maxResults, timeMin, timeMax });
+    return res.status(200).json(result);
+  } catch (err) {
+    console.error('[mcp/calendar]', err.message);
+    return res.status(200).json({ ok: false, error: 'Failed to fetch calendar events.' });
+  }
 });
 
 router.post('/mcp/email', async (req, res) => {
   const user = await peekUser(req);
   if (!user) {
-    return res.status(200).json({ ok: false, error: "I can only read your email when you're signed in with a passkey." });
+    return res.status(200).json({ ok: false, error: "I can only read your email when you're signed in." });
   }
-  if (!process.env.MCP_ENABLED) return res.status(200).json(mcpUnavailable('your email'));
-  return res.status(200).json({ ok: false, error: 'MCP email not configured yet.' });
+  if (!process.env.MCP_ENABLED) return res.status(200).json({ ok: false, unavailable: true, error: 'MCP integrations are not enabled on this server.' });
+  
+  const connected = await googleMcp.hasGoogleConnection(user.id);
+  if (!connected) {
+    const url = googleMcp.getConnectUrl(user.id);
+    return res.status(200).json({ ok: false, error: `Your Google account is not connected yet. Visit this link to connect: ${url}`, connectUrl: url });
+  }
+  
+  try {
+    const { maxResults, query } = req.body || {};
+    const result = await googleMcp.listEmails(user.id, { maxResults, query });
+    return res.status(200).json(result);
+  } catch (err) {
+    console.error('[mcp/email]', err.message);
+    return res.status(200).json({ ok: false, error: 'Failed to fetch emails.' });
+  }
 });
 
 router.post('/mcp/files', async (req, res) => {
   const user = await peekUser(req);
   if (!user) {
-    return res.status(200).json({ ok: false, error: "I can only search your files when you're signed in with a passkey." });
+    return res.status(200).json({ ok: false, error: "I can only search your files when you're signed in." });
   }
-  if (!process.env.MCP_ENABLED) return res.status(200).json(mcpUnavailable('your files'));
-  return res.status(200).json({ ok: false, error: 'MCP files not configured yet.' });
+  if (!process.env.MCP_ENABLED) return res.status(200).json({ ok: false, unavailable: true, error: 'MCP integrations are not enabled on this server.' });
+  
+  const connected = await googleMcp.hasGoogleConnection(user.id);
+  if (!connected) {
+    const url = googleMcp.getConnectUrl(user.id);
+    return res.status(200).json({ ok: false, error: `Your Google account is not connected yet. Visit this link to connect: ${url}`, connectUrl: url });
+  }
+  
+  try {
+    const { maxResults, query } = req.body || {};
+    const result = await googleMcp.listDriveFiles(user.id, { maxResults, query });
+    return res.status(200).json(result);
+  } catch (err) {
+    console.error('[mcp/files]', err.message);
+    return res.status(200).json({ ok: false, error: 'Failed to fetch files.' });
+  }
 });
 
 // ─── Real-tool proxy (shared server-side executor) ────────────────
