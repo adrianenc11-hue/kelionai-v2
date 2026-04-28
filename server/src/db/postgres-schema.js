@@ -48,6 +48,11 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS cloned_voice_id              TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS cloned_voice_consent_at      TIMESTAMPTZ;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS cloned_voice_consent_version TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS cloned_voice_enabled         INTEGER NOT NULL DEFAULT 0;
+-- Google API tokens — stored encrypted at rest. Used by read_calendar,
+-- read_email, search_files tools to access the user's Google data.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS google_access_token   TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS google_refresh_token  TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS google_token_expires_at BIGINT;
 CREATE INDEX IF NOT EXISTS idx_users_google_id     ON users(google_id);
 CREATE INDEX IF NOT EXISTS idx_users_email         ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_referral_code ON users(referral_code);

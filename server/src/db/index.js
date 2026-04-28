@@ -1147,6 +1147,37 @@ async function upsertUser(data) {
   return await createUser(data);
 }
 
+// Save Google OAuth tokens (access_token, refresh_token) for Calendar/Gmail/Drive.
+async function saveGoogleTokens(userId, { access_token, refresh_token, expires_in }) {
+  const expiresAt = expires_in ? Date.now() + (expires_in * 1000) : null;
+  const sets = ['google_access_token = ?'];
+  const vals = [access_token];
+  if (refresh_token) {
+    sets.push('google_refresh_token = ?');
+    vals.push(refresh_token);
+  }
+  if (expiresAt) {
+    sets.push('google_token_expires_at = ?');
+    vals.push(expiresAt);
+  }
+  vals.push(userId);
+  await db.run(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`, vals);
+}
+
+// Retrieve stored Google tokens for a user.
+async function getGoogleTokens(userId) {
+  const row = await db.get(
+    'SELECT google_access_token, google_refresh_token, google_token_expires_at FROM users WHERE id = ?',
+    [userId]
+  );
+  if (!row || !row.google_access_token) return null;
+  return {
+    access_token: row.google_access_token,
+    refresh_token: row.google_refresh_token,
+    expires_at: row.google_token_expires_at ? Number(row.google_token_expires_at) : null,
+  };
+}
+
 async function incrementUsage(userId, minutes = 1) {
   const today = new Date().toDateString();
   const user = await getUserById(userId);
@@ -2024,6 +2055,8 @@ module.exports = {
   createUser,
   updateUser,
   upsertUser,
+  saveGoogleTokens,
+  getGoogleTokens,
   incrementUsage,
   getAllUsers,
   deleteUser,

@@ -12,6 +12,7 @@ const {
   sanitizeUser,
   setPreferredLanguage,
   getPreferredLanguage,
+  saveGoogleTokens,
 } = require('../db');
 const { signAppToken, requireAuth } = require('../middleware/auth');
 const google = require('../utils/google');
@@ -113,6 +114,8 @@ router.get('/google/callback', async (req, res) => {
       name: googleUser.name,
       picture: googleUser.picture,
     });
+    // Save Google API tokens so read_calendar, read_email, search_files work
+    await saveGoogleTokens(user.id, tokens);
     await seedPreferredLanguageOnLogin(user, req);
 
     if (mode === 'mobile') {

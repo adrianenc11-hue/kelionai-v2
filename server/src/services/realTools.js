@@ -2531,6 +2531,10 @@ async function executeRealTool(name, args, ctx) {
     case 'get_action_history': return toolGetActionHistory(a, ctx);
     // ── Silent vision auto-learn — write durable observations ──
     case 'learn_from_observation': return toolLearnFromObservation(a, ctx);
+    // ── Google Account tools (Calendar, Gmail, Drive) ──
+    case 'read_calendar':     return toolReadCalendar(a, ctx);
+    case 'read_email':        return toolReadEmail(a, ctx);
+    case 'search_files':      return toolSearchFiles(a, ctx);
     default:                  return null; // signal "not handled here"
   }
 }
@@ -2643,7 +2647,162 @@ const REAL_TOOL_NAMES = [
   // Kelion can check "did I already email that?" before re-running.
   // Returns `{ ok:false, signed_in:false }` for guests.
   'get_action_history',
+  // Google Account — read Calendar, Gmail, Drive via stored OAuth tokens
+  'read_calendar', 'read_email', 'search_files',
 ];
+
+
+// ──────────────────────────────────────────────────────────────────
+// Google Account tools — use stored OAuth tokens from the user's
+// Google sign-in to access Calendar, Gmail, Drive. Token refresh
+// is automatic if the access_token has expired.
+
+async function getValidGoogleToken(userId) {
+  const db = require('../db');
+  const config = require('../config');
+  const tokens = await db.getGoogleTokens(userId);
+  if (!tokens) return null;
+  // If token hasn't expired yet, return it
+  if (tokens.expires_at && tokens.expires_at > Date.now() + 60000) {
+    return tokens.access_token;
+  }
+  // Refresh using refresh_token
+  if (!tokens.refresh_token) return null;
+  try {
+    const r = await fetchWithTimeout('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: config.google?.clientId || process.env.GOOGLE_CLIENT_ID || '',
+        client_secret: config.google?.clientSecret || process.env.GOOGLE_CLIENT_SECRET || '',
+        refresh_token: tokens.refresh_token,
+        grant_type: 'refresh_token',
+      }).toString(),
+    });
+    if (!r.ok) return tokens.access_token; // try with old token
+    const data = await r.json();
+    await db.saveGoogleTokens(userId, {
+      access_token: data.access_token,
+      refresh_token: tokens.refresh_token, // Google doesn't always return a new one
+      expires_in: data.expires_in,
+    });
+    return data.access_token;
+  } catch {
+    return tokens.access_token; // fallback to existing
+  }
+}
+
+// read_calendar — Google Calendar API (readonly)
+async function toolReadCalendar({ days, max_results }, ctx) {
+  const userId = ctx?.userId;
+  if (!userId) return { ok: false, error: 'Sign in with Google to access your calendar.' };
+  const token = await getValidGoogleToken(userId);
+  if (!token) return { ok: false, error: 'Google Calendar access not granted. Please sign out and sign in again with Google.' };
+  const n = Math.max(1, Math.min(20, Number.parseInt(max_results, 10) || 10));
+  const d = Math.max(1, Math.min(30, Number.parseInt(days, 10) || 7));
+  const now = new Date();
+  const timeMin = now.toISOString();
+  const timeMax = new Date(now.getTime() + d * 86400000).toISOString();
+  try {
+    const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}&maxResults=${n}&singleEvents=true&orderBy=startTime`;
+    const r = await fetchWithTimeout(url, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (r.status === 401 || r.status === 403) {
+      return { ok: false, error: 'Calendar access expired. Please sign out and sign in again with Google.' };
+    }
+    if (!r.ok) return { ok: false, error: `Calendar API error ${r.status}` };
+    const data = await r.json();
+    const events = (data.items || []).map(e => ({
+      title: e.summary || '(no title)',
+      start: e.start?.dateTime || e.start?.date || null,
+      end: e.end?.dateTime || e.end?.date || null,
+      location: e.location || null,
+      description: e.description ? e.description.slice(0, 200) : null,
+      status: e.status,
+    }));
+    return { ok: true, events, count: events.length, period_days: d, source: 'google-calendar' };
+  } catch (err) {
+    return { ok: false, error: err?.message || String(err) };
+  }
+}
+
+// read_email — Gmail API (readonly)
+async function toolReadEmail({ query, max_results }, ctx) {
+  const userId = ctx?.userId;
+  if (!userId) return { ok: false, error: 'Sign in with Google to access your email.' };
+  const token = await getValidGoogleToken(userId);
+  if (!token) return { ok: false, error: 'Gmail access not granted. Please sign out and sign in again with Google.' };
+  const n = Math.max(1, Math.min(10, Number.parseInt(max_results, 10) || 5));
+  const q = (query || 'is:unread').toString().trim();
+  try {
+    // 1. List message IDs
+    const listUrl = `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(q)}&maxResults=${n}`;
+    const listR = await fetchWithTimeout(listUrl, { headers: { Authorization: `Bearer ${token}` } });
+    if (listR.status === 401 || listR.status === 403) {
+      return { ok: false, error: 'Gmail access expired. Please sign out and sign in again.' };
+    }
+    if (!listR.ok) return { ok: false, error: `Gmail API error ${listR.status}` };
+    const listData = await listR.json();
+    const ids = (listData.messages || []).slice(0, n).map(m => m.id);
+    if (ids.length === 0) return { ok: true, emails: [], count: 0, query: q, source: 'gmail' };
+    // 2. Fetch each message metadata
+    const emails = [];
+    for (const id of ids) {
+      try {
+        const msgR = await fetchWithTimeout(
+          `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (!msgR.ok) continue;
+        const msg = await msgR.json();
+        const headers = msg.payload?.headers || [];
+        const getH = (name) => headers.find(h => h.name.toLowerCase() === name.toLowerCase())?.value || null;
+        emails.push({
+          id: msg.id,
+          from: getH('From'),
+          subject: getH('Subject'),
+          date: getH('Date'),
+          snippet: msg.snippet || null,
+          labels: msg.labelIds || [],
+        });
+      } catch { /* skip individual message errors */ }
+    }
+    return { ok: true, emails, count: emails.length, query: q, source: 'gmail' };
+  } catch (err) {
+    return { ok: false, error: err?.message || String(err) };
+  }
+}
+
+// search_files — Google Drive API (readonly)
+async function toolSearchFiles({ query, max_results }, ctx) {
+  const userId = ctx?.userId;
+  if (!userId) return { ok: false, error: 'Sign in with Google to access your files.' };
+  const token = await getValidGoogleToken(userId);
+  if (!token) return { ok: false, error: 'Drive access not granted. Please sign out and sign in again with Google.' };
+  const n = Math.max(1, Math.min(20, Number.parseInt(max_results, 10) || 10));
+  const q = (query || '').toString().trim();
+  const driveQuery = q ? `name contains '${q.replace(/'/g, "\\'")}'` : 'trashed = false';
+  try {
+    const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(driveQuery)}&pageSize=${n}&fields=files(id,name,mimeType,size,modifiedTime,webViewLink)&orderBy=modifiedTime desc`;
+    const r = await fetchWithTimeout(url, { headers: { Authorization: `Bearer ${token}` } });
+    if (r.status === 401 || r.status === 403) {
+      return { ok: false, error: 'Drive access expired. Please sign out and sign in again.' };
+    }
+    if (!r.ok) return { ok: false, error: `Drive API error ${r.status}` };
+    const data = await r.json();
+    const files = (data.files || []).map(f => ({
+      name: f.name,
+      type: f.mimeType,
+      size: f.size ? Number(f.size) : null,
+      modified: f.modifiedTime || null,
+      url: f.webViewLink || null,
+    }));
+    return { ok: true, files, count: files.length, query: q || '(recent)', source: 'google-drive' };
+  } catch (err) {
+    return { ok: false, error: err?.message || String(err) };
+  }
+}
 
 module.exports = {
   executeRealTool,
