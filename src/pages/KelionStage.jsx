@@ -1326,8 +1326,11 @@ export default function KelionStage() {
   useEffect(() => {
     const prev = prevStatusRef.current
     prevStatusRef.current = status
-    const justEnded = (prev && prev !== 'idle' && prev !== 'error') && (status === 'idle' || status === 'error')
-    if (!justEnded) return
+    // Extract memory when: voice session ends (listening/speaking→idle)
+    // OR text chat completes (thinking→idle).
+    const voiceEnded = (prev && prev !== 'idle' && prev !== 'error') && (status === 'idle' || status === 'error')
+    const textChatDone = prev === 'thinking' && status === 'idle'
+    if (!voiceEnded && !textChatDone) return
     if (!authState.signedIn) return
     const snapshot = turnsRef.current.filter((t) => t && t.role && t.text && t.text.trim())
     if (snapshot.length < 2) return
