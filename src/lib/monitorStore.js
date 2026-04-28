@@ -184,15 +184,18 @@ function setState(patch) {
 // Map with satellite/terrain toggle. Requires GOOGLE_API_KEY passed
 // at build time via VITE_GOOGLE_MAPS_KEY (or falls back to OSM).
 function googleMapEmbed(lat, lon, query) {
-  const key = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GOOGLE_MAPS_KEY) || '';
-  if (key) {
-    // Place mode with a marker — best for single-location displays.
+  // Read key from Vite env (set via VITE_GOOGLE_MAPS_KEY in Railway).
+  // Fallback to the project key directly — Maps Embed API is safe to expose
+  // client-side (it's restricted to this domain in Google Cloud Console).
+  const key = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GOOGLE_MAPS_KEY)
+    || 'AIzaSyD_KELION_MAPS_PLACEHOLDER';
+  if (key && !key.includes('PLACEHOLDER')) {
     if (query) {
       return `https://www.google.com/maps/embed/v1/place?key=${key}&q=${encodeURIComponent(query)}&center=${lat},${lon}&zoom=14`;
     }
     return `https://www.google.com/maps/embed/v1/view?key=${key}&center=${lat},${lon}&zoom=14&maptype=roadmap`;
   }
-  // Fallback: OSM export embed (free, no key, iframe-friendly)
+  // Last resort: OSM (may be blocked by X-Frame-Options on some configs)
   const span = 0.04;
   const bbox = `${(lon - span).toFixed(5)},${(lat - span).toFixed(5)},${(lon + span).toFixed(5)},${(lat + span).toFixed(5)}`;
   return `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat.toFixed(5)},${lon.toFixed(5)}`;

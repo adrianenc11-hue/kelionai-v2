@@ -67,11 +67,13 @@ router.get('/search', async (req, res) => {
     return res.json(cached);
   }
   try {
+    // Step 1: search — get up to 5 candidates (videoEmbeddable=true is a hint,
+    // not a guarantee — some channels disable embedding post-indexing).
     const url = new URL('https://www.googleapis.com/youtube/v3/search');
     url.searchParams.set('part', 'snippet');
     url.searchParams.set('type', 'video');
     url.searchParams.set('videoEmbeddable', 'true');
-    url.searchParams.set('maxResults', '1');
+    url.searchParams.set('maxResults', '5'); // fetch 5, verify each
     url.searchParams.set('q', q);
     url.searchParams.set('key', apiKey);
 
@@ -89,17 +91,53 @@ router.get('/search', async (req, res) => {
       return res.status(502).json({ error: 'YouTube upstream error', status: r.status });
     }
     const data = await r.json();
-    const item = Array.isArray(data.items) ? data.items[0] : null;
-    if (!item || !item.id || !item.id.videoId) {
+    const items = Array.isArray(data.items) ? data.items : [];
+    if (!items.length) {
       return res.status(204).end();
     }
+
+    // Step 2: verify embeddability via videos.list?part=status for all candidates
+    const ids = items.map(i => i.id?.videoId).filter(Boolean);
+    let verifiedId = null;
+    let verifiedItem = null;
+    if (ids.length > 0) {
+      try {
+        const vUrl = new URL('https://www.googleapis.com/youtube/v3/videos');
+        vUrl.searchParams.set('part', 'status');
+        vUrl.searchParams.set('id', ids.join(','));
+        vUrl.searchParams.set('key', apiKey);
+        const vr = await fetch(vUrl.toString());
+        if (vr.ok) {
+          const vdata = await vr.json();
+          // Find the first video that is actually embeddable
+          for (const vitem of (vdata.items || [])) {
+            if (vitem.status?.embeddable === true) {
+              verifiedId = vitem.id;
+              // Match back to snippet
+              verifiedItem = items.find(i => i.id?.videoId === verifiedId);
+              break;
+            }
+          }
+        }
+      } catch (verifyErr) {
+        console.warn('[youtube/search] status verify failed, using first result:', verifyErr.message);
+      }
+    }
+
+    // Fallback: use first candidate if none passed verification
+    const chosenItem = verifiedItem || items[0];
+    const chosenId = verifiedId || chosenItem?.id?.videoId;
+    if (!chosenId) {
+      return res.status(204).end();
+    }
+
     const payload = {
-      videoId: item.id.videoId,
-      title: item.snippet?.title || '',
-      channelTitle: item.snippet?.channelTitle || '',
+      videoId: chosenId,
+      title: chosenItem.snippet?.title || '',
+      channelTitle: chosenItem.snippet?.channelTitle || '',
       thumbnail:
-        item.snippet?.thumbnails?.medium?.url ||
-        item.snippet?.thumbnails?.default?.url ||
+        chosenItem.snippet?.thumbnails?.medium?.url ||
+        chosenItem.snippet?.thumbnails?.default?.url ||
         '',
     };
     cachePut(cacheKey, payload);

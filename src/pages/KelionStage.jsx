@@ -1838,7 +1838,7 @@ export default function KelionStage() {
             }
           }}
           placeholder="Type to Kelion…"
-          disabled={status === 'thinking' || status === 'idle' || status === 'error'}
+          disabled={status === 'thinking'}
           autoComplete="off"
           autoCorrect="on"
           spellCheck={true}
@@ -1859,7 +1859,7 @@ export default function KelionStage() {
         />
         <button
           type="submit"
-          disabled={status === 'thinking' || status === 'idle' || status === 'error' || (chatInput.trim().length === 0 && !attachedFile)}
+          disabled={status === 'thinking' || (chatInput.trim().length === 0 && !attachedFile)}
           style={{
             width: 40, height: 40, borderRadius: '50%',
             background: (chatInput.trim().length === 0 && !attachedFile)
