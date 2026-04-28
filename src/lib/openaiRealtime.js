@@ -474,11 +474,13 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
               start(opts).catch(() => {})
             }, delay)
           } else {
-            // Give up after MAX_RECONNECT attempts
+            // All retries exhausted — wait for browser 'online' event to
+            // auto-reconnect (signal detector pattern). Setting status to
+            // 'offline' ensures the handleOnline listener will call start().
             sessionActiveRef.current = false
-            setStatus('idle')
-            statusRef.current = 'idle'
-            setError('Connection lost. Please check your internet and try again.')
+            setStatus('offline')
+            statusRef.current = 'offline'
+            setError('Connection lost. Will reconnect automatically when signal returns.')
           }
         }
         if (state === 'closed') {
