@@ -1125,7 +1125,7 @@ const openaiTokenHandler = async (req, res) => {
         instructions: systemPrompt,
         input_audio_format:  'pcm16',
         output_audio_format: 'pcm16',
-        input_audio_transcription: { model: 'gpt-4o-transcribe' },
+        input_audio_transcription: { model: 'gpt-4o-transcribe', language: forcedLang.slice(0, 2) },
         turn_detection: {
           type: 'server_vad',
           threshold: 0.45,
