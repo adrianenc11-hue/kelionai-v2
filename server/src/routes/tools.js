@@ -108,15 +108,12 @@ router.post('/browser/browse', async (req, res) => {
   const maxSteps = Math.min(Number(process.env.BROWSER_USE_MAX_STEPS) || 25, 50);
   const base = process.env.BROWSER_USE_API_BASE || 'https://api.browser-use.com';
   try {
-    // Kick off the task
-    const createResp = await fetch(`${base}/api/v3/run-task`, {
+    // Create a session (v3 API)
+    const createResp = await fetch(`${base}/api/v3/sessions`, {
       method: 'POST',
       headers: { 'X-Browser-Use-API-Key': apiKey, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         task: start_url ? `${task}\n\nStart at: ${start_url}` : task,
-        max_steps: maxSteps,
-        use_adblock: true,
-        use_proxy: false,
       }),
     });
     if (!createResp.ok) {
@@ -124,9 +121,10 @@ router.post('/browser/browse', async (req, res) => {
       console.error('[tools/browse] create failed', createResp.status, txt);
       return res.status(502).json({ ok: false, error: 'The web-browsing agent is not reachable right now.' });
     }
-    const { id: taskId } = await createResp.json();
-    if (!taskId) {
-      return res.status(502).json({ ok: false, error: 'Web-browsing agent returned no task id.' });
+    const session = await createResp.json();
+    const sessionId = session.id;
+    if (!sessionId) {
+      return res.status(502).json({ ok: false, error: 'Web-browsing agent returned no session id.' });
     }
 
     // Poll until completion or timeout (~90s)
@@ -134,13 +132,13 @@ router.post('/browser/browse', async (req, res) => {
     let finalStatus = null;
     let result = null;
     while (Date.now() < deadline) {
-      await new Promise((r) => setTimeout(r, 2_000));
-      const st = await fetch(`${base}/api/v3/task/${taskId}/status`, {
+      await new Promise((r) => setTimeout(r, 3_000));
+      const st = await fetch(`${base}/api/v3/sessions/${sessionId}`, {
         headers: { 'X-Browser-Use-API-Key': apiKey },
       });
       if (!st.ok) continue;
       const j = await st.json();
-      if (['finished', 'failed', 'stopped'].includes(j.status)) {
+      if (['completed', 'finished', 'failed', 'stopped', 'error'].includes(j.status)) {
         finalStatus = j.status;
         result = j;
         break;
@@ -149,13 +147,13 @@ router.post('/browser/browse', async (req, res) => {
     if (!finalStatus) {
       return res.status(200).json({ ok: false, error: 'The web task took too long, I gave up waiting.' });
     }
-    if (finalStatus !== 'finished') {
-      return res.status(200).json({ ok: false, error: `Task ${finalStatus}: ${result?.last_message || 'no details'}.` });
+    if (finalStatus === 'failed' || finalStatus === 'error' || finalStatus === 'stopped') {
+      return res.status(200).json({ ok: false, error: `Task ${finalStatus}: ${result?.lastStepSummary || result?.output || 'no details'}.` });
     }
     return res.json({
       ok: true,
-      result: String(result?.output || result?.last_message || 'Done, but the agent returned no summary.').slice(0, 4000),
-      live_url: result?.live_url || null,
+      result: String(result?.output || result?.lastStepSummary || 'Done, but the agent returned no summary.').slice(0, 4000),
+      live_url: result?.liveUrl || null,
     });
   } catch (err) {
     console.error('[tools/browse] error', err.message);
