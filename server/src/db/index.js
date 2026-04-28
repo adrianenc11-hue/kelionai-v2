@@ -681,7 +681,8 @@ async function getClonedVoice(userId) {
     `SELECT cloned_voice_id           AS voiceId,
             cloned_voice_consent_at   AS consentAt,
             cloned_voice_consent_version AS consentVersion,
-            cloned_voice_enabled      AS enabled
+            cloned_voice_enabled      AS enabled,
+            name                      AS displayName
        FROM users WHERE id = ?`,
     [userId]
   );
@@ -691,6 +692,7 @@ async function getClonedVoice(userId) {
     consentAt: row.consentAt || null,
     consentVersion: row.consentVersion || null,
     enabled: Boolean(row.enabled) && Boolean(row.voiceId),
+    displayName: row.displayName || null,
   };
 }
 

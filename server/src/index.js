@@ -318,7 +318,7 @@ app.get('/api/push/public-key', (_req, res) => {
   res.json({ publicKey: pushRouter.getVapidPublicKey() });
 });
 app.use('/api/push', requireAuth, pushRouter);
-app.use('/api/voice/clone', requireAuth, voiceCloneRouter);
+app.use('/api/voice/clone', requireAuth, chatLimiter, voiceCloneRouter);
 
 if (process.env.NODE_ENV !== 'test' && process.env.PROACTIVE_DISABLED !== '1') {
   try { proactive.start(require('./routes/push').getWebPush()); }
