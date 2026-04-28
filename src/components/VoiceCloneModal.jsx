@@ -24,7 +24,10 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { getCsrfToken } from '../lib/api'
 import ALL_PASSAGES from './voiceClonePassages'
 
-const CONSENT_VERSION = '2026-04-27.v2'
+// P2 fix — CONSENT_VERSION is no longer hardcoded here. It's read from
+// the GET /api/voice/clone response (server is the single source of truth).
+// This fallback is only used if the server response is missing the field.
+const CONSENT_VERSION_FALLBACK = '2026-04-27.v2'
 const MIN_SECONDS = 30
 const TARGET_SECONDS = 60
 const MAX_SECONDS = 180
@@ -317,6 +320,8 @@ export default function VoiceCloneModal({ open, onClose, userEmail, userName }) 
   const [existing, setExisting] = useState(null)
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
+  // P2 fix — consent version read from the server, not hardcoded
+  const [serverConsentVersion, setServerConsentVersion] = useState(CONSENT_VERSION_FALLBACK)
 
   // Consent panel state
   const [agree1, setAgree1] = useState(false)
@@ -370,6 +375,8 @@ export default function VoiceCloneModal({ open, onClose, userEmail, userName }) 
           return
         }
         const voice = (j && j.voice) || null
+        // P2 fix — pick up the server's authoritative consent version
+        if (j && j.consentVersion) setServerConsentVersion(j.consentVersion)
         setExisting(voice && voice.voiceId ? voice : null)
         setStep(voice && voice.voiceId ? 'manage' : 'consent')
       })
@@ -509,8 +516,12 @@ export default function VoiceCloneModal({ open, onClose, userEmail, userName }) 
           audioBase64,
           mimeType: sampleBlob.type || 'audio/webm',
           consent: true,
-          consentVersion: CONSENT_VERSION,
+          // P2 fix — use server-sourced consent version (single source of truth)
+          consentVersion: serverConsentVersion,
           displayName: userName ? `Kelion — ${userName}` : undefined,
+          // P3 fix — send the digital signature so the server can
+          // persist it in the audit trail as proof of consent identity.
+          signature: signature.trim(),
         }),
       })
       const j = await r.json().catch(() => ({}))
@@ -525,7 +536,7 @@ export default function VoiceCloneModal({ open, onClose, userEmail, userName }) 
     } finally {
       setBusy(false)
     }
-  }, [sampleBlob, elapsed, userName, resetRecording])
+  }, [sampleBlob, elapsed, userName, signature, serverConsentVersion, resetRecording])
 
   const toggleEnabled = useCallback(async (next) => {
     setBusy(true); setError(null)
@@ -663,7 +674,7 @@ export default function VoiceCloneModal({ open, onClose, userEmail, userName }) 
               />
               {userEmail && (
                 <div style={{ fontSize: 11, opacity: 0.6, marginTop: 4 }}>
-                  {t('signedAs', userEmail, CONSENT_VERSION)}
+                  {t('signedAs', userEmail, serverConsentVersion)}
                 </div>
               )}
             </div>

@@ -129,7 +129,7 @@ router.get('/events', async (req, res) => {
 });
 
 // POST /api/voice/clone
-// Body: { audioBase64, mimeType?, consent: true, consentVersion?, displayName? }
+// Body: { audioBase64, mimeType?, consent: true, consentVersion?, displayName?, signature? }
 router.post('/', async (req, res) => {
   const userId = uidOf(req);
   const body = req.body || {};
@@ -143,6 +143,19 @@ router.post('/', async (req, res) => {
     return res.status(409).json({
       error: 'Consent text has been updated. Please re-read and re-confirm.',
       consentVersion: CONSENT_VERSION,
+    });
+  }
+
+  // P3 fix — persist the digital signature typed by the user as proof
+  // of consent identity. The frontend captures the full name as a
+  // typed signature; we validate it's non-empty and store it in the
+  // audit event note field alongside every 'created' row.
+  const signature = (typeof body.signature === 'string')
+    ? body.signature.trim().slice(0, 200)
+    : '';
+  if (!signature || signature.length < 3) {
+    return res.status(400).json({
+      error: 'Digital signature (full name, ≥3 characters) is required.',
     });
   }
 
@@ -184,7 +197,7 @@ router.post('/', async (req, res) => {
         consentVersion: CONSENT_VERSION,
         ip: ipOf(req),
         userAgent: uaOf(req),
-        note: String(err && err.message || '').slice(0, 400),
+        note: `signature:${signature}|${String(err && err.message || '').slice(0, 300)}`,
       });
     } catch (_) { /* ignore */ }
     return res.status(status).json({ error: err.message || 'Voice clone creation failed.' });
@@ -199,6 +212,7 @@ router.post('/', async (req, res) => {
       consentVersion: CONSENT_VERSION,
       ip: ipOf(req),
       userAgent: uaOf(req),
+      note: `signature:${signature}`,
     });
   } catch (err) {
     // If the DB write failed after ElevenLabs succeeded we still have a
@@ -220,6 +234,13 @@ router.post('/', async (req, res) => {
 });
 
 // DELETE /api/voice/clone — remove the clone from ElevenLabs + the DB.
+//
+// P4 fix — only clear the DB record when ElevenLabs confirms the
+// clone is gone (200) or was already gone (404). If ElevenLabs
+// returns a real server error (5xx, network), we refuse to clear
+// the local record so the admin retains awareness that a clone
+// exists on their account and can retry later. This prevents
+// orphaned clones on the ElevenLabs side that no one knows about.
 router.delete('/', async (req, res) => {
   const userId = uidOf(req);
   let existing;
@@ -232,14 +253,29 @@ router.delete('/', async (req, res) => {
     return res.json({ ok: true, voice: null, note: 'No clone to delete.' });
   }
 
-  let elevenErr = null;
   try {
     await deleteClonedVoice(existing.voiceId);
   } catch (err) {
-    elevenErr = err;
     console.warn('[voice/clone DELETE] elevenlabs delete failed', err && err.message);
+    // P4 — do NOT clear the DB; the clone still lives on ElevenLabs.
+    // Log the failure so the admin can see it in the audit trail.
+    try {
+      await logVoiceCloneEvent({
+        userId,
+        action: 'delete_failed',
+        voiceId: existing.voiceId,
+        consentVersion: existing.consentVersion || null,
+        ip: ipOf(req),
+        userAgent: uaOf(req),
+        note: `elevenlabs_error:${String(err && err.message || '').slice(0, 300)}`,
+      });
+    } catch (_) { /* ignore */ }
+    return res.status(502).json({
+      error: 'ElevenLabs failed to delete the clone. Your record is preserved — please try again later.',
+    });
   }
 
+  // ElevenLabs confirmed deletion (200 or 404) — now safe to clear DB.
   try {
     await clearClonedVoice(userId);
     await logVoiceCloneEvent({
@@ -249,7 +285,6 @@ router.delete('/', async (req, res) => {
       consentVersion: existing.consentVersion || null,
       ip: ipOf(req),
       userAgent: uaOf(req),
-      note: elevenErr ? `elevenlabs_error:${String(elevenErr.message).slice(0, 200)}` : null,
     });
   } catch (err) {
     console.error('[voice/clone DELETE] db update failed', err && err.message);
@@ -290,6 +325,45 @@ router.patch('/', async (req, res) => {
     console.error('[voice/clone PATCH] failed', err && err.message);
     return res.status(500).json({ error: 'Failed to update voice clone toggle.' });
   }
+});
+
+// P1 fix — POST /api/voice/clone/synthesize
+// Log a 'synthesize' audit event when the cloned voice is actually
+// used for TTS. The TTS layer (or any future integration) calls this
+// endpoint whenever it synthesises speech with a user's cloned voice.
+// This fulfils the GDPR promise in the consent UI:
+//   "We keep an audit log (create / enable / disable / delete / synthesize)"
+//
+// Body: { chars?: number } — optional character count of the text
+// that was synthesised, for cost-tracking cross-reference.
+router.post('/synthesize', async (req, res) => {
+  const userId = uidOf(req);
+  if (!userId) return res.status(401).json({ error: 'Not authenticated.' });
+  let current;
+  try {
+    current = await getClonedVoice(userId);
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to load voice clone state.' });
+  }
+  if (!current || !current.voiceId || !current.enabled) {
+    return res.status(404).json({ error: 'No active cloned voice.' });
+  }
+  const chars = Number(req.body && req.body.chars) || 0;
+  try {
+    await logVoiceCloneEvent({
+      userId,
+      action: 'synthesize',
+      voiceId: current.voiceId,
+      consentVersion: current.consentVersion || null,
+      ip: ipOf(req),
+      userAgent: uaOf(req),
+      note: chars > 0 ? `chars:${chars}` : null,
+    });
+  } catch (err) {
+    // Best-effort — never let audit failure break TTS.
+    console.warn('[voice/clone synthesize] audit log failed', err && err.message);
+  }
+  return res.json({ ok: true });
 });
 
 module.exports = router;

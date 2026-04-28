@@ -871,7 +871,39 @@ export default function KelionStage() {
   // fall back to localStorage. See src/lib/conversationStore.js.
   const [historyOpen, setHistoryOpen] = useState(false)
   const [voiceCloneOpen, setVoiceCloneOpen] = useState(false)
+  // Cloned voice state — fetched on mount + when VoiceCloneModal closes.
+  // Used to show a "Use my voice — <name>" toggle in the Voice Style menu.
+  const [clonedVoiceInfo, setClonedVoiceInfo] = useState(null)
   const [historyItems, setHistoryItems] = useState([])
+
+  // Fetch cloned voice state on mount + whenever the modal closes
+  const fetchClonedVoice = useCallback(async () => {
+    if (!authState.signedIn) { setClonedVoiceInfo(null); return }
+    try {
+      const r = await fetch('/api/voice/clone', { credentials: 'include' })
+      if (r.ok) {
+        const j = await r.json()
+        const v = j && j.voice
+        setClonedVoiceInfo(v && v.voiceId ? v : null)
+      }
+    } catch (_) { /* ignore */ }
+  }, [authState.signedIn])
+  useEffect(() => { fetchClonedVoice() }, [fetchClonedVoice])
+
+  const toggleClonedVoice = useCallback(async (enabled) => {
+    try {
+      const r = await fetch('/api/voice/clone', {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+        body: JSON.stringify({ enabled }),
+      })
+      if (r.ok) {
+        const j = await r.json()
+        setClonedVoiceInfo(j.voice || null)
+      }
+    } catch (_) { /* ignore */ }
+  }, [])
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyError, setHistoryError] = useState(null)
   // Track how many messages we've already persisted so the save-effect
@@ -2187,6 +2219,35 @@ export default function KelionStage() {
               </span>
             </MenuItem>
           ))}
+          {/* Cloned voice toggle — appears in the voice style section
+              when the user has a cloned voice. Shows the clone display
+              name and lets them enable/disable it inline without opening
+              the full VoiceCloneModal. */}
+          {clonedVoiceInfo && clonedVoiceInfo.voiceId && (
+            <MenuItem
+              onClick={() => {
+                toggleClonedVoice(!clonedVoiceInfo.enabled)
+                setMenuOpen(false)
+              }}
+            >
+              <span style={{
+                opacity: clonedVoiceInfo.enabled ? 1 : 0.65,
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}>
+                <span style={{
+                  width: 8, height: 8, borderRadius: '50%',
+                  background: clonedVoiceInfo.enabled
+                    ? '#4ade80'
+                    : 'rgba(255,255,255,0.2)',
+                  flexShrink: 0,
+                }} />
+                {clonedVoiceInfo.displayName
+                  ? `My voice — ${clonedVoiceInfo.displayName}`
+                  : 'My cloned voice'}
+                {clonedVoiceInfo.enabled && ' ✓'}
+              </span>
+            </MenuItem>
+          )}
           <div style={{ height: 6 }} />
           {/* Conversation history — works for guests (localStorage)
               and signed-in users (server). Above the auth gate so guests
@@ -2455,7 +2516,7 @@ export default function KelionStage() {
 
       <VoiceCloneModal
         open={voiceCloneOpen}
-        onClose={() => setVoiceCloneOpen(false)}
+        onClose={() => { setVoiceCloneOpen(false); fetchClonedVoice() }}
         userEmail={authState.user && authState.user.email}
         userName={authState.user && (authState.user.name || authState.user.displayName)}
       />
