@@ -178,22 +178,24 @@ function setState(patch) {
   notify();
 }
 
-// Build an OpenStreetMap "export embed" URL for a real lat/lon.
-// OSM's embed.html is iframe-friendly (no X-Frame-Options blocking)
-// and renders a Mapnik tile view with a marker. Adrian (2026-04-25)
-// had Google Maps refuse the embed for "Witney, Oxfordshire, Regatul
-// Unit" — switching to OSM gives us a reliably embeddable map.
-function osmMapEmbed(lat, lon) {
-  // ~5 km bbox window — small enough to actually see the marker, big
-  // enough that the user can pan if they want to.
+// Build a Google Maps Embed API URL for a real lat/lon.
+// The Embed API is free (no billing required), iframe-friendly (no
+// X-Frame-Options blocking), and renders a full interactive Google
+// Map with satellite/terrain toggle. Requires GOOGLE_API_KEY passed
+// at build time via VITE_GOOGLE_MAPS_KEY (or falls back to OSM).
+function googleMapEmbed(lat, lon, query) {
+  const key = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GOOGLE_MAPS_KEY) || '';
+  if (key) {
+    // Place mode with a marker — best for single-location displays.
+    if (query) {
+      return `https://www.google.com/maps/embed/v1/place?key=${key}&q=${encodeURIComponent(query)}&center=${lat},${lon}&zoom=14`;
+    }
+    return `https://www.google.com/maps/embed/v1/view?key=${key}&center=${lat},${lon}&zoom=14&maptype=roadmap`;
+  }
+  // Fallback: OSM export embed (free, no key, iframe-friendly)
   const span = 0.04;
-  const minLon = (lon - span).toFixed(5);
-  const maxLon = (lon + span).toFixed(5);
-  const minLat = (lat - span).toFixed(5);
-  const maxLat = (lat + span).toFixed(5);
-  const bbox = `${minLon},${minLat},${maxLon},${maxLat}`;
-  const marker = `${lat.toFixed(5)},${lon.toFixed(5)}`;
-  return `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${marker}`;
+  const bbox = `${(lon - span).toFixed(5)},${(lat - span).toFixed(5)},${(lon + span).toFixed(5)},${(lat + span).toFixed(5)}`;
+  return `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat.toFixed(5)},${lon.toFixed(5)}`;
 }
 
 // Build a Windy.com weather embed for a real lat/lon. Windy is the
@@ -265,7 +267,7 @@ async function queueGeocodeUpgrade(kind, query) {
     if (kind === 'map') {
       setState({
         kind: 'map',
-        src: osmMapEmbed(lat, lon),
+        src: googleMapEmbed(lat, lon, hit.display_name || q),
         title: hit.display_name ? `Hartă — ${hit.display_name}` : `Hartă — ${q}`,
         embedType: 'iframe',
       });
@@ -373,7 +375,7 @@ function resolveMonitor(kind, query) {
       if (direct) {
         return {
           kind: 'map',
-          src: osmMapEmbed(direct.lat, direct.lon),
+          src: googleMapEmbed(direct.lat, direct.lon, q),
           title: `Hartă — ${q}`,
           embedType: 'iframe',
         };
@@ -389,7 +391,7 @@ function resolveMonitor(kind, query) {
           if (g && Number.isFinite(g.latitude) && Number.isFinite(g.longitude)) {
             return {
               kind: 'map',
-              src: osmMapEmbed(g.latitude, g.longitude),
+              src: googleMapEmbed(g.latitude, g.longitude, null),
               title: 'Hartă — locația ta',
               embedType: 'iframe',
             };
