@@ -1894,14 +1894,28 @@ export default function KelionStage() {
           zIndex: bottomZIndex || 50,
           boxShadow: (status === 'idle' || status === 'error') ? 'none' : '0 0 20px rgba(139, 92, 246, 0.5)',
         }}
-        aria-label={(status === 'idle' || status === 'error') ? "Turn microphone on" : "Turn microphone off"}
+        aria-label={(status === 'idle' || status === 'error') ? t('micOff') : t('micOn')}
       >
         <span style={{
           width: 10, height: 10, borderRadius: '50%',
           background: (status === 'idle' || status === 'error') ? '#6b7280' : '#ffffff',
           boxShadow: (status === 'idle' || status === 'error') ? 'none' : '0 0 8px #ffffff',
         }} />
-        {(status === 'idle' || status === 'error') ? 'OFF' : 'ON'}
+        {/* Audio level bargraph */}
+        {!(status === 'idle' || status === 'error') && (
+          <span style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 16 }}>
+            {[0.3, 0.6, 1.0, 0.7, 0.4].map((scale, i) => {
+              const level = Math.min(1, (userLevel || 0) * scale)
+              return <span key={i} style={{
+                width: 3, borderRadius: 2,
+                height: Math.max(3, level * 16),
+                background: level > 0.6 ? '#4ade80' : level > 0.3 ? '#a78bfa' : 'rgba(255,255,255,0.4)',
+                transition: 'height 0.1s ease',
+              }} />
+            })}
+          </span>
+        )}
+        {(status === 'idle' || status === 'error') ? t('micOff') : t('micOn')}
       </button>
 
       {/* Guest trial countdown — Adrian: "timer se afiseaza dreapta sus

@@ -1118,12 +1118,12 @@ const openaiTokenHandler = async (req, res) => {
         instructions: systemPrompt,
         input_audio_format:  'pcm16',
         output_audio_format: 'pcm16',
-        input_audio_transcription: { model: 'gpt-4o-mini-transcribe' },
+        input_audio_transcription: { model: 'gpt-4o-transcribe' },
         turn_detection: {
           type: 'server_vad',
-          threshold: 0.5,
-          prefix_padding_ms: 300,
-          silence_duration_ms: 500,
+          threshold: 0.45,
+          prefix_padding_ms: 500,
+          silence_duration_ms: 800,
         },
         tools: buildKelionToolsChatCompletions().map(t => ({
           type: 'function',
@@ -1592,13 +1592,19 @@ router.post('/gemini-token', geminiTokenHandler);
 // back into the realtime session as a user message.
 // ──────────────────────────────────────────────────────────────────
 router.post('/vision', async (req, res) => {
-  const { image, mimeType } = req.body || {};
+  const { image, mimeType, timeContext } = req.body || {};
   if (!image) return res.status(400).json({ error: 'No image provided' });
 
   try {
     const { getOpenAI, getDefaultChatModel } = require('../utils/openai');
     const client = getOpenAI();
     if (!client) return res.status(503).json({ error: 'OPENAI_API_KEY not configured' });
+
+    // Build time-aware vision prompt
+    let timeInfo = '';
+    if (timeContext && typeof timeContext === 'object') {
+      timeInfo = ` Current date: ${timeContext.date || 'unknown'}. Time: ${timeContext.time || 'unknown'} (${timeContext.timezone || 'unknown timezone'}). Time of day: ${timeContext.timeOfDay || 'unknown'}.`;
+    }
 
     const r = await client.chat.completions.create({
       model: getDefaultChatModel(),
@@ -1608,7 +1614,7 @@ router.post('/vision', async (req, res) => {
         content: [
           {
             type: 'text',
-            text: 'Describe what you see in this camera frame in 1-2 concise sentences. Focus on people, objects, actions, and environment. Be factual and brief.',
+            text: `Describe what you see in this camera frame in 1-2 concise sentences. Focus on people, objects, actions, and environment. Be factual and brief.${timeInfo} Note the lighting conditions and whether they match the time of day.`,
           },
           {
             type: 'image_url',

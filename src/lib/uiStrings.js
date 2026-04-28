@@ -58,6 +58,8 @@ const STRINGS = {
   listening:          { en: 'LISTENING',              ro: 'ASCULTĂ',               fr: 'ÉCOUTE',              de: 'HÖRT ZU',             es: 'ESCUCHANDO' },
   thinking:           { en: 'THINKING',              ro: 'GÂNDEȘTE',              fr: 'RÉFLÉCHIT',           de: 'DENKT',               es: 'PENSANDO' },
   speaking:           { en: 'SPEAKING',              ro: 'VORBEȘTE',              fr: 'PARLE',               de: 'SPRICHT',             es: 'SPRICHT' },
+  micOn:              { en: 'ON',                    ro: 'PORNIT',                fr: 'ACTIVÉ',              de: 'EIN',                 es: 'ENCENDIDO' },
+  micOff:             { en: 'OFF',                   ro: 'OPRIT',                 fr: 'DÉSACTIVÉ',           de: 'AUS',                 es: 'APAGADO' },
 
   // ─── PWA Install ──────────────────────────────────────
   installApp:         { en: 'Install app',           ro: 'Instalează aplicația',  fr: 'Installer l\'app',    de: 'App installieren',    es: 'Instalar app' },

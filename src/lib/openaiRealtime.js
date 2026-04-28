@@ -534,9 +534,9 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
     let running = true
     let busy = false
 
-    // 2fps continuous vision stream — professional quality, with back-pressure.
+    // 4fps continuous vision stream — max quality, with back-pressure.
     // If a request is still in-flight, the next frame is skipped (not queued).
-    const FRAME_INTERVAL = 500 // 2fps
+    const FRAME_INTERVAL = 250 // 4fps
     const sendFrame = async () => {
       if (!running || busy) return
       if (!video.videoWidth) return
@@ -559,11 +559,19 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
         }
         const b64 = btoa(binary)
 
+        // Include date/time context so vision model knows when it is
+        const now = new Date()
+        const timeContext = {
+          date: now.toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
+          time: now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false }),
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          timeOfDay: now.getHours() < 6 ? 'night' : now.getHours() < 12 ? 'morning' : now.getHours() < 18 ? 'afternoon' : 'evening',
+        }
         const r = await fetch('/api/realtime/vision', {
           method: 'POST',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
-          body: JSON.stringify({ image: b64, mimeType: 'image/jpeg' }),
+          body: JSON.stringify({ image: b64, mimeType: 'image/jpeg', timeContext }),
         })
         if (r.ok) {
           const data = await r.json()
