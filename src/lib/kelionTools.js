@@ -62,14 +62,20 @@ const REAL_TOOL_NAMES = new Set([
   'fetch_url', 'rss_read',
   'wikipedia_search', 'dictionary',
   'translate',
+  'run_code',
+  'read_pdf', 'read_docx', 'ocr_image', 'ocr_passport',
+  'send_email', 'send_sms', 'create_calendar_ics', 'zapier_trigger',
+  'github_repo_info', 'npm_package_info', 'pypi_package_info',
+  'run_regex', 'get_my_credits', 'get_my_usage', 'get_my_profile',
+  'generate_image',
   // PR 8/N — Memory of Actions.
   'get_action_history',
   // Silent vision auto-learn (PR #210).
   'learn_from_observation',
   // Faza A — global live-radio search via radio-browser.info.
   'play_radio',
-  // F11 — `generate_image` is handled specially in the runTool switch
-  // below so we can side-effect the monitor; it isn't in this set.
+  // Google Account tools (Calendar, Gmail, Drive)
+  'read_calendar', 'read_email', 'search_files',
 ])
 
 // Compress a tool-result JSON into a short, speakable string for the voice
@@ -203,17 +209,11 @@ export async function runTool(name, args) {
       return summarize(j)
     }
     case 'read_calendar':
-      return summarize(await postJSON('/api/tools/mcp/calendar', { range: args?.range || 'today' }))
+      return summarizeRealTool('read_calendar', await postJSON('/api/tools/execute', { name: 'read_calendar', args: args || {} }))
     case 'read_email':
-      return summarize(await postJSON('/api/tools/mcp/email', {
-        query: args?.query || '',
-        limit: args?.limit || 5,
-      }))
+      return summarizeRealTool('read_email', await postJSON('/api/tools/execute', { name: 'read_email', args: args || {} }))
     case 'search_files':
-      return summarize(await postJSON('/api/tools/mcp/files', {
-        query: args?.query || '',
-        limit: args?.limit || 5,
-      }))
+      return summarizeRealTool('search_files', await postJSON('/api/tools/execute', { name: 'search_files', args: args || {} }))
     case 'observe_user_emotion': {
       // Local-only: mutate the emotion store so the avatar reacts.
       // Return a tiny ack so Gemini knows we heard it.
@@ -256,35 +256,65 @@ export async function runTool(name, args) {
       return 'ok:composer:email_opened'
     }
     case 'generate_image': {
-      // F11 — OpenAI gpt-image-1. The server generates the PNG, caches it
-      // for 10 min, and returns a short-lived URL. We then push it onto
-      // the stage monitor so the avatar literally shows the new image
-      // inline (no second "show_on_monitor" turn needed — cuts one
-      // round-trip of latency the user would otherwise hear).
+      // F11 — OpenAI gpt-image-1. Show on monitor automatically.
       const j = await postJSON('/api/tools/execute', {
         name: 'generate_image',
-        args: {
-          prompt: args?.prompt,
-          size: args?.size,
-        },
+        args: { prompt: args?.prompt, size: args?.size },
       })
-      if (!j?.ok) {
-        // Preserve the upstream error so Kelion can explain ("the safety
-        // system rejected that prompt", "image service isn't configured
-        // yet", …). The caller already surfaces this verbatim to the
-        // voice model via the transport's tool-response frame.
-        return j?.error || 'Image generation failed.'
-      }
-      if (j.url) {
-        showImageOnMonitor({
-          src: j.url,
-          title: j.title || args?.prompt || 'Generated image',
-        })
-      }
-      // The voice model reads this short ack back to the user. Keeping
-      // it under ~80 chars avoids filler latency on the TTS pass.
+      if (!j?.ok) return j?.error || 'Image generation failed.'
+      if (j.url) showImageOnMonitor({ src: j.url, title: j.title || args?.prompt || 'Generated image' })
       const label = (j.title || args?.prompt || '').toString().slice(0, 80)
       return label ? `Generated: ${label}` : 'Image generated and displayed.'
+    }
+    case 'run_code': {
+      // Execute code in e2b sandbox, then show result on the monitor.
+      const j = await postJSON('/api/tools/execute', {
+        name: 'run_code',
+        args: { code: args?.code, language: args?.language || 'python', timeout_ms: args?.timeout_ms },
+      })
+      if (!j?.ok) return j?.error || 'Code execution failed.'
+      // Build an HTML page with the code + output + download button
+      const lang = j.language || 'python'
+      const code = String(args?.code || '')
+      const stdout = String(j.stdout || '')
+      const stderr = String(j.stderr || '')
+      const hasError = !!(j.error || stderr)
+      const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Code Result — ${lang}</title>
+<style>
+  body{margin:0;font-family:'Consolas',monospace;background:#0d1117;color:#e6edf3;font-size:13px;}
+  .header{background:#161b22;padding:10px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #30363d;}
+  .lang{color:#58a6ff;font-weight:bold;text-transform:uppercase;font-size:11px;letter-spacing:1px;}
+  .dl{background:#238636;color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;}
+  .dl:hover{background:#2ea043;}
+  .section{padding:12px 16px;border-bottom:1px solid #21262d;}
+  .label{color:#8b949e;font-size:11px;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;}
+  pre{margin:0;white-space:pre-wrap;word-break:break-all;background:#161b22;padding:10px;border-radius:6px;border:1px solid #30363d;max-height:200px;overflow:auto;}
+  .ok{color:#3fb950;} .err{color:#f85149;}
+</style></head><body>
+<div class="header">
+  <span class="lang">💻 ${lang}</span>
+  <button class="dl" onclick="download()">⬇ Download</button>
+</div>
+<div class="section"><div class="label">Code</div><pre>${code.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</pre></div>
+${stdout ? `<div class="section"><div class="label ok">Output</div><pre class="ok">${stdout.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</pre></div>` : ''}
+${hasError ? `<div class="section"><div class="label err">Error</div><pre class="err">${(j.error||stderr).toString().replace(/</g,'&lt;').replace(/>/g,'&gt;')}</pre></div>` : ''}
+<script>
+function download(){
+  const blob=new Blob([${JSON.stringify(code)}],{type:'text/plain'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='kelion_code.${lang === 'javascript' ? 'js' : lang === 'typescript' ? 'ts' : 'py'}';
+  a.click();
+}
+</script></body></html>`
+      // Show on monitor using a blob data URL
+      const dataUrl = 'data:text/html;base64,' + btoa(unescape(encodeURIComponent(html)))
+      handleShowOnMonitor({ kind: 'web', query: dataUrl, title: `Code — ${lang}` })
+      // Return compact summary for voice
+      const lines = stdout.split('\n').filter(Boolean).slice(0, 3).join(' | ')
+      return j.error
+        ? `Code error: ${j.error.slice(0, 200)}`
+        : `Code executed (${lang}). Output: ${lines || '(no output)'}. Shown on monitor with download button.`
     }
     case 'set_narration_mode': {
       // Accessibility mode. Flips a module-level flag that
