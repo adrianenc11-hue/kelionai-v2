@@ -79,9 +79,19 @@ function rewriteSql(sql) {
   return { sql: toPgParams(sql), isPragma: false };
 }
 
+// Tables that use a non-BIGSERIAL primary key (no 'id' column).
+// Adding RETURNING id to their INSERT would throw "column id does not exist".
+const NO_ID_TABLES = new Set([
+  'trial_usage',          // ip TEXT PRIMARY KEY
+  'credits_consume_state', // user_id BIGINT PRIMARY KEY
+]);
+
 function shouldAppendReturningId(sql) {
   if (!/^\s*INSERT\s+INTO/i.test(sql)) return false;
   if (/\bRETURNING\b/i.test(sql)) return false;
+  // Don't add RETURNING id for tables without an id column
+  const tableMatch = sql.match(/INSERT\s+INTO\s+([a-zA-Z_][a-zA-Z0-9_]*)/i);
+  if (tableMatch && NO_ID_TABLES.has(tableMatch[1])) return false;
   return true;
 }
 
