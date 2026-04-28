@@ -1,4 +1,4 @@
-el trebuie sa poata scrie soft 'use strict';
+'use strict';
 
 const { Router } = require('express');
 const { listMemoryItems, getCreditsBalance, addCreditsTransaction, setPreferredLanguage, getPreferredLanguage, logVisionRevenue } = require('../db');
