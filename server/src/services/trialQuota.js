@@ -72,11 +72,13 @@ async function saveToDb(ip, rec) {
   const db = getDb();
   if (!db) return;
   try {
-    // Upsert: INSERT OR REPLACE for SQLite, ON CONFLICT for Postgres.
-    // The db wrapper normalises this via run().
+    // Upsert: use ON CONFLICT which works on both SQLite 3.24+ and Postgres.
     await db.run(
-      `INSERT OR REPLACE INTO trial_usage (ip, first_ever_stamp_at, first_stamp_at)
-       VALUES (?, ?, ?)`,
+      `INSERT INTO trial_usage (ip, first_ever_stamp_at, first_stamp_at)
+       VALUES (?, ?, ?)
+       ON CONFLICT (ip) DO UPDATE SET
+         first_ever_stamp_at = EXCLUDED.first_ever_stamp_at,
+         first_stamp_at = EXCLUDED.first_stamp_at`,
       ip, rec.firstEverStampAt, rec.firstStampAt,
     );
   } catch (e) {
