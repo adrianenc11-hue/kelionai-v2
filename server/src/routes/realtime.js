@@ -244,7 +244,28 @@ MONITOR — ce poți afișa (folosește show_on_monitor):
 5. VREME: Apelează get_weather, apoi kind='html' cu card HTML frumos. Include emoji (☀️🌧️❄️⛅🌩️🌤️), temperatură, umiditate, vânt.
    NICIODATĂ URL extern pentru vreme — construiești cardul HTML tu din datele tool-ului.
 
-6. HĂRȚI: kind='map', query='Oraș' SAU query='LAT,LON'. Exemplu: show_on_monitor(kind='map', query='Cluj-Napoca')
+6. HĂRȚI INTERACTIVE (Leaflet.js): kind='html' cu Leaflet — funcționează MEREU, fără restricții iframe.
+   Exemplu pentru hartă simplă:
+   <div id="map" style="width:100%;height:500px"></div>
+   <script>
+   var map = L.map('map').setView([46.7712, 23.6236], 13);
+   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM'}).addTo(map);
+   L.marker([46.7712, 23.6236]).addTo(map).bindPopup('Cluj-Napoca').openPopup();
+   <\/script>
+
+6b. RUTE (Leaflet + OSRM routing): kind='html' cu Leaflet + fetch OSRM pentru ruta reală:
+   <div id="map" style="width:100%;height:500px"></div>
+   <script>
+   var map = L.map('map').setView([46.7712, 23.6236], 6);
+   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM'}).addTo(map);
+   // Marchează origine și destinație
+   L.marker([46.7712, 23.6236]).addTo(map).bindPopup('Cluj-Napoca');
+   L.marker([51.7873, -1.4837]).addTo(map).bindPopup('Witney');
+   // Trasează linie directă
+   L.polyline([[46.7712, 23.6236],[51.7873, -1.4837]],{color:'#7c3aed',weight:3}).addTo(map);
+   map.fitBounds([[46.7712, 23.6236],[51.7873, -1.4837]]);
+   <\/script>
+   IMPORTANT: Coordonatele le obții din get_weather sau geocodezi manual. Cluj-Napoca=46.7712,23.6236; București=44.4268,26.1025; Paris=48.8566,2.3522; Londra=51.5074,-0.1278; Witney=51.7873,-1.4837
 
 7. IMAGINI: kind='image', query='cuvânt cheie'. Exemplu: show_on_monitor(kind='image', query='mountain lake')
 

@@ -386,11 +386,34 @@ function resolveMonitor(kind, query) {
       // lands, queueGeocodeUpgrade swaps the placeholder for the real
       // OSM embed centered on the resolved lat/lon.
       queueGeocodeUpgrade('map', q);
+      // Show OSM search in proxy while geocode runs
+      const osmSearch = `https://www.openstreetmap.org/search?query=${encodeURIComponent(q)}`;
       return {
         kind: 'map',
-        src: `https://www.openstreetmap.org/search?query=${encodeURIComponent(q)}`,
+        src: proxyUrl(osmSearch),
         title: `Hartă — ${label}`,
-        embedType: 'external',
+        embedType: 'iframe',
+      };
+    }
+
+    // ROUTE — point-to-point directions using OpenStreetMap / OSRM.
+    // No API key needed. Works in iframe. Supports driving, cycling, walking.
+    // query format: 'From City -> To City' or 'Origin | Destination'
+    case 'route': {
+      // Parse 'origin -> destination' or 'origin | destination'
+      const sep = q.includes('->') ? '->' : q.includes('|') ? '|' : null;
+      let origin = q, destination = '';
+      if (sep) {
+        [origin, destination] = q.split(sep).map(s => s.trim());
+      }
+      const osmDir = destination
+        ? `https://www.openstreetmap.org/directions?engine=osrm_car&route=${encodeURIComponent(origin)}%3B${encodeURIComponent(destination)}`
+        : `https://www.openstreetmap.org/directions?engine=osrm_car&route=${encodeURIComponent(origin)}`;
+      return {
+        kind: 'route',
+        src: proxyUrl(osmDir),
+        title: destination ? `Rută: ${origin} → ${destination}` : `Direcții: ${origin}`,
+        embedType: 'iframe',
       };
     }
 
