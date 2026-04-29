@@ -340,6 +340,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
         // Accumulate for cloned TTS flush on turnComplete
         if (isClonedVoiceActive()) {
           cloneTranscriptBufRef.current += sc.outputTranscription.text
+          console.log('[clonedTTS] buffered outputTranscription:', sc.outputTranscription.text.slice(0, 80))
         }
       }
 
@@ -347,15 +348,25 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
       for (const part of parts) {
         const inline = part.inlineData || part.inline_data
         if (inline?.data && inline.mimeType?.startsWith('audio/')) {
-          // Skip Gemini audio when cloned voice mode is active — we'll
-          // synthesise from the transcript instead.
           if (!isClonedVoiceActive()) {
             const bytes = bytesFromBase64(inline.data)
             enqueueAudio(bytes)
+          } else {
+            console.log('[clonedTTS] skipped Gemini PCM chunk (cloned voice active)')
           }
         }
-        if (part.text && !turnHasTranscriptRef.current) {
-          appendTurn('assistant', part.text, false)
+        if (part.text) {
+          if (!turnHasTranscriptRef.current) {
+            appendTurn('assistant', part.text, false)
+          }
+          // ALSO buffer part.text for TTS — Gemini sometimes sends text
+          // via modelTurn.parts instead of (or in addition to) outputTranscription.
+          // Without this, if outputTranscription is absent the buffer stays
+          // empty and ElevenLabs never gets called.
+          if (isClonedVoiceActive() && !turnHasTranscriptRef.current) {
+            cloneTranscriptBufRef.current += part.text
+            console.log('[clonedTTS] buffered part.text:', part.text.slice(0, 80))
+          }
         }
       }
 
