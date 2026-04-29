@@ -125,6 +125,9 @@ const EXPECTED_TOOL_NAMES = [
   // then does the modal route through send_email (Resend). Nothing is
   // delivered without an explicit user click.
   'compose_email_draft',
+  // ElevenLabs cloned voice toggle — switches Kelion's TTS between
+  // Gemini built-in voice and the user's ElevenLabs cloned voice.
+  'switch_voice',
 ];
 
 describe('Kelion tool catalog', () => {
