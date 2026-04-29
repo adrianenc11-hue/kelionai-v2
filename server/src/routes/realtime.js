@@ -441,11 +441,11 @@ const KELION_TOOLS = [
     properties: {
       kind: {
         type: 'string',
-        enum: ['map', 'weather', 'image', 'wiki', 'web', 'audio', 'html', 'clear'],
-        description: "Type of content: 'map' = Google Maps for a place; 'weather' = forecast for a city; 'image' = photo search; 'wiki' = Wikipedia article; 'web' = arbitrary URL (must start with https://); 'audio' = live audio stream URL (radio, podcast feed, .mp3/.aac/.m3u8) rendered as an HTML5 audio player on the monitor; 'html' = formatted HTML content (math solutions, step-by-step demonstrations, calculations with all steps, formatted text) displayed directly on the monitor — pass the full HTML string as `query`; 'clear' = blank the monitor.",
+        enum: ['map', 'weather', 'image', 'wiki', 'web', 'audio', 'html', 'video', 'document', 'cad', 'route', 'clear'],
+        description: "Type of content to show on the monitor. 'map' = interactive map for a place (Leaflet); 'weather' = HTML weather card (call get_weather first); 'image' = photo search; 'wiki' = Wikipedia article; 'web' = any URL (proxied to bypass iframe blocks); 'audio' = live audio stream (radio/.mp3/.aac); 'html' = custom HTML displayed directly — supports KaTeX math ($formula$), Chart.js graphs, Mermaid diagrams, Prism code, Leaflet maps, SVG, CSS animations — pass the FULL HTML body content as `query`; 'video' = YouTube/Vimeo URL or direct mp4/webm — auto-converted to embed; 'document' = PDF/DOC/XLS/PPT URL — PDF native, Office via Google Docs Viewer; 'cad' = engineering files DXF/STEP/STL/OBJ/GLTF/KiCad via 3dviewer.net; 'route' = driving directions between two places (query: 'Origin -> Destination'); 'clear' = blank the monitor.",
       },
-      query: { type: 'string', description: "Search term, URL, or stream URL. Examples: 'Cluj-Napoca', 'New York', 'sunset mountains', 'Paris', 'https://en.wikipedia.org/wiki/Artificial_intelligence', 'https://stream.example.fm/radio.aac'. For audio: pass the directly-playable HTTP(S) stream URL returned by play_radio. For a Linux shell / terminal, pass kind='web' with query='https://webvm.io'. Required unless kind='clear'." },
-      title: { type: 'string', description: "Optional human-friendly label shown above the monitor. For audio playback, pass the station name (e.g. 'Radio ZU — Bucharest'). Otherwise omit and the monitor builds a title from the kind+query." },
+      query: { type: 'string', description: "Content to display. For 'html': full HTML body (can include Leaflet maps, Chart.js, KaTeX, Mermaid, SVG). For 'video': YouTube/Vimeo URL or direct mp4. For 'document': URL to PDF/DOC/XLS/PPT. For 'cad': URL to DXF/STEP/STL/OBJ. For 'route': 'City A -> City B'. For 'map'/'weather': place name or LAT,LON. For 'audio': playable stream URL. For 'web': https://url." },
+      title: { type: 'string', description: 'Optional label shown above the monitor.' },
     },
     required: ['kind'],
   },
