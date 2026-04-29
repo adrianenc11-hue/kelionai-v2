@@ -1702,39 +1702,25 @@ router.post('/vision', visionLimiter, async (req, res) => {
 });
 
 // ──────────────────────────────────────────────────────────────────
-// /pipeline — Full GPT-5.5 voice pipeline (no Realtime API).
-// Flow: audio (PCM16 base64) → Whisper STT → GPT-5.5 chat → TTS → audio back.
-// All 47 tools supported. Voice: ash (masculine, multilingual).
+// /pipeline — Gemini Flash text-chat pipeline (tools supported).
+// For typed messages: text → Gemini chat → tool loop → text back.
+// Voice goes directly through Gemini Live WebSocket — not this route.
 // ──────────────────────────────────────────────────────────────────
 router.post('/pipeline', async (req, res) => {
-  const { audio, mimeType, history, cameraFrame, textOverride, visionContext } = req.body || {};
-  if (!audio && !textOverride) return res.status(400).json({ error: 'No audio or text provided' });
+  const { history, textOverride, visionContext } = req.body || {};
+  if (!textOverride) return res.status(400).json({ error: 'No text provided' });
 
   try {
-    const { getOpenAI, getDefaultChatModel } = require('../utils/openai');
-    const client = getOpenAI();
-    if (!client) return res.status(503).json({ error: 'OPENAI_API_KEY not configured' });
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) return res.status(503).json({ error: 'GEMINI_API_KEY not configured' });
 
-    // 1. STT — skip if textOverride is provided (typed message)
-    let userText = '';
-    if (textOverride && typeof textOverride === 'string' && textOverride.trim()) {
-      userText = textOverride.trim();
-    } else {
-      const audioBuffer = Buffer.from(audio, 'base64');
-      const audioFile = new File([audioBuffer], 'audio.wav', { type: mimeType || 'audio/wav' });
-      const sttResult = await client.audio.transcriptions.create({
-        model: 'whisper-1',
-        file: audioFile,
-        language: undefined, // auto-detect
-      });
-      userText = (sttResult.text || '').trim();
-    }
+    const userText = (typeof textOverride === 'string' ? textOverride : '').trim();
     if (!userText) {
       return res.json({ ok: true, userText: '', assistantText: '', audio: null, toolCalls: [] });
     }
-    console.log('[pipeline] STT:', userText);
+    console.log('[pipeline] text:', userText);
 
-    // 2. Build messages with history + persona
+    // Build persona + system prompt
     const adminUser = await peekSignedInUser(req);
     const isAdmin = await isAdminUser(adminUser);
     const user = adminUser;
@@ -1753,113 +1739,119 @@ router.post('/pipeline', async (req, res) => {
       lockedLangTag: await resolveLockedLangTag({ req, user, forcedLang }),
     });
 
-    const messages = [{ role: 'system', content: systemPrompt + '\n\nCRITICAL RULES:\n1. Maximum seriousness and professionalism at all times.\n2. NEVER fabricate, guess, or make up information. If you don\'t know something, USE YOUR TOOLS to find out.\n3. When asked about facts, news, people, places, events — ALWAYS use web_search or wikipedia_search to get real, current information. Do NOT answer from memory alone.\n4. Answer questions precisely and directly. No filler, no padding.\n5. Zero tolerance for hallucination or lies. If a tool search returns no results, say honestly that you couldn\'t find the information.\n6. You have tools: web_search, wikipedia_search, browse_web, calculate, get_weather, and many more. USE THEM proactively.' }];
-    // Add conversation history
+    const systemText = systemPrompt + '\n\nCRITICAL RULES:\n1. Maximum seriousness and professionalism at all times.\n2. NEVER fabricate, guess, or make up information. If you don\'t know something, USE YOUR TOOLS to find out.\n3. When asked about facts, news, people, places, events — ALWAYS use web_search or wikipedia_search to get real, current information. Do NOT answer from memory alone.\n4. Answer questions precisely and directly. No filler, no padding.\n5. Zero tolerance for hallucination or lies. If a tool search returns no results, say honestly that you couldn\'t find the information.\n6. You have tools: web_search, wikipedia_search, browse_web, calculate, get_weather, and many more. USE THEM proactively.';
+
+    // Build Gemini contents from history
+    const contents = [];
     if (Array.isArray(history)) {
       for (const h of history.slice(-20)) {
-        messages.push({ role: h.role || 'user', content: h.text || h.content || '' });
+        const role = h.role === 'assistant' ? 'model' : 'user';
+        contents.push({ role, parts: [{ text: h.text || h.content || '' }] });
       }
     }
-    // Add live vision context (rolling scene descriptions from continuous stream)
     if (visionContext && typeof visionContext === 'string' && visionContext.trim()) {
-      messages.push({ role: 'user', content: `[Live camera feed observations: ${visionContext}]` });
+      contents.push({ role: 'user', parts: [{ text: `[Live camera feed observations: ${visionContext}]` }] });
     }
-    // Add camera frame if present (high-res snapshot with this turn)
-    if (cameraFrame) {
-      messages.push({
-        role: 'user',
-        content: [
-          { type: 'text', text: `[Current camera frame — analyze this visual]` },
-          { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${cameraFrame}` } },
-        ],
-      });
-    }
-    messages.push({ role: 'user', content: userText });
+    contents.push({ role: 'user', parts: [{ text: userText }] });
 
-    // 3. GPT-5.5 chat completion with tools
-    const tools = buildKelionToolsChatCompletions();
-    let completion = await client.chat.completions.create({
-      model: getDefaultChatModel(),
-      messages,
-      tools,
-      tool_choice: 'auto',
-      max_completion_tokens: 1024,
+    // Build tools in Gemini format
+    const geminiTools = buildKelionToolsGemini();
+
+    const chatModel = process.env.GEMINI_CHAT_MODEL || 'gemini-2.5-flash';
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${chatModel}:generateContent?key=${apiKey}`;
+
+    const body = {
+      systemInstruction: { parts: [{ text: systemText }] },
+      contents,
+      tools: geminiTools,
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 2048,
+      },
+    };
+
+    let completion = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
     });
+    if (!completion.ok) {
+      const errText = await completion.text();
+      throw new Error(`Gemini HTTP ${completion.status}: ${errText.slice(0, 300)}`);
+    }
+    let result = await completion.json();
 
-    let choice = completion.choices?.[0];
     const toolCalls = [];
-
-    // Handle tool calls (up to 3 rounds)
     let rounds = 0;
-    while (choice?.finish_reason === 'tool_calls' && choice?.message?.tool_calls?.length && rounds < 3) {
+
+    // Tool call loop (up to 3 rounds)
+    while (rounds < 3) {
+      const candidate = result?.candidates?.[0];
+      const parts = candidate?.content?.parts || [];
+      const fnCalls = parts.filter(p => p.functionCall);
+
+      if (fnCalls.length === 0) break;
       rounds++;
-      messages.push(choice.message);
-      for (const tc of choice.message.tool_calls) {
-        let args = {};
-        try { args = JSON.parse(tc.function.arguments || '{}'); } catch { }
-        toolCalls.push({ name: tc.function.name, args });
-        // Execute tool server-side via the real tool dispatcher.
-        // CRITICAL: pass ctx with user so memory, location, credits etc. work.
-        let result = { status: 'tool_not_found' };
+
+      // Add model response to contents
+      contents.push({ role: 'model', parts });
+
+      // Execute each tool call
+      const toolResultParts = [];
+      for (const fc of fnCalls) {
+        const name = fc.functionCall.name;
+        const args = fc.functionCall.args || {};
+        toolCalls.push({ name, args });
+
+        let toolResult = { status: 'tool_not_found' };
         try {
           const { executeRealTool } = require('../services/realTools');
           const latRaw = req?.query?.lat ?? req?.body?.lat ?? req?.body?.latitude;
           const lonRaw = req?.query?.lon ?? req?.query?.lng ?? req?.body?.lon ?? req?.body?.lng ?? req?.body?.longitude;
-          const accRaw = req?.query?.acc ?? req?.body?.acc ?? req?.body?.accuracy;
           const lat = latRaw === undefined || latRaw === null || latRaw === '' ? undefined : Number(latRaw);
           const lon = lonRaw === undefined || lonRaw === null || lonRaw === '' ? undefined : Number(lonRaw);
-          const acc = accRaw === undefined || accRaw === null || accRaw === '' ? undefined : Number(accRaw);
-          const coords = Number.isFinite(lat) && Number.isFinite(lon)
-            ? {
-                lat,
-                lon,
-                ...(Number.isFinite(acc) ? { acc } : {}),
-              }
-            : undefined;
-          result = await executeRealTool(tc.function.name, args, { user, req, coords });
+          const coords = Number.isFinite(lat) && Number.isFinite(lon) ? { lat, lon } : undefined;
+          toolResult = await executeRealTool(name, args, { user, req, coords });
         } catch (err) {
-          result = { error: err.message };
+          toolResult = { error: err.message };
         }
-        messages.push({
-          role: 'tool',
-          tool_call_id: tc.id,
-          content: JSON.stringify(result),
+
+        toolResultParts.push({
+          functionResponse: {
+            name,
+            response: toolResult || { ok: true },
+          },
         });
       }
-      completion = await client.chat.completions.create({
-        model: getDefaultChatModel(),
-        messages,
-        tools,
-        tool_choice: 'auto',
-        max_completion_tokens: 1024,
+
+      // Add tool results to contents
+      contents.push({ role: 'user', parts: toolResultParts });
+
+      // Re-call Gemini with tool results
+      body.contents = contents;
+      completion = await fetch(url, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
       });
-      choice = completion.choices?.[0];
+      if (!completion.ok) {
+        const errText = await completion.text();
+        throw new Error(`Gemini tool-round HTTP ${completion.status}: ${errText.slice(0, 300)}`);
+      }
+      result = await completion.json();
     }
 
-    const assistantText = choice?.message?.content || '';
-    console.log('[pipeline] GPT-5.5:', assistantText.slice(0, 100));
-
-    // 4. TTS — OpenAI TTS with ash voice
-    let ttsAudioB64 = null;
-    if (assistantText.trim()) {
-      const voice = process.env.OPENAI_REALTIME_VOICE || 'ash';
-      const ttsResponse = await client.audio.speech.create({
-        model: 'tts-1',
-        voice,
-        input: assistantText,
-        response_format: 'mp3',
-        speed: 1.0,
-      });
-      const ttsBuffer = Buffer.from(await ttsResponse.arrayBuffer());
-      ttsAudioB64 = ttsBuffer.toString('base64');
-    }
+    // Extract final text
+    const finalParts = result?.candidates?.[0]?.content?.parts || [];
+    const assistantText = finalParts.map(p => p.text || '').join('').trim();
+    console.log('[pipeline] Gemini:', assistantText.slice(0, 100));
 
     return res.json({
       ok: true,
       userText,
       assistantText,
-      audio: ttsAudioB64,
-      audioFormat: 'mp3',
+      audio: null,
+      audioFormat: null,
       toolCalls,
     });
 
