@@ -30,6 +30,8 @@ const diagRouter       = require('./routes/diag');
 // YouTube removed (2026-04-28) — was causing constant errors and API quota issues.
 const generatedImagesRouter = require('./routes/generatedImages');
 const voiceCloneRouter = require('./routes/voiceClone');
+const demoRouter       = require('./routes/demo');
+const proxyRouter      = require('./routes/proxy');
 const { attachVertexLiveProxy } = require('./routes/vertexLiveProxy');
 const proactive        = require('./services/proactive');
 const { bootstrapAdmin, healAdminCredits } = require('./services/adminBootstrap');
@@ -338,6 +340,13 @@ app.get('/api/push/public-key', (_req, res) => {
 });
 app.use('/api/push', requireAuth, pushRouter);
 app.use('/api/voice/clone', requireAuth, chatLimiter, voiceCloneRouter);
+// Demo request system — public submit + code activation, admin approve/reject.
+app.use('/api/demo', chatLimiter, demoRouter);
+// Monitor content proxy — strips X-Frame-Options/CSP so ANY external URL
+// can be embedded in the monitor iframe without a white/blocked screen.
+// Rate-limited internally (30 req/min per IP). Public endpoint.
+app.use('/api/proxy', proxyRouter);
+
 
 if (process.env.NODE_ENV !== 'test' && process.env.PROACTIVE_DISABLED !== '1') {
   try { proactive.start(require('./routes/push').getWebPush()); }

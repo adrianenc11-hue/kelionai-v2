@@ -82,10 +82,18 @@ function isNonEmbeddableHost(host) {
 function requiresExternalTab(url) {
   try {
     const host = new URL(url).hostname.toLowerCase();
+    // Only truly cross-origin-isolated sites need a real tab;
+    // everything else we can proxy through /api/proxy.
     if (EXTERNAL_ONLY_HOSTS.has(host)) return true;
-    if (isNonEmbeddableHost(host)) return true;
     return false;
   } catch { return false; }
+}
+
+// Wrap a URL through our server-side proxy that strips X-Frame-Options/CSP.
+// Used for any external URL that normally blocks iframes.
+function proxyUrl(url) {
+  if (!url || typeof url !== 'string') return url;
+  return `/api/proxy?url=${encodeURIComponent(url)}`;
 }
 
 // Fallback geolocation provider — lets the React tree register the
@@ -171,7 +179,8 @@ function setState(patch) {
   state.title = patch.title ?? null;
   // Pin valid embed types only — anything else collapses to 'iframe'
   // so a stale persisted record doesn't render the wrong renderer.
-  const allowedEmbed = new Set(['iframe', 'image', 'external', 'audio', 'html']);
+  const allowedEmbed = new Set(['iframe', 'image', 'external', 'audio', 'html', 'video', 'cad']);
+
   state.embedType = allowedEmbed.has(patch.embedType) ? patch.embedType : 'iframe';
   state.updatedAt = Date.now();
   savePersisted();
@@ -184,18 +193,15 @@ function setState(patch) {
 // Map with satellite/terrain toggle. Requires GOOGLE_API_KEY passed
 // at build time via VITE_GOOGLE_MAPS_KEY (or falls back to OSM).
 function googleMapEmbed(lat, lon, query) {
-  // Read key from Vite env (set via VITE_GOOGLE_MAPS_KEY in Railway).
-  // Fallback to the project key directly — Maps Embed API is safe to expose
-  // client-side (it's restricted to this domain in Google Cloud Console).
   const key = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GOOGLE_MAPS_KEY)
-    || 'AIzaSyD_KELION_MAPS_PLACEHOLDER';
+    || '';
   if (key && !key.includes('PLACEHOLDER')) {
     if (query) {
       return `https://www.google.com/maps/embed/v1/place?key=${key}&q=${encodeURIComponent(query)}&center=${lat},${lon}&zoom=14`;
     }
     return `https://www.google.com/maps/embed/v1/view?key=${key}&center=${lat},${lon}&zoom=14&maptype=roadmap`;
   }
-  // Last resort: OSM (may be blocked by X-Frame-Options on some configs)
+  // OpenStreetMap embed — always works, no key needed, no iframe blocking
   const span = 0.04;
   const bbox = `${(lon - span).toFixed(5)},${(lat - span).toFixed(5)},${(lon + span).toFixed(5)},${(lat + span).toFixed(5)}`;
   return `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat.toFixed(5)},${lon.toFixed(5)}`;
@@ -275,9 +281,10 @@ async function queueGeocodeUpgrade(kind, query) {
         embedType: 'iframe',
       });
     } else if (kind === 'weather') {
+      // Route Windy through proxy so X-Frame-Options is stripped
       setState({
         kind: 'weather',
-        src: windyWeatherEmbed(lat, lon),
+        src: proxyUrl(windyWeatherEmbed(lat, lon)),
         title: hit.display_name ? `Vreme — ${hit.display_name}` : `Vreme — ${q}`,
         embedType: 'iframe',
       });
@@ -295,6 +302,36 @@ function safeUrl(u) {
   if (!/^https?:\/\//i.test(s)) return null;
   try { new URL(s); return s; } catch { return null; }
 }
+
+// CAD / EDA / 3D engineering file viewer resolver.
+// Maps file extension to the best free browser-based viewer.
+function resolveCadUrl(src, ext, label) {
+  // 3D/CAD model formats → 3dviewer.net (free, no key, iframe-friendly, 50+ formats)
+  const viewer3d = ['dxf','step','stp','iges','igs','stl','obj','3dm','3ds','fbx','glb','gltf','off','ply','brep','bim'];
+  if (viewer3d.includes(ext)) {
+    return {
+      kind: 'cad',
+      src: `https://3dviewer.net/#model=${encodeURIComponent(src)}`,
+      title: label || `3D — ${ext.toUpperCase()}`,
+      embedType: 'iframe',
+    };
+  }
+  // KiCad PCB/schematic → KiCanvas (open-source KiCad web viewer)
+  if (['kicad_pcb','kicad_sch','kicad_pro'].includes(ext)) {
+    return {
+      kind: 'cad',
+      src: `https://kicanvas.org/?github=${encodeURIComponent(src)}`,
+      title: label || `KiCad — ${ext}`,
+      embedType: 'iframe',
+    };
+  }
+  // DWG (AutoCAD binary) → needs upload, open in new tab
+  if (ext === 'dwg') {
+    return { kind: 'cad', src, title: label || 'AutoCAD DWG', embedType: 'external' };
+  }
+  return null;
+}
+
 
 // Resolve a (kind, query) pair to a concrete embeddable URL. Centralized so
 // the AI can always trust that "map Cluj" produces a working Google Maps
@@ -370,7 +407,7 @@ function resolveMonitor(kind, query) {
       if (direct) {
         return {
           kind: 'weather',
-          src: windyWeatherEmbed(direct.lat, direct.lon),
+          src: proxyUrl(windyWeatherEmbed(direct.lat, direct.lon)),
           title: `Vreme — ${q}`,
           embedType: 'iframe',
         };
@@ -383,7 +420,7 @@ function resolveMonitor(kind, query) {
           if (g && Number.isFinite(g.latitude) && Number.isFinite(g.longitude)) {
             return {
               kind: 'weather',
-              src: windyWeatherEmbed(g.latitude, g.longitude),
+              src: proxyUrl(windyWeatherEmbed(g.latitude, g.longitude)),
               title: 'Vreme — locația ta',
               embedType: 'iframe',
             };
@@ -392,19 +429,62 @@ function resolveMonitor(kind, query) {
       }
       if (!q) return null;
 
-      // Free-text place name → fire async Nominatim geocode and render
-      // an external "Open in Windy" card in the meantime so the user
-      // can still get there in one click.
+      // Free-text place name → geocode async; in the meantime proxy Windy for the query
       queueGeocodeUpgrade('weather', q);
       return {
         kind: 'weather',
-        src: `https://www.windy.com/?${encodeURIComponent(q)}`,
+        src: proxyUrl(`https://www.windy.com/?${encodeURIComponent(q)}`),
         title: `Vreme — ${q}`,
-        embedType: 'external',
+        embedType: 'iframe',
       };
     }
 
     // case 'video' removed (2026-04-28) — YouTube integration dropped.
+
+    // VIDEO — restored with full format support (2026-04-29).
+    // Supports: MP4, WebM, OGG (native player), YouTube, Vimeo (iframe embed),
+    // and any other video URL (proxied through server to strip X-Frame-Options).
+    case 'video': {
+      const src = safeUrl(q);
+      if (!src) return null;
+      let label = src;
+      try { label = new URL(src).hostname.replace(/^www\./, ''); } catch { /* ignore */ }
+
+      // Direct video file → native HTML5 player
+      const ext = src.split('?')[0].split('#')[0].split('.').pop().toLowerCase();
+      if (['mp4', 'webm', 'ogg', 'mov', 'm4v', 'mkv'].includes(ext)) {
+        return { kind: 'video', src, title: m?.title || label, embedType: 'video' };
+      }
+
+      // YouTube → use the /embed/ path (no X-Frame-Options blocking)
+      try {
+        const u = new URL(src);
+        const host = u.hostname.replace(/^www\./, '');
+        if (host === 'youtube.com' || host === 'youtu.be') {
+          let videoId = u.searchParams.get('v');
+          if (!videoId && host === 'youtu.be') videoId = u.pathname.slice(1);
+          if (!videoId) {
+            const m2 = u.pathname.match(/\/(?:embed|v|shorts)\/([a-zA-Z0-9_-]{11})/);
+            if (m2) videoId = m2[1];
+          }
+          if (videoId) {
+            const embedSrc = `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`;
+            return { kind: 'video', src: embedSrc, title: label, embedType: 'iframe' };
+          }
+        }
+        // Vimeo → use /video/ embed path
+        if (host === 'vimeo.com') {
+          const vid = u.pathname.replace(/^\//, '').split('/')[0];
+          if (vid && /^\d+$/.test(vid)) {
+            const embedSrc = `https://player.vimeo.com/video/${vid}?autoplay=1`;
+            return { kind: 'video', src: embedSrc, title: label, embedType: 'iframe' };
+          }
+        }
+      } catch { /* ignore */ }
+
+      // Any other video URL → proxy to strip X-Frame-Options
+      return { kind: 'video', src: proxyUrl(src), title: label, embedType: 'iframe' };
+    }
 
     case 'image': {
       if (!q) return null;
@@ -443,20 +523,70 @@ function resolveMonitor(kind, query) {
       return { kind: 'audio', src, title: label, embedType: 'audio' };
     }
 
+    case 'document': {
+      const src = safeUrl(q);
+      if (!src) return null;
+      let label;
+      try { label = decodeURIComponent(src.split('/').pop().split('?')[0]) || 'Document'; } catch { label = 'Document'; }
+
+      const ext2 = src.split('?')[0].split('#')[0].split('.').pop().toLowerCase();
+
+      // CAD formats — route to appropriate viewer
+      const cadResult = resolveCadUrl(src, ext2, label);
+      if (cadResult) return cadResult;
+
+      // PDF → browser renders natively inside iframe
+      if (ext2 === 'pdf') {
+        return { kind: 'document', src: proxyUrl(src), title: label, embedType: 'iframe' };
+      }
+
+      // Office / OpenDocument formats → Google Docs Viewer
+      const officeExts = ['doc','docx','xls','xlsx','ppt','pptx','odt','ods','odp','rtf','csv'];
+      if (officeExts.includes(ext2)) {
+        const viewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(src)}&embedded=true`;
+        return { kind: 'document', src: viewerUrl, title: label, embedType: 'iframe' };
+      }
+
+      // TXT or unknown → proxy directly
+      return { kind: 'document', src: proxyUrl(src), title: label, embedType: 'iframe' };
+    }
+
+    // CAD / EDA / 3D engineering formats
+    case 'cad': {
+      const src = safeUrl(q);
+      if (!src) return null;
+      let label;
+      try { label = decodeURIComponent(src.split('/').pop().split('?')[0]) || 'CAD File'; } catch { label = 'CAD File'; }
+      const ext3 = src.split('?')[0].split('#')[0].split('.').pop().toLowerCase();
+      const result = resolveCadUrl(src, ext3, label);
+      return result || { kind: 'cad', src, title: label, embedType: 'external' };
+    }
+
     case 'web': {
       const src = safeUrl(q);
       if (!src) return null;
       let label = src;
       try { label = new URL(src).hostname.replace(/^www\./, ''); } catch { /* ignore */ }
-      // Hosts that need cross-origin isolation (WebVM/CheerpX, JSLinux,
-      // v86) cannot render inside our iframe — the browser blocks
-      // SharedArrayBuffer without COOP+COEP and the page shows a broken
-      // file icon. Serve a friendly launcher card the user can click to
-      // open in a dedicated tab.
+      // Only truly cross-origin-isolated sites need a real tab;
+      // everything else goes through the proxy to strip X-Frame-Options.
       if (requiresExternalTab(src)) {
         return { kind: 'web', src, title: label, embedType: 'external' };
       }
-      return { kind: 'web', src, title: label, embedType: 'iframe' };
+      // Auto-detect document URLs even when kind='web'
+      const extW = src.split('?')[0].split('#')[0].split('.').pop().toLowerCase();
+      const docExts = ['pdf','doc','docx','xls','xlsx','ppt','pptx','odt','ods','odp','rtf'];
+      if (docExts.includes(extW)) {
+        return resolveMonitor('document', q);
+      }
+      // Route through server-side proxy — strips X-Frame-Options/CSP
+      return { kind: 'web', src: proxyUrl(src), title: label, embedType: 'iframe' };
+    }
+
+    case 'html': {
+      // Render raw HTML content directly on the monitor — used for math
+      // solutions, step-by-step demonstrations, formatted text, etc.
+      if (!q) return null;
+      return { kind: 'html', src: q, title: args?.title || 'Kelion — Demonstrație', embedType: 'html' };
     }
 
     case 'html': {
