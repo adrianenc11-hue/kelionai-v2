@@ -259,4 +259,91 @@ CREATE TABLE IF NOT EXISTS trial_usage (
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_trial_usage_first_ever ON trial_usage(first_ever_stamp_at);
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- Row Level Security (RLS) — Supabase Security Advisor P0
+-- ═══════════════════════════════════════════════════════════════════════
+-- KelionAI connects via DATABASE_URL (postgres role / service_role),
+-- NOT via the Supabase anon key. RLS MUST still be enabled so the
+-- public Data API (PostgREST) cannot be abused if the anon key leaks.
+-- The service_role bypasses RLS by default in Supabase, so our
+-- server queries remain unaffected.
+-- ═══════════════════════════════════════════════════════════════════════
+
+ALTER TABLE users                  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE referrals              ENABLE ROW LEVEL SECURITY;
+ALTER TABLE memory_items           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE push_subscriptions     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE proactive_log          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE credit_transactions    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE conversations          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE conversation_messages  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE voice_clone_events     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE action_history         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE visitor_events         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE studio_workspaces      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE credits_consume_state  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE trial_usage            ENABLE ROW LEVEL SECURITY;
+
+-- Allow the postgres/service_role to bypass RLS (idempotent).
+-- These policies are named kelion_service_* so they don't conflict with
+-- any future Supabase Auth policies you may add.
+DO $$ BEGIN
+  -- Users
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'kelion_service_users') THEN
+    CREATE POLICY kelion_service_users ON users FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+  -- Referrals
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'kelion_service_referrals') THEN
+    CREATE POLICY kelion_service_referrals ON referrals FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+  -- Memory items
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'kelion_service_memory') THEN
+    CREATE POLICY kelion_service_memory ON memory_items FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+  -- Push subscriptions
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'kelion_service_push') THEN
+    CREATE POLICY kelion_service_push ON push_subscriptions FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+  -- Proactive log
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'kelion_service_proactive') THEN
+    CREATE POLICY kelion_service_proactive ON proactive_log FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+  -- Credit transactions
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'kelion_service_credits') THEN
+    CREATE POLICY kelion_service_credits ON credit_transactions FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+  -- Conversations
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'kelion_service_conversations') THEN
+    CREATE POLICY kelion_service_conversations ON conversations FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+  -- Conversation messages
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'kelion_service_conv_messages') THEN
+    CREATE POLICY kelion_service_conv_messages ON conversation_messages FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+  -- Voice clone events
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'kelion_service_voice_clone') THEN
+    CREATE POLICY kelion_service_voice_clone ON voice_clone_events FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+  -- Action history
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'kelion_service_actions') THEN
+    CREATE POLICY kelion_service_actions ON action_history FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+  -- Visitor events
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'kelion_service_visitors') THEN
+    CREATE POLICY kelion_service_visitors ON visitor_events FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+  -- Studio workspaces
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'kelion_service_studio') THEN
+    CREATE POLICY kelion_service_studio ON studio_workspaces FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+  -- Credits consume state
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'kelion_service_consume') THEN
+    CREATE POLICY kelion_service_consume ON credits_consume_state FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+  -- Trial usage
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'kelion_service_trial') THEN
+    CREATE POLICY kelion_service_trial ON trial_usage FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+END $$;
 `;
