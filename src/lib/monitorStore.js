@@ -15,7 +15,7 @@ const STORAGE_KEY = 'kelion.monitor.v1';
 const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 const state = {
-  kind: null,        // 'map' | 'weather' | 'image' | 'wiki' | 'web' | 'audio' | null
+  kind: null,        // 'map' | 'weather' | 'image' | 'wiki' | 'web' | 'audio' | 'html' | null
   src: null,         // string — final URL (iframe), image URL, or audio stream URL
   title: null,       // short label shown above the frame
   embedType: 'iframe', // 'iframe' | 'image' | 'external' | 'audio'
@@ -113,7 +113,7 @@ function loadPersisted() {
     state.kind = parsed.kind;
     state.src = parsed.src;
     state.title = parsed.title || null;
-    state.embedType = ['image', 'external', 'audio'].includes(parsed.embedType)
+    state.embedType = ['image', 'external', 'audio', 'html'].includes(parsed.embedType)
       ? parsed.embedType
       : 'iframe';
     state.updatedAt = updatedAt;
@@ -171,7 +171,7 @@ function setState(patch) {
   state.title = patch.title ?? null;
   // Pin valid embed types only — anything else collapses to 'iframe'
   // so a stale persisted record doesn't render the wrong renderer.
-  const allowedEmbed = new Set(['iframe', 'image', 'external', 'audio']);
+  const allowedEmbed = new Set(['iframe', 'image', 'external', 'audio', 'html']);
   state.embedType = allowedEmbed.has(patch.embedType) ? patch.embedType : 'iframe';
   state.updatedAt = Date.now();
   savePersisted();
@@ -457,6 +457,13 @@ function resolveMonitor(kind, query) {
         return { kind: 'web', src, title: label, embedType: 'external' };
       }
       return { kind: 'web', src, title: label, embedType: 'iframe' };
+    }
+
+    case 'html': {
+      // Render raw HTML content directly on the monitor — used for math
+      // solutions, step-by-step demonstrations, formatted text, etc.
+      if (!q) return null;
+      return { kind: 'html', src: q, title: args?.title || 'Kelion — Demonstrație', embedType: 'html' };
     }
 
     default:

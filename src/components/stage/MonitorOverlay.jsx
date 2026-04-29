@@ -111,6 +111,7 @@ function MonitorOverlay() {
   const isImage = m.embedType === 'image'
   const isExternal = m.embedType === 'external'
   const isAudio = m.embedType === 'audio'
+  const isHtml = m.embedType === 'html'
   const externalCopy = isExternal ? externalCardCopy(m) : null
   const onClose = (e) => {
     e.stopPropagation()
@@ -202,7 +203,37 @@ function MonitorOverlay() {
         </button>
       </div>
       <div style={{ flex: '1 1 auto', minHeight: 0, background: '#0d0b1d' }}>
-        {isImage ? (
+        {isHtml ? (
+          <iframe
+            title={m.title || 'Kelion — Demonstrație'}
+            sandbox="allow-scripts"
+            style={{ width: '100%', height: '100%', border: 'none', background: '#0d0b1d', display: 'block' }}
+            srcDoc={`<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+              * { box-sizing: border-box; margin: 0; padding: 0; }
+              body {
+                font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+                background: #0d0b1d; color: #ede9fe;
+                padding: 24px 28px; line-height: 1.7; font-size: 15px;
+                overflow-y: auto;
+              }
+              h1, h2, h3 { color: #c4b5fd; margin: 18px 0 10px; }
+              h1 { font-size: 22px; border-bottom: 2px solid rgba(167,139,250,0.3); padding-bottom: 8px; }
+              h2 { font-size: 18px; }
+              h3 { font-size: 16px; }
+              p { margin: 8px 0; }
+              ol, ul { padding-left: 24px; margin: 10px 0; }
+              li { margin: 6px 0; }
+              .step { background: rgba(124,58,237,0.12); border-left: 3px solid #7c3aed; padding: 12px 16px; margin: 12px 0; border-radius: 0 8px 8px 0; }
+              .step-num { color: #a78bfa; font-weight: 700; font-size: 13px; text-transform: uppercase; margin-bottom: 4px; }
+              .result { background: rgba(34,197,94,0.15); border: 1px solid rgba(34,197,94,0.4); padding: 14px 18px; border-radius: 10px; margin: 16px 0; font-weight: 600; font-size: 17px; text-align: center; color: #86efac; }
+              .formula { background: rgba(167,139,250,0.1); padding: 8px 14px; border-radius: 6px; font-family: 'Cambria Math', 'Times New Roman', serif; font-size: 17px; text-align: center; margin: 10px 0; letter-spacing: 0.5px; }
+              code { background: rgba(167,139,250,0.15); padding: 2px 6px; border-radius: 4px; font-size: 14px; }
+              table { border-collapse: collapse; margin: 12px 0; width: 100%; }
+              th, td { border: 1px solid rgba(167,139,250,0.25); padding: 8px 12px; text-align: left; }
+              th { background: rgba(124,58,237,0.2); color: #c4b5fd; }
+            </style></head><body>${m.src}</body></html>`}
+          />
+        ) : isImage ? (
           <img
             src={m.src}
             alt={m.title || 'Monitor content'}
