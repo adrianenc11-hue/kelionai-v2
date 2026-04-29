@@ -500,6 +500,15 @@ const KELION_TOOLS = [
     required: ['observation'],
   },
   {
+    name: 'remember_fact',
+    description: "Save an important fact about the user to long-term memory. Use this PROACTIVELY whenever the user shares personal information: their name, job, preferences, family, routines, goals, or any detail worth remembering for future conversations. AUTOMATICALLY call this — do NOT ask the user 'should I remember this?'. Say naturally 'Am retinut.' or equivalent in the user's language. Also use when the user explicitly says 'remember this' / 'ține minte'. Guests get a no-op.",
+    properties: {
+      fact: { type: 'string', description: "The fact to remember, in third person. E.g. 'User's name is Adrian', 'Prefers dark mode', 'Has a dog named Rex', 'Works as a software engineer'." },
+      kind: { type: 'string', enum: ['fact', 'preference', 'routine', 'context', 'skill', 'goal'], description: "Category. Default 'fact'." },
+    },
+    required: ['fact'],
+  },
+  {
     name: 'calculate',
     description: "Evaluate a math expression DETERMINISTICALLY using a local math engine (mathjs). Use this whenever the user asks you to compute anything — arithmetic, percentages, unit-free conversions, algebraic expressions. NEVER do mental math for anything beyond a trivial one-digit sum. Examples: '127 * 38', 'sqrt(2) + log(10)', '12% of 340', '(100 - 35) / 2'.",
     properties: {
@@ -1815,11 +1824,25 @@ router.post('/pipeline', async (req, res) => {
         let args = {};
         try { args = JSON.parse(tc.function.arguments || '{}'); } catch { }
         toolCalls.push({ name: tc.function.name, args });
-        // Execute tool server-side via the real tool dispatcher
+        // Execute tool server-side via the real tool dispatcher.
+        // CRITICAL: pass ctx with user so memory, location, credits etc. work.
         let result = { status: 'tool_not_found' };
         try {
           const { executeRealTool } = require('../services/realTools');
-          result = await executeRealTool(tc.function.name, args);
+          const latRaw = req?.query?.lat ?? req?.body?.lat ?? req?.body?.latitude;
+          const lonRaw = req?.query?.lon ?? req?.query?.lng ?? req?.body?.lon ?? req?.body?.lng ?? req?.body?.longitude;
+          const accRaw = req?.query?.acc ?? req?.body?.acc ?? req?.body?.accuracy;
+          const lat = latRaw === undefined || latRaw === null || latRaw === '' ? undefined : Number(latRaw);
+          const lon = lonRaw === undefined || lonRaw === null || lonRaw === '' ? undefined : Number(lonRaw);
+          const acc = accRaw === undefined || accRaw === null || accRaw === '' ? undefined : Number(accRaw);
+          const coords = Number.isFinite(lat) && Number.isFinite(lon)
+            ? {
+                lat,
+                lon,
+                ...(Number.isFinite(acc) ? { acc } : {}),
+              }
+            : undefined;
+          result = await executeRealTool(tc.function.name, args, { user, req, coords });
         } catch (err) {
           result = { error: err.message };
         }

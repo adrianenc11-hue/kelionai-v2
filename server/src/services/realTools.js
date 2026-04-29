@@ -2531,7 +2531,38 @@ async function executeRealTool(name, args, ctx) {
     case 'get_action_history': return toolGetActionHistory(a, ctx);
     // ── Silent vision auto-learn — write durable observations ──
     case 'learn_from_observation': return toolLearnFromObservation(a, ctx);
+    // ── Explicit memory from text chat — user says "my name is X" etc. ──
+    case 'remember_fact': return toolRememberFact(a, ctx);
     default:                  return null; // signal "not handled here"
+  }
+}
+
+// Explicit memory save — user tells Kelion something worth remembering.
+// Unlike learn_from_observation (camera inferences, low confidence),
+// these are direct user statements → HIGH confidence (0.9).
+async function toolRememberFact(args, ctx) {
+  const userId = ctx?.user?.id;
+  if (!userId) {
+    return { ok: true, signed_in: false, persisted: 0, note: 'Guest — memory only works when signed in.' };
+  }
+  const factText = typeof args?.fact === 'string' ? args.fact.trim() : '';
+  if (!factText) return { ok: false, error: 'fact is required' };
+  const fact = factText.slice(0, 500);
+  const kindIn = typeof args?.kind === 'string' ? args.kind.trim().toLowerCase() : '';
+  const allowed = new Set(['fact', 'preference', 'routine', 'context', 'skill', 'goal']);
+  const kind = allowed.has(kindIn) ? kindIn : 'fact';
+  try {
+    const db = require('../db');
+    const inserted = await db.addMemoryItems(userId, [{
+      kind,
+      fact,
+      subject: 'self',
+      confidence: 0.9, // HIGH — user explicitly stated this
+    }]);
+    return { ok: true, signed_in: true, persisted: inserted.length };
+  } catch (err) {
+    console.warn('[remember_fact] failed:', err && err.message);
+    return { ok: false, error: 'persist failed' };
   }
 }
 
@@ -2643,6 +2674,8 @@ const REAL_TOOL_NAMES = [
   // Kelion can check "did I already email that?" before re-running.
   // Returns `{ ok:false, signed_in:false }` for guests.
   'get_action_history',
+  // Explicit memory save — user tells Kelion something worth remembering.
+  'remember_fact',
 ];
 
 module.exports = {
@@ -2710,6 +2743,8 @@ module.exports = {
   toolGetActionHistory,
   // Silent auto-learn — observations from camera persisted to memory_items
   toolLearnFromObservation,
+  // Explicit memory save from text chat
+  toolRememberFact,
   // Faza A — global live radio search (radio-browser.info, ~50k stations)
   toolPlayRadio,
 };

@@ -109,6 +109,8 @@ const EXPECTED_TOOL_NAMES = [
   // announcing the call and forbids reciting accumulated memory back
   // to the user.
   'learn_from_observation',
+  // Explicit memory save from text chat — user says facts about themselves.
+  'remember_fact',
   // Faza A — global live-radio search. Adrian's directive: Kelion must
   // be able to find and play any radio station, anywhere in the world,
   // in any language. Backed by radio-browser.info (~50k stations, free,
