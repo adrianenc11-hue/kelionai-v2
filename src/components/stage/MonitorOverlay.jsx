@@ -111,6 +111,8 @@ function MonitorOverlay() {
   const isImage = m.embedType === 'image'
   const isExternal = m.embedType === 'external'
   const isAudio = m.embedType === 'audio'
+  const isHtml = m.embedType === 'html'
+  const isVideo = m.embedType === 'video'
   const externalCopy = isExternal ? externalCardCopy(m) : null
   const onClose = (e) => {
     e.stopPropagation()
@@ -202,7 +204,94 @@ function MonitorOverlay() {
         </button>
       </div>
       <div style={{ flex: '1 1 auto', minHeight: 0, background: '#0d0b1d' }}>
-        {isImage ? (
+        {isHtml ? (
+          <iframe
+            title={m.title || 'Kelion — Demonstrație'}
+            sandbox="allow-scripts allow-same-origin"
+            style={{ width: '100%', height: '100%', border: 'none', background: '#0d0b1d', display: 'block' }}
+            srcDoc={`<!DOCTYPE html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"><\/script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"><\/script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"><\/script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.0/dist/mermaid.min.js"><\/script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"><\/script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"><\/script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: #0d0b1d; color: #ede9fe;
+    padding: 24px 28px; line-height: 1.7; font-size: 15px;
+    overflow-y: auto;
+  }
+  h1, h2, h3 { color: #c4b5fd; margin: 18px 0 10px; }
+  h1 { font-size: 22px; border-bottom: 2px solid rgba(167,139,250,0.3); padding-bottom: 8px; }
+  h2 { font-size: 18px; } h3 { font-size: 16px; }
+  p { margin: 8px 0; }
+  ol, ul { padding-left: 24px; margin: 10px 0; } li { margin: 6px 0; }
+  .step { background: rgba(124,58,237,0.12); border-left: 3px solid #7c3aed; padding: 12px 16px; margin: 12px 0; border-radius: 0 8px 8px 0; }
+  .step-num { color: #a78bfa; font-weight: 700; font-size: 13px; text-transform: uppercase; margin-bottom: 4px; }
+  .result { background: rgba(34,197,94,0.15); border: 1px solid rgba(34,197,94,0.4); padding: 14px 18px; border-radius: 10px; margin: 16px 0; font-weight: 600; font-size: 17px; text-align: center; color: #86efac; }
+  .formula { background: rgba(167,139,250,0.1); padding: 8px 14px; border-radius: 6px; font-size: 17px; text-align: center; margin: 10px 0; }
+  .katex { color: #e2d9f3; }
+  .katex-display { margin: 16px 0; }
+  code { background: rgba(167,139,250,0.15); padding: 2px 6px; border-radius: 4px; font-size: 14px; }
+  table { border-collapse: collapse; margin: 12px 0; width: 100%; }
+  th, td { border: 1px solid rgba(167,139,250,0.25); padding: 8px 12px; text-align: left; }
+  th { background: rgba(124,58,237,0.2); color: #c4b5fd; }
+  canvas { max-width: 100%; border-radius: 12px; }
+  .chart-container { background: rgba(255,255,255,0.03); border: 1px solid rgba(167,139,250,0.15); border-radius: 12px; padding: 16px; margin: 16px 0; }
+<\/style><\/head><body>${m.src}
+<script>
+  // Auto-render KaTeX: $...$ inline, $$...$$ block
+  if (window.renderMathInElement) {
+    renderMathInElement(document.body, {
+      delimiters: [
+        {left: '$$', right: '$$', display: true},
+        {left: '$', right: '$', display: false},
+        {left: '\\\\(', right: '\\\\)', display: false},
+        {left: '\\\\[', right: '\\\\]', display: true}
+      ],
+      throwOnError: false
+    });
+  }
+  // Auto-render Mermaid diagrams: <div class="mermaid">...</div>
+  if (window.mermaid) {
+    mermaid.initialize({ startOnLoad: true, theme: 'dark',
+      themeVariables: { darkMode: true, background: '#0d0b1d', primaryColor: '#7c3aed',
+        primaryTextColor: '#ede9fe', lineColor: '#a78bfa', fontSize: '14px' }
+    });
+  }
+  // Prism code highlighting runs automatically via autoloader
+<\/script><\/body><\/html>`}
+          />
+
+
+
+        ) : isVideo ? (
+          <div style={{
+            width: '100%', height: '100%',
+            display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center',
+            background: '#000',
+          }}>
+            <video
+              src={m.src}
+              controls
+              autoPlay
+              playsInline
+              style={{ width: '100%', height: '100%', maxHeight: '100%', outline: 'none', background: '#000' }}
+              onError={() => {
+                try { console.warn('[monitor] video failed to load', m.src) } catch (_) {}
+              }}
+            >
+              <source src={m.src} />
+              Your browser does not support video playback.
+            </video>
+          </div>
+        ) : isImage ? (
           <img
             src={m.src}
             alt={m.title || 'Monitor content'}

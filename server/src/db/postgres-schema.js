@@ -260,6 +260,22 @@ CREATE TABLE IF NOT EXISTS trial_usage (
 );
 CREATE INDEX IF NOT EXISTS idx_trial_usage_first_ever ON trial_usage(first_ever_stamp_at);
 
+CREATE TABLE IF NOT EXISTS demo_requests (
+  id         BIGSERIAL PRIMARY KEY,
+  first_name TEXT NOT NULL,
+  last_name  TEXT NOT NULL,
+  email      TEXT NOT NULL,
+  status     TEXT NOT NULL DEFAULT 'pending',
+  demo_code  TEXT UNIQUE,
+  approved_at   TIMESTAMPTZ,
+  approved_by   TEXT,
+  activated_at  TIMESTAMPTZ,
+  activated_user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_demo_requests_email ON demo_requests(email);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_demo_requests_code ON demo_requests(demo_code) WHERE demo_code IS NOT NULL;
+
 -- ═══════════════════════════════════════════════════════════════════════
 -- Row Level Security (RLS) — Supabase Security Advisor P0
 -- ═══════════════════════════════════════════════════════════════════════
@@ -284,6 +300,7 @@ ALTER TABLE visitor_events         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE studio_workspaces      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE credits_consume_state  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE trial_usage            ENABLE ROW LEVEL SECURITY;
+ALTER TABLE demo_requests           ENABLE ROW LEVEL SECURITY;
 
 -- Allow the postgres/service_role to bypass RLS (idempotent).
 -- These policies are named kelion_service_* so they don't conflict with
@@ -344,6 +361,10 @@ DO $$ BEGIN
   -- Trial usage
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'kelion_service_trial') THEN
     CREATE POLICY kelion_service_trial ON trial_usage FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+  -- Demo requests
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'kelion_service_demo') THEN
+    CREATE POLICY kelion_service_demo ON demo_requests FOR ALL USING (true) WITH CHECK (true);
   END IF;
 END $$;
 `;

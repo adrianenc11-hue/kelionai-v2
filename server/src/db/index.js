@@ -471,6 +471,28 @@ async function initDb() {
   `);
   await db.exec('CREATE INDEX IF NOT EXISTS idx_trial_usage_first_ever ON trial_usage(first_ever_stamp_at)');
 
+  // Demo request system — landing page visitors request a demo account,
+  // admin approves and generates a unique code, visitor activates it for
+  // a one-time 15-min free trial.
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS demo_requests (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      first_name TEXT NOT NULL,
+      last_name TEXT NOT NULL,
+      email TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      demo_code TEXT UNIQUE,
+      approved_at DATETIME,
+      approved_by TEXT,
+      activated_at DATETIME,
+      activated_user_id INTEGER,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (activated_user_id) REFERENCES users(id) ON DELETE SET NULL
+    )
+  `);
+  await db.exec('CREATE INDEX IF NOT EXISTS idx_demo_requests_email ON demo_requests(email)');
+  await db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_demo_requests_code ON demo_requests(demo_code) WHERE demo_code IS NOT NULL');
+
   return db;
 }
 
