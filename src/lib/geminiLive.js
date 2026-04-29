@@ -1265,46 +1265,55 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
     }
   }, [])
 
-  // sendText — typed text through the live WebSocket (Canal B only).
-  // FIX: must wait for setupComplete (status === 'listening'), NOT just
-  // ws.readyState === OPEN. The WS is OPEN at onopen — BEFORE Google's
-  // setupComplete ack. Sending clientContent before setupComplete violates
-  // the Gemini Live protocol: Google silently drops the message or kills
-  // the socket with 1007. This was the root cause of "text chat doesn't
-  // reach the AI" (April 2026).
+  // sendText — typed text through the live WebSocket, with REST fallback.
+  // If the WebSocket is not connected or fails to connect, falls back to
+  // /api/realtime/pipeline (Gemini REST) so text chat ALWAYS works.
   const sendText = useCallback(async (text) => {
     if (!text || typeof text !== 'string') return
     const trimmed = text.trim()
     if (!trimmed) return
     appendTurn('user', trimmed, true)
     lastActivityAtRef.current = Date.now()
+    setStatus('thinking')
+
+    // Try WebSocket path first (if voice session is active)
     const ws = wsRef.current
-    // If no live session, start one and wait for setupComplete.
-    if (!ws || ws.readyState !== WebSocket.OPEN || statusRef.current === 'idle') {
-      await start({ textOnly: true })
-      // Poll until the session is fully initialised (setupComplete sets
-      // status to 'listening') or a terminal state is reached.
-      const deadline = Date.now() + 8000
-      while (Date.now() < deadline) {
-        const s = statusRef.current
-        if (s === 'listening') break
-        if (s === 'error' || s === 'idle') break
-        await new Promise(r => setTimeout(r, 150))
-      }
-    }
-    // Even when the session was already open, double-check that the WS is
-    // alive and that we're past setupComplete before sending.
-    const activeWs = wsRef.current
-    if (activeWs && activeWs.readyState === WebSocket.OPEN && statusRef.current === 'listening') {
-      activeWs.send(JSON.stringify({
+    if (ws && ws.readyState === WebSocket.OPEN && statusRef.current !== 'idle') {
+      ws.send(JSON.stringify({
         clientContent: {
           turns: [{ role: 'user', parts: [{ text: trimmed }] }],
           turnComplete: true,
         },
       }))
-      setStatus('thinking')
+      return
     }
-  }, [appendTurn, start])
+
+    // REST fallback — /api/realtime/pipeline (Gemini Flash)
+    try {
+      const history = turns.map(t => ({ role: t.role, text: t.text })).slice(-20)
+      const lang = encodeURIComponent(navigator.language || 'en-US')
+      const r = await fetch(`/api/realtime/pipeline?lang=${lang}`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+        body: JSON.stringify({
+          textOverride: trimmed,
+          history,
+        }),
+      })
+      if (!r.ok) {
+        const body = await r.json().catch(() => ({}))
+        throw new Error(body.error || `HTTP ${r.status}`)
+      }
+      const data = await r.json()
+      if (data.assistantText) appendTurn('assistant', data.assistantText, true)
+    } catch (err) {
+      console.error('[gemini-live] sendText REST fallback error:', err)
+      setError(err.message || 'Chat failed')
+    } finally {
+      setStatus(wsRef.current && wsRef.current.readyState === WebSocket.OPEN ? 'listening' : 'idle')
+    }
+  }, [appendTurn, start, turns])
 
   // Allow the parent to clear or seed the transcript (used by history
   // load, new-conversation, sign-out). Avoids duplicating state.
