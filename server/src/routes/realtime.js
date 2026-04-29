@@ -1580,7 +1580,7 @@ router.post('/vision', visionLimiter, async (req, res) => {
       timeInfo = ` Current date: ${timeContext.date || 'unknown'}. Time: ${timeContext.time || 'unknown'} (${timeContext.timezone || 'unknown timezone'}). Time of day: ${timeContext.timeOfDay || 'unknown'}.`;
     }
 
-    const visionModel = process.env.GEMINI_VISION_MODEL || 'gemini-2.5-flash';
+    const visionModel = process.env.GEMINI_VISION_MODEL || 'gemini-3.1-pro-preview';
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${visionModel}:generateContent?key=${apiKey}`;
 
     const r = await fetch(url, {
@@ -1706,7 +1706,7 @@ router.post('/pipeline', async (req, res) => {
     // Build tools in Gemini format
     const geminiTools = buildKelionToolsGemini();
 
-    const chatModel = process.env.GEMINI_CHAT_MODEL || 'gemini-2.5-flash';
+    const chatModel = process.env.GEMINI_CHAT_MODEL || 'gemini-3.1-pro-preview';
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${chatModel}:generateContent?key=${apiKey}`;
 
     const body = {

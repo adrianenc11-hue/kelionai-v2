@@ -79,7 +79,7 @@ module.exports = {
 
   gemini: {
     apiKey:       optional('GEMINI_API_KEY'),
-    chatModel:    optional('GEMINI_CHAT_MODEL', 'gemini-3-flash-preview'),
+    chatModel:    optional('GEMINI_CHAT_MODEL', 'gemini-3.1-pro-preview'),
     // Keep this default in sync with server/src/routes/realtime.js — both
     // read GEMINI_LIVE_MODEL directly, so the fallbacks must match.
     //
