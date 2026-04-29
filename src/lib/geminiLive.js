@@ -7,6 +7,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { runTool } from './kelionTools'
+import { isClonedVoiceActive, setDetectedLang } from './voiceModeStore'
 import { setCameraController, setCurrentFacingMode } from './cameraControl'
 import { getCsrfToken } from './api'
 import { subscribeNarrationMode, getNarrationMode } from './narrationMode'
@@ -291,6 +292,9 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
   // so that modelTurn.parts[].text arriving in a LATER frame is not
   // appended a second time. Reset on turnComplete.
   const turnHasTranscriptRef = useRef(false)
+  // Buffer for cloned-voice TTS: accumulates outputTranscription chunks
+  // across frames; flushed to ElevenLabs on turnComplete.
+  const cloneTranscriptBufRef = useRef('')
 
   const handleMessage = useCallback(async (raw, ws) => {
     let msg
@@ -324,42 +328,71 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
       if (sc.inputTranscription?.text) {
         appendTurn('user', sc.inputTranscription.text, false)
         lastActivityAtRef.current = Date.now()
+        // Detect language from what the user says (first word heuristic)
+        // so ElevenLabs TTS speaks in the right language.
+        const langHint = sc.inputTranscription.lang || sc.inputTranscription.languageCode
+        if (langHint) setDetectedLang(langHint)
       }
-      // outputTranscription is Gemini's own transcript of what it said.
-      // modelTurn.parts[].text carries the same content inline. Processing
-      // both causes the assistant's reply to appear twice in the chat.
-      // We prefer outputTranscription (cleaner, post-processed by Gemini)
-      // and skip part.text when it was already handled.
-      // FIX: use a per-turn ref (not a per-frame local) so that
-      // outputTranscription arriving in frame N still suppresses
-      // modelTurn.parts[].text arriving in frame N+1.
       if (sc.outputTranscription?.text) {
         appendTurn('assistant', sc.outputTranscription.text, false)
         turnHasTranscriptRef.current = true
         lastActivityAtRef.current = Date.now()
+        // Accumulate for cloned TTS flush on turnComplete
+        if (isClonedVoiceActive()) {
+          cloneTranscriptBufRef.current += sc.outputTranscription.text
+        }
       }
 
       const parts = sc.modelTurn?.parts || []
       for (const part of parts) {
         const inline = part.inlineData || part.inline_data
         if (inline?.data && inline.mimeType?.startsWith('audio/')) {
-          const bytes = bytesFromBase64(inline.data)
-          enqueueAudio(bytes)
+          // Skip Gemini audio when cloned voice mode is active — we'll
+          // synthesise from the transcript instead.
+          if (!isClonedVoiceActive()) {
+            const bytes = bytesFromBase64(inline.data)
+            enqueueAudio(bytes)
+          }
         }
-        // Only append text if we didn't already get it from outputTranscription
         if (part.text && !turnHasTranscriptRef.current) {
           appendTurn('assistant', part.text, false)
         }
       }
 
       if (sc.turnComplete) {
-        // We no longer reset turnActiveRef.current here. Resetting on turnComplete
-        // causes tool calls (which span multiple server turns) to split the
-        // assistant's reply into multiple chat bubbles ("mai multe intrari in chat").
-        // Reset the per-turn transcript dedup flag so the NEXT turn
-        // can accept either outputTranscription or inline text again.
         turnHasTranscriptRef.current = false
-        if (!playbackPlayingRef.current) setStatus('listening')
+        // Cloned voice: flush accumulated transcript to ElevenLabs TTS
+        if (isClonedVoiceActive() && cloneTranscriptBufRef.current.trim()) {
+          const textToSpeak = cloneTranscriptBufRef.current.trim()
+          cloneTranscriptBufRef.current = ''
+          ;(async () => {
+            try {
+              setStatus('speaking')
+              const r = await fetch('/api/voice/clone/tts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ text: textToSpeak }),
+              })
+              if (!r.ok) { setStatus('listening'); return }
+              const audioData = await r.arrayBuffer()
+              const ctx = playbackCtxRef.current
+                || (playbackCtxRef.current = new (window.AudioContext || window.webkitAudioContext)())
+              const decoded = await ctx.decodeAudioData(audioData)
+              const src = ctx.createBufferSource()
+              src.buffer = decoded
+              src.connect(ctx.destination)
+              src.start()
+              src.onended = () => setStatus('listening')
+            } catch (err) {
+              console.error('[geminiLive] cloned TTS failed', err)
+              setStatus('listening')
+            }
+          })()
+        } else {
+          cloneTranscriptBufRef.current = ''
+          if (!playbackPlayingRef.current) setStatus('listening')
+        }
       } else if (sc.generationComplete) {
         setStatus('speaking')
       }

@@ -327,7 +327,82 @@ router.patch('/', async (req, res) => {
   }
 });
 
+// POST /api/voice/clone/tts
+// Synthesise speech with the user's cloned ElevenLabs voice.
+// Body: { text: string, speed?: number (0.7-1.2) }
+// Returns: audio/mpeg stream
+router.post('/tts', async (req, res) => {
+  const userId = uidOf(req);
+  if (!userId) return res.status(401).json({ error: 'Not authenticated.' });
+
+  const { text, speed = 1.0 } = req.body || {};
+  if (!text || typeof text !== 'string' || !text.trim()) {
+    return res.status(400).json({ error: 'text is required.' });
+  }
+
+  let cloneInfo;
+  try {
+    cloneInfo = await getClonedVoice(userId);
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to load voice clone state.' });
+  }
+  if (!cloneInfo || !cloneInfo.voiceId || !cloneInfo.enabled) {
+    return res.status(404).json({ error: 'No active cloned voice. Create and enable one first.' });
+  }
+
+  const apiKey = process.env.ELEVENLABS_API_KEY;
+  if (!apiKey) return res.status(503).json({ error: 'ElevenLabs not configured on server.' });
+
+  try {
+    const r = await fetch(
+      `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(cloneInfo.voiceId)}/stream`,
+      {
+        method: 'POST',
+        headers: {
+          'xi-api-key': apiKey,
+          'Content-Type': 'application/json',
+          'Accept': 'audio/mpeg',
+        },
+        body: JSON.stringify({
+          text: text.trim().slice(0, 5000),
+          model_id: 'eleven_turbo_v2_5',
+          voice_settings: {
+            stability: 0.5,
+            similarity_boost: 0.75,
+            speed: Math.max(0.7, Math.min(1.2, Number(speed) || 1.0)),
+          },
+        }),
+      }
+    );
+
+    if (!r.ok) {
+      const errText = await r.text().catch(() => '');
+      console.error(`[voice/tts] ElevenLabs ${r.status}: ${errText.slice(0, 500)}`);
+      return res.status(r.status === 401 ? 401 : 502).json({
+        error: r.status === 401 ? 'ElevenLabs API key invalid.' : `TTS failed (${r.status}).`,
+      });
+    }
+
+    res.setHeader('Content-Type', 'audio/mpeg');
+    res.setHeader('Cache-Control', 'no-store');
+    // Log audit event (fire-and-forget)
+    logVoiceCloneEvent({
+      userId, action: 'synthesize', voiceId: cloneInfo.voiceId,
+      consentVersion: cloneInfo.consentVersion || null,
+      ip: ipOf(req), userAgent: uaOf(req),
+      note: `chars:${text.trim().length}`,
+    }).catch(() => {});
+    // Stream the audio directly to the client
+    const { Readable } = require('stream');
+    Readable.fromWeb(r.body).pipe(res);
+  } catch (err) {
+    console.error('[voice/tts] network error:', err?.message);
+    return res.status(502).json({ error: `ElevenLabs network error: ${err?.message}` });
+  }
+});
+
 // P1 fix — POST /api/voice/clone/synthesize
+
 // Log a 'synthesize' audit event when the cloned voice is actually
 // used for TTS. The TTS layer (or any future integration) calls this
 // endpoint whenever it synthesises speech with a user's cloned voice.
