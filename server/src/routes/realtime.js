@@ -224,6 +224,7 @@ IMPORTANT: If you search the web or look for something and CANNOT find any resul
 When you display something on the monitor, assume you can 'see' it because you put it there - do not complain that you cannot see the screen.
 MONITOR AUTO-CLEAR: When the user asks a NEW question that is UNRELATED to what is currently displayed on the monitor, FIRST clear the monitor (show_on_monitor kind='clear'), THEN process the new request. Only keep the monitor content if the new question is a direct follow-up to the displayed content.
 MONITOR PAGING: When displaying content related to the chat (search results, articles, references), show results one page at a time. If there are multiple pages, show each page sequentially as the conversation progresses, maintaining logical connection between what is on the monitor and what is being discussed.
+MATH/CALCULATIONS: When the user asks you to solve ANY math problem, equation, geometry problem, or anything requiring calculation — you MUST show the FULL step-by-step solution on the monitor using show_on_monitor with kind='html'. Format the solution as clear HTML with: numbered steps, mathematical expressions, diagrams described in text, and the final answer highlighted. Include ALL intermediate steps — never show just the final result. Use proper mathematical notation. The user's physical monitor and YOUR presentation monitor are DIFFERENT things — YOUR monitor is the display panel in the 3D scene.
 
 Silent tools (never mention these to user): observe_user_emotion, learn_from_observation, get_action_history.
 
@@ -384,8 +385,8 @@ const KELION_TOOLS = [
     properties: {
       kind: {
         type: 'string',
-        enum: ['map', 'weather', 'image', 'wiki', 'web', 'audio', 'clear'],
-        description: "Type of content: 'map' = Google Maps for a place; 'weather' = forecast for a city; 'image' = photo search; 'wiki' = Wikipedia article; 'web' = arbitrary URL (must start with https://); 'audio' = live audio stream URL (radio, podcast feed, .mp3/.aac/.m3u8) rendered as an HTML5 audio player on the monitor; 'clear' = blank the monitor.",
+        enum: ['map', 'weather', 'image', 'wiki', 'web', 'audio', 'html', 'clear'],
+        description: "Type of content: 'map' = Google Maps for a place; 'weather' = forecast for a city; 'image' = photo search; 'wiki' = Wikipedia article; 'web' = arbitrary URL (must start with https://); 'audio' = live audio stream URL (radio, podcast feed, .mp3/.aac/.m3u8) rendered as an HTML5 audio player on the monitor; 'html' = formatted HTML content (math solutions, step-by-step demonstrations, calculations with all steps, formatted text) displayed directly on the monitor — pass the full HTML string as `query`; 'clear' = blank the monitor.",
       },
       query: { type: 'string', description: "Search term, URL, or stream URL. Examples: 'Cluj-Napoca', 'New York', 'sunset mountains', 'Paris', 'https://en.wikipedia.org/wiki/Artificial_intelligence', 'https://stream.example.fm/radio.aac'. For audio: pass the directly-playable HTTP(S) stream URL returned by play_radio. For a Linux shell / terminal, pass kind='web' with query='https://webvm.io'. Required unless kind='clear'." },
       title: { type: 'string', description: "Optional human-friendly label shown above the monitor. For audio playback, pass the station name (e.g. 'Radio ZU — Bucharest'). Otherwise omit and the monitor builds a title from the kind+query." },
