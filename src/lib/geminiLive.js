@@ -374,16 +374,24 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
                 credentials: 'include',
                 body: JSON.stringify({ text: textToSpeak }),
               })
-              if (!r.ok) { setStatus('listening'); return }
+              if (!r.ok) {
+                const errText = await r.text().catch(() => '')
+                console.error('[geminiLive] cloned TTS error', r.status, errText)
+                setStatus('listening')
+                return
+              }
               const audioData = await r.arrayBuffer()
-              const ctx = playbackCtxRef.current
-                || (playbackCtxRef.current = new (window.AudioContext || window.webkitAudioContext)())
+              // Use a dedicated AudioContext for mp3 (different from the
+              // 24kHz PCM context used for Gemini audio playback).
+              const ctx = new (window.AudioContext || window.webkitAudioContext)()
+              // Resume — browsers suspend AudioContext until a user gesture.
+              if (ctx.state === 'suspended') await ctx.resume()
               const decoded = await ctx.decodeAudioData(audioData)
               const src = ctx.createBufferSource()
               src.buffer = decoded
               src.connect(ctx.destination)
               src.start()
-              src.onended = () => setStatus('listening')
+              src.onended = () => { setStatus('listening'); ctx.close() }
             } catch (err) {
               console.error('[geminiLive] cloned TTS failed', err)
               setStatus('listening')
