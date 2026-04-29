@@ -816,4 +816,4 @@ function ExportButtons() {
   )
 }
 
-export { TopBarIconButton, AdminTabBar, VisitorsAnalyticsPanel, PayoutsPanel, MenuItem, friendlyCreditStatus, uaIsBot, uaBrowser, uaOs, refHost, RevenueChart, LiveSessionsPanel, ExportButtons }
+export { TopBarIconButton, AdminTabBar, VisitorsAnalyticsPanel, PayoutsPanel, MenuItem, friendlyCreditStatus, uaIsBot, uaBrowser, uaOs, refHost, flagEmoji, RevenueChart, LiveSessionsPanel, ExportButtons }
