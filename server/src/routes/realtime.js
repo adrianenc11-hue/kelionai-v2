@@ -1065,6 +1065,16 @@ const KELION_TOOLS = [
     },
     required: ['prompt'],
   },
+  {
+    // Switch between Gemini's built-in voice and the user's ElevenLabs cloned voice.
+    // Handled entirely on the client — kelionTools.js calls setVoiceMode().
+    name: 'switch_voice',
+    description: "Switch Kelion's voice between 'default' (Gemini built-in) and 'cloned' (the user's ElevenLabs cloned voice). Use 'cloned' when the user asks to hear their own voice or says 'use my voice' / 'switch to my voice' / 'use cloned voice'. Use 'default' to revert to normal Gemini voice. Only works if the user has previously created a voice clone.",
+    properties: {
+      mode: { type: 'string', description: "Target voice mode.", enum: ['default', 'cloned'] },
+    },
+    required: ['mode'],
+  },
 ];
 
 // Gemini v1alpha BidiGenerateContent — JSON schema with UPPERCASE types and
