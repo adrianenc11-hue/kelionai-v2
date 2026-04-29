@@ -816,16 +816,38 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
   const startCamera = useCallback(async (opts = {}) => {
     setVisionError(null)
     if (cameraStreamRef.current) return
+    // Default to back (environment) camera for AI vision — higher resolution,
+    // sees what the user sees. Front (selfie) only when explicitly requested.
     const facing = (opts.side === 'front' || opts.facingMode === 'user') ? 'user' : 'environment'
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: facing }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+        video: {
+          facingMode: { ideal: facing },
+          // Request max resolution — the device will give the highest it supports.
+          // Back cameras on modern phones support 4K (3840x2160) or 48/108MP downscaled.
+          width: { ideal: 3840 },
+          height: { ideal: 2160 },
+        },
         audio: false,
       })
       cameraStreamRef.current = stream
       setCameraStream(stream)
       setCurrentFacingMode(facing)
       startFrameStream(stream, opts.visionMode || 'dynamic')
+
+      // Apply initial zoom if requested (optical zoom on supported devices)
+      if (opts.zoom && opts.zoom > 1) {
+        const track = stream.getVideoTracks()[0]
+        if (track) {
+          try {
+            const capabilities = track.getCapabilities()
+            if (capabilities.zoom) {
+              const clampedZoom = Math.min(opts.zoom, capabilities.zoom.max)
+              await track.applyConstraints({ advanced: [{ zoom: clampedZoom }] })
+            }
+          } catch (_) { /* zoom not supported on this device */ }
+        }
+      }
     } catch (e) {
       if (e.name !== 'NotAllowedError') setVisionError(e.message || 'Camera failed')
       throw e
@@ -874,8 +896,13 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
     setCameraController({
       start: (opts) => startCamera(opts),
       stop: () => stopCamera(),
-      restart: (opts) => startCamera(opts),
-      getFacingMode: () => 'user',
+      restart: async (opts) => {
+        stopCamera()
+        // Small delay to ensure hardware releases the camera
+        await new Promise(r => setTimeout(r, 300))
+        return startCamera(opts)
+      },
+      getFacingMode: () => currentFacingMode || 'environment',
       getActiveTrack: () => {
         const src = cameraStreamRef.current
         if (src && typeof src.getVideoTracks === 'function') {
@@ -883,6 +910,21 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
           return tracks?.[0] || null
         }
         return null
+      },
+      // Zoom control — works on devices with optical/digital zoom capability.
+      // level: 1.0 = no zoom, 2.0 = 2x, etc. Clamped to device max.
+      setZoom: async (level) => {
+        const track = cameraStreamRef.current?.getVideoTracks()?.[0]
+        if (!track) return { ok: false, error: 'No active camera track' }
+        try {
+          const caps = track.getCapabilities()
+          if (!caps.zoom) return { ok: false, error: 'Zoom not supported on this device' }
+          const clamped = Math.max(caps.zoom.min, Math.min(level, caps.zoom.max))
+          await track.applyConstraints({ advanced: [{ zoom: clamped }] })
+          return { ok: true, zoom: clamped, max: caps.zoom.max }
+        } catch (err) {
+          return { ok: false, error: err.message || 'Zoom failed' }
+        }
       },
     })
     return () => setCameraController(null)
