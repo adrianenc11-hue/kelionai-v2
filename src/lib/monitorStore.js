@@ -255,7 +255,7 @@ function parseLatLon(s) {
 // Nominatim sends `Access-Control-Allow-Origin: *`, and the polite
 // rate limit (1 req/s) is met by user-driven request frequency.
 let lastGeocodeQuery = 0;
-async function queueGeocodeUpgrade(kind, query) {
+async function queueGeocodeUpgrade(kind, query, opts = {}) {
   if (typeof window === 'undefined' || !window.fetch) return;
   const q = (query || '').toString().trim();
   if (!q) return;
@@ -263,7 +263,7 @@ async function queueGeocodeUpgrade(kind, query) {
   try {
     const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`;
     const r = await fetch(url, { credentials: 'omit' });
-    if (token !== lastGeocodeQuery) return; // superseded
+    if (token !== lastGeocodeQuery) return;
     if (!r.ok) return;
     const data = await r.json();
     const hit = Array.isArray(data) ? data[0] : null;
@@ -272,26 +272,63 @@ async function queueGeocodeUpgrade(kind, query) {
     const lon = Number.parseFloat(hit.lon);
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
     if (token !== lastGeocodeQuery) return;
-    if (state.kind !== kind) return; // user opened something else
+    if (state.kind !== kind) return;
     if (kind === 'map') {
+      const satellite = opts && opts.satellite;
+      const tileLayer = satellite
+        ? `L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{attribution:'Esri World Imagery',maxZoom:19})`
+        : `L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'\u00a9 OpenStreetMap',maxZoom:19})`;
+      const name = hit.display_name || q;
+      const html = `<div id="map" style="width:100%;height:100vh;margin:0"></div><script>\nvar map=L.map('map',{zoomControl:true}).setView([${lat},${lon}],13);\n${tileLayer}.addTo(map);\nL.marker([${lat},${lon}]).addTo(map).bindPopup(${JSON.stringify(name)}).openPopup();\n<\/script>`;
       setState({
         kind: 'map',
-        src: googleMapEmbed(lat, lon, hit.display_name || q),
-        title: hit.display_name ? `Hartă — ${hit.display_name}` : `Hartă — ${q}`,
-        embedType: 'iframe',
+        src: html,
+        title: `Hart\u0103 \u2014 ${hit.display_name || q}`,
+        embedType: 'html',
       });
     } else if (kind === 'weather') {
-      // Route Windy through proxy so X-Frame-Options is stripped
       setState({
         kind: 'weather',
         src: proxyUrl(windyWeatherEmbed(lat, lon)),
-        title: hit.display_name ? `Vreme — ${hit.display_name}` : `Vreme — ${q}`,
+        title: hit.display_name ? `Vreme \u2014 ${hit.display_name}` : `Vreme \u2014 ${q}`,
         embedType: 'iframe',
       });
     }
   } catch {
-    /* Network / abort — placeholder card stays, user still has a fallback. */
+    /* Network / abort */
   }
+}
+
+// Geocode two place names in parallel, then render a Leaflet route between them.
+async function queueRouteUpgrade(origin, destination) {
+  if (typeof window === 'undefined' || !window.fetch) return;
+  const token = ++lastGeocodeQuery;
+  try {
+    const geocode = async (name) => {
+      const r = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(name)}&format=json&limit=1`,
+        { credentials: 'omit' }
+      );
+      if (!r.ok) return null;
+      const data = await r.json();
+      const hit = Array.isArray(data) ? data[0] : null;
+      if (!hit) return null;
+      return { lat: Number.parseFloat(hit.lat), lon: Number.parseFloat(hit.lon), name: hit.display_name || name };
+    };
+    const [orig, dest] = await Promise.all([geocode(origin), geocode(destination)]);
+    if (token !== lastGeocodeQuery) return;
+    if (state.kind !== 'map') return;
+    if (!orig || !dest) return;
+    const midLat = (orig.lat + dest.lat) / 2;
+    const midLon = (orig.lon + dest.lon) / 2;
+    const html = `<div id="map" style="width:100%;height:100vh;margin:0"></div><script>\nvar map=L.map('map').setView([${midLat},${midLon}],6);\nL.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'\u00a9 OSM'}).addTo(map);\nL.marker([${orig.lat},${orig.lon}]).addTo(map).bindPopup(${JSON.stringify(orig.name)}).openPopup();\nL.marker([${dest.lat},${dest.lon}]).addTo(map).bindPopup(${JSON.stringify(dest.name)});\nvar line=L.polyline([[${orig.lat},${orig.lon}],[${dest.lat},${dest.lon}]],{color:'#7c3aed',weight:4,dashArray:'8 4'}).addTo(map);\nmap.fitBounds(line.getBounds(),{padding:[40,40]});\n<\/script>`;
+    setState({
+      kind: 'map',
+      src: html,
+      title: `Rut\u0103: ${orig.name.split(',')[0]} \u2192 ${dest.name.split(',')[0]}`,
+      embedType: 'html',
+    });
+  } catch { /* ignore */ }
 }
 
 // YouTube integration removed (2026-04-28).
