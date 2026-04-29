@@ -2775,6 +2775,8 @@ const REAL_TOOL_NAMES = [
   'get_action_history',
   // Explicit memory save — user tells Kelion something worth remembering.
   'remember_fact',
+  // Live radio streaming via radio-browser.info
+  'play_radio',
 ];
 
 module.exports = {
