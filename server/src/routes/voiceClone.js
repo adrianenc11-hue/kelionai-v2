@@ -392,9 +392,9 @@ router.post('/tts', async (req, res) => {
       ip: ipOf(req), userAgent: uaOf(req),
       note: `chars:${text.trim().length}`,
     }).catch(() => {});
-    // Stream the audio directly to the client
-    const { Readable } = require('stream');
-    Readable.fromWeb(r.body).pipe(res);
+    // Buffer the audio and send — avoids Readable.fromWeb (Node 17+) dependency.
+    const audioBuffer = await r.arrayBuffer();
+    res.end(Buffer.from(audioBuffer));
   } catch (err) {
     console.error('[voice/tts] network error:', err?.message);
     return res.status(502).json({ error: `ElevenLabs network error: ${err?.message}` });
