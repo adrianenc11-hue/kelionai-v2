@@ -17,7 +17,7 @@ import StudioDecor from '../components/stage/StudioDecor'
 import CameraRig from '../components/stage/CameraRig'
 import MonitorOverlay from '../components/stage/MonitorOverlay'
 import { TopBarIconButton, AdminTabBar, VisitorsAnalyticsPanel, PayoutsPanel, MenuItem, friendlyCreditStatus, uaIsBot, uaBrowser, uaOs, refHost, flagEmoji, RevenueChart, LiveSessionsPanel, ExportButtons } from '../components/stage/AdminPanels'
-import { useOpenAIRealtime } from '../lib/openaiRealtime'
+import { useGeminiLive } from '../lib/geminiLive'
 import { useWakeWord } from '../lib/useWakeWord'
 import { useTrial } from '../lib/useTrial'
 import { useClientGeo } from '../lib/useClientGeo'
@@ -971,11 +971,9 @@ export default function KelionStage() {
   const bubbleHideTimerRef = useRef(null)
   // NOTE: bubbleVisible useEffect moved after useGeminiLive (needs turns + status)
 
-  // Voice transport — OpenAI Realtime (gpt-realtime-1.5) for voice,
-  // GPT-5.5 for vision and text chat. Camera frames are sent to
-  // /api/realtime/vision (GPT-5.5) and descriptions injected back
-  // into the realtime session.
-  const liveHook = useOpenAIRealtime({
+  // Voice transport — Gemini Live (WebSocket) for both voice and text.
+  // All AI goes through Google Gemini — no OpenAI dependency.
+  const liveHook = useGeminiLive({
     audioRef,
     coords: clientGeo,
     onBalanceUpdate: (minutes) => setBalance(minutes),
