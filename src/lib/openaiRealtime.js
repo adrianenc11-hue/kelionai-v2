@@ -618,7 +618,8 @@ export function useOpenAIRealtime({ audioRef, coords = null, onBalanceUpdate = n
 
     try {
       const history = turns.map(t => ({ role: t.role, text: t.text })).slice(-20)
-      const r = await fetch('/api/realtime/pipeline', {
+      const lang = encodeURIComponent(navigator.language || 'en-US')
+      const r = await fetch(`/api/realtime/pipeline?lang=${lang}`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
