@@ -13,10 +13,10 @@ function useNYCSkylineTexture() {
     const ctx = canvas.getContext('2d')
     // Deep-night sky gradient
     const sky = ctx.createLinearGradient(0, 0, 0, 1024)
-    sky.addColorStop(0, '#04060e')
-    sky.addColorStop(0.45, '#0b1029')
-    sky.addColorStop(0.72, '#1a1236')
-    sky.addColorStop(1, '#2a1640')
+    sky.addColorStop(0, '#0a0f1e')
+    sky.addColorStop(0.45, '#121838')
+    sky.addColorStop(0.72, '#251a45')
+    sky.addColorStop(1, '#3a2055')
     ctx.fillStyle = sky
     ctx.fillRect(0, 0, 2048, 1024)
     // Stars
@@ -57,9 +57,9 @@ function useNYCSkylineTexture() {
             const warm = Math.random() < 0.65
             const flicker = 0.55 + Math.random() * 0.45
             ctx.fillStyle = warm
-              ? `rgba(250, 215, 140, ${flicker})`
-              : `rgba(170, 200, 255, ${flicker})`
-            ctx.fillRect(wx, wy, 4, 6)
+              ? `rgba(255, 225, 160, ${flicker})`
+              : `rgba(190, 215, 255, ${flicker})`
+            ctx.fillRect(wx, wy, 5, 7)
           }
         }
       }
@@ -147,7 +147,7 @@ export default function StudioDecor() {
         position={[4, 5, 4]}
         angle={0.35}
         penumbra={0.6}
-        intensity={1.8}
+        intensity={3.5}
         color={'#fef3c7'}
         castShadow
         shadow-mapSize={[1024, 1024]}
@@ -156,22 +156,22 @@ export default function StudioDecor() {
         position={[-4, 4, 3]}
         angle={0.4}
         penumbra={0.7}
-        intensity={1.2}
+        intensity={2.2}
         color={'#a78bfa'}
       />
       <spotLight
         position={[1.6, 4, -3]}
         angle={0.6}
         penumbra={0.8}
-        intensity={0.9}
+        intensity={1.8}
         color={'#60a5fa'}
         target-position={[1.6, 0, 0]}
       />
       {/* Rim light from behind */}
-      <pointLight position={[0, 1.5, -3]} intensity={0.6} color={'#c084fc'} />
+      <pointLight position={[0, 1.5, -3]} intensity={1.2} color={'#c084fc'} />
 
-      {/* Ambient fill */}
-      <ambientLight intensity={0.22} color={'#3b2a6b'} />
+      {/* Ambient fill — boosted for outdoor visibility */}
+      <ambientLight intensity={0.5} color={'#5040a0'} />
     </group>
   )
 }
