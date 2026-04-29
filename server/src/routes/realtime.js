@@ -1,7 +1,20 @@
 'use strict';
 
 const { Router } = require('express');
+const rateLimit = require('express-rate-limit');
 const { listMemoryItems, getCreditsBalance, addCreditsTransaction, setPreferredLanguage, getPreferredLanguage, logVisionRevenue } = require('../db');
+
+// Vision frames arrive at up to 4fps (240 req/min). The global chatLimiter
+// (120 req/min) would still throttle them, so vision gets its own bucket.
+const visionLimiter = (process.env.NODE_ENV === 'test')
+  ? (req, res, next) => next()
+  : rateLimit({
+      windowMs: 60 * 1000,
+      max: 300,
+      standardHeaders: true,
+      legacyHeaders: false,
+      message: { error: 'Vision rate limit exceeded.' },
+    });
 
 // Adrian 2026-04-25: "default engleza e obligat sa detecteze limba user si o
 // va folosi permanent cit e logat". Mirror of the table in chat.js — keep in
@@ -1609,7 +1622,7 @@ router.post('/gemini-token', geminiTokenHandler);
 // the scene in 1-2 sentences, and the client injects that description
 // back into the realtime session as a user message.
 // ──────────────────────────────────────────────────────────────────
-router.post('/vision', async (req, res) => {
+router.post('/vision', visionLimiter, async (req, res) => {
   const { image, mimeType, timeContext } = req.body || {};
   if (!image) return res.status(400).json({ error: 'No image provided' });
   // Reject tiny images that GPT-5.5 will reject anyway (saves an API call).

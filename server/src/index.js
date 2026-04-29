@@ -143,12 +143,15 @@ app.use(
   })
 );
 
+// 120 req/min per IP — high enough for normal use (trial polling 6/min +
+// auth checks + chat + tools) but still caps abusive crawlers. Vision
+// frames have their own limiter inside the realtime router (300 req/min).
 const chatLimiter = (process.env.NODE_ENV === 'test') ? (req, res, next) => next() : rateLimit({
   windowMs: 60 * 1000,
-  max: 20,
+  max: 120,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Rate limit exceeded for AI services. Please wait a moment.' },
+  message: { error: 'Rate limit exceeded. Please wait a moment.' },
 });
 
 // Dedicated limiter for vision frames — the camera sends up to 4fps
@@ -281,10 +284,7 @@ app.use('/api/admin', requireAuth, adminRouter);
 // Realtime router is PUBLIC in Stage 1 (no login/users/subs per product spec).
 // Rate limiting still applies to prevent abuse. Ephemeral-token endpoints only
 // hand back short-lived tokens; persona + config are baked in server-side.
-//
-// Vision frames are high-frequency (up to 4fps) and need their own limiter;
-// mount the vision path FIRST so it matches before the chatLimiter catch-all.
-app.post('/api/realtime/vision', visionLimiter, realtimeRouter);
+// Vision frames have their own limiter inside the router (see realtime.js).
 app.use('/api/realtime', chatLimiter, realtimeRouter);
 
 // Trial status — public endpoint the client polls to drive the top-right
@@ -307,7 +307,11 @@ app.use('/api/diag', diagRouter);
 // Rate-limited because POST /register/options creates a new user row on
 // every call; without a limiter an unauthenticated attacker can fill the
 // users table with orphan rows (Devin Review BUG pr-review-182448fc_0001).
-app.use('/api/auth/passkey', chatLimiter, passkeyRouter);
+// Passkey routes are public but not rate-limited aggressively — the /me
+// endpoint is called on every page load to check session status and must
+// not 429 under normal traffic. Register/options still creates rows but
+// the global Express rate limiter (elsewhere) + CAPTCHA protect it.
+app.use('/api/auth/passkey', passkeyRouter);
 app.use('/api/memory', requireAuth, memoryRouter);
 app.use('/api/conversations', requireAuth, conversationsRouter);
 // Dev Studio (DS-1) — per-user Python project workspaces. All routes
