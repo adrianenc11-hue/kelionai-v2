@@ -1829,7 +1829,20 @@ router.post('/pipeline', async (req, res) => {
         let result = { status: 'tool_not_found' };
         try {
           const { executeRealTool } = require('../services/realTools');
-          result = await executeRealTool(tc.function.name, args, { user, req });
+          const latRaw = req?.query?.lat ?? req?.body?.lat ?? req?.body?.latitude;
+          const lonRaw = req?.query?.lon ?? req?.query?.lng ?? req?.body?.lon ?? req?.body?.lng ?? req?.body?.longitude;
+          const accRaw = req?.query?.acc ?? req?.body?.acc ?? req?.body?.accuracy;
+          const lat = latRaw === undefined || latRaw === null || latRaw === '' ? undefined : Number(latRaw);
+          const lon = lonRaw === undefined || lonRaw === null || lonRaw === '' ? undefined : Number(lonRaw);
+          const acc = accRaw === undefined || accRaw === null || accRaw === '' ? undefined : Number(accRaw);
+          const coords = Number.isFinite(lat) && Number.isFinite(lon)
+            ? {
+                lat,
+                lon,
+                ...(Number.isFinite(acc) ? { acc } : {}),
+              }
+            : undefined;
+          result = await executeRealTool(tc.function.name, args, { user, req, coords });
         } catch (err) {
           result = { error: err.message };
         }
