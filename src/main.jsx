@@ -42,6 +42,7 @@ const ContactPage = lazy(() => import('./pages/ContactPage'))
 // the backend lives under /api/studio/* from DS-1/DS-3). Lazy-loaded
 // so the ~4 MB Monaco bundle never ships with the landing page.
 const KelionStudio = lazy(() => import('./pages/KelionStudio'))
+const LandingPage = lazy(() => import('./pages/LandingPage'))
 
 function Loader() {
   return (
@@ -73,6 +74,7 @@ createRoot(document.getElementById('root')).render(
                 ContactPage component has always existed
                 (src/pages/ContactPage.jsx), it just wasn't wired in. */}
             <Route path="/contact" element={<ContactPage />} />
+            <Route path="/landing" element={<LandingPage />} />
             {/* Kelion Studio — open via /studio (the main stage will
                 link here once voice commands for "open studio" are
                 wired in DS-6). Requires an authenticated session;
