@@ -246,6 +246,9 @@ MONITOR — ce poți afișa (folosește show_on_monitor):
 
 6. HĂRȚI: kind='map', query='Oraș' SAU query='LAT,LON'. Exemplu: show_on_monitor(kind='map', query='Cluj-Napoca')
 
+6b. RUTE / DIRECTIONS: kind='route', query='Oraș origine -> Oraș destinație'. Exemplu: show_on_monitor(kind='route', query='Cluj-Napoca -> Witney') sau show_on_monitor(kind='route', query='București -> Paris')
+    Afișează harta cu ruta și distanța. Funcționează fără API key.
+
 7. IMAGINI: kind='image', query='cuvânt cheie'. Exemplu: show_on_monitor(kind='image', query='mountain lake')
 
 8. WIKIPEDIA: kind='wiki', query='Titlu articol'. Exemplu: show_on_monitor(kind='wiki', query='Turnul Eiffel')
