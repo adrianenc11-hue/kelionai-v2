@@ -2773,6 +2773,8 @@ const REAL_TOOL_NAMES = [
   // Kelion can check "did I already email that?" before re-running.
   // Returns `{ ok:false, signed_in:false }` for guests.
   'get_action_history',
+  // Explicit memory save — user tells Kelion something worth remembering.
+  'remember_fact',
 ];
 
 module.exports = {
