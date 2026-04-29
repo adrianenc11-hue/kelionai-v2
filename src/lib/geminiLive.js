@@ -295,6 +295,10 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
   // Buffer for cloned-voice TTS: accumulates outputTranscription chunks
   // across frames; flushed to ElevenLabs on turnComplete.
   const cloneTranscriptBufRef = useRef('')
+  // Accumulates part.text silently across frames. Resolved at turnComplete:
+  // if outputTranscription arrived → discard (prevents narration doubling);
+  // if not → show in chat and use for cloned TTS.
+  const partTextBufRef = useRef('')
 
   const handleMessage = useCallback(async (raw, ws) => {
     let msg
@@ -355,23 +359,31 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
             console.log('[clonedTTS] skipped Gemini PCM chunk (cloned voice active)')
           }
         }
+        // DO NOT append part.text immediately — accumulate silently.
+        // outputTranscription is the clean, post-processed version and
+        // always arrives for voice turns. We resolve which one to show
+        // at turnComplete to prevent both paths from displaying the same
+        // content (narration doubling).
         if (part.text) {
-          if (!turnHasTranscriptRef.current) {
-            appendTurn('assistant', part.text, false)
-          }
-          // ALSO buffer part.text for TTS — Gemini sometimes sends text
-          // via modelTurn.parts instead of (or in addition to) outputTranscription.
-          // Without this, if outputTranscription is absent the buffer stays
-          // empty and ElevenLabs never gets called.
-          if (isClonedVoiceActive() && !turnHasTranscriptRef.current) {
-            cloneTranscriptBufRef.current += part.text
-            console.log('[clonedTTS] buffered part.text:', part.text.slice(0, 80))
-          }
+          partTextBufRef.current += part.text
         }
       }
 
       if (sc.turnComplete) {
+        const hadTranscript = turnHasTranscriptRef.current
+        const partText = partTextBufRef.current.trim()
+        // Resolve: if outputTranscription came → partText is redundant (no doubling).
+        // If not → partText is the only text we have; show it + use for TTS.
+        if (!hadTranscript && partText) {
+          appendTurn('assistant', partText, false)
+          if (isClonedVoiceActive()) {
+            cloneTranscriptBufRef.current += partText
+            console.log('[clonedTTS] using partText fallback:', partText.slice(0, 80))
+          }
+        }
+        // Reset all per-turn buffers
         turnHasTranscriptRef.current = false
+        partTextBufRef.current = ''
         // Cloned voice: flush accumulated transcript to ElevenLabs TTS
         if (isClonedVoiceActive() && cloneTranscriptBufRef.current.trim()) {
           const textToSpeak = cloneTranscriptBufRef.current.trim()
@@ -491,7 +503,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
   // textOnly: true → open WS without mic (text chat). Voice (tap-to-talk)
   // calls start() without textOnly so the mic opens as before.
   const start = useCallback(async (opts = {}) => {
-    // F4 — on auto-fallback from OpenAI, KelionStage passes the current
+    // F4 — KelionStage passes the current
     // session transcript so Gemini continues rather than re-greeting.
     // Fresh sessions call start() with no args and stay on GET.
     const priorTurns = Array.isArray(opts.priorTurns) ? opts.priorTurns : []
@@ -1266,10 +1278,9 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
 
   // Register the camera controller so the `switch_camera` / camera_on /
   // camera_off / zoom_camera voice tools can drive this hook. Only the
-  // ACTIVE transport registers — KelionStage always mounts both the
-  // Gemini and OpenAI hooks and without the `active` gate both commit
-  // setCameraController in the same render pass, with whichever ran
-  // last silently winning. That caused verbal camera commands to land
+  // ACTIVE transport registers — the `active` gate prevents
+  // setCameraController from being committed by an inactive instance
+  // in the same render pass. That caused verbal camera commands to land
   // on the wrong transport whenever the user picked the "losing"
   // provider (user-visible symptom: "camera nu merge corect" because
   // the stream opened on the inactive hook and the UI reads
@@ -1320,55 +1331,13 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
     }
   }, [])
 
-  // sendText — typed text through the live WebSocket, with REST fallback.
-  // If the WebSocket is not connected or fails to connect, falls back to
-  // /api/realtime/pipeline (Gemini REST) so text chat ALWAYS works.
-  const sendText = useCallback(async (text) => {
-    if (!text || typeof text !== 'string') return
-    const trimmed = text.trim()
-    if (!trimmed) return
-    appendTurn('user', trimmed, true)
-    lastActivityAtRef.current = Date.now()
-    setStatus('thinking')
-
-    // Try WebSocket path first (if voice session is active)
-    const ws = wsRef.current
-    if (ws && ws.readyState === WebSocket.OPEN && statusRef.current !== 'idle') {
-      ws.send(JSON.stringify({
-        clientContent: {
-          turns: [{ role: 'user', parts: [{ text: trimmed }] }],
-          turnComplete: true,
-        },
-      }))
-      return
-    }
-
-    // REST fallback — /api/realtime/pipeline (Gemini Flash)
-    try {
-      const history = turns.map(t => ({ role: t.role, text: t.text })).slice(-20)
-      const lang = encodeURIComponent(navigator.language || 'en-US')
-      const r = await fetch(`/api/realtime/pipeline?lang=${lang}`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
-        body: JSON.stringify({
-          textOverride: trimmed,
-          history,
-        }),
-      })
-      if (!r.ok) {
-        const body = await r.json().catch(() => ({}))
-        throw new Error(body.error || `HTTP ${r.status}`)
-      }
-      const data = await r.json()
-      if (data.assistantText) appendTurn('assistant', data.assistantText, true)
-    } catch (err) {
-      console.error('[gemini-live] sendText REST fallback error:', err)
-      setError(err.message || 'Chat failed')
-    } finally {
-      setStatus(wsRef.current && wsRef.current.readyState === WebSocket.OPEN ? 'listening' : 'idle')
-    }
-  }, [appendTurn, start, turns])
+  // sendText — DISABLED. Text chat is not used; both user and Kelion
+  // communicate exclusively via live voice. Kept as a no-op so existing
+  // callers don't crash.
+  const sendText = useCallback(async (/* text */) => {
+    // No-op — live voice only, no written chat.
+    console.warn('[geminiLive] sendText called but text chat is disabled — use live voice')
+  }, [])
 
   // Allow the parent to clear or seed the transcript (used by history
   // load, new-conversation, sign-out). Avoids duplicating state.

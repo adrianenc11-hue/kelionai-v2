@@ -1,6 +1,6 @@
 // Module-level registry for the active camera controller.
 //
-// Both voice transports (openaiRealtime.js, geminiLive.js) expose a
+// The voice transport (geminiLive.js) exposes a
 // `startCamera({ facingMode, deviceId })` / `stopCamera()` pair. They
 // register their controller here on mount and unregister on unmount.
 //
@@ -25,7 +25,7 @@
 // negotiates down to the highest resolution the picked camera can
 // produce. Vision frames are still downsampled before send, but a
 // higher native capture means license plates stay legible after the
-// downsample. See openaiRealtime.js for MAX_W tuning.
+// downsample. See geminiLive.js for MAX_W tuning.
 
 let controller = null
 let currentFacingMode = 'user'

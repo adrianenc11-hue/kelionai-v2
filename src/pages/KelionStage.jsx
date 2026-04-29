@@ -971,8 +971,7 @@ export default function KelionStage() {
   const bubbleHideTimerRef = useRef(null)
   // NOTE: bubbleVisible useEffect moved after useGeminiLive (needs turns + status)
 
-  // Voice transport — Gemini Live (WebSocket) for both voice and text.
-  // All AI goes through Google Gemini — no OpenAI dependency.
+  // Voice transport — Gemini Live (WebSocket) for live voice.
   const liveHook = useGeminiLive({
     audioRef,
     coords: clientGeo,
@@ -1689,8 +1688,9 @@ export default function KelionStage() {
       {/* Last assistant text reply (when chatting by typing) — fades
           {/* Chat bubble — unified, reads from turns[] (single source of truth).
           Shows the last user utterance + the streaming assistant reply.
-          Auto-hides 8s after the last turn. */}
-      {turns.length > 0 && bubbleVisible && (() => {
+          Auto-hides 8s after the last turn.
+          ISOLATED: text chat disabled — live voice only. */}
+      {false && turns.length > 0 && bubbleVisible && (() => {
         const lastAssistant = [...turns].reverse().find((t) => t.role === 'assistant')
         const lastUser = [...turns].reverse().find((t) => t.role === 'user')
         return (
@@ -1758,8 +1758,9 @@ export default function KelionStage() {
           Narrower (420px) than the old 680px because the wider pill was
           overlapping the stage monitor on the left. Stops click
           propagation so typing doesn't toggle the voice session.
-          Submit with Enter or the send button. */}
-      <form
+          Submit with Enter or the send button.
+          ISOLATED: text chat disabled — live voice only. */}
+      {false && <form
         onClick={(e) => e.stopPropagation()}
         onSubmit={(e) => { e.preventDefault(); sendTextMessage() }}
         style={{
@@ -1936,7 +1937,7 @@ export default function KelionStage() {
           }}
           aria-label="Send message"
         >↑</button>
-      </form>
+      </form>}
 
       {/* Microphone ON/OFF Toggle — bottom center */}
       <button
@@ -2200,9 +2201,7 @@ export default function KelionStage() {
           <MenuItem onClick={() => { screenStream ? stopScreen() : startScreen(); setMenuOpen(false) }}>
             {screenStream ? t('stopScreen') : t('shareScreen')}
           </MenuItem>
-          <MenuItem onClick={() => { setTranscriptOpen((v) => !v); setMenuOpen(false) }}>
-            {transcriptOpen ? t('hideTranscript') : t('showTranscript')}
-          </MenuItem>
+          {/* ISOLATED: transcript toggle hidden — live voice only */}
           <MenuItem onClick={() => { navigate('/contact'); setMenuOpen(false) }}>
             {t('contactUs')}
           </MenuItem>
@@ -2269,12 +2268,8 @@ export default function KelionStage() {
           {/* Conversation history — works for guests (localStorage)
               and signed-in users (server). Above the auth gate so guests
               can find their saved threads too. */}
-          <MenuItem onClick={() => { setHistoryOpen(true); setMenuOpen(false) }}>
-            {t('conversationHistory')}
-          </MenuItem>
-          <MenuItem onClick={() => { handleNewChat(); setMenuOpen(false) }}>
-            {t('newChat')}
-          </MenuItem>
+          {/* ISOLATED: conversation history hidden — live voice only */}
+          {/* ISOLATED: new chat hidden — live voice only */}
           <div style={{ height: 6 }} />
           {/* Stage 3 — memory + passkey */}
           {authState.signedIn ? (
@@ -2423,8 +2418,9 @@ export default function KelionStage() {
 
       {/* Transcript drawer — opt-in, has X + backdrop + ESC to close.
           Previously the only way to close it was to re-open the ? menu
-          and pick "Hide transcript", which was not discoverable. */}
-      {transcriptOpen && (
+          and pick "Hide transcript", which was not discoverable.
+          ISOLATED: transcript disabled — live voice only. */}
+      {false && transcriptOpen && (
         <div
           onClick={() => setTranscriptOpen(false)}
           style={{
@@ -2434,7 +2430,7 @@ export default function KelionStage() {
           }}
         />
       )}
-      {transcriptOpen && (
+      {false && transcriptOpen && (
         <div
           onClick={(e) => e.stopPropagation()}
           style={{
@@ -2714,8 +2710,9 @@ export default function KelionStage() {
 
       {/* Conversation history drawer — lists saved threads for both
           guests (localStorage) and signed-in users (server). Clicking a
-          row replays that transcript into the chat log. */}
-      {historyOpen && (
+          row replays that transcript into the chat log.
+          ISOLATED: history disabled — live voice only. */}
+      {false && historyOpen && (
         <div
           onClick={() => setHistoryOpen(false)}
           style={{
@@ -2725,7 +2722,7 @@ export default function KelionStage() {
           }}
         />
       )}
-      {historyOpen && (
+      {false && historyOpen && (
         <div
           onClick={(e) => e.stopPropagation()}
           style={{
@@ -4384,7 +4381,7 @@ export default function KelionStage() {
               nimic — odata configurat, fiecare top-up al unui user trece
               prin: Stripe Checkout ? Stripe balance ? payout automat (zilnic
               sau saptamânal, dupa setarea ta). Jumatate din fiecare top-up
-              e deja rezervata intern pentru costurile AI (OpenAI, Groq,
+              e deja rezervata intern pentru costurile AI (Gemini,
               ElevenLabs), cealalta jumatate e profitul net.
             </div>
           </div>

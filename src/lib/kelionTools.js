@@ -257,7 +257,7 @@ export async function runTool(name, args) {
       return 'ok:composer:email_opened'
     }
     case 'generate_image': {
-      // F11 — OpenAI gpt-image-1. Show on monitor automatically.
+      // F11 — Image generation. Show on monitor automatically.
       const j = await postJSON('/api/tools/execute', {
         name: 'generate_image',
         args: { prompt: args?.prompt, size: args?.size },
@@ -319,8 +319,8 @@ function download(){
     }
     case 'set_narration_mode': {
       // Accessibility mode. Flips a module-level flag that
-      // src/lib/openaiRealtime.js watches — when true it runs a periodic
-      // vision call and injects the description into the OpenAI session
+      // src/lib/geminiLive.js watches — when true it runs a periodic
+      // vision call and injects the description into the Gemini session
       // so Kelion speaks a short natural narration. Does NOT itself
       // fetch the first frame; the transport's narration loop handles
       // the cadence. We just confirm the transition back to the model

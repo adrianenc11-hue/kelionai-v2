@@ -701,7 +701,7 @@ export function handleShowOnMonitor(args = {}) {
 
 // F11 — direct image-display entrypoint used by the `generate_image` tool.
 // Unlike `handleShowOnMonitor` this takes an already-resolved URL (produced
-// server-side by OpenAI Images → cached PNG) and skips the query→URL
+// server-side → cached PNG) and skips the query→URL
 // mapping table. The monitor renderer already handles `embedType:'image'`
 // via the existing `kind:'image'` case, so all we do here is publish state.
 export function showImageOnMonitor({ src, title } = {}) {
