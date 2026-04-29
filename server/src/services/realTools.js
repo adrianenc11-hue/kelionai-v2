@@ -679,6 +679,30 @@ async function toolTranslate({ text, to, from }) {
     } catch (_) { continue; }
   }
 
+  // Priority 4: MyMemory — free, no key, 5000 words/day
+  // MyMemory requires explicit 2-letter codes. 'autodetect' as source
+  // triggers their auto-detection. Empty source causes INVALID LANGUAGE error.
+  try {
+    const mmSource = source === 'auto' ? 'autodetect' : source;
+    const langPair = `${mmSource}|${target}`;
+    const mmUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(src)}&langpair=${encodeURIComponent(langPair)}`;
+    const r = await fetchWithTimeout(mmUrl, {}, 8000);
+    if (r.ok) {
+      const data = await r.json();
+      const txt = data?.responseData?.translatedText;
+      // Guard against error messages returned as "translations"
+      if (txt && !txt.startsWith('INVALID') && !txt.startsWith('MYMEMORY')) {
+        return {
+          ok: true,
+          translated: txt,
+          detectedSource: data.responseData?.detectedLanguage || mmSource,
+          target,
+          source: 'mymemory',
+        };
+      }
+    }
+  } catch (_) { /* give up */ }
+
   return { ok: false, error: 'no translation provider available' };
 }
 
@@ -846,33 +870,46 @@ async function toolGetStockPrice({ symbol }) {
 // get_forex / currency_convert — exchangerate.host (free, no key)
 
 async function toolGetForex({ base, from, to, amount }) {
-  // Accept either `base` or `from` — the catalog uses `from` but the
-  // executor was historically `base`. Normalize here.
   const b = (base || from || 'USD').toString().toUpperCase().slice(0, 3);
   const t = (to || 'EUR').toString().toUpperCase().slice(0, 3);
   const a = Number.parseFloat(amount);
+  const amt = Number.isFinite(a) ? a : 1;
+
+  // Priority 1: frankfurter.app — free, no key, ECB data
   try {
-    const url = `https://api.exchangerate.host/convert?from=${b}&to=${t}${Number.isFinite(a) ? `&amount=${a}` : ''}`;
+    const url = `https://api.frankfurter.app/latest?from=${b}&to=${t}&amount=${amt}`;
     const r = await fetchWithTimeout(url);
-    if (!r.ok) return { ok: false, error: `exchangerate.host ${r.status}` };
-    const data = await r.json();
-    if (!data || data.success === false || typeof data.result !== 'number') {
-      return { ok: false, error: 'conversion failed' };
+    if (r.ok) {
+      const data = await r.json();
+      if (data.rates && data.rates[t] != null) {
+        return {
+          ok: true, base: b, from: b, to: t,
+          rate: data.rates[t] / amt,
+          amount: amt, result: data.rates[t],
+          date: data.date, source: 'frankfurter.app (ECB)',
+        };
+      }
     }
-    return {
-      ok: true,
-      base: b,
-      from: b,
-      to: t,
-      rate: data.info?.rate ?? null,
-      amount: Number.isFinite(a) ? a : 1,
-      result: data.result,
-      date: data.date,
-      source: 'exchangerate.host',
-    };
-  } catch (err) {
-    return { ok: false, error: err && err.message ? err.message : String(err) };
-  }
+  } catch (_) { /* fall through */ }
+
+  // Priority 2: open.er-api.com — free, no key
+  try {
+    const url = `https://open.er-api.com/v6/latest/${b}`;
+    const r = await fetchWithTimeout(url);
+    if (r.ok) {
+      const data = await r.json();
+      if (data.rates && data.rates[t] != null) {
+        const rate = data.rates[t];
+        return {
+          ok: true, base: b, from: b, to: t,
+          rate, amount: amt, result: +(rate * amt).toFixed(4),
+          date: data.time_last_update_utc, source: 'open.er-api.com',
+        };
+      }
+    }
+  } catch (_) { /* fall through */ }
+
+  return { ok: false, error: `Could not convert ${b} to ${t}` };
 }
 
 const toolCurrencyConvert = toolGetForex;
