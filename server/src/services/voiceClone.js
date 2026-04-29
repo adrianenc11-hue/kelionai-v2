@@ -20,7 +20,7 @@
 
 const ELEVENLABS_API_BASE = 'https://api.elevenlabs.io/v1';
 const MAX_SAMPLE_BYTES = 10 * 1024 * 1024;      // 10 MB
-const MIN_SAMPLE_BYTES = 30 * 1024;             //  ~30 KB floor; real floor is duration
+const MIN_SAMPLE_BYTES = 5 * 1024;              //  ~5 KB floor; webm/opus is very compact
 const ALLOWED_MIME_PREFIXES = [
   'audio/',
   'video/webm',   // MediaRecorder in Chrome produces `audio/webm;codecs=opus` but some browsers tag it video/webm
