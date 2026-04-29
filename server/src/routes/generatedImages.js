@@ -1,8 +1,8 @@
 'use strict';
 
 /**
- * F11 — serves PNGs produced by services/imageGen.js. The OpenAI Images
- * API returns a base64 blob; we decode it once, drop it into a 20-entry
+ * F11 — serves images produced by services/imageGen.js. Gemini image
+ * generation returns a base64 blob; we decode it once, drop it into a 20-entry
  * in-process cache, and hand the client a short-lived URL
  * (`/api/generated-images/<id>`) it can render inside the avatar's
  * stage monitor.

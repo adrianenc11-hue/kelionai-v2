@@ -85,7 +85,7 @@ initDb().then(async () => {
 
 // Validate required API keys in production
 if (config.isProduction) {
-  const requiredKeys = ['OPENAI_API_KEY', 'ELEVENLABS_API_KEY'];
+  const requiredKeys = ['GEMINI_API_KEY', 'ELEVENLABS_API_KEY'];
   const missing = requiredKeys.filter(key => !process.env[key]);
   
   if (missing.length > 0) {
@@ -111,7 +111,7 @@ app.use(
         styleSrc:   ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         fontSrc:    ["'self'", "https://fonts.gstatic.com"],
         imgSrc:     ["'self'", "data:", "blob:", "https:"],
-        connectSrc: ["'self'", "https://api.openai.com", "wss://api.openai.com", "https://generativelanguage.googleapis.com", "wss://generativelanguage.googleapis.com", "https://raw.githack.com", "https://*.githubusercontent.com", "blob:", "https:", "wss:"],
+        connectSrc: ["'self'", "https://generativelanguage.googleapis.com", "wss://generativelanguage.googleapis.com", "https://raw.githack.com", "https://*.githubusercontent.com", "blob:", "https:", "wss:"],
         mediaSrc:   ["'self'", "blob:"],
         workerSrc:  ["'self'", "blob:"],
         // Allow cross-origin iframes for the <MonitorOverlay/>: Google Maps
@@ -270,7 +270,7 @@ app.post('/api/referral/use', requireAuth, async (req, res) => {
 // removed. It was:
 //   - bypassing the shared 15-min/day trial window enforced by
 //     /api/trial/status + /api/chat + /api/tts, so a guest could mint
-//     a new OpenAI Realtime session every 24 h _on top of_ their
+//     a new Realtime session every 24 h _on top of_ their
 //     text-chat quota — effectively doubling free minutes.
 //   - storing a per-IP last-issued timestamp in a Map that was never
 //     garbage-collected (same leak shape as H2 `consumeStateByUser`).
@@ -374,7 +374,6 @@ app.get('/health', async (_req, res) => {
       database: 'unknown',
       ai: 'unknown',
       ai_provider: 'none',
-      openai: 'unknown',
       gemini: 'unknown',
       elevenlabs: 'unknown',
     },
@@ -394,15 +393,13 @@ app.get('/health', async (_req, res) => {
     health.services.database = 'error';
   }
 
-  // AI providers — Gemini preferred, OpenAI fallback
+  // AI providers — Gemini only
   const hasGemini = !!process.env.GEMINI_API_KEY;
-  const hasOpenAI = !!process.env.OPENAI_API_KEY;
   health.services.gemini = hasGemini ? 'configured' : 'not configured';
-  health.services.openai = hasOpenAI ? 'configured' : 'not configured';
-  health.services.ai = (hasGemini || hasOpenAI) ? 'configured' : 'not configured';
-  health.services.ai_provider = hasGemini ? 'gemini' : (hasOpenAI ? 'openai' : 'none');
+  health.services.ai = hasGemini ? 'configured' : 'not configured';
+  health.services.ai_provider = hasGemini ? 'gemini' : 'none';
 
-  // ElevenLabs (legacy TTS fallback)
+  // ElevenLabs (cloned voice TTS)
   health.services.elevenlabs = process.env.ELEVENLABS_API_KEY ? 'configured' : 'not configured';
 
   res.json(health);

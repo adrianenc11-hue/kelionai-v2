@@ -2363,7 +2363,7 @@ async function toolZapierTrigger(args) {
   if (!/^https:\/\/hooks\.zapier\.com\/hooks\/catch\//i.test(url)) {
     return { ok: false, error: 'webhook_url must be a Zapier Catch Hook (https://hooks.zapier.com/hooks/catch/…)' };
   }
-  // Schema advertises `payload` as a JSON string (Gemini's OpenAI-compat
+  // Schema advertises `payload` as a JSON string (Gemini's
   // endpoint rejects object-type params without explicit properties). Accept
   // both a pre-parsed object and a JSON string for backward compat.
   let payload = {};
@@ -2543,7 +2543,7 @@ async function toolPypiPackageInfo(args) {
 // ──────────────────────────────────────────────────────────────────
 // Dispatch
 
-// F11 — OpenAI image generation. Returns a short-lived URL pointing at
+// F11 — Image generation. Returns a short-lived URL pointing at
 // the in-process cache served by routes/generatedImages.js — the voice
 // model's read-back stays tiny while the client gets a real PNG URL to
 // embed on the avatar's stage monitor.

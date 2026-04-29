@@ -75,11 +75,7 @@ module.exports = {
 
   dbPath: optional('DB_PATH', './data/kelion.db'),
 
-  openai: {
-    apiKey:   optional('OPENAI_API_KEY'),
-    baseUrl:  optional('OPENAI_BASE_URL', 'https://api.openai.com/v1'),
-    model:    optional('OPENAI_MODEL', 'gpt-4o-mini'),
-  },
+  // openai config REMOVED — project uses Gemini only.
 
   gemini: {
     apiKey:       optional('GEMINI_API_KEY'),
@@ -94,7 +90,7 @@ module.exports = {
     // exact model id does not exist on v1main Live. Reverting to the
     // preview that at least opens the session (`gemini-3.1-flash-live-
     // preview`) so admin can talk to Kelion again while we swap the
-    // transport to OpenAI Realtime (plan C) for real stability.
+    // preview`) so admin can talk to Kelion again.
     // Override via Railway env GEMINI_LIVE_MODEL.
     liveModel:    optional('GEMINI_LIVE_MODEL', 'gemini-3.1-flash-live-preview'),
     ttsModel:     optional('GEMINI_TTS_MODEL', 'gemini-3.1-flash-tts-preview'),

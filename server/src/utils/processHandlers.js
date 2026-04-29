@@ -9,7 +9,7 @@
  * setTimeout callback that threw, a background job) would trigger a
  * default Node 15+ behaviour: *terminate the process*. Railway would
  * restart within a few seconds, but every in-flight WebSocket (Gemini
- * Live, OpenAI Realtime) would get a mid-sentence disconnect and the
+ * Live) would get a mid-sentence disconnect and the
  * user would see a cryptic "reconnecting…" toast.
  *
  * Policy here:

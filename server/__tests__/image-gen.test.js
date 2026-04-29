@@ -1,9 +1,9 @@
 'use strict';
 
 /**
- * F11 — unit tests for the OpenAI image-generation helper + the
+ * F11 — unit tests for the Gemini image-generation helper + the
  * `/api/generated-images/:id` serving route. Mocks fetch so no
- * real OpenAI quota is consumed.
+ * real Gemini quota is consumed.
  */
 
 const express = require('express');
@@ -26,25 +26,25 @@ function mountRoute(service) {
 
 describe('imageGen.generateImage', () => {
   const origFetch = global.fetch;
-  const origKey = process.env.OPENAI_API_KEY;
+  const origKey = process.env.GEMINI_API_KEY;
 
   beforeEach(() => {
-    process.env.OPENAI_API_KEY = 'sk-test';
+    process.env.GEMINI_API_KEY = 'test-gemini-key';
     global.fetch = jest.fn();
   });
 
   afterEach(() => {
     global.fetch = origFetch;
-    process.env.OPENAI_API_KEY = origKey;
+    process.env.GEMINI_API_KEY = origKey;
   });
 
-  it('returns unavailable when OPENAI_API_KEY is missing', async () => {
-    delete process.env.OPENAI_API_KEY;
+  it('returns unavailable when GEMINI_API_KEY is missing', async () => {
+    delete process.env.GEMINI_API_KEY;
     const { generateImage } = freshService();
     const r = await generateImage({ prompt: 'a red apple' });
     expect(r.ok).toBe(false);
     expect(r.unavailable).toBe(true);
-    expect(r.error).toMatch(/OPENAI_API_KEY/);
+    expect(r.error).toMatch(/GEMINI_API_KEY/);
   });
 
   it('rejects empty prompt', async () => {
@@ -54,14 +54,7 @@ describe('imageGen.generateImage', () => {
     expect(r.error).toMatch(/Missing prompt/);
   });
 
-  it('rejects unsupported size values', async () => {
-    const { generateImage } = freshService();
-    const r = await generateImage({ prompt: 'cat', size: '42x42' });
-    expect(r.ok).toBe(false);
-    expect(r.error).toMatch(/Invalid size/);
-  });
-
-  it('surfaces OpenAI moderation errors specifically', async () => {
+  it('surfaces Gemini safety errors specifically', async () => {
     global.fetch.mockResolvedValueOnce({
       ok: false,
       status: 400,
@@ -85,14 +78,20 @@ describe('imageGen.generateImage', () => {
     expect(r.error).toMatch(/500/);
   });
 
-  it('on success: caches PNG + returns a short-lived URL', async () => {
+  it('on success: caches image + returns a short-lived URL', async () => {
     // Tiny fake PNG header — not a real image, but enough that the
     // cache + route round-trip is exercised without pulling Jimp.
     const fakeBase64 = Buffer.from('fake-png-bytes').toString('base64');
     global.fetch.mockResolvedValueOnce({
       ok: true,
       status: 200,
-      json: async () => ({ data: [{ b64_json: fakeBase64 }] }),
+      json: async () => ({
+        candidates: [{
+          content: {
+            parts: [{ inlineData: { data: fakeBase64, mimeType: 'image/png' } }],
+          },
+        }],
+      }),
     });
     const service = freshService();
     const r = await service.generateImage({ prompt: 'a calm sunset over the sea' });
@@ -102,8 +101,8 @@ describe('imageGen.generateImage', () => {
     expect(r.title).toBe('a calm sunset over the sea');
     expect(r.prompt).toBe('a calm sunset over the sea');
     expect(r.size).toBe('auto');
-    // Model is pinned on gpt-image-1 unless overridden.
-    expect(r.model).toBe('gpt-image-1');
+    // Model is pinned on gemini-3.1-flash-image-preview unless overridden.
+    expect(r.model).toBe('gemini-3.1-flash-image-preview');
     // And the cache really holds the bytes.
     const hit = service.cacheGet(r.id);
     expect(hit).not.toBeNull();
@@ -119,7 +118,13 @@ describe('imageGen.generateImage', () => {
       global.fetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
-        json: async () => ({ data: [{ b64_json: b64 }] }),
+        json: async () => ({
+          candidates: [{
+            content: {
+              parts: [{ inlineData: { data: b64, mimeType: 'image/png' } }],
+            },
+          }],
+        }),
       });
       await service.generateImage({ prompt: `prompt ${i}` });
     }
@@ -131,7 +136,13 @@ describe('imageGen.generateImage', () => {
     global.fetch.mockResolvedValueOnce({
       ok: true,
       status: 200,
-      json: async () => ({ data: [{ b64_json: b64 }] }),
+      json: async () => ({
+        candidates: [{
+          content: {
+            parts: [{ inlineData: { data: b64, mimeType: 'image/png' } }],
+          },
+        }],
+      }),
     });
     const { generateImage } = freshService();
     const r = await generateImage({ prompt: 'coffee', publicBase: 'https://kelion.ai' });
@@ -141,24 +152,30 @@ describe('imageGen.generateImage', () => {
 
 describe('GET /api/generated-images/:id', () => {
   const origFetch = global.fetch;
-  const origKey = process.env.OPENAI_API_KEY;
+  const origKey = process.env.GEMINI_API_KEY;
 
   beforeEach(() => {
-    process.env.OPENAI_API_KEY = 'sk-test';
+    process.env.GEMINI_API_KEY = 'test-gemini-key';
     global.fetch = jest.fn();
   });
 
   afterEach(() => {
     global.fetch = origFetch;
-    process.env.OPENAI_API_KEY = origKey;
+    process.env.GEMINI_API_KEY = origKey;
   });
 
-  it('serves the cached PNG with correct content-type', async () => {
+  it('serves the cached image with correct content-type', async () => {
     const b64 = Buffer.from('png-data').toString('base64');
     global.fetch.mockResolvedValueOnce({
       ok: true,
       status: 200,
-      json: async () => ({ data: [{ b64_json: b64 }] }),
+      json: async () => ({
+        candidates: [{
+          content: {
+            parts: [{ inlineData: { data: b64, mimeType: 'image/png' } }],
+          },
+        }],
+      }),
     });
     const service = freshService();
     const gen = await service.generateImage({ prompt: 'dog' });
@@ -190,16 +207,16 @@ describe('GET /api/generated-images/:id', () => {
 
 describe('realTools.toolGenerateImage dispatch', () => {
   const origFetch = global.fetch;
-  const origKey = process.env.OPENAI_API_KEY;
+  const origKey = process.env.GEMINI_API_KEY;
 
   beforeEach(() => {
-    process.env.OPENAI_API_KEY = 'sk-test';
+    process.env.GEMINI_API_KEY = 'test-gemini-key';
     global.fetch = jest.fn();
   });
 
   afterEach(() => {
     global.fetch = origFetch;
-    process.env.OPENAI_API_KEY = origKey;
+    process.env.GEMINI_API_KEY = origKey;
   });
 
   it('executeRealTool("generate_image") routes through toolGenerateImage', async () => {
@@ -208,7 +225,13 @@ describe('realTools.toolGenerateImage dispatch', () => {
     global.fetch.mockResolvedValueOnce({
       ok: true,
       status: 200,
-      json: async () => ({ data: [{ b64_json: b64 }] }),
+      json: async () => ({
+        candidates: [{
+          content: {
+            parts: [{ inlineData: { data: b64, mimeType: 'image/png' } }],
+          },
+        }],
+      }),
     });
     const { executeRealTool, REAL_TOOL_NAMES } = require('../src/services/realTools');
     expect(REAL_TOOL_NAMES).toContain('generate_image');
