@@ -1,11 +1,11 @@
 'use strict';
 
 /**
- * F11 — OpenAI image generation (gpt-image-1) + short-lived URL serving.
+ * F11 — Gemini native image generation + short-lived URL serving.
  *
- * The voice model / text chat calls `generate_image(prompt, size?)`. The
- * OpenAI Images API returns a base64 PNG (`b64_json`). Piping the raw
- * base64 payload back through a tool result would:
+ * The voice model / text chat calls `generate_image(prompt, size?)`. Gemini
+ * returns the image as inlineData (base64 PNG). Piping the raw base64
+ * payload back through a tool result would:
  *   1) blow past the voice model's context on the read-back pass,
  *   2) send 1-2 MB down an audio WebSocket frame-by-frame,
  *   3) waste bandwidth since the client just wants to render it.
@@ -45,15 +45,9 @@ function cacheGet(id) {
   return hit;
 }
 
-// Accept sizes supported by gpt-image-1 (1024x1024, 1024x1536, 1536x1024,
-// or the shortcut `auto`). Reject anything else so we don't surface a
-// cryptic OpenAI 400 to the voice model — returning a clean error keeps
-// Kelion honest in its reply.
-const VALID_SIZES = new Set(['auto', '1024x1024', '1024x1536', '1536x1024']);
-
 /**
- * Generate an image with OpenAI gpt-image-1. Returns `{ ok, id, url,
- * title, prompt, size }` on success, or `{ ok:false, error }` on any
+ * Generate an image with Gemini native image generation. Returns `{ ok, id,
+ * url, title, prompt, size }` on success, or `{ ok:false, error }` on any
  * failure mode (missing key, moderation block, timeout, upstream error).
  *
  * `publicBase` (optional) is the absolute origin (e.g. `https://host`) so
@@ -63,38 +57,35 @@ const VALID_SIZES = new Set(['auto', '1024x1024', '1024x1536', '1536x1024']);
  * which the same-origin client resolves against its own host.
  */
 async function generateImage({ prompt, size, publicBase } = {}) {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    return { ok: false, unavailable: true, error: 'Image generation unavailable: OPENAI_API_KEY is not configured.' };
+    return { ok: false, unavailable: true, error: 'Image generation unavailable: GEMINI_API_KEY is not configured.' };
   }
   const cleanPrompt = typeof prompt === 'string' ? prompt.trim().slice(0, 4000) : '';
   if (!cleanPrompt) {
     return { ok: false, error: 'Missing prompt for image generation.' };
   }
-  const wantedSize = typeof size === 'string' && size ? size : 'auto';
-  if (!VALID_SIZES.has(wantedSize)) {
-    return { ok: false, error: `Invalid size "${wantedSize}". Use one of: ${[...VALID_SIZES].join(', ')}.` };
-  }
-  const model = process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1';
 
-  // 60 s timeout — gpt-image-1 averages 15-30 s for 1024×1024, pushing
-  // higher for portrait/landscape at 1536. Anything past 60 s is almost
-  // certainly a stuck connection.
+  const model = process.env.GEMINI_IMAGE_MODEL || 'gemini-3.1-flash-image-preview';
+
+  // 60 s timeout — image generation can take 15-30 s.
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 60_000);
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
   let r;
   try {
-    r = await fetch('https://api.openai.com/v1/images/generations', {
+    r = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model,
-        prompt: cleanPrompt,
-        size: wantedSize,
-        n: 1,
+        contents: [{
+          parts: [{ text: cleanPrompt }],
+        }],
+        generationConfig: {
+          responseModalities: ['TEXT', 'IMAGE'],
+        },
       }),
       signal: controller.signal,
     });
@@ -113,9 +104,6 @@ async function generateImage({ prompt, size, publicBase } = {}) {
       const j = await r.json();
       detail = j?.error?.message || '';
     } catch { /* ignore */ }
-    // Surface the moderation message specifically — the voice model can
-    // then explain to the user what was rejected instead of hallucinating
-    // that the image "just didn't load".
     if (r.status === 400 && /safety|policy|moderation/i.test(detail)) {
       return { ok: false, error: `Image rejected by safety system: ${detail}` };
     }
@@ -128,28 +116,40 @@ async function generateImage({ prompt, size, publicBase } = {}) {
   } catch {
     return { ok: false, error: 'Image API returned non-JSON payload.' };
   }
-  const first = Array.isArray(payload?.data) ? payload.data[0] : null;
-  const b64 = first?.b64_json;
-  if (!b64) {
-    return { ok: false, error: 'Image API returned no b64_json payload.' };
-  }
-  let pngBuffer;
-  try {
-    pngBuffer = Buffer.from(b64, 'base64');
-  } catch {
-    return { ok: false, error: 'Failed to decode b64 image payload.' };
+
+  // Extract the image from Gemini response parts
+  const parts = payload?.candidates?.[0]?.content?.parts || [];
+  let imageData = null;
+  let imageMimeType = 'image/png';
+  for (const part of parts) {
+    if (part.inlineData?.data) {
+      imageData = part.inlineData.data;
+      imageMimeType = part.inlineData.mimeType || 'image/png';
+      break;
+    }
   }
 
-  const id = cachePut({ pngBuffer, contentType: 'image/png', prompt: cleanPrompt });
+  if (!imageData) {
+    return { ok: false, error: 'Image API returned no image data.' };
+  }
+
+  let pngBuffer;
+  try {
+    pngBuffer = Buffer.from(imageData, 'base64');
+  } catch {
+    return { ok: false, error: 'Failed to decode image payload.' };
+  }
+
+  const id = cachePut({ pngBuffer, contentType: imageMimeType, prompt: cleanPrompt });
   const path = `/api/generated-images/${id}`;
-  const url = publicBase ? new URL(path, publicBase).toString() : path;
+  const finalUrl = publicBase ? new URL(path, publicBase).toString() : path;
   return {
     ok: true,
     id,
-    url,
+    url: finalUrl,
     title: cleanPrompt.slice(0, 80),
     prompt: cleanPrompt,
-    size: wantedSize,
+    size: size || 'auto',
     model,
   };
 }

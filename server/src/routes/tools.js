@@ -236,7 +236,7 @@ router.post('/mcp/files', async (req, res) => {
 });
 
 // ─── Real-tool proxy (shared server-side executor) ────────────────
-// Voice sessions (Gemini Live + OpenAI Realtime) emit tool calls on the
+// Voice sessions (Gemini Live) emit tool calls on the
 // client; src/lib/kelionTools.js runTool() proxies unknown names here so
 // they run inside our trust boundary with the same executor the text
 // chat route already uses. Rate-limited per IP to stop a runaway session

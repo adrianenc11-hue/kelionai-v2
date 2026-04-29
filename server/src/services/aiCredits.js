@@ -9,13 +9,10 @@
  *
  * Providers vary a lot:
  *
+ *
  *  - Gemini (Google AI Studio): no public balance endpoint. We test the key
  *    with a cheap models.list call and return a "configured" signal + link
- *    to the aistudio console where Adrian can rotate/check billing.
- *
- *  - OpenAI: the legacy /dashboard/billing/credit_grants endpoint is no
- *    longer usable with regular API keys. We return "configured" +
- *    top-up link to platform.openai.com.
+ *    to the aistudio console where the admin can rotate/check billing.
  *
  *  - ElevenLabs: /v1/user/subscription returns character_count /
  *    character_limit — exact remaining quota, translated to a fraction.
@@ -88,46 +85,7 @@ async function probeGemini() {
   return card;
 }
 
-async function probeOpenAI() {
-  const apiKey = config.openai && config.openai.apiKey;
-  const card = {
-    id: 'openai',
-    name: 'OpenAI',
-    subtitle: 'Realtime voice fallback',
-    configured: Boolean(apiKey),
-    keyFingerprint: maskKey(apiKey),
-    balance: null,
-    balanceDisplay: 'Check in billing',
-    unit: null,
-    status: 'unknown',
-    message: null,
-    topUpUrl: 'https://platform.openai.com/settings/organization/billing/overview',
-    billingUrl: 'https://platform.openai.com/usage',
-  };
-  if (!apiKey) {
-    card.status = 'error';
-    card.message = 'OPENAI_API_KEY not set';
-    return card;
-  }
-  try {
-    const r = await fetchWithTimeout('https://api.openai.com/v1/models?limit=1', {
-      method: 'GET',
-      headers: { 'Authorization': `Bearer ${apiKey}` },
-    });
-    if (r.ok) {
-      card.status = 'ok';
-      card.message = 'API key valid';
-    } else {
-      const body = await r.text().catch(() => '');
-      card.status = 'error';
-      card.message = `HTTP ${r.status}: ${body.slice(0, 200)}`;
-    }
-  } catch (err) {
-    card.status = 'error';
-    card.message = err && err.message ? err.message : 'network error';
-  }
-  return card;
-}
+// probeOpenAI REMOVED — project uses Gemini only.
 
 // probeGroq REMOVED — Groq coding tools were removed.
 // Keeping the function as a no-op for backwards compat if anything calls it.
@@ -289,21 +247,20 @@ async function getAllCredits() {
   // Order is display order in the admin grid. Groq sits next to the
   // other AI providers so admins can eyeball "is every AI brain we
   // call actually reachable" in a single glance.
-  const [gemini, openai, groq, elevenlabs, stripe, railway] = await Promise.all([
+  const [gemini, groq, elevenlabs, stripe, railway] = await Promise.all([
     probeGemini(),
-    probeOpenAI(),
     probeGroq(),
     probeElevenLabs(),
     probeStripe(),
     probeRailway(),
   ]);
-  return [gemini, openai, groq, elevenlabs, stripe, railway];
+  return [gemini, groq, elevenlabs, stripe, railway];
 }
 
 /**
  * Revenue-split contract: for every credit top-up the user pays, a
  * fixed fraction (default 50%) is earmarked for AI provider spend
- * (Google Gemini, ElevenLabs, OpenAI). The remainder is the owner's
+ * (Google Gemini, ElevenLabs). The remainder is the owner's
  * net. We do NOT transfer money automatically — Stripe cannot pay GCP
  * directly. Instead we compute the allocation off the existing credit
  * ledger and surface it next to the raw provider cards so the admin
@@ -476,7 +433,6 @@ async function buildRevenueSplit(revenueSummary, { days = 30, currency = 'gbp' }
 module.exports = {
   getAllCredits,
   probeGemini,
-  probeOpenAI,
   probeGroq,
   probeElevenLabs,
   probeStripe,

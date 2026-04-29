@@ -13,7 +13,7 @@
 //   • `isAdminUser` consulted only the DB row + email allowlist and
 //     ignored the JWT's own `role: 'admin'` claim.
 // Result: HUD rendered "Admin · ∞" (the permissive `/auth/passkey/me`
-// path), but `/gemini-token` + `/openai-live-token` fell into the guest
+// path), but `/gemini-token` fell into the guest
 // branch and 429'd after the 15-min IP trial window.
 //
 // New contract:

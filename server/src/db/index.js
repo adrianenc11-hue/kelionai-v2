@@ -843,7 +843,7 @@ async function listRecentActions(userId, { limit = 40, sessionId = null } = {}) 
 // `setPreferredLanguage` persists the short BCP-47 primary tag on the
 // users row AND mirrors it as a `locale` memory_item. The memory row is
 // what chat.js / realtime.js already inject into the persona via
-// `listMemoryItems`, so every provider (text + OpenAI Realtime + Gemini
+// `listMemoryItems`, so every provider (text chat + Gemini
 // Live) sees the fact without chat.js being touched.
 //
 // Older `locale` rows for the same user are pruned first so the persona
