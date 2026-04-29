@@ -11,6 +11,7 @@ import { handleShowOnMonitor, showImageOnMonitor } from './monitorStore'
 import { openEmailComposer } from './composerStore'
 import { getLatestCameraFrame } from './cameraFrameBuffer'
 import { setNarrationMode } from './narrationMode'
+import { setVoiceMode } from './voiceModeStore'
 import {
   readClientCoords,
   readClientGeoPermission,
@@ -341,6 +342,11 @@ function download(){
     }
     // what_do_you_see REMOVED — Gemini Live receives camera frames
     // natively via realtimeInput.video and can describe them directly.
+    case 'switch_voice': {
+      // Switch between Gemini built-in voice and user's ElevenLabs cloned voice.
+      const next = setVoiceMode(args?.mode || 'default')
+      return `ok:voice_mode:${next}`
+    }
     case 'get_my_location': {
       // Client-side GPS — on mobile this hits real GPS, on desktop the OS
       // WiFi-fused location. KelionStage registered a provider via
