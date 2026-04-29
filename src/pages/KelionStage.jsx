@@ -1628,7 +1628,7 @@ export default function KelionStage() {
         shadows={{ type: THREE.VSMShadowMap }}
         camera={{ position: [0, 0.2, 4.2], fov: 36 }}
         dpr={[1, 2]}
-        gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, outputColorSpace: THREE.SRGBColorSpace, powerPreference: 'low-power' }}
+        gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.8, outputColorSpace: THREE.SRGBColorSpace, powerPreference: 'low-power' }}
         onCreated={({ gl }) => {
           // Handle WebGL context loss gracefully — prevent the crash
           // that takes down the entire React tree via ErrorBoundary.
@@ -1644,11 +1644,11 @@ export default function KelionStage() {
           }
         }}
       >
-        <color attach="background" args={['#05060a']} />
-        <fog attach="fog" args={['#080614', 5.5, 12]} />
+        <color attach="background" args={['#0a0d1a']} />
+        <fog attach="fog" args={['#0e0b20', 6, 14]} />
         <CameraRig />
         <Suspense fallback={null}>
-          <Environment preset="city" environmentIntensity={0.35} />
+          <Environment preset="city" environmentIntensity={0.6} />
           <StudioDecor />
           {/* Halo removed — Adrian asked to stop the pulsating circle behind
               the avatar; it was too busy. Status color is still conveyed
