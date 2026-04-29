@@ -370,7 +370,10 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
               setStatus('speaking')
               const r = await fetch('/api/voice/clone/tts', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                  'Content-Type': 'application/json',
+                  'X-CSRF-Token': getCsrfToken(),
+                },
                 credentials: 'include',
                 body: JSON.stringify({ text: textToSpeak }),
               })
