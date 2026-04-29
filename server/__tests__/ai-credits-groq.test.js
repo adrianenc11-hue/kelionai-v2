@@ -7,7 +7,7 @@
  * function now returns a static "removed" card for backwards compat.
  */
 
-process.env.OPENAI_API_KEY = process.env.OPENAI_API_KEY || 'test-openai';
+// OpenAI removed — project uses Gemini only.
 process.env.GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'test-gemini';
 
 const { probeGroq, getAllCredits } = require('../src/services/aiCredits');
@@ -33,8 +33,8 @@ describe('getAllCredits — Groq slot', () => {
   test('Groq card sits alongside the other AI-provider cards', async () => {
     const cards = await getAllCredits();
     const idx = Object.fromEntries(cards.map((c, i) => [c.id, i]));
-    // OpenAI → Groq → ElevenLabs (AI brains before revenue/infra).
-    expect(idx.openai).toBeLessThan(idx.groq);
+    // Gemini → Groq → ElevenLabs (AI brains before revenue/infra).
+    expect(idx.gemini).toBeLessThan(idx.groq);
     expect(idx.groq).toBeLessThan(idx.elevenlabs);
   });
 });
