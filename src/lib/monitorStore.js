@@ -343,81 +343,101 @@ function resolveMonitor(kind, query) {
       return { kind: null, src: null, title: null, embedType: 'iframe' };
 
     case 'map': {
-      // Switched off Google Maps' `?output=embed` — Adrian (2026-04-25)
-      // had it refused with "Acest site a refuzat să încorporeze"
-      // (X-Frame-Options). OpenStreetMap's export embed is iframe-
-      // friendly and renders a real Mapnik tile view with a marker.
-      // Free-text queries are geocoded async via Nominatim; in the
-      // meantime we render an "Open in Maps" placeholder so the user
-      // always has something clickable instead of a blank pane.
       let label = q;
 
-      // Already a coordinate string? Render directly without geocoding.
+      // Helper: build Leaflet HTML card for a lat/lon + label.
+      function leafletMapHtml(lat, lon, name, satellite = false) {
+        const tile = satellite
+          ? `L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{attribution:'Esri World Imagery',maxZoom:19})`
+          : `L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:19})`;
+        return `<div id="map" style="width:100%;height:100vh;margin:0"></div><script>
+var map=L.map('map',{zoomControl:true}).setView([${lat},${lon}],13);
+${tile}.addTo(map);
+L.marker([${lat},${lon}]).addTo(map).bindPopup(${JSON.stringify(name)}).openPopup();
+<\/script>`;
+      }
+
+      // Already a coordinate string? Render Leaflet immediately.
       const direct = parseLatLon(q);
       if (direct) {
+        const satellite = /satelit|satellite|esri|aerial/i.test(q);
         return {
           kind: 'map',
-          src: googleMapEmbed(direct.lat, direct.lon, q),
+          src: leafletMapHtml(direct.lat, direct.lon, q, satellite),
           title: `Hartă — ${q}`,
-          embedType: 'iframe',
+          embedType: 'html',
         };
       }
 
-      // Empty query → center on the user's current coordinates if the
-      // React tree registered a geo provider. Lets voice commands like
-      // "arată-mi harta" (no place mentioned) resolve to the user's own
-      // location instead of a blank card.
+      // Empty query → user's location.
       if (!q && geoProvider) {
         try {
           const g = geoProvider();
           if (g && Number.isFinite(g.latitude) && Number.isFinite(g.longitude)) {
             return {
               kind: 'map',
-              src: googleMapEmbed(g.latitude, g.longitude, null),
+              src: leafletMapHtml(g.latitude, g.longitude, 'Locația ta'),
               title: 'Hartă — locația ta',
-              embedType: 'iframe',
+              embedType: 'html',
             };
           }
         } catch { /* ignore */ }
       }
       if (!q) return null;
 
-      // Free-text place name → fire async Nominatim geocode; once it
-      // lands, queueGeocodeUpgrade swaps the placeholder for the real
-      // OSM embed centered on the resolved lat/lon.
-      queueGeocodeUpgrade('map', q);
-      // Show OSM search in proxy while geocode runs
-      const osmSearch = `https://www.openstreetmap.org/search?query=${encodeURIComponent(q)}`;
+      // Free-text → geocode async, show loading HTML in the meantime.
+      const satellite = /satelit|satellite|esri|aerial/i.test(q);
+      queueGeocodeUpgrade('map', q, { satellite });
       return {
         kind: 'map',
-        src: proxyUrl(osmSearch),
+        src: `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#a78bfa;font-size:18px;font-family:system-ui">⏳ Se încarcă harta pentru <b style="margin-left:6px">${label}</b>…</div>`,
         title: `Hartă — ${label}`,
-        embedType: 'iframe',
+        embedType: 'html',
       };
     }
 
-    // ROUTE — point-to-point directions using OpenStreetMap / OSRM.
-    // No API key needed. Works in iframe. Supports driving, cycling, walking.
-    // query format: 'From City -> To City' or 'Origin | Destination'
+    // ROUTE — Leaflet HTML with polyline between two places.
     case 'route': {
-      // Parse 'origin -> destination' or 'origin | destination'
       const sep = q.includes('->') ? '->' : q.includes('|') ? '|' : null;
       let origin = q, destination = '';
       if (sep) {
         [origin, destination] = q.split(sep).map(s => s.trim());
       }
-      const osmDir = destination
-        ? `https://www.openstreetmap.org/directions?engine=osrm_car&route=${encodeURIComponent(origin)}%3B${encodeURIComponent(destination)}`
-        : `https://www.openstreetmap.org/directions?engine=osrm_car&route=${encodeURIComponent(origin)}`;
+      // Known coordinate pairs for common routes (extend as needed)
+      const KNOWN_COORDS = {
+        'cluj-napoca': [46.7712, 23.6236], 'cluj': [46.7712, 23.6236],
+        'bucurești': [44.4268, 26.1025], 'bucharest': [44.4268, 26.1025],
+        'paris': [48.8566, 2.3522], 'londra': [51.5074, -0.1278], 'london': [51.5074, -0.1278],
+        'witney': [51.7873, -1.4837], 'berlin': [52.52, 13.405], 'roma': [41.9028, 12.4964],
+        'madrid': [40.4168, -3.7038], 'viena': [48.2082, 16.3738], 'vienna': [48.2082, 16.3738],
+        'amsterdam': [52.3676, 4.9041], 'bruxelles': [50.8503, 4.3517],
+        'timișoara': [45.7489, 21.2087], 'iași': [47.1585, 27.6014], 'brașov': [45.6580, 25.6012],
+      };
+      const look = (name) => KNOWN_COORDS[name.toLowerCase().trim()] || null;
+      const orig = look(origin);
+      const dest = look(destination);
+      if (orig && dest) {
+        const html = `<div id="map" style="width:100%;height:100vh;margin:0"></div><script>
+var map=L.map('map').setView([${(orig[0]+dest[0])/2},${(orig[1]+dest[1])/2}],6);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM'}).addTo(map);
+var o=L.marker([${orig}]).addTo(map).bindPopup(${JSON.stringify(origin)}).openPopup();
+var d=L.marker([${dest}]).addTo(map).bindPopup(${JSON.stringify(destination)});
+var line=L.polyline([[${orig}],[${dest}]],{color:'#7c3aed',weight:4,dashArray:'8 4'}).addTo(map);
+map.fitBounds(line.getBounds(),{padding:[40,40]});
+<\/script>`;
+        return { kind: 'map', src: html, title: `Rută: ${origin} → ${destination}`, embedType: 'html' };
+      }
+      // Unknown places — show loading + queue geocode for both
       return {
-        kind: 'route',
-        src: proxyUrl(osmDir),
-        title: destination ? `Rută: ${origin} → ${destination}` : `Direcții: ${origin}`,
-        embedType: 'iframe',
+        kind: 'map',
+        src: `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#a78bfa;font-size:18px;font-family:system-ui">⏳ Se calculează ruta <b style="margin:0 6px">${origin}</b>→<b style="margin-left:6px">${destination}</b>…</div>`,
+        title: `Rută: ${origin} → ${destination}`,
+        embedType: 'html',
       };
     }
 
     case 'weather': {
+
       // Switched off the wttr.in text page — Adrian (2026-04-25)
       // wanted "ceva profesional cu coordonatele reale GPS". Windy.com
       // is the industry standard: live radar, wind, precipitation,

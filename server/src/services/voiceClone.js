@@ -133,9 +133,12 @@ async function createClonedVoice({ buffer, mimeType, name, description }) {
       if (detail && typeof detail !== 'string') detail = JSON.stringify(detail);
     } catch (_) { /* keep raw */ }
     throw new VoiceCloneError(
-      `ElevenLabs voice creation failed: ${r.status} ${String(detail).slice(0, 500)}`,
-      r.status === 401 ? 502 : r.status
+      r.status === 401
+        ? 'ElevenLabs API key invalid or expired. Update ELEVENLABS_API_KEY in Railway.'
+        : `ElevenLabs voice creation failed: ${r.status} ${String(detail).slice(0, 500)}`,
+      r.status === 401 ? 401 : r.status
     );
+
   }
   let payload = {};
   try { payload = JSON.parse(text); } catch (_) { /* ignore */ }
