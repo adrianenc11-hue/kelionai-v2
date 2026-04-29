@@ -1077,22 +1077,13 @@ const openaiTokenHandler = async (req, res) => {
   const isAdmin = await isAdminUser(adminUser);
   const isGuest = !adminUser;
 
-  // ── Gating (same rules as Gemini) ────────────────────────────────
+  // ── Gating: NO FREE TRIAL — sign in + buy credits required ─────
   let trial = null;
   if (isGuest && !isAdmin) {
-    const ip = ipGeo.clientIp(req) || req.ip || '';
-    const status = await trialStatus(ip);
-    if (!status.allowed) {
-      const isLifetime = status.reason === 'lifetime_expired';
-      return res.status(429).json({
-        error: isLifetime
-          ? 'Your 7-day free trial has ended. Please create an account and buy credits to keep talking to Kelion.'
-          : 'Free trial for today is used up. Come back tomorrow or sign in to continue.',
-        trial: { allowed: false, reason: status.reason || 'window_expired', remainingMs: 0 },
-      });
-    }
-    await stampTrialIfFresh(ip, status);
-    trial = { allowed: true, remainingMs: status.remainingMs, windowMs: TRIAL_WINDOW_MS };
+    return res.status(401).json({
+      error: 'Please sign in and purchase credits to use Kelion.',
+      trial: { allowed: false, reason: 'trial_disabled', remainingMs: 0 },
+    });
   } else if (adminUser && !isAdmin) {
     if (adminUser.id == null) {
       res.clearCookie('kelion.token', { path: '/' });
@@ -1304,28 +1295,11 @@ const geminiTokenHandler = async (req, res) => {
   const isGuest = !adminUser;
   let trial = null;
   if (isGuest && !isAdmin) {
-    const ip = ipGeo.clientIp(req) || req.ip || '';
-    const status = await trialStatus(ip);
-    if (!status.allowed) {
-      const isLifetime = status.reason === 'lifetime_expired';
-      return res.status(429).json({
-        error: isLifetime
-          ? 'Your 7-day free trial has ended. Please create an account and buy credits to keep talking to Kelion.'
-          : 'Free trial for today is used up. Come back tomorrow or sign in to continue.',
-        trial: {
-          allowed: false,
-          reason: status.reason || 'window_expired',
-          remainingMs: 0,
-          ...(status.nextWindowMs != null ? { nextWindowMs: status.nextWindowMs } : {}),
-        },
-      });
-    }
-    await stampTrialIfFresh(ip, status);
-    trial = {
-      allowed: true,
-      remainingMs: status.remainingMs,
-      windowMs: TRIAL_WINDOW_MS,
-    };
+    // NO FREE TRIAL — all guests must sign in and buy credits.
+    return res.status(401).json({
+      error: 'Please sign in and purchase credits to use Kelion.',
+      trial: { allowed: false, reason: 'trial_disabled', remainingMs: 0 },
+    });
   } else if (adminUser && !isAdmin) {
     // Non-admin with a stale JWT whose `sub` is not a numeric row id
     // (pre-Postgres UUID). Without an id we can't look up a credits

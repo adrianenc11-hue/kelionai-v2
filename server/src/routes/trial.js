@@ -52,17 +52,16 @@ router.get('/status', async (req, res) => {
     });
   }
   const ip = ipGeo.clientIp(req) || req.ip || '';
-  const status = await trialStatus(ip);
+  // Trial is DISABLED — all guests must sign in and purchase credits.
   return res.json({
     applicable:   true,
-    allowed:      status.allowed,
-    remainingMs:  status.remainingMs,
+    allowed:      false,
+    reason:       'trial_disabled',
+    remainingMs:  0,
     windowMs:     TRIAL_WINDOW_MS,
     lifetimeMs:   TRIAL_LIFETIME_MS,
-    lifetimeRemainingMs: status.lifetimeRemainingMs,
-    stamped:      !status.fresh && status.allowed, // already ticking
-    ...(status.reason      ? { reason: status.reason } : {}),
-    ...(status.nextWindowMs != null ? { nextWindowMs: status.nextWindowMs } : {}),
+    lifetimeRemainingMs: 0,
+    stamped:      false,
   });
 });
 
