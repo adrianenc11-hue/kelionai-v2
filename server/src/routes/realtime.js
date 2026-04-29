@@ -1670,7 +1670,7 @@ router.post('/vision', visionLimiter, async (req, res) => {
         content: [
           {
             type: 'text',
-            text: `Describe what you see in this camera frame in 1-2 concise sentences. Focus on people, objects, actions, and environment. Be factual and brief.${timeInfo} Note the lighting conditions and whether they match the time of day.`,
+            text: `You are a vision system analyzing a real camera frame from a user's device. RULES:\n1. Describe ONLY what you can LITERALLY see in this image. Never invent, assume, or hallucinate details.\n2. If the image is blurry, dark, or unclear, say so honestly — do NOT guess what might be there.\n3. Focus on: people (position, clothing, actions), objects, text visible, environment (indoor/outdoor, vehicle, room type).\n4. If you see a steering wheel, dashboard, or road — the user is in a vehicle. Describe the driving scene.\n5. If you see a face close-up — this is likely a front-facing (selfie) camera.\n6. Keep to 1-2 factual sentences. No creative writing.${timeInfo}`,
           },
           {
             type: 'image_url',
