@@ -368,10 +368,10 @@ router.post('/tts', async (req, res) => {
         },
         body: JSON.stringify({
           text: text.trim().slice(0, 5000),
-          model_id: 'eleven_turbo_v2_5',
+          model_id: 'eleven_multilingual_v2',
           voice_settings: {
-            stability: 0.5,
-            similarity_boost: 0.75,
+            stability: 0.4,
+            similarity_boost: 0.85,
             speed: Math.max(0.7, Math.min(1.2, Number(speed) || 1.0)),
           },
         }),
