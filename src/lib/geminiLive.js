@@ -474,6 +474,14 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
               }
               const audioData = await r.arrayBuffer()
               logAiEvent('clone_tts_ok', { durationMs: Date.now() - ttsStart, bytes: audioData.byteLength })
+              console.log(`[clonedTTS] received ${audioData.byteLength} bytes in ${Date.now() - ttsStart}ms`)
+
+              if (audioData.byteLength < 100) {
+                console.warn('[clonedTTS] audio response too small, likely empty')
+                appendTurn('assistant', `⚠️ Voce clonată: răspuns audio gol (${audioData.byteLength} bytes)`, true)
+                setStatus('listening')
+                return
+              }
 
               // Play through the avatar's <audio> element so lip-sync works.
               // The audio element is connected to the lip-sync analyser via
@@ -497,6 +505,8 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
                 // For cloned voice the blob IS the primary audio source, so we
                 // MUST unmute it or the user hears nothing.
                 audioEl.muted = false
+                audioEl.volume = 1.0
+                console.log(`[clonedTTS] playing via main audioEl, muted=${audioEl.muted}, volume=${audioEl.volume}`)
                 audioEl.onended = () => {
                   URL.revokeObjectURL(blobUrl)
                   audioEl.src = ''
@@ -504,21 +514,28 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
                   audioEl.muted = prevMuted         // restore muted state
                   setStatus('listening')
                 }
-                audioEl.onerror = () => {
+                audioEl.onerror = (e) => {
+                  console.error('[clonedTTS] audioEl error:', e)
+                  appendTurn('assistant', `⚠️ Voce clonată: eroare la redare audio`, true)
                   URL.revokeObjectURL(blobUrl)
                   audioEl.src = ''
                   audioEl.srcObject = prevSrcObject
                   audioEl.muted = prevMuted
                   setStatus('listening')
                 }
-                await audioEl.play().catch(() => {
+                await audioEl.play().catch((playErr) => {
                   // Fallback: play via a new Audio() if the main element fails
-                  console.warn('[clonedTTS] main audioEl play failed, using fallback')
+                  console.warn('[clonedTTS] main audioEl play failed:', playErr?.message, 'using fallback')
                   audioEl.srcObject = prevSrcObject
                   audioEl.muted = prevMuted
                   const fallback = new Audio(blobUrl)
+                  fallback.volume = 1.0
                   fallback.onended = () => { URL.revokeObjectURL(blobUrl); setStatus('listening') }
-                  fallback.play().catch(() => setStatus('listening'))
+                  fallback.play().catch((e2) => {
+                    console.error('[clonedTTS] fallback play also failed:', e2?.message)
+                    appendTurn('assistant', `⚠️ Voce clonată: browser blochează redarea (${e2?.message})`, true)
+                    setStatus('listening')
+                  })
                 })
               } else {
                 // No audioRef — fallback to standalone Audio element

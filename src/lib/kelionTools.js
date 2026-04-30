@@ -209,10 +209,52 @@ async function runRealToolRemote(name, args) {
 function autoDisplayOnMonitor(name, j, args) {
   if (!j || j.ok === false || j.error) return
   try {
-    // Weather → Windy.com (live radar, wind, clouds, temperature)
+    // Weather → inline HTML card with real data (Windy iframes get blocked)
     if ((name === 'get_weather' || name === 'get_forecast') && (j.current || j.daily)) {
-      const loc = j.location?.name || args?.location || ''
-      if (loc) handleShowOnMonitor({ kind: 'weather', query: loc })
+      const loc = j.location?.name || args?.location || 'Unknown'
+      const c = j.current || {}
+      const temp = c.temperature_2m ?? c.temp ?? ''
+      const feels = c.apparent_temperature ?? c.feels_like ?? ''
+      const humid = c.relative_humidity_2m ?? c.humidity ?? ''
+      const wind = c.wind_speed_10m ?? c.wind_speed ?? ''
+      const code = c.weather_code ?? c.weathercode ?? null
+      // Weather code → emoji mapping
+      const wxEmoji = code != null ? ({
+        0:'☀️',1:'🌤',2:'⛅',3:'☁️',45:'🌫',48:'🌫',51:'🌦',53:'🌧',55:'🌧',
+        61:'🌧',63:'🌧',65:'🌧',71:'🌨',73:'🌨',75:'❄️',80:'🌦',81:'🌧',82:'⛈',
+        95:'⛈',96:'⛈',99:'⛈'
+      }[code] || '🌡') : '🌡'
+
+      // Build forecast rows if available
+      let forecastHtml = ''
+      if (j.daily && Array.isArray(j.daily.time)) {
+        const rows = j.daily.time.slice(0, 5).map((d, i) => {
+          const hi = j.daily.temperature_2m_max?.[i] ?? ''
+          const lo = j.daily.temperature_2m_min?.[i] ?? ''
+          const dc = j.daily.weather_code?.[i]
+          const de = dc != null ? ({0:'☀️',1:'🌤',2:'⛅',3:'☁️',51:'🌦',61:'🌧',71:'🌨',95:'⛈'}[dc]||'🌡') : ''
+          return `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(167,139,250,0.15)">
+            <span style="opacity:0.7">${d}</span><span>${de}</span><span>${lo}° / ${hi}°</span>
+          </div>`
+        }).join('')
+        forecastHtml = `<div style="margin-top:16px"><div style="font-size:13px;color:#a78bfa;margin-bottom:8px;font-weight:600">Prognoză 5 zile</div>${rows}</div>`
+      }
+
+      handleShowOnMonitor({
+        kind: 'html',
+        query: `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100%;background:linear-gradient(135deg,#0f0a1e,#1a1145);font-family:system-ui;color:#ede9fe;padding:32px">
+          <div style="font-size:72px;margin-bottom:8px">${wxEmoji}</div>
+          <div style="font-size:48px;font-weight:800">${temp}°C</div>
+          <div style="font-size:18px;opacity:0.8;margin:4px 0">${loc}</div>
+          <div style="display:flex;gap:24px;margin-top:16px;font-size:14px;opacity:0.7">
+            ${feels !== '' ? `<span>Simte ca ${feels}°</span>` : ''}
+            ${humid !== '' ? `<span>💧 ${humid}%</span>` : ''}
+            ${wind !== '' ? `<span>💨 ${wind} km/h</span>` : ''}
+          </div>
+          ${forecastHtml}
+        </div>`,
+        title: `Vreme — ${loc}`,
+      })
       return
     }
 
@@ -244,24 +286,68 @@ function autoDisplayOnMonitor(name, j, args) {
       return
     }
 
-    // Crypto → CoinGecko (industry standard)
+    // Crypto → inline HTML card with real data
     if (name === 'get_crypto_price' && j.prices) {
-      const firstCoin = Object.keys(j.prices)[0] || 'bitcoin'
-      handleShowOnMonitor({ kind: 'web', query: `https://www.coingecko.com/en/coins/${firstCoin}`, title: `${firstCoin} — CoinGecko` })
+      const coins = Object.entries(j.prices)
+      const rows = coins.map(([coin, data]) => {
+        const p = typeof data === 'object' ? data : { usd: data }
+        const price = p.usd ?? p.eur ?? Object.values(p)[0] ?? '—'
+        const change = p.usd_24h_change ?? p.change_24h ?? null
+        const ch = change != null ? `<span style="color:${change >= 0 ? '#86efac' : '#fca5a5'}">${change >= 0 ? '+' : ''}${Number(change).toFixed(1)}%</span>` : ''
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid rgba(167,139,250,0.15)">
+          <span style="font-weight:600;text-transform:capitalize">${coin.replace(/-/g,' ')}</span>
+          <span>$${Number(price).toLocaleString('en',{maximumFractionDigits:2})}</span>
+          ${ch}
+        </div>`
+      }).join('')
+      handleShowOnMonitor({
+        kind: 'html',
+        query: `<div style="padding:32px;font-family:system-ui;color:#ede9fe;min-height:100%;background:linear-gradient(135deg,#0f0a1e,#1a1145)">
+          <div style="font-size:40px;text-align:center;margin-bottom:16px">₿</div>
+          <div style="font-size:22px;font-weight:700;text-align:center;color:#c4b5fd;margin-bottom:24px">Crypto Prices</div>
+          ${rows}
+        </div>`,
+        title: `Crypto — ${coins.map(c => c[0]).join(', ')}`,
+      })
       return
     }
 
-    // Stocks → Google Finance
+    // Stocks → inline HTML card with real data
     if (name === 'get_stock_price' && j.symbol) {
-      handleShowOnMonitor({ kind: 'web', query: `https://www.google.com/finance/quote/${j.symbol}:${j.exchange || 'NASDAQ'}`, title: `${j.symbol} — Google Finance` })
+      const p = j.price ?? j.regularMarketPrice ?? '—'
+      const ch = j.change ?? j.regularMarketChange ?? null
+      const pct = j.changePercent ?? j.regularMarketChangePercent ?? null
+      const chColor = ch != null && ch >= 0 ? '#86efac' : '#fca5a5'
+      handleShowOnMonitor({
+        kind: 'html',
+        query: `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100%;background:linear-gradient(135deg,#0f0a1e,#1a1145);font-family:system-ui;color:#ede9fe;padding:32px">
+          <div style="font-size:48px;margin-bottom:8px">📈</div>
+          <div style="font-size:16px;opacity:0.7;margin-bottom:4px">${j.symbol}${j.exchange ? ' · ' + j.exchange : ''}</div>
+          <div style="font-size:44px;font-weight:800">$${Number(p).toLocaleString('en',{maximumFractionDigits:2})}</div>
+          ${ch != null ? `<div style="font-size:18px;margin-top:8px;color:${chColor}">${ch >= 0 ? '+' : ''}${Number(ch).toFixed(2)} ${pct != null ? '(' + Number(pct).toFixed(2) + '%)' : ''}</div>` : ''}
+          ${j.name ? `<div style="font-size:14px;opacity:0.5;margin-top:12px">${j.name}</div>` : ''}
+        </div>`,
+        title: `${j.symbol} — Stock Price`,
+      })
       return
     }
 
-    // Forex / Currency → XE.com
+    // Forex / Currency → inline HTML card
     if ((name === 'get_forex' || name === 'currency_convert') && (args?.from || j.from)) {
       const from = args?.from || j.from || 'EUR'
       const to = args?.to || j.to || 'USD'
-      handleShowOnMonitor({ kind: 'web', query: `https://www.xe.com/currencyconverter/convert/?From=${from}&To=${to}`, title: `${from}/${to} — XE` })
+      const rate = j.rate ?? j.result ?? j.price ?? '—'
+      const amount = args?.amount || 1
+      handleShowOnMonitor({
+        kind: 'html',
+        query: `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100%;background:linear-gradient(135deg,#0f0a1e,#1a1145);font-family:system-ui;color:#ede9fe;padding:32px">
+          <div style="font-size:48px;margin-bottom:8px">💱</div>
+          <div style="font-size:18px;opacity:0.7;margin-bottom:8px">${amount} ${from} →</div>
+          <div style="font-size:44px;font-weight:800">${Number(rate).toLocaleString('en',{maximumFractionDigits:4})} ${to}</div>
+          <div style="font-size:13px;opacity:0.5;margin-top:16px">Rate: 1 ${from} = ${Number(rate/amount || rate).toLocaleString('en',{maximumFractionDigits:6})} ${to}</div>
+        </div>`,
+        title: `${from}/${to} — Exchange Rate`,
+      })
       return
     }
 
@@ -422,10 +508,12 @@ export async function runTool(name, args) {
     }
     case 'generate_image': {
       // F11 — Image generation. Show on monitor automatically.
+      console.log('[generate_image] prompt:', args?.prompt?.slice(0, 80))
       const j = await postJSON('/api/tools/execute', {
         name: 'generate_image',
         args: { prompt: args?.prompt, size: args?.size },
       })
+      console.log('[generate_image] response:', j?.ok, j?.url?.slice(0, 80), j?.error)
       if (!j?.ok) return j?.error || 'Image generation failed.'
       if (j.url) showImageOnMonitor({ src: j.url, title: j.title || args?.prompt || 'Generated image' })
       const label = (j.title || args?.prompt || '').toString().slice(0, 80)
