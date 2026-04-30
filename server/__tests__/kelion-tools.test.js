@@ -94,7 +94,7 @@ const EXPECTED_TOOL_NAMES = [
   'get_my_usage',
   'get_my_profile',
   // PR D — communications + automations + package info.
-  'send_email', 'send_sms', 'create_calendar_ics', 'zapier_trigger',
+  'send_email', 'create_calendar_ics', 'zapier_trigger',
   'github_repo_info', 'npm_package_info', 'pypi_package_info',
   // F11 — AI image generation (Gemini native). Graceful fallback when
   // GEMINI_API_KEY is absent.

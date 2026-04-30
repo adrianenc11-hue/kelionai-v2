@@ -24,10 +24,14 @@ export default defineConfig(({ mode }) => {
             if (id.includes('node_modules/react-router')) {
               return 'router'
             }
-            // Group all Monaco editor code into a dedicated chunk so it
-            // never leaks into the main KelionStage bundle.
             if (id.includes('node_modules/monaco-editor') || id.includes('node_modules/@monaco-editor')) {
               return 'monaco-vendor'
+            }
+            if (id.includes('node_modules/chart.js') || id.includes('node_modules/katex') || id.includes('node_modules/mermaid')) {
+              return 'viz-vendor'
+            }
+            if (id.includes('node_modules/framer-motion')) {
+              return 'motion-vendor'
             }
           },
         },
