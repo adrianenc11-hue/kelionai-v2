@@ -1323,10 +1323,19 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
       clearNarrationTimer()
       if (!snap.enabled) return
       const intervalMs = snap.intervalMs || 8000
+      let lastSentAt = 0
       narrationTimerRef.current = setInterval(() => {
         const ws = wsRef.current
         if (!ws || ws.readyState !== WebSocket.OPEN) return
+        // Don't narrate while Kelion is speaking/thinking — wait for silence
         if (statusRef.current !== 'listening') return
+        // Debounce: skip if we sent a narration prompt less than (intervalMs - 2s) ago.
+        // This prevents the loop from firing immediately after Kelion finishes
+        // speaking the previous description (status flips to 'listening' and the
+        // next interval tick fires within milliseconds).
+        const now = Date.now()
+        if (now - lastSentAt < intervalMs - 2000) return
+        lastSentAt = now
         const focus = snap.focus
           ? `Focus on: ${snap.focus}. `
           : ''
