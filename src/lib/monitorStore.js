@@ -299,8 +299,8 @@ async function queueGeocodeUpgrade(kind, query, opts = {}) {
   }
 }
 
-// Geocode two place names in parallel, then render a Leaflet route between them.
-async function queueRouteUpgrade(origin, destination) {
+// Geocode two place names, fetch REAL driving route from OSRM, render on Leaflet.
+async function queueRouteWithOSRM(origin, destination) {
   if (typeof window === 'undefined' || !window.fetch) return;
   const token = ++lastGeocodeQuery;
   try {
@@ -319,13 +319,52 @@ async function queueRouteUpgrade(origin, destination) {
     if (token !== lastGeocodeQuery) return;
     if (state.kind !== 'map') return;
     if (!orig || !dest) return;
-    const midLat = (orig.lat + dest.lat) / 2;
-    const midLon = (orig.lon + dest.lon) / 2;
-    const html = `<div id="map" style="width:100%;height:100vh;margin:0"></div><script>\nvar map=L.map('map').setView([${midLat},${midLon}],6);\nL.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'\u00a9 OSM'}).addTo(map);\nL.marker([${orig.lat},${orig.lon}]).addTo(map).bindPopup(${JSON.stringify(orig.name)}).openPopup();\nL.marker([${dest.lat},${dest.lon}]).addTo(map).bindPopup(${JSON.stringify(dest.name)});\nvar line=L.polyline([[${orig.lat},${orig.lon}],[${dest.lat},${dest.lon}]],{color:'#7c3aed',weight:4,dashArray:'8 4'}).addTo(map);\nmap.fitBounds(line.getBounds(),{padding:[40,40]});\n<\/script>`;
+
+    // Fetch real driving route from OSRM (free, no key needed)
+    let routeCoords = `[[${orig.lat},${orig.lon}],[${dest.lat},${dest.lon}]]`;
+    let distanceKm = '';
+    let durationMin = '';
+    try {
+      const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${orig.lon},${orig.lat};${dest.lon},${dest.lat}?overview=full&geometries=geojson`;
+      const osrmR = await fetch(osrmUrl, { credentials: 'omit' });
+      if (osrmR.ok) {
+        const osrmData = await osrmR.json();
+        if (osrmData.routes && osrmData.routes[0]) {
+          const route = osrmData.routes[0];
+          const coords = route.geometry.coordinates; // [lon, lat] pairs
+          routeCoords = '[' + coords.map(c => `[${c[1]},${c[0]}]`).join(',') + ']';
+          distanceKm = (route.distance / 1000).toFixed(1);
+          durationMin = Math.round(route.duration / 60);
+        }
+      }
+    } catch { /* OSRM failed, fall back to straight line */ }
+
+    if (token !== lastGeocodeQuery) return;
+
+    const infoText = distanceKm ? `${distanceKm} km • ~${durationMin} min` : '';
+    const origLabel = orig.name.split(',')[0];
+    const destLabel = dest.name.split(',')[0];
+
+    const html = `<div id="map" style="width:100%;height:100vh;margin:0"></div>
+<div style="position:fixed;bottom:12px;left:50%;transform:translateX(-50%);background:rgba(10,8,20,0.85);color:#ede9fe;padding:8px 18px;border-radius:999px;font:600 14px system-ui;border:1px solid rgba(167,139,250,0.4);z-index:999;backdrop-filter:blur(8px)">
+  🚗 ${origLabel} → ${destLabel}${infoText ? ' • ' + infoText : ''}
+</div>
+<script>
+var map=L.map('map',{zoomControl:true});
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM',maxZoom:18}).addTo(map);
+var startIcon=L.divIcon({html:'<div style="background:#22c55e;width:14px;height:14px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 6px rgba(0,0,0,0.4)"></div>',iconSize:[20,20],iconAnchor:[10,10]});
+var endIcon=L.divIcon({html:'<div style="background:#ef4444;width:14px;height:14px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 6px rgba(0,0,0,0.4)"></div>',iconSize:[20,20],iconAnchor:[10,10]});
+L.marker([${orig.lat},${orig.lon}],{icon:startIcon}).addTo(map).bindPopup('<b>Start:</b> ${origLabel.replace(/'/g,"\\'")}');
+L.marker([${dest.lat},${dest.lon}],{icon:endIcon}).addTo(map).bindPopup('<b>Finish:</b> ${destLabel.replace(/'/g,"\\'")}');
+var coords=${routeCoords};
+var route=L.polyline(coords,{color:'#7c3aed',weight:5,opacity:0.85}).addTo(map);
+map.fitBounds(route.getBounds(),{padding:[50,50]});
+<\\/script>`;
+
     setState({
       kind: 'map',
       src: html,
-      title: `Rut\u0103: ${orig.name.split(',')[0]} \u2192 ${dest.name.split(',')[0]}`,
+      title: `Rută: ${origLabel} → ${destLabel}${infoText ? ' (' + infoText + ')' : ''}`,
       embedType: 'html',
     });
   } catch { /* ignore */ }
@@ -433,44 +472,29 @@ L.marker([${lat},${lon}]).addTo(map).bindPopup(${JSON.stringify(name)}).openPopu
       };
     }
 
-    // ROUTE — Leaflet HTML with polyline between two places.
+    // ROUTE — Google Maps Directions embed.
+    // Uses Google Maps Embed API for real professional routing.
     case 'route': {
-      const sep = q.includes('->') ? '->' : q.includes('|') ? '|' : null;
+      const sep = q.includes('->') ? '->' : q.includes('|') ? '|' : q.includes(' to ') ? ' to ' : q.includes(' la ') ? ' la ' : q.includes(' spre ') ? ' spre ' : null;
       let origin = q, destination = '';
       if (sep) {
-        [origin, destination] = q.split(sep).map(s => s.trim());
+        const parts = q.split(sep).map(s => s.trim());
+        origin = parts[0] || '';
+        destination = parts[1] || '';
       }
-      // Known coordinate pairs for common routes (extend as needed)
-      const KNOWN_COORDS = {
-        'cluj-napoca': [46.7712, 23.6236], 'cluj': [46.7712, 23.6236],
-        'bucurești': [44.4268, 26.1025], 'bucharest': [44.4268, 26.1025],
-        'paris': [48.8566, 2.3522], 'londra': [51.5074, -0.1278], 'london': [51.5074, -0.1278],
-        'witney': [51.7873, -1.4837], 'berlin': [52.52, 13.405], 'roma': [41.9028, 12.4964],
-        'madrid': [40.4168, -3.7038], 'viena': [48.2082, 16.3738], 'vienna': [48.2082, 16.3738],
-        'amsterdam': [52.3676, 4.9041], 'bruxelles': [50.8503, 4.3517],
-        'timișoara': [45.7489, 21.2087], 'iași': [47.1585, 27.6014], 'brașov': [45.6580, 25.6012],
-      };
-      const look = (name) => KNOWN_COORDS[name.toLowerCase().trim()] || null;
-      const orig = look(origin);
-      const dest = look(destination);
-      if (orig && dest) {
-        const html = `<div id="map" style="width:100%;height:100vh;margin:0"></div><script>
-var map=L.map('map').setView([${(orig[0]+dest[0])/2},${(orig[1]+dest[1])/2}],6);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM'}).addTo(map);
-var o=L.marker([${orig}]).addTo(map).bindPopup(${JSON.stringify(origin)}).openPopup();
-var d=L.marker([${dest}]).addTo(map).bindPopup(${JSON.stringify(destination)});
-var line=L.polyline([[${orig}],[${dest}]],{color:'#7c3aed',weight:4,dashArray:'8 4'}).addTo(map);
-map.fitBounds(line.getBounds(),{padding:[40,40]});
-<\/script>`;
-        return { kind: 'map', src: html, title: `Rută: ${origin} → ${destination}`, embedType: 'html' };
+      if (!origin || !destination) {
+        return null;
       }
-      // Unknown places — show loading + queue geocode for both
-      return {
-        kind: 'map',
-        src: `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#a78bfa;font-size:18px;font-family:system-ui">⏳ Se calculează ruta <b style="margin:0 6px">${origin}</b>→<b style="margin-left:6px">${destination}</b>…</div>`,
-        title: `Rută: ${origin} → ${destination}`,
-        embedType: 'html',
-      };
+
+      const key = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GOOGLE_MAPS_KEY) || '';
+      if (key && !key.includes('PLACEHOLDER')) {
+        // Google Maps Embed API — real directions with routing
+        const src = `https://www.google.com/maps/embed/v1/directions?key=${key}&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}&mode=driving`;
+        return { kind: 'map', src, title: `Rută: ${origin} → ${destination}`, embedType: 'iframe' };
+      }
+      // Fallback: Google Maps URL (proxied to bypass X-Frame-Options)
+      const gmapsUrl = `https://www.google.com/maps/dir/${encodeURIComponent(origin)}/${encodeURIComponent(destination)}`;
+      return { kind: 'map', src: proxyUrl(gmapsUrl), title: `Rută: ${origin} → ${destination}`, embedType: 'iframe' };
     }
 
     case 'weather': {
