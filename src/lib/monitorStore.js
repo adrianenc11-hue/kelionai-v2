@@ -492,9 +492,9 @@ L.marker([${lat},${lon}]).addTo(map).bindPopup(${JSON.stringify(name)}).openPopu
         const src = `https://www.google.com/maps/embed/v1/directions?key=${key}&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}&mode=driving`;
         return { kind: 'map', src, title: `Rută: ${origin} → ${destination}`, embedType: 'iframe' };
       }
-      // Fallback: Google Maps URL (proxied to bypass X-Frame-Options)
+      // Fallback: open Google Maps directions as a web page
       const gmapsUrl = `https://www.google.com/maps/dir/${encodeURIComponent(origin)}/${encodeURIComponent(destination)}`;
-      return { kind: 'map', src: proxyUrl(gmapsUrl), title: `Rută: ${origin} → ${destination}`, embedType: 'iframe' };
+      return { kind: 'web', src: gmapsUrl, title: `Rută: ${origin} → ${destination}`, embedType: 'iframe' };
     }
 
     case 'weather': {
