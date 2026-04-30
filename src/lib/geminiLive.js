@@ -11,6 +11,7 @@ import { isClonedVoiceActive, setDetectedLang } from './voiceModeStore'
 import { setCameraController, setCurrentFacingMode } from './cameraControl'
 import { getCsrfToken } from './api'
 import { subscribeNarrationMode, getNarrationMode } from './narrationMode'
+import { logAiEvent } from './aiEventLog'
 
 const SAMPLE_RATE_IN = 16000   // Gemini Live expects 16kHz PCM16 mic
 const SAMPLE_RATE_OUT = 24000  // Gemini Live returns 24kHz PCM16 audio
@@ -46,7 +47,8 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
   // credits heartbeat every render.
   const onBalanceUpdateRef = useRef(onBalanceUpdate)
   onBalanceUpdateRef.current = onBalanceUpdate
-  const [status, setStatus] = useState('idle') // idle, requesting, connecting, listening, thinking, speaking, error
+  const [status, _setStatus] = useState('idle') // idle, requesting, connecting, listening, thinking, speaking, error
+  const setStatus = useCallback((s) => { logAiEvent('status', { status: s }); _setStatus(s) }, [])
   const [error, setError] = useState(null)
   const [turns, setTurns] = useState([]) // [{ role: 'user'|'assistant', text }]
   const [userLevel, setUserLevel] = useState(0) // mic level 0..1 for halo reactivity
@@ -331,6 +333,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
 
       if (sc.inputTranscription?.text) {
         appendTurn('user', sc.inputTranscription.text, false)
+        logAiEvent('transcript_in', { text: sc.inputTranscription.text })
         lastActivityAtRef.current = Date.now()
         // Detect language from what the user says (first word heuristic)
         // so ElevenLabs TTS speaks in the right language.
@@ -339,6 +342,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
       }
       if (sc.outputTranscription?.text) {
         appendTurn('assistant', sc.outputTranscription.text, false)
+        logAiEvent('transcript_out', { text: sc.outputTranscription.text, source: 'gemini-live' })
         turnHasTranscriptRef.current = true
         lastActivityAtRef.current = Date.now()
         // Accumulate for cloned TTS flush on turnComplete
@@ -354,8 +358,10 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
         if (inline?.data && inline.mimeType?.startsWith('audio/')) {
           if (!isClonedVoiceActive()) {
             const bytes = bytesFromBase64(inline.data)
+            logAiEvent('audio_out', { bytes: bytes.length, source: 'gemini-native' })
             enqueueAudio(bytes)
           } else {
+            logAiEvent('audio_skipped', { reason: 'cloned-voice-active' })
             console.log('[clonedTTS] skipped Gemini PCM chunk (cloned voice active)')
           }
         }
@@ -370,6 +376,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
       }
 
       if (sc.turnComplete) {
+        logAiEvent('turn_complete', { hadTranscript: turnHasTranscriptRef.current })
         const hadTranscript = turnHasTranscriptRef.current
         const partText = partTextBufRef.current.trim()
         // Resolve: if outputTranscription came → partText is redundant (no doubling).
@@ -391,6 +398,8 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
           ;(async () => {
             try {
               setStatus('speaking')
+              logAiEvent('clone_tts_req', { text: textToSpeak })
+              const ttsStart = Date.now()
               const r = await fetch('/api/voice/clone/tts', {
                 method: 'POST',
                 headers: {
@@ -402,6 +411,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
               })
               if (!r.ok) {
                 const errText = await r.text().catch(() => '')
+                logAiEvent('clone_tts_err', { error: `HTTP ${r.status}: ${errText}` })
                 console.error('[geminiLive] cloned TTS error', r.status, errText)
                 setStatus('listening')
                 return
@@ -417,6 +427,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
               src.buffer = decoded
               src.connect(ctx.destination)
               src.start()
+              logAiEvent('clone_tts_ok', { durationMs: Date.now() - ttsStart })
               src.onended = () => { setStatus('listening'); ctx.close() }
             } catch (err) {
               console.error('[geminiLive] cloned TTS failed', err)
@@ -441,6 +452,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
       // Narrate to the transcript so the user SEES what Kelion is doing
       // (audio narration is handled by the model itself per the persona).
       for (const fc of fcs) {
+        logAiEvent('tool_call', { name: fc.name, args: fc.args })
         appendTurn('assistant', `[tool: ${fc.name}]`, true)
       }
       try {
@@ -472,6 +484,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
     }
 
     if (msg.setupComplete) {
+      logAiEvent('setup_complete', {})
       setStatus('listening')
       // Translator mode kickstart — only fires when the user explicitly
       // selected translator mode from the menu. Normal sessions start
@@ -692,6 +705,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
       } else {
         wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained?access_token=${encodeURIComponent(token)}`
       }
+      logAiEvent('ws_open', { backend: resolvedBackend, url: wsUrl.slice(0, 80) })
       const ws = new WebSocket(wsUrl)
       wsRef.current = ws
 
@@ -703,6 +717,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
         // MessageChannel (async), so this synchronous send(setup) always
         // lands before the first audio frame.
         try {
+          logAiEvent('setup_sent', { model: setupPayload?.model || 'from-server', voice: setupPayload?.generationConfig?.speechConfig?.voiceConfig?.prebuiltVoiceConfig?.voiceName || '?' })
           ws.send(JSON.stringify({ setup: setupPayload }))
         } catch (err) {
           console.error('[geminiLive] failed to send setup frame', err)
