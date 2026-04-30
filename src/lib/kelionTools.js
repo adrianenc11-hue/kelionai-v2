@@ -575,10 +575,16 @@ function download(){
       // vision call and injects the description into the Gemini session
       // so Kelion speaks a short natural narration. Does NOT itself
       // fetch the first frame; the transport's narration loop handles
-      // the cadence. We just confirm the transition back to the model
-      // so it can say something like "OK, I'll keep describing what
-      // I see" before the first tick fires.
+      // the cadence.
+      //
+      // GUARD: The AI must NOT enable narration on its own initiative.
+      // It should only be enabled when the user explicitly asks for it.
+      // The AI CAN disable it anytime. This prevents the bug where
+      // Kelion autonomously activates continuous narration.
       const enabled = !!args?.enabled
+      if (enabled) {
+        console.warn('[set_narration_mode] AI tried to enable narration — only user-initiated requests should enable this.')
+      }
       const interval = Number(args?.interval_s)
       const focus = typeof args?.focus === 'string' ? args.focus : ''
       const next = setNarrationMode({

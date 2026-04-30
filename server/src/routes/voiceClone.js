@@ -346,8 +346,8 @@ router.post('/tts', async (req, res) => {
   } catch (err) {
     return res.status(500).json({ error: 'Failed to load voice clone state.' });
   }
-  if (!cloneInfo || !cloneInfo.voiceId || !cloneInfo.enabled) {
-    return res.status(404).json({ error: 'No active cloned voice. Create and enable one first.' });
+  if (!cloneInfo || !cloneInfo.voiceId) {
+    return res.status(404).json({ error: 'No cloned voice found. Create one first.' });
   }
 
   const apiKey = process.env.ELEVENLABS_API_KEY;
