@@ -197,7 +197,157 @@ function summarizeRealTool(name, j) {
 
 async function runRealToolRemote(name, args) {
   const j = await postJSON('/api/tools/execute', { name, args: args || {} })
+  // Auto-display results on monitor for tools that produce visual data.
+  // This ensures the monitor is ALWAYS used — no dependency on the model
+  // calling show_on_monitor as a second step.
+  autoDisplayOnMonitor(name, j, args)
   return summarizeRealTool(name, j)
+}
+
+// Auto-display results on the monitor using REAL professional services.
+// EVERY tool that returns data opens a real website — no custom HTML.
+function autoDisplayOnMonitor(name, j, args) {
+  if (!j || j.ok === false || j.error) return
+  try {
+    // Weather → Windy.com (live radar, wind, clouds, temperature)
+    if ((name === 'get_weather' || name === 'get_forecast') && (j.current || j.daily)) {
+      const loc = j.location?.name || args?.location || ''
+      if (loc) handleShowOnMonitor({ kind: 'weather', query: loc })
+      return
+    }
+
+    // Air Quality → IQAir real-time AQI
+    if (name === 'get_air_quality' && j.location) {
+      const loc = j.location?.name || args?.location || ''
+      handleShowOnMonitor({ kind: 'web', query: `https://www.iqair.com/search?q=${encodeURIComponent(loc)}`, title: `Air Quality — ${loc}` })
+      return
+    }
+
+    // Wikipedia → real Wikipedia page
+    if (name === 'wikipedia_search' && j.title) {
+      handleShowOnMonitor({ kind: 'wiki', query: j.title })
+      return
+    }
+
+    // Dictionary → real Wiktionary page
+    if (name === 'dictionary' && args?.word) {
+      const lang = args?.lang || 'en'
+      handleShowOnMonitor({ kind: 'web', query: `https://${lang}.wiktionary.org/wiki/${encodeURIComponent(args.word)}`, title: `${args.word} — Wiktionary` })
+      return
+    }
+
+    // Translate → Google Translate with pre-filled text
+    if (name === 'translate' && j.translated) {
+      const from = args?.from || 'auto'
+      const to = args?.to || 'en'
+      handleShowOnMonitor({ kind: 'web', query: `https://translate.google.com/?sl=${from}&tl=${to}&text=${encodeURIComponent(args?.text || '')}`, title: `Translate → ${to}` })
+      return
+    }
+
+    // Crypto → CoinGecko (industry standard)
+    if (name === 'get_crypto_price' && j.prices) {
+      const firstCoin = Object.keys(j.prices)[0] || 'bitcoin'
+      handleShowOnMonitor({ kind: 'web', query: `https://www.coingecko.com/en/coins/${firstCoin}`, title: `${firstCoin} — CoinGecko` })
+      return
+    }
+
+    // Stocks → Google Finance
+    if (name === 'get_stock_price' && j.symbol) {
+      handleShowOnMonitor({ kind: 'web', query: `https://www.google.com/finance/quote/${j.symbol}:${j.exchange || 'NASDAQ'}`, title: `${j.symbol} — Google Finance` })
+      return
+    }
+
+    // Forex / Currency → XE.com
+    if ((name === 'get_forex' || name === 'currency_convert') && (args?.from || j.from)) {
+      const from = args?.from || j.from || 'EUR'
+      const to = args?.to || j.to || 'USD'
+      handleShowOnMonitor({ kind: 'web', query: `https://www.xe.com/currencyconverter/convert/?From=${from}&To=${to}`, title: `${from}/${to} — XE` })
+      return
+    }
+
+    // Earthquakes → USGS real-time earthquake map
+    if (name === 'get_earthquakes') {
+      handleShowOnMonitor({ kind: 'web', query: 'https://earthquake.usgs.gov/earthquakes/map/', title: 'Earthquakes — USGS' })
+      return
+    }
+
+    // Sun times / Moon phase → TimeAndDate.com
+    if (name === 'get_sun_times' || name === 'get_moon_phase') {
+      handleShowOnMonitor({ kind: 'web', query: 'https://www.timeanddate.com/astronomy/', title: 'Astronomy — TimeAndDate' })
+      return
+    }
+
+    // Geocode / Reverse geocode → Google Maps
+    if ((name === 'geocode' || name === 'reverse_geocode') && (j.lat || j.latitude)) {
+      const lat = j.lat || j.latitude
+      const lon = j.lon || j.longitude
+      const q = j.display_name || args?.query || `${lat},${lon}`
+      handleShowOnMonitor({ kind: 'map', query: q })
+      return
+    }
+
+    // Nearby places → Google Maps search
+    if (name === 'nearby_places' && Array.isArray(j.places) && j.places.length) {
+      const q = args?.query || args?.type || 'nearby'
+      handleShowOnMonitor({ kind: 'web', query: `https://www.google.com/maps/search/${encodeURIComponent(q)}`, title: `Nearby: ${q}` })
+      return
+    }
+
+    // Route / Directions → Google Maps
+    if (name === 'get_route' && j.distance) {
+      const from = args?.from || args?.origin || ''
+      const to = args?.to || args?.destination || ''
+      if (from && to) handleShowOnMonitor({ kind: 'route', query: `${from} -> ${to}` })
+      return
+    }
+
+    // Search results → open the first result URL
+    if ((name === 'web_search' || name === 'search_academic' || name === 'search_github' || name === 'search_stackoverflow') && Array.isArray(j.results) && j.results.length) {
+      const first = j.results[0]
+      if (first?.url) handleShowOnMonitor({ kind: 'web', query: first.url, title: first.title || 'Search Result' })
+      return
+    }
+
+    // News → open first article
+    if (name === 'get_news' && Array.isArray(j.articles) && j.articles.length) {
+      const first = j.articles[0]
+      if (first?.url) handleShowOnMonitor({ kind: 'web', query: first.url, title: first.title || 'News' })
+      return
+    }
+
+    // GitHub repo → open on GitHub
+    if (name === 'github_repo_info' && j.html_url) {
+      handleShowOnMonitor({ kind: 'web', query: j.html_url, title: j.full_name || 'GitHub' })
+      return
+    }
+
+    // NPM package → open on npmjs.com
+    if (name === 'npm_package_info' && j.name) {
+      handleShowOnMonitor({ kind: 'web', query: `https://www.npmjs.com/package/${j.name}`, title: `${j.name} — npm` })
+      return
+    }
+
+    // PyPI package → open on pypi.org
+    if (name === 'pypi_package_info' && j.name) {
+      handleShowOnMonitor({ kind: 'web', query: `https://pypi.org/project/${j.name}/`, title: `${j.name} — PyPI` })
+      return
+    }
+
+    // Calculate / Unit convert → Wolfram Alpha
+    if ((name === 'calculate' || name === 'unit_convert') && j.result !== undefined) {
+      const expr = j.expression || args?.expression || `${args?.value} ${args?.from} to ${args?.to}`
+      handleShowOnMonitor({ kind: 'web', query: `https://www.wolframalpha.com/input?i=${encodeURIComponent(expr)}`, title: `${expr} — Wolfram Alpha` })
+      return
+    }
+
+    // Timezone → TimeAndDate
+    if (name === 'get_timezone' && j.timezone) {
+      handleShowOnMonitor({ kind: 'web', query: `https://www.timeanddate.com/worldclock/timezone/${j.timezone}`, title: `${j.timezone} — TimeAndDate` })
+      return
+    }
+  } catch (err) {
+    console.warn('[autoDisplay] failed:', err.message)
+  }
 }
 
 export async function runTool(name, args) {
