@@ -410,7 +410,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
         turnHasTranscriptRef.current = false
         partTextBufRef.current = ''
         // Cloned voice: flush accumulated transcript to ElevenLabs TTS
-        if (isClonedVoiceActive() && cloneTranscriptBufRef.current.trim()) {
+         if (isClonedVoiceActive() && cloneTranscriptBufRef.current.trim()) {
           const textToSpeak = cloneTranscriptBufRef.current.trim()
           cloneTranscriptBufRef.current = ''
           ;(async () => {
@@ -435,18 +435,49 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
                 return
               }
               const audioData = await r.arrayBuffer()
-              // Use a dedicated AudioContext for mp3 (different from the
-              // 24kHz PCM context used for Gemini audio playback).
-              const ctx = new (window.AudioContext || window.webkitAudioContext)()
-              // Resume — browsers suspend AudioContext until a user gesture.
-              if (ctx.state === 'suspended') await ctx.resume()
-              const decoded = await ctx.decodeAudioData(audioData)
-              const src = ctx.createBufferSource()
-              src.buffer = decoded
-              src.connect(ctx.destination)
-              src.start()
-              logAiEvent('clone_tts_ok', { durationMs: Date.now() - ttsStart })
-              src.onended = () => { setStatus('listening'); ctx.close() }
+              logAiEvent('clone_tts_ok', { durationMs: Date.now() - ttsStart, bytes: audioData.byteLength })
+
+              // Play through the avatar's <audio> element so lip-sync works.
+              // The audio element is connected to the lip-sync analyser via
+              // audioRef in KelionStage → useLipSync. Using a blob URL ensures
+              // the browser treats it as a normal media source.
+              const blob = new Blob([audioData], { type: 'audio/mpeg' })
+              const blobUrl = URL.createObjectURL(blob)
+
+              // Try to use the main audioRef element first (enables lip-sync)
+              const audioEl = audioRef?.current
+              if (audioEl) {
+                // Temporarily detach the MediaStream so the <audio> element
+                // plays the blob instead of the (now-silent) Gemini stream.
+                const prevSrcObject = audioEl.srcObject
+                audioEl.srcObject = null
+                audioEl.src = blobUrl
+                audioEl.onended = () => {
+                  URL.revokeObjectURL(blobUrl)
+                  audioEl.src = ''
+                  audioEl.srcObject = prevSrcObject // restore Gemini stream
+                  setStatus('listening')
+                }
+                audioEl.onerror = () => {
+                  URL.revokeObjectURL(blobUrl)
+                  audioEl.src = ''
+                  audioEl.srcObject = prevSrcObject
+                  setStatus('listening')
+                }
+                await audioEl.play().catch(() => {
+                  // Fallback: play via a new Audio() if the main element fails
+                  console.warn('[clonedTTS] main audioEl play failed, using fallback')
+                  audioEl.srcObject = prevSrcObject
+                  const fallback = new Audio(blobUrl)
+                  fallback.onended = () => { URL.revokeObjectURL(blobUrl); setStatus('listening') }
+                  fallback.play().catch(() => setStatus('listening'))
+                })
+              } else {
+                // No audioRef — fallback to standalone Audio element
+                const fallback = new Audio(blobUrl)
+                fallback.onended = () => { URL.revokeObjectURL(blobUrl); setStatus('listening') }
+                fallback.play().catch(() => setStatus('listening'))
+              }
             } catch (err) {
               console.error('[geminiLive] cloned TTS failed', err)
               setStatus('listening')
