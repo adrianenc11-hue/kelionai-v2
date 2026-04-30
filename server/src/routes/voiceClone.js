@@ -441,6 +441,35 @@ router.post('/synthesize', async (req, res) => {
   return res.json({ ok: true });
 });
 
+// Admin-only: re-associate an existing ElevenLabs voiceId that was lost
+// during a Railway SQLite wipe. Avoids re-recording audio samples.
+// POST /api/voice/clone/admin-set  { voiceId: string }
+router.post('/admin-set', async (req, res) => {
+  const userId = uidOf(req);
+  if (!userId) return res.status(401).json({ error: 'Not authenticated.' });
+  // Admin-only gate
+  if (!req.user || req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin only.' });
+  }
+  const { voiceId } = req.body || {};
+  if (!voiceId || typeof voiceId !== 'string' || !voiceId.trim()) {
+    return res.status(400).json({ error: 'voiceId (string) is required.' });
+  }
+  try {
+    const result = await setClonedVoice(userId, voiceId.trim(), CONSENT_VERSION);
+    await logVoiceCloneEvent({
+      userId, action: 'admin-set', voiceId: voiceId.trim(),
+      consentVersion: CONSENT_VERSION,
+      ip: ipOf(req), userAgent: uaOf(req),
+      note: 'Restored after DB wipe',
+    });
+    return res.json({ ok: true, voice: result });
+  } catch (err) {
+    console.error('[voice/clone admin-set] failed', err?.message);
+    return res.status(500).json({ error: 'Failed to set voice.' });
+  }
+});
+
 module.exports = router;
 module.exports.CONSENT_VERSION = CONSENT_VERSION;
 // Audit M5 — exported for direct unit coverage of the byte caps.
