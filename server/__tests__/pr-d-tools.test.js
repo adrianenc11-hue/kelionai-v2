@@ -13,7 +13,7 @@
 const {
   executeRealTool,
   toolSendEmail,
-  toolSendSms,
+
   toolCreateCalendarIcs,
   toolZapierTrigger,
   toolGithubRepoInfo,
@@ -38,9 +38,9 @@ afterEach(() => {
 // ───────────────────────── catalog regression ─────────────────────
 
 describe('PR D catalog', () => {
-  test('REAL_TOOL_NAMES includes the 7 PR D tools', () => {
+  test('REAL_TOOL_NAMES includes the 6 PR D tools', () => {
     expect(REAL_TOOL_NAMES).toEqual(expect.arrayContaining([
-      'send_email', 'send_sms', 'create_calendar_ics',
+      'send_email', 'create_calendar_ics',
       'zapier_trigger',
       'github_repo_info', 'npm_package_info', 'pypi_package_info',
     ]));
@@ -118,71 +118,7 @@ describe('send_email', () => {
   });
 });
 
-// ───────────────────────── send_sms ───────────────────────────────
 
-describe('send_sms', () => {
-  test('returns unavailable when Twilio keys are missing', async () => {
-    const r = await toolSendSms({ to: '+14155550123', message: 'hi' });
-    expect(r.ok).toBe(false);
-    expect(r.unavailable).toBe(true);
-    expect(r.error).toMatch(/TWILIO/);
-  });
-
-  test('requires a "from" number', async () => {
-    process.env.TWILIO_ACCOUNT_SID = 'AC123';
-    process.env.TWILIO_AUTH_TOKEN = 'secret';
-    const r = await toolSendSms({ to: '+14155550123', message: 'hi' });
-    expect(r.ok).toBe(false);
-    expect(r.unavailable).toBe(true);
-    expect(r.error).toMatch(/TWILIO_FROM/);
-  });
-
-  test('rejects non-E.164 "to" numbers', async () => {
-    process.env.TWILIO_ACCOUNT_SID = 'AC123';
-    process.env.TWILIO_AUTH_TOKEN = 'secret';
-    process.env.TWILIO_FROM = '+14155550100';
-    const r = await toolSendSms({ to: 'call me', message: 'hi' });
-    expect(r.ok).toBe(false);
-    expect(r.error).toMatch(/E\.164/);
-  });
-
-  test('POSTs form-encoded body with HTTP Basic auth', async () => {
-    process.env.TWILIO_ACCOUNT_SID = 'AC123';
-    process.env.TWILIO_AUTH_TOKEN = 'secret';
-    process.env.TWILIO_FROM = '+14155550100';
-    let captured = null;
-    globalThis.fetch = async (url, init) => {
-      captured = { url, init };
-      return { ok: true, status: 201, json: async () => ({ sid: 'SM42', status: 'queued', num_segments: '1' }) };
-    };
-    const r = await toolSendSms({ to: '+14155550123', message: 'hi' });
-    expect(r.ok).toBe(true);
-    expect(r.sid).toBe('SM42');
-    expect(captured.url).toBe('https://api.twilio.com/2010-04-01/Accounts/AC123/Messages.json');
-    expect(captured.init.headers['Content-Type']).toBe('application/x-www-form-urlencoded');
-    expect(captured.init.headers.Authorization).toMatch(/^Basic /);
-    const params = new URLSearchParams(captured.init.body);
-    expect(params.get('From')).toBe('+14155550100');
-    expect(params.get('To')).toBe('+14155550123');
-    expect(params.get('Body')).toBe('hi');
-  });
-
-  test('strips spaces / dashes / parens from to+from before hitting Twilio', async () => {
-    process.env.TWILIO_ACCOUNT_SID = 'AC123';
-    process.env.TWILIO_AUTH_TOKEN = 'secret';
-    process.env.TWILIO_FROM = '+1 (415) 555-0100';
-    let captured = null;
-    globalThis.fetch = async (url, init) => {
-      captured = { url, init };
-      return { ok: true, status: 201, json: async () => ({ sid: 'SM99', status: 'queued' }) };
-    };
-    const r = await toolSendSms({ to: '+1 (415) 555-0123', message: 'hi' });
-    expect(r.ok).toBe(true);
-    const params = new URLSearchParams(captured.init.body);
-    expect(params.get('From')).toBe('+14155550100');
-    expect(params.get('To')).toBe('+14155550123');
-  });
-});
 
 // ───────────────────────── create_calendar_ics ────────────────────
 
@@ -482,11 +418,6 @@ describe('executeRealTool dispatch for PR D', () => {
     const r1 = await executeRealTool('send_email', { to: 'a@b.co', subject: 's', text: 't' });
     expect(r1).not.toBeNull();
     expect(r1.unavailable).toBe(true);
-
-    // send_sms — unavailable path
-    const r2 = await executeRealTool('send_sms', { to: '+14155550123', message: 'hi' });
-    expect(r2).not.toBeNull();
-    expect(r2.unavailable).toBe(true);
 
     // create_calendar_ics — pure function, happy path
     const r3 = await executeRealTool('create_calendar_ics', { title: 'x', start: '2026-05-01T09:00:00Z' });

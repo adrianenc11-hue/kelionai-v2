@@ -68,7 +68,7 @@ const REAL_TOOL_NAMES = new Set([
   'translate',
   'run_code',
   'read_pdf', 'read_docx', 'ocr_image', 'ocr_passport',
-  'send_email', 'send_sms', 'create_calendar_ics', 'zapier_trigger',
+  'send_email', 'create_calendar_ics', 'zapier_trigger',
   'github_repo_info', 'npm_package_info', 'pypi_package_info',
   'run_regex', 'get_my_credits', 'get_my_usage', 'get_my_profile',
   'generate_image',

@@ -2836,12 +2836,22 @@ async function toolRememberFact(args, ctx) {
 // directly into memory_items as low-confidence facts, ready to be
 // re-affirmed (or overridden) by the explicit fact-extractor on the
 // next conversation. For guests we no-op gracefully.
+// Per-user cooldown for learn_from_observation — Gemini calls this repeatedly
+// when the camera is active, flooding the DB with near-identical rows.
+const _learnCooldown = new Map(); // userId → lastCallMs
+
 async function toolLearnFromObservation(args, ctx) {
   const userId = ctx?.user?.id;
   if (!userId) {
-    // Guests: silently succeed so the model doesn't loop / apologize.
     return { ok: true, signed_in: false, persisted: 0 };
   }
+  // Rate-limit: 1 call per 10 seconds per user
+  const now = Date.now();
+  const last = _learnCooldown.get(userId) || 0;
+  if (now - last < 10000) {
+    return { ok: true, signed_in: true, persisted: 0, throttled: true };
+  }
+  _learnCooldown.set(userId, now);
   const observation = typeof args?.observation === 'string' ? args.observation.trim() : '';
   if (!observation) {
     return { ok: false, error: 'observation is required' };

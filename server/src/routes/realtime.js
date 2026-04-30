@@ -999,16 +999,6 @@ const KELION_TOOLS = [
     required: ['to', 'subject'],
   },
   {
-    name: 'send_sms',
-    description: "Send an SMS via Twilio (requires TWILIO_ACCOUNT_SID + TWILIO_AUTH_TOKEN + TWILIO_FROM). The number must be in E.164 format, e.g. +14155550123. Use only when the user explicitly asks to send an SMS.",
-    properties: {
-      to: { type: 'string', description: "Recipient phone number in E.164 format (e.g. +14155550123)." },
-      message: { type: 'string', description: "SMS body (max 1600 chars — ~10 segments)." },
-      from: { type: 'string', description: "Override sender number. Defaults to TWILIO_FROM." },
-    },
-    required: ['to', 'message'],
-  },
-  {
     name: 'create_calendar_ics',
     description: "Generate a valid .ics calendar invite (RFC 5545). Returns the ics text and a data: URL the caller can surface as a downloadable 'add to calendar' link. Does not deliver the invite — pair with send_email if the user wants it emailed.",
     properties: {
