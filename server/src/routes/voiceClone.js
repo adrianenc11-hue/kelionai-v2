@@ -346,8 +346,11 @@ router.post('/tts', async (req, res) => {
   } catch (err) {
     return res.status(500).json({ error: 'Failed to load voice clone state.' });
   }
-  if (!cloneInfo || !cloneInfo.voiceId) {
-    return res.status(404).json({ error: 'No cloned voice found. Create one first.' });
+  // Fallback: if DB lost the voiceId (Railway SQLite wipe), use env var.
+  // This is the admin's cloned voice — shared with all authenticated users.
+  const voiceId = cloneInfo?.voiceId || process.env.ELEVENLABS_CLONED_VOICE_ID;
+  if (!voiceId) {
+    return res.status(404).json({ error: 'No cloned voice configured. Set ELEVENLABS_CLONED_VOICE_ID env var.' });
   }
 
   const apiKey = process.env.ELEVENLABS_API_KEY;
@@ -355,7 +358,7 @@ router.post('/tts', async (req, res) => {
 
   try {
     const r = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(cloneInfo.voiceId)}/stream`,
+      `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}/stream`,
       {
         method: 'POST',
         headers: {
