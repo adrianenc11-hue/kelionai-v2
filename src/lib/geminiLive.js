@@ -108,6 +108,11 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
   // the system instruction and Gemini would re-greet anyway, defeating F4.
   // handleMessage reads this ref to decide whether to skip the kickstart.
   const handoffSessionRef = useRef(false)
+  // Anti-double-greeting guard. Gemini Live models sometimes generate
+  // an unsolicited greeting even when the system prompt says "don't
+  // speak first". We suppress ALL model audio/text until the user has
+  // spoken at least once. Becomes true on first inputTranscription.
+  const userHasSpokenRef = useRef(false)
   // translatorModeRef — set in start() before the WS opens so handleMessage
   // can read it inside setupComplete without a closure/scope issue.
   const translatorModeRef = useRef(false)
@@ -332,6 +337,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
       }
 
       if (sc.inputTranscription?.text) {
+        userHasSpokenRef.current = true
         appendTurn('user', sc.inputTranscription.text, false)
         logAiEvent('transcript_in', { text: sc.inputTranscription.text })
         lastActivityAtRef.current = Date.now()
@@ -341,8 +347,14 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
         if (langHint) setDetectedLang(langHint)
       }
       if (sc.outputTranscription?.text) {
-        appendTurn('assistant', sc.outputTranscription.text, false)
-        logAiEvent('transcript_out', { text: sc.outputTranscription.text, source: 'gemini-live' })
+        // Suppress model output before the user has spoken — prevents
+        // unsolicited greetings from appearing in the transcript.
+        if (!userHasSpokenRef.current) {
+          logAiEvent('transcript_out', { text: sc.outputTranscription.text, source: 'suppressed-pre-user' })
+        } else {
+          appendTurn('assistant', sc.outputTranscription.text, false)
+          logAiEvent('transcript_out', { text: sc.outputTranscription.text, source: 'gemini-live' })
+        }
         turnHasTranscriptRef.current = true
         lastActivityAtRef.current = Date.now()
         // Accumulate for cloned TTS flush on turnComplete
@@ -357,9 +369,15 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
         const inline = part.inlineData || part.inline_data
         if (inline?.data && inline.mimeType?.startsWith('audio/')) {
           if (!isClonedVoiceActive()) {
-            const bytes = bytesFromBase64(inline.data)
-            logAiEvent('audio_out', { bytes: bytes.length, source: 'gemini-native' })
-            enqueueAudio(bytes)
+            // Suppress audio before the user has spoken — prevents
+            // unsolicited model greetings from playing.
+            if (!userHasSpokenRef.current) {
+              logAiEvent('audio_skipped', { reason: 'pre-user-greeting-suppressed' })
+            } else {
+              const bytes = bytesFromBase64(inline.data)
+              logAiEvent('audio_out', { bytes: bytes.length, source: 'gemini-native' })
+              enqueueAudio(bytes)
+            }
           } else {
             logAiEvent('audio_skipped', { reason: 'cloned-voice-active' })
             console.log('[clonedTTS] skipped Gemini PCM chunk (cloned voice active)')
@@ -557,6 +575,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
       wsRef.current = null
     }
     startInFlightRef.current = true
+    userHasSpokenRef.current = false // Reset for new session
     setError(null)
     setStatus('requesting')
     // Reset silence-idle timestamp on every new session — otherwise a stale
