@@ -669,12 +669,6 @@ map.fitBounds(line.getBounds(),{padding:[40,40]});
       return { kind: 'html', src: q, title: args?.title || 'Kelion — Demonstrație', embedType: 'html' };
     }
 
-    case 'html': {
-      // Render raw HTML content directly on the monitor — used for math
-      // solutions, step-by-step demonstrations, formatted text, etc.
-      if (!q) return null;
-      return { kind: 'html', src: q, title: args?.title || 'Kelion — Demonstrație', embedType: 'html' };
-    }
 
     default:
       return null;
