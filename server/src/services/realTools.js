@@ -716,7 +716,8 @@ async function toolGetForecast({ city, lat, lon, days }) {
 }
 
 // ──────────────────────────────────────────────────────────────────
-// get_air_quality — OpenAQ v3 nearest-station lookup
+// get_air_quality — Open-Meteo Air Quality API (free, no key)
+// OpenAQ v2 deprecated (410 Gone). Using Open-Meteo AQI instead.
 
 async function toolGetAirQuality({ city, lat, lon }) {
   try {
@@ -728,26 +729,23 @@ async function toolGetAirQuality({ city, lat, lon }) {
       latitude = place.latitude;
       longitude = place.longitude;
     }
-    const url = `https://api.openaq.org/v2/latest?coordinates=${latitude},${longitude}&radius=25000&limit=5&order_by=distance`;
+    const url = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${latitude}&longitude=${longitude}&current=european_aqi,pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone`;
     const r = await fetchWithTimeout(url);
-    if (!r.ok) return { ok: false, error: `openaq ${r.status}` };
+    if (!r.ok) return { ok: false, error: `open-meteo-aqi ${r.status}` };
     const data = await r.json();
-    const stations = Array.isArray(data.results) ? data.results.slice(0, 3) : [];
+    const c = data.current || {};
     return {
       ok: true,
       coords: { latitude, longitude },
-      stations: stations.map((s) => ({
-        location: s.location,
-        city: s.city,
-        country: s.country,
-        measurements: (s.measurements || []).map((m) => ({
-          parameter: m.parameter,
-          value: m.value,
-          unit: m.unit,
-          lastUpdated: m.lastUpdated,
-        })),
-      })),
-      source: 'openaq.org',
+      location: { name: city || `${latitude.toFixed(2)},${longitude.toFixed(2)}` },
+      aqi: c.european_aqi,
+      pm2_5: c.pm2_5,
+      pm10: c.pm10,
+      ozone: c.ozone,
+      no2: c.nitrogen_dioxide,
+      so2: c.sulphur_dioxide,
+      co: c.carbon_monoxide,
+      source: 'open-meteo.com (air-quality)',
     };
   } catch (err) {
     return { ok: false, error: err && err.message ? err.message : String(err) };
@@ -755,34 +753,75 @@ async function toolGetAirQuality({ city, lat, lon }) {
 }
 
 // ──────────────────────────────────────────────────────────────────
-// get_news — GDELT Doc API v2 (free, no key)
+// get_news — GDELT Doc API v2 + GNews fallback
 
 async function toolGetNews({ topic, lang, limit }) {
   const q = (topic || '').toString().trim() || 'world';
   const n = Math.max(1, Math.min(20, Number.parseInt(limit, 10) || 10));
   const l = (lang || '').toString().toLowerCase().slice(0, 8);
+
+  // Priority 1: GDELT (free, no key)
   const langFilter = l ? ` sourcelang:${l}` : '';
   try {
     const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(q + langFilter)}&mode=artlist&format=json&maxrecords=${n}&sort=datedesc`;
-    const r = await fetchWithTimeout(url);
-    if (!r.ok) return { ok: false, error: `gdelt ${r.status}` };
-    const data = await r.json();
-    const arts = Array.isArray(data.articles) ? data.articles.slice(0, n) : [];
-    return {
-      ok: true,
-      topic: q,
-      articles: arts.map((a) => ({
-        title: a.title,
-        url: a.url,
-        source: a.sourcecountry ? `${a.domain} (${a.sourcecountry})` : a.domain,
-        seendate: a.seendate,
-        language: a.language,
-      })),
-      source: 'gdeltproject.org',
-    };
-  } catch (err) {
-    return { ok: false, error: err && err.message ? err.message : String(err) };
+    const r = await fetchWithTimeout(url, {}, 8000);
+    if (r.ok) {
+      const data = await r.json();
+      const arts = Array.isArray(data.articles) ? data.articles.slice(0, n) : [];
+      if (arts.length > 0) {
+        return {
+          ok: true,
+          topic: q,
+          articles: arts.map((a) => ({
+            title: a.title,
+            url: a.url,
+            source: a.sourcecountry ? `${a.domain} (${a.sourcecountry})` : a.domain,
+            seendate: a.seendate,
+            language: a.language,
+          })),
+          source: 'gdeltproject.org',
+        };
+      }
+    }
+  } catch (_) { /* fall through to GNews */ }
+
+  // Priority 2: GNews (free tier, 100 req/day)
+  const gnewsKey = process.env.GNEWS_API_KEY;
+  if (gnewsKey) {
+    try {
+      const url = `https://gnews.io/api/v4/search?q=${encodeURIComponent(q)}&max=${n}&token=${gnewsKey}${l ? `&lang=${l}` : ''}`;
+      const r = await fetchWithTimeout(url);
+      if (r.ok) {
+        const data = await r.json();
+        const arts = Array.isArray(data.articles) ? data.articles.slice(0, n) : [];
+        return {
+          ok: true, topic: q,
+          articles: arts.map((a) => ({ title: a.title, url: a.url, source: a.source?.name || '', seendate: a.publishedAt })),
+          source: 'gnews.io',
+        };
+      }
+    } catch (_) { /* fall through */ }
   }
+
+  // Priority 3: NewsAPI.org
+  const newsApiKey = process.env.NEWSAPI_KEY;
+  if (newsApiKey) {
+    try {
+      const url = `https://newsapi.org/v2/everything?q=${encodeURIComponent(q)}&pageSize=${n}&sortBy=publishedAt&apiKey=${newsApiKey}${l ? `&language=${l}` : ''}`;
+      const r = await fetchWithTimeout(url);
+      if (r.ok) {
+        const data = await r.json();
+        const arts = Array.isArray(data.articles) ? data.articles.slice(0, n) : [];
+        return {
+          ok: true, topic: q,
+          articles: arts.map((a) => ({ title: a.title, url: a.url, source: a.source?.name || '', seendate: a.publishedAt })),
+          source: 'newsapi.org',
+        };
+      }
+    } catch (_) { /* give up */ }
+  }
+
+  return { ok: false, error: 'news unavailable (rate limited — try again in a minute)' };
 }
 
 // ──────────────────────────────────────────────────────────────────
@@ -1177,10 +1216,11 @@ async function toolNearbyPlaces({ lat, lon, category, query: queryArg, radius, r
   const cap = Math.max(1, Math.min(20, Number.parseInt(limit, 10) || 10));
   const query = `[out:json][timeout:10];(node${filter}(around:${rad},${latitude},${longitude}););out body ${cap};`;
   try {
+    // Use form-urlencoded (Overpass returns 406 with text/plain)
     const r = await fetchWithTimeout('https://overpass-api.de/api/interpreter', {
       method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body: query,
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `data=${encodeURIComponent(query)}`,
     });
     if (!r.ok) return { ok: false, error: `overpass ${r.status}` };
     const data = await r.json();
@@ -1211,9 +1251,24 @@ async function toolGetElevation({ lat, lon }) {
   const latitude = Number.parseFloat(lat);
   const longitude = Number.parseFloat(lon);
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return { ok: false, error: 'missing lat/lon' };
+
+  // Priority 1: Open-Meteo Elevation API (fast, reliable)
+  try {
+    const omUrl = `https://api.open-meteo.com/v1/elevation?latitude=${latitude}&longitude=${longitude}`;
+    const omR = await fetchWithTimeout(omUrl, {}, 5000);
+    if (omR.ok) {
+      const omData = await omR.json();
+      const elev = Array.isArray(omData.elevation) ? omData.elevation[0] : null;
+      if (elev != null) {
+        return { ok: true, latitude, longitude, elevation_m: elev, source: 'open-meteo.com' };
+      }
+    }
+  } catch (_) { /* fall through */ }
+
+  // Priority 2: Open-Elevation (sometimes slow/timeout)
   try {
     const url = `https://api.open-elevation.com/api/v1/lookup?locations=${latitude},${longitude}`;
-    const r = await fetchWithTimeout(url);
+    const r = await fetchWithTimeout(url, {}, 8000);
     if (!r.ok) return { ok: false, error: `open-elevation ${r.status}` };
     const data = await r.json();
     const hit = data.results && data.results[0];
