@@ -865,6 +865,7 @@ export default function KelionStage() {
 
   // Text input for typed messages (goes through Gemini Live WebSocket).
   const [chatInput, setChatInput] = useState('')
+  const [chatPanelOpen, setChatPanelOpen] = useState(false)
   const [chatError, setChatError] = useState(null)
   // Conversation history — user-requested ("sa aiba optiune de save").
   // Signed-in users get server persistence via /api/conversations; guests
@@ -1760,7 +1761,7 @@ export default function KelionStage() {
           propagation so typing doesn't toggle the voice session.
           Submit with Enter or the send button.
           ISOLATED: text chat disabled — live voice only. */}
-      {false && <form
+      {chatPanelOpen && <form
         onClick={(e) => e.stopPropagation()}
         onSubmit={(e) => { e.preventDefault(); sendTextMessage() }}
         style={{
@@ -1991,6 +1992,44 @@ export default function KelionStage() {
           </span>
         )}
         {(status === 'idle' || status === 'error') ? t('micOff') : t('micOn')}
+      </button>
+
+      {/* Chat toggle button — right of mic pill */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation()
+          setChatPanelOpen((v) => !v)
+        }}
+        style={{
+          position: 'absolute',
+          bottom: 'max(32px, env(safe-area-inset-bottom))',
+          left: `calc(${bottomLeft} + 100px)`,
+          transform: 'translateX(-50%)',
+          width: 44,
+          height: 44,
+          borderRadius: '50%',
+          background: chatPanelOpen
+            ? 'linear-gradient(135deg, #7c3aed, #a78bfa)'
+            : 'rgba(30, 30, 40, 0.65)',
+          backdropFilter: 'blur(12px)',
+          border: chatPanelOpen
+            ? '1px solid #c4b5fd'
+            : '1px solid rgba(255, 255, 255, 0.1)',
+          color: chatPanelOpen ? '#fff' : '#9ca3af',
+          fontSize: 20,
+          cursor: 'pointer',
+          pointerEvents: 'auto',
+          zIndex: bottomZIndex || 50,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: chatPanelOpen ? '0 0 16px rgba(139, 92, 246, 0.5)' : 'none',
+          transition: 'all 0.2s ease',
+        }}
+        aria-label={chatPanelOpen ? 'Close chat' : 'Open chat'}
+        title={chatPanelOpen ? 'Close chat' : 'Open text chat'}
+      >
+        ⌨
       </button>
 
       {/* Guest trial countdown — Adrian: "timer se afiseaza dreapta sus
