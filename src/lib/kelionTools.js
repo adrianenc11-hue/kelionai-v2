@@ -27,6 +27,9 @@ import {
 import { requestUINotify, requestUINavigate, listAllowedRoutes } from './uiActionStore'
 import { getCsrfToken } from './api'
 
+// Rate-limit for observe_user_emotion — Gemini floods this tool (~1/sec)
+let _lastEmotionAt = 0
+
 async function postJSON(url, body) {
   const r = await fetch(url, {
     method: 'POST',
@@ -467,7 +470,12 @@ export async function runTool(name, args) {
       return summarizeRealTool('search_files', await postJSON('/api/tools/execute', { name: 'search_files', args: args || {} }))
     case 'observe_user_emotion': {
       // Local-only: mutate the emotion store so the avatar reacts.
-      // Return a tiny ack so Gemini knows we heard it.
+      // Cooldown: Gemini calls this in a tight loop (~1/sec) when the camera
+      // is active, flooding the WS and blocking useful responses. Rate-limit
+      // to once per 30 seconds — intermediate calls return a silent ack.
+      const now = Date.now()
+      if (now - _lastEmotionAt < 5000) return 'ack:throttled'
+      _lastEmotionAt = now
       const applied = setEmotion({
         state: args?.state || 'neutral',
         intensity: args?.intensity ?? 0.5,
