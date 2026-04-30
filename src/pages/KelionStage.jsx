@@ -27,6 +27,7 @@ import SignInModal from '../components/SignInModal'
 import VoiceCloneModal from '../components/VoiceCloneModal'
 import EmailComposerModal from '../components/EmailComposerModal'
 import { getCsrfToken } from '../lib/api'
+import { getVoiceMode } from '../lib/voiceModeStore'
 import {
   supportsPasskey,
   registerPasskey,
@@ -1993,6 +1994,25 @@ export default function KelionStage() {
         )}
         {(status === 'idle' || status === 'error') ? t('micOff') : t('micOn')}
       </button>
+      {/* Voice mode label under the main button */}
+      {!(status === 'idle' || status === 'error') && (
+        <div style={{
+          position: 'absolute',
+          bottom: `calc(max(32px, env(safe-area-inset-bottom)) - 22px)`,
+          left: bottomLeft,
+          transform: 'translateX(-50%)',
+          fontSize: 10,
+          fontWeight: 500,
+          letterSpacing: '0.05em',
+          color: getVoiceMode() === 'cloned' ? '#c4b5fd' : 'rgba(255,255,255,0.45)',
+          fontFamily: 'system-ui, -apple-system, sans-serif',
+          pointerEvents: 'none',
+          zIndex: bottomZIndex || 50,
+          textShadow: '0 1px 4px rgba(0,0,0,0.6)',
+        }}>
+          {getVoiceMode() === 'cloned' ? '🎙 Voce clonată' : '🔊 Voce default'}
+        </div>
+      )}
 
       {/* Chat toggle button — right of mic pill */}
       <button

@@ -340,9 +340,23 @@ function autoDisplayOnMonitor(name, j, args) {
       return
     }
 
-    // Timezone → TimeAndDate
+    // Timezone → inline HTML card (timeanddate.com blocks proxy via Cloudflare)
     if (name === 'get_timezone' && j.timezone) {
-      handleShowOnMonitor({ kind: 'web', query: `https://www.timeanddate.com/worldclock/timezone/${j.timezone}`, title: `${j.timezone} — TimeAndDate` })
+      const tz = j.timezone
+      const localTime = j.localTime || j.local_time || ''
+      const offset = j.utcOffset || j.utc_offset || ''
+      handleShowOnMonitor({
+        kind: 'html',
+        query: `<div style="display:flex;align-items:center;justify-content:center;height:100%;background:linear-gradient(135deg,#0f0a1e,#1a1145);font-family:system-ui;color:#ede9fe">
+          <div style="text-align:center;padding:40px">
+            <div style="font-size:64px;margin-bottom:16px">🕐</div>
+            <div style="font-size:32px;font-weight:700;margin-bottom:8px">${localTime || tz}</div>
+            <div style="font-size:18px;opacity:0.7;margin-bottom:4px">${tz}</div>
+            ${offset ? `<div style="font-size:14px;opacity:0.5">UTC ${offset}</div>` : ''}
+          </div>
+        </div>`,
+        title: `${tz}`,
+      })
       return
     }
   } catch (err) {
