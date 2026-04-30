@@ -465,6 +465,10 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
                 const errText = await r.text().catch(() => '')
                 logAiEvent('clone_tts_err', { error: `HTTP ${r.status}: ${errText}` })
                 console.error('[geminiLive] cloned TTS error', r.status, errText)
+                // Show error visibly so user knows why cloned voice failed
+                let reason = errText
+                try { reason = JSON.parse(errText)?.error || errText } catch {}
+                appendTurn('assistant', `⚠️ Voce clonată: ${reason || 'eroare necunoscută (HTTP ' + r.status + ')'}`, true)
                 setStatus('listening')
                 return
               }
@@ -524,6 +528,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
               }
             } catch (err) {
               console.error('[geminiLive] cloned TTS failed', err)
+              appendTurn('assistant', `⚠️ Voce clonată: ${err?.message || 'eroare de rețea'}`, true)
               setStatus('listening')
             }
           })()
