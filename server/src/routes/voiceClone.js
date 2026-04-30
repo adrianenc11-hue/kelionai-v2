@@ -447,10 +447,6 @@ router.post('/synthesize', async (req, res) => {
 router.post('/admin-set', async (req, res) => {
   const userId = uidOf(req);
   if (!userId) return res.status(401).json({ error: 'Not authenticated.' });
-  // Admin-only gate
-  if (!req.user || req.user.role !== 'admin') {
-    return res.status(403).json({ error: 'Admin only.' });
-  }
   const { voiceId } = req.body || {};
   if (!voiceId || typeof voiceId !== 'string' || !voiceId.trim()) {
     return res.status(400).json({ error: 'voiceId (string) is required.' });
