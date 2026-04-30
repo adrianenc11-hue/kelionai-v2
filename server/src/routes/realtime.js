@@ -163,8 +163,13 @@ function buildKelionPersona(opts = {}) {
   // "location unknown" line and is instructed to call get_my_location
   // before answering any location question.
   const hasRealGps = !!(geo && geo.source === 'client-gps' && geo.latitude != null && geo.longitude != null);
-  // If we have real GPS, ignore the IP-geo city/country because it could be Manchester (from a VPN/Proxy).
-  const locationLine = hasRealGps ? '' : ipGeo.formatForPrompt(geo);
+  // NEVER inject IP-geo city/country/coordinates into the persona.
+  // IP-geo (ipapi.co) resolves to Railway's data center (Manchester, UK) and
+  // makes Kelion confidently act on a wrong location — showing Manchester maps,
+  // Manchester weather, etc. The only thing we keep from IP-geo is the timezone
+  // (already resolved via `tz` above). For any location question Kelion must
+  // call get_my_location to get real GPS coordinates.
+  const locationLine = '';
   const coordLine = (() => {
     if (!hasRealGps) return '';
     const lat = geo.latitude.toFixed(6);

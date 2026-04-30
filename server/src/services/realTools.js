@@ -2687,6 +2687,10 @@ async function executeRealTool(name, args, ctx) {
     case 'learn_from_observation': return toolLearnFromObservation(a, ctx);
     // ── Explicit memory from text chat — user says "my name is X" etc. ──
     case 'remember_fact': return toolRememberFact(a, ctx);
+    // ── MCP — Google Calendar / Gmail / Drive (per-user OAuth) ──
+    case 'read_calendar':     return toolReadCalendar(a, ctx);
+    case 'read_email':        return toolReadEmail(a, ctx);
+    case 'search_files':      return toolSearchFiles(a, ctx);
     default:                  return null; // signal "not handled here"
   }
 }

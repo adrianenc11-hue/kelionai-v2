@@ -351,17 +351,20 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
         // unsolicited greetings from appearing in the transcript.
         if (!userHasSpokenRef.current) {
           logAiEvent('transcript_out', { text: sc.outputTranscription.text, source: 'suppressed-pre-user' })
+          // Do NOT set turnHasTranscriptRef — the suppressed turn must be
+          // completely invisible so it doesn't leak into the next real turn.
+          // Do NOT buffer for cloned TTS either.
         } else {
           appendTurn('assistant', sc.outputTranscription.text, false)
           logAiEvent('transcript_out', { text: sc.outputTranscription.text, source: 'gemini-live' })
+          turnHasTranscriptRef.current = true
+          // Accumulate for cloned TTS flush on turnComplete
+          if (isClonedVoiceActive()) {
+            cloneTranscriptBufRef.current += sc.outputTranscription.text
+            console.log('[clonedTTS] buffered outputTranscription:', sc.outputTranscription.text.slice(0, 80))
+          }
         }
-        turnHasTranscriptRef.current = true
         lastActivityAtRef.current = Date.now()
-        // Accumulate for cloned TTS flush on turnComplete
-        if (isClonedVoiceActive()) {
-          cloneTranscriptBufRef.current += sc.outputTranscription.text
-          console.log('[clonedTTS] buffered outputTranscription:', sc.outputTranscription.text.slice(0, 80))
-        }
       }
 
       const parts = sc.modelTurn?.parts || []
@@ -450,24 +453,34 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
                 // Temporarily detach the MediaStream so the <audio> element
                 // plays the blob instead of the (now-silent) Gemini stream.
                 const prevSrcObject = audioEl.srcObject
+                const prevMuted = audioEl.muted
                 audioEl.srcObject = null
                 audioEl.src = blobUrl
+                // CRITICAL: enqueueAudio() sets audioEl.muted = true because
+                // Gemini native audio is routed through AudioContext.destination
+                // and the <audio> element only carries the stream for lip-sync.
+                // For cloned voice the blob IS the primary audio source, so we
+                // MUST unmute it or the user hears nothing.
+                audioEl.muted = false
                 audioEl.onended = () => {
                   URL.revokeObjectURL(blobUrl)
                   audioEl.src = ''
                   audioEl.srcObject = prevSrcObject // restore Gemini stream
+                  audioEl.muted = prevMuted         // restore muted state
                   setStatus('listening')
                 }
                 audioEl.onerror = () => {
                   URL.revokeObjectURL(blobUrl)
                   audioEl.src = ''
                   audioEl.srcObject = prevSrcObject
+                  audioEl.muted = prevMuted
                   setStatus('listening')
                 }
                 await audioEl.play().catch(() => {
                   // Fallback: play via a new Audio() if the main element fails
                   console.warn('[clonedTTS] main audioEl play failed, using fallback')
                   audioEl.srcObject = prevSrcObject
+                  audioEl.muted = prevMuted
                   const fallback = new Audio(blobUrl)
                   fallback.onended = () => { URL.revokeObjectURL(blobUrl); setStatus('listening') }
                   fallback.play().catch(() => setStatus('listening'))
