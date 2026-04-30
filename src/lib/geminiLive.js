@@ -258,6 +258,13 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
     src.buffer = buffer
     src.connect(outputGainRef.current)
 
+    // Drive bargraph from AI playback audio — compute RMS of the PCM chunk
+    let sum = 0
+    for (let i = 0; i < float.length; i++) sum += float[i] * float[i]
+    const rms = Math.sqrt(sum / float.length)
+    const aiLvl = Math.max(0, Math.min(1, rms * 4))
+    setUserLevel(aiLvl)
+
     const now = ctx.currentTime
     const startAt = Math.max(now, playbackEndTimeRef.current)
     src.start(startAt)
