@@ -37,6 +37,9 @@ const mathRestricted = create(all, {
   // even for expressions like `factorial(1000)`.
   number: 'number',
 });
+// Save original gamma before we override it below — we need it for the
+// capped replacement that still delegates to the Lanczos approximation.
+const _origGamma = mathRestricted.gamma;
 mathRestricted.import(
   {
     // Wipe the dangerous constructors + anything that builds arbitrary
@@ -52,7 +55,9 @@ mathRestricted.import(
     resize:     () => { throw new Error('resize is disabled'); },
     reshape:    () => { throw new Error('reshape is disabled'); },
     matrix:     () => { throw new Error('matrix is disabled'); },
-    // Factorial / gamma allow small-expression OOM (e.g. `1e9!`) — cap.
+    // Factorial / gamma — capped to prevent OOM (e.g. `1e9!`), but
+    // still functional for university-level math (combinatorics,
+    // probability, statistics).
     factorial:  (n) => {
       const x = Number(n);
       if (!Number.isFinite(x) || x < 0 || x > 170) {
@@ -62,7 +67,31 @@ mathRestricted.import(
       for (let i = 2; i <= x; i += 1) out *= i;
       return out;
     },
-    gamma:      () => { throw new Error('gamma is disabled'); },
+    // gamma(n) is essential for university-level statistics, probability,
+    // and integral calculus. We delegate to mathjs's internal gamma but
+    // cap the input to prevent memory abuse.
+    gamma:      (n) => {
+      const x = Number(n);
+      if (!Number.isFinite(x) || Math.abs(x) > 170) {
+        throw new Error('gamma out of range (|n| ≤ 170)');
+      }
+      return _origGamma(x);
+    },
+    // Combinations C(n,k) and permutations P(n,k) for combinatorics
+    combinations: (n, k) => {
+      const ni = Math.round(Number(n)), ki = Math.round(Number(k));
+      if (ni < 0 || ki < 0 || ki > ni || ni > 170) throw new Error('combinations out of range');
+      let out = 1;
+      for (let i = 1; i <= ki; i++) out = out * (ni - ki + i) / i;
+      return Math.round(out);
+    },
+    permutations: (n, k) => {
+      const ni = Math.round(Number(n)), ki = Math.round(Number(k));
+      if (ni < 0 || ki < 0 || ki > ni || ni > 170) throw new Error('permutations out of range');
+      let out = 1;
+      for (let i = ni - ki + 1; i <= ni; i++) out *= i;
+      return Math.round(out);
+    },
   },
   { override: true }
 );
@@ -755,8 +784,8 @@ async function toolGetAirQuality({ city, lat, lon }) {
 // ──────────────────────────────────────────────────────────────────
 // get_news — GDELT Doc API v2 + GNews fallback
 
-async function toolGetNews({ topic, lang, limit }) {
-  const q = (topic || '').toString().trim() || 'world';
+async function toolGetNews({ topic, query, lang, limit }) {
+  const q = (topic || query || '').toString().trim() || 'world';
   const n = Math.max(1, Math.min(20, Number.parseInt(limit, 10) || 10));
   const l = (lang || '').toString().toLowerCase().slice(0, 8);
 
@@ -1059,8 +1088,8 @@ const NOMINATIM_HEADERS = {
   'Accept-Language': 'en',
 };
 
-async function toolGeocode({ query }) {
-  const q = (query || '').toString().trim();
+async function toolGeocode({ query, address, city, place }) {
+  const q = (query || address || city || place || '').toString().trim();
   if (!q) return { ok: false, error: 'missing query' };
   try {
     const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5&addressdetails=1`;
@@ -2692,6 +2721,81 @@ async function executeRealTool(name, args, ctx) {
     case 'read_email':        return toolReadEmail(a, ctx);
     case 'search_files':      return toolSearchFiles(a, ctx);
     default:                  return null; // signal "not handled here"
+  }
+}
+
+// ── MCP tool implementations — delegate to googleMcp.js ─────────
+// These were wired in the switch above but had no function bodies,
+// which would cause a ReferenceError at runtime. Each one checks
+// sign-in + MCP_ENABLED + Google connection before calling the API.
+const googleMcp = require('./googleMcp');
+
+async function toolReadCalendar(args, ctx) {
+  if (!ctx?.user?.id) return { ok: false, signed_in: false, error: 'Calendar access requires sign-in.' };
+  if (!process.env.MCP_ENABLED) return { ok: false, unavailable: true, error: 'MCP integrations are not enabled on this server.' };
+  const connected = await googleMcp.hasGoogleConnection(ctx.user.id);
+  if (!connected) {
+    const url = googleMcp.getConnectUrl(ctx.user.id);
+    return { ok: false, error: `Google account not connected. Connect at: ${url}`, connectUrl: url };
+  }
+  try {
+    const range = typeof args?.range === 'string' ? args.range : 'this week';
+    // Parse natural-language range into timeMin/timeMax
+    const now = new Date();
+    let timeMin = now.toISOString();
+    let timeMax;
+    const r = range.toLowerCase();
+    if (r.includes('today')) {
+      const end = new Date(now); end.setHours(23, 59, 59, 999);
+      timeMax = end.toISOString();
+    } else if (r.includes('tomorrow')) {
+      const start = new Date(now); start.setDate(start.getDate() + 1); start.setHours(0, 0, 0, 0);
+      const end = new Date(start); end.setHours(23, 59, 59, 999);
+      timeMin = start.toISOString(); timeMax = end.toISOString();
+    } else if (r.includes('week')) {
+      const end = new Date(now); end.setDate(end.getDate() + 7);
+      timeMax = end.toISOString();
+    } else {
+      const end = new Date(now); end.setDate(end.getDate() + 7);
+      timeMax = end.toISOString();
+    }
+    return await googleMcp.listCalendarEvents(ctx.user.id, { maxResults: 15, timeMin, timeMax });
+  } catch (err) {
+    return { ok: false, error: 'Failed to fetch calendar: ' + (err?.message || err) };
+  }
+}
+
+async function toolReadEmail(args, ctx) {
+  if (!ctx?.user?.id) return { ok: false, signed_in: false, error: 'Email access requires sign-in.' };
+  if (!process.env.MCP_ENABLED) return { ok: false, unavailable: true, error: 'MCP integrations are not enabled on this server.' };
+  const connected = await googleMcp.hasGoogleConnection(ctx.user.id);
+  if (!connected) {
+    const url = googleMcp.getConnectUrl(ctx.user.id);
+    return { ok: false, error: `Google account not connected. Connect at: ${url}`, connectUrl: url };
+  }
+  try {
+    const query = typeof args?.query === 'string' ? args.query : '';
+    const limit = Math.min(Math.max(Number(args?.limit) || 5, 1), 20);
+    return await googleMcp.listEmails(ctx.user.id, { maxResults: limit, query });
+  } catch (err) {
+    return { ok: false, error: 'Failed to fetch emails: ' + (err?.message || err) };
+  }
+}
+
+async function toolSearchFiles(args, ctx) {
+  if (!ctx?.user?.id) return { ok: false, signed_in: false, error: 'File search requires sign-in.' };
+  if (!process.env.MCP_ENABLED) return { ok: false, unavailable: true, error: 'MCP integrations are not enabled on this server.' };
+  const connected = await googleMcp.hasGoogleConnection(ctx.user.id);
+  if (!connected) {
+    const url = googleMcp.getConnectUrl(ctx.user.id);
+    return { ok: false, error: `Google account not connected. Connect at: ${url}`, connectUrl: url };
+  }
+  try {
+    const query = typeof args?.query === 'string' ? args.query : '';
+    const limit = Math.min(Math.max(Number(args?.limit) || 5, 1), 20);
+    return await googleMcp.listDriveFiles(ctx.user.id, { maxResults: limit, query });
+  } catch (err) {
+    return { ok: false, error: 'Failed to search files: ' + (err?.message || err) };
   }
 }
 

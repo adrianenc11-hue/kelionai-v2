@@ -289,7 +289,7 @@ async function queueGeocodeUpgrade(kind, query, opts = {}) {
     } else if (kind === 'weather') {
       setState({
         kind: 'weather',
-        src: proxyUrl(windyWeatherEmbed(lat, lon)),
+        src: windyWeatherEmbed(lat, lon),
         title: hit.display_name ? `Vreme \u2014 ${hit.display_name}` : `Vreme \u2014 ${q}`,
         embedType: 'iframe',
       });
@@ -472,8 +472,9 @@ L.marker([${lat},${lon}]).addTo(map).bindPopup(${JSON.stringify(name)}).openPopu
       };
     }
 
-    // ROUTE — Google Maps Directions embed.
-    // Uses Google Maps Embed API for real professional routing.
+    // ROUTE — OSRM + Leaflet inline map with real driving route.
+    // Google Maps Embed API used when VITE_GOOGLE_MAPS_KEY is set,
+    // otherwise Leaflet + OSRM (free, no key, no CORS issues).
     case 'route': {
       const sep = q.includes('->') ? '->' : q.includes('|') ? '|' : q.includes(' to ') ? ' to ' : q.includes(' la ') ? ' la ' : q.includes(' spre ') ? ' spre ' : null;
       let origin = q, destination = '';
@@ -492,9 +493,14 @@ L.marker([${lat},${lon}]).addTo(map).bindPopup(${JSON.stringify(name)}).openPopu
         const src = `https://www.google.com/maps/embed/v1/directions?key=${key}&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}&mode=driving`;
         return { kind: 'map', src, title: `Rută: ${origin} → ${destination}`, embedType: 'iframe' };
       }
-      // Fallback: open Google Maps directions as a web page
-      const gmapsUrl = `https://www.google.com/maps/dir/${encodeURIComponent(origin)}/${encodeURIComponent(destination)}`;
-      return { kind: 'web', src: gmapsUrl, title: `Rută: ${origin} → ${destination}`, embedType: 'iframe' };
+      // Fallback: OSRM + Leaflet (free, works everywhere, no proxy needed)
+      queueRouteWithOSRM(origin, destination);
+      return {
+        kind: 'map',
+        src: `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#a78bfa;font-size:18px;font-family:system-ui">⏳ Se calculează ruta <b style="margin-left:6px">${origin} → ${destination}</b>…</div>`,
+        title: `Rută: ${origin} → ${destination}`,
+        embedType: 'html',
+      };
     }
 
     case 'weather': {
@@ -511,7 +517,7 @@ L.marker([${lat},${lon}]).addTo(map).bindPopup(${JSON.stringify(name)}).openPopu
       if (direct) {
         return {
           kind: 'weather',
-          src: proxyUrl(windyWeatherEmbed(direct.lat, direct.lon)),
+          src: windyWeatherEmbed(direct.lat, direct.lon),
           title: `Vreme — ${q}`,
           embedType: 'iframe',
         };
@@ -524,7 +530,7 @@ L.marker([${lat},${lon}]).addTo(map).bindPopup(${JSON.stringify(name)}).openPopu
           if (g && Number.isFinite(g.latitude) && Number.isFinite(g.longitude)) {
             return {
               kind: 'weather',
-              src: proxyUrl(windyWeatherEmbed(g.latitude, g.longitude)),
+              src: windyWeatherEmbed(g.latitude, g.longitude),
               title: 'Vreme — locația ta',
               embedType: 'iframe',
             };
@@ -537,7 +543,7 @@ L.marker([${lat},${lon}]).addTo(map).bindPopup(${JSON.stringify(name)}).openPopu
       queueGeocodeUpgrade('weather', q);
       return {
         kind: 'weather',
-        src: proxyUrl(`https://www.windy.com/?${encodeURIComponent(q)}`),
+        src: `https://embed.windy.com/embed2.html?lat=51.5&lon=-0.1&zoom=6&overlay=wind&level=surface&type=map&location=coordinates&metricWind=default&metricTemp=default`,
         title: `Vreme — ${q}`,
         embedType: 'iframe',
       };
@@ -690,7 +696,7 @@ L.marker([${lat},${lon}]).addTo(map).bindPopup(${JSON.stringify(name)}).openPopu
       // Render raw HTML content directly on the monitor — used for math
       // solutions, step-by-step demonstrations, formatted text, etc.
       if (!q) return null;
-      return { kind: 'html', src: q, title: args?.title || 'Kelion — Demonstrație', embedType: 'html' };
+      return { kind: 'html', src: q, title: 'Kelion — Demonstrație', embedType: 'html' };
     }
 
 

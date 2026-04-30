@@ -113,6 +113,10 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
   // speak first". We suppress ALL model audio/text until the user has
   // spoken at least once. Becomes true on first inputTranscription.
   const userHasSpokenRef = useRef(false)
+  // Narration-pending guard — set true right before sending a synthetic
+  // narration prompt so the returning inputTranscription (which Gemini
+  // echoes back as the 'user' turn) is NOT shown in the transcript.
+  const narrationPendingRef = useRef(false)
   // translatorModeRef — set in start() before the WS opens so handleMessage
   // can read it inside setupComplete without a closure/scope issue.
   const translatorModeRef = useRef(false)
@@ -155,6 +159,12 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
   const hiddenVideoCameraRef = useRef(null)
   const hiddenVideoScreenRef = useRef(null)
   const frameCanvasRef = useRef(null)
+  // Tool-call loop guard — detects when Gemini repeatedly calls the same
+  // tool with the same args (infinite loop). After MAX_REPEATS identical
+  // calls within WINDOW_MS, we return an error telling the model to stop.
+  const toolCallLoopRef = useRef({ key: '', count: 0, firstAt: 0 })
+  const TOOL_LOOP_MAX = 3
+  const TOOL_LOOP_WINDOW_MS = 5000
 
   const appendTurn = useCallback((role, delta, finalize = false) => {
     // When a role speaks, finalize the OTHER role's bubble so they don't merge infinitely.
@@ -232,6 +242,10 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
         audioRef.current.muted = true // audible through ctx.destination; stream is for lipsync analyser
         audioRef.current.play().catch(() => {})
       }
+    } else if (audioRef.current) {
+      // Subsequent chunks: ensure muted stays true even if cloned TTS
+      // left it false (race between onended restore and next enqueue).
+      audioRef.current.muted = true
     }
 
     // Drop any chunk that belongs to a superseded generation. See the
@@ -331,39 +345,56 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
       // Interruption — user spoke over Kelion
       if (sc.interrupted) {
         clearAudioQueue()
+        // Clear all per-turn buffers on interrupt so stale text from the
+        // interrupted turn doesn't leak into the next turn's cloned TTS
+        // or partText fallback.
+        cloneTranscriptBufRef.current = ''
+        partTextBufRef.current = ''
+        turnHasTranscriptRef.current = false
         lastActivityAtRef.current = Date.now()
         setStatus('listening')
         return
       }
 
       if (sc.inputTranscription?.text) {
-        userHasSpokenRef.current = true
-        appendTurn('user', sc.inputTranscription.text, false)
-        logAiEvent('transcript_in', { text: sc.inputTranscription.text })
-        lastActivityAtRef.current = Date.now()
-        // Detect language from what the user says (first word heuristic)
-        // so ElevenLabs TTS speaks in the right language.
-        const langHint = sc.inputTranscription.lang || sc.inputTranscription.languageCode
-        if (langHint) setDetectedLang(langHint)
+        // Skip synthetic narration prompts — they echo back as
+        // inputTranscription but are NOT real user speech.
+        if (narrationPendingRef.current) {
+          narrationPendingRef.current = false
+          logAiEvent('transcript_in', { text: sc.inputTranscription.text, source: 'narration-synthetic-skipped' })
+        } else {
+          userHasSpokenRef.current = true
+          appendTurn('user', sc.inputTranscription.text, false)
+          logAiEvent('transcript_in', { text: sc.inputTranscription.text })
+          lastActivityAtRef.current = Date.now()
+          // Detect language from what the user says (first word heuristic)
+          // so ElevenLabs TTS speaks in the right language.
+          const langHint = sc.inputTranscription.lang || sc.inputTranscription.languageCode
+          if (langHint) setDetectedLang(langHint)
+        }
       }
       if (sc.outputTranscription?.text) {
         // Suppress model output before the user has spoken — prevents
         // unsolicited greetings from appearing in the transcript.
         if (!userHasSpokenRef.current) {
           logAiEvent('transcript_out', { text: sc.outputTranscription.text, source: 'suppressed-pre-user' })
-          // Do NOT set turnHasTranscriptRef — the suppressed turn must be
-          // completely invisible so it doesn't leak into the next real turn.
-          // Do NOT buffer for cloned TTS either.
+          // Do NOT appendTurn or buffer for cloned TTS — the suppressed
+          // turn must be invisible in the UI.
         } else {
           appendTurn('assistant', sc.outputTranscription.text, false)
           logAiEvent('transcript_out', { text: sc.outputTranscription.text, source: 'gemini-live' })
-          turnHasTranscriptRef.current = true
           // Accumulate for cloned TTS flush on turnComplete
           if (isClonedVoiceActive()) {
             cloneTranscriptBufRef.current += sc.outputTranscription.text
             console.log('[clonedTTS] buffered outputTranscription:', sc.outputTranscription.text.slice(0, 80))
           }
         }
+        // ALWAYS mark that we received a transcript for this turn —
+        // even for suppressed turns. This prevents the partText fallback
+        // at turnComplete from leaking the suppressed text back into the
+        // transcript (partTextBufRef accumulates part.text regardless of
+        // userHasSpokenRef, so without this flag the fallback would show it).
+        turnHasTranscriptRef.current = true
         lastActivityAtRef.current = Date.now()
       }
 
@@ -519,6 +550,24 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
       }
       try {
         const responses = await Promise.all(fcs.map(async (fc) => {
+          // Loop guard — detect repeated identical tool calls
+          const loopKey = `${fc.name}:${JSON.stringify(fc.args || {})}`
+          const now = Date.now()
+          const loop = toolCallLoopRef.current
+          if (loop.key === loopKey && (now - loop.firstAt) < TOOL_LOOP_WINDOW_MS) {
+            loop.count++
+          } else {
+            toolCallLoopRef.current = { key: loopKey, count: 1, firstAt: now }
+          }
+          if (toolCallLoopRef.current.count > TOOL_LOOP_MAX) {
+            console.warn(`[geminiLive] tool loop detected: ${fc.name} called ${toolCallLoopRef.current.count}x — breaking`)
+            logAiEvent('tool_loop_break', { name: fc.name, count: toolCallLoopRef.current.count })
+            return {
+              id: fc.id,
+              name: fc.name,
+              response: { result: `STOP: you already called ${fc.name} ${toolCallLoopRef.current.count} times with the same arguments. Do NOT call it again. Move on and speak to the user.` },
+            }
+          }
           const result = await runTool(fc.name, fc.args || {})
           return {
             id: fc.id,
@@ -1341,6 +1390,8 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
           : ''
         const prompt = `${focus}Describe briefly what you see right now from the camera. Be natural, concise (2-3 sentences). Mention any changes since your last description.`
         try {
+          // Mark as synthetic so the echoed inputTranscription is suppressed
+          narrationPendingRef.current = true
           ws.send(JSON.stringify({
             clientContent: {
               turns: [{ role: 'user', parts: [{ text: prompt }] }],
@@ -1418,13 +1469,32 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
     }
   }, [])
 
-  // sendText — DISABLED. Text chat is not used; both user and Kelion
-  // communicate exclusively via live voice. Kept as a no-op so existing
-  // callers don't crash.
-  const sendText = useCallback(async (/* text */) => {
-    // No-op — live voice only, no written chat.
-    console.warn('[geminiLive] sendText called but text chat is disabled — use live voice')
-  }, [])
+  // sendText — sends a typed message through the live WebSocket as a
+  // clientContent turn. The model responds with voice + transcript just
+  // like a spoken turn. Enables the chat panel (⌨ button) to work.
+  const sendText = useCallback(async (text) => {
+    const ws = wsRef.current
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      console.warn('[geminiLive] sendText: no open WebSocket')
+      return
+    }
+    const clean = (text || '').trim()
+    if (!clean) return
+    userHasSpokenRef.current = true
+    appendTurn('user', clean, true)
+    logAiEvent('text_sent', { text: clean })
+    try {
+      ws.send(JSON.stringify({
+        clientContent: {
+          turns: [{ role: 'user', parts: [{ text: clean }] }],
+          turnComplete: true,
+        },
+      }))
+      setStatus('thinking')
+    } catch (err) {
+      console.error('[geminiLive] sendText failed', err)
+    }
+  }, [appendTurn])
 
   // Allow the parent to clear or seed the transcript (used by history
   // load, new-conversation, sign-out). Avoids duplicating state.
