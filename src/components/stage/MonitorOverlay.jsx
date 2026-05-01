@@ -72,7 +72,7 @@ function IframeWithFallback({ src, title, onBlocked }) {
       src={src}
       title={title}
       referrerPolicy="no-referrer"
-      sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation"
+      sandbox="allow-scripts allow-popups allow-forms allow-presentation"
       allow="fullscreen; geolocation; autoplay; encrypted-media"
       onLoad={() => { loadedRef.current = true }}
       onError={() => { try { onBlocked && onBlocked() } catch (_) {} }}
