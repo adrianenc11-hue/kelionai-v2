@@ -20,7 +20,7 @@ process.env.NODE_ENV       = 'test';
 process.env.JWT_SECRET     = 'test-jwt-secret-at-least-32-chars!!';
 process.env.SESSION_SECRET = 'test-session-secret-32chars-longx';
 process.env.DB_PATH        = '/tmp/kelion-memory-subject-test.db';
-process.env.GEMINI_API_KEY = 'test-dummy-key';
+process.env.OPENROUTER_API_KEY = 'test-dummy-key';
 
 const { formatMemoryBlocks } = require('../src/routes/realtime');
 const { extractFacts }       = require('../src/services/factExtractor');
@@ -92,8 +92,8 @@ describe('formatMemoryBlocks (Audit M9)', () => {
 
 describe('extractFacts normalisation (Audit M9)', () => {
   // We exercise the production parsing path by faking global.fetch so the
-  // module's Gemini call returns whatever JSON string we want.
-  const withMockGemini = (rawText) => {
+  // module's OpenRouter call returns whatever JSON string we want.
+  const withMockOpenRouter = (rawText) => {
     const fetchMock = jest.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -111,7 +111,7 @@ describe('extractFacts normalisation (Audit M9)', () => {
   });
 
   it('defaults subject to "self" when the model omits the field', () => {
-    withMockGemini(JSON.stringify([
+    withMockOpenRouter(JSON.stringify([
       { kind: 'identity', fact: 'lives in Cluj' },
     ]));
     return extractFacts([{ role: 'user', text: 'I live in Cluj.' }]).then((out) => {
@@ -125,7 +125,7 @@ describe('extractFacts normalisation (Audit M9)', () => {
   });
 
   it('accepts subject="other" with a subject_name', () => {
-    withMockGemini(JSON.stringify([
+    withMockOpenRouter(JSON.stringify([
       { kind: 'identity', fact: 'works as a dancer', subject: 'other', subject_name: 'Ioana', confidence: 0.85 },
       { kind: 'identity', fact: 'works as a vet',    subject: 'self',  confidence: 0.95 },
     ]));
@@ -145,7 +145,7 @@ describe('extractFacts normalisation (Audit M9)', () => {
     // The extractor's #1 job is "don't corrupt the self profile".
     // A nameless "other" fact is useless (we can't group it by person)
     // and dangerous if mis-coerced back to self, so we drop it.
-    withMockGemini(JSON.stringify([
+    withMockOpenRouter(JSON.stringify([
       { kind: 'identity', fact: 'nameless dancer', subject: 'other' },
       { kind: 'identity', fact: 'nameless dancer', subject: 'other', subject_name: '   ' },
       { kind: 'identity', fact: 'lives in Cluj',   subject: 'self' },
@@ -157,7 +157,7 @@ describe('extractFacts normalisation (Audit M9)', () => {
   });
 
   it('clamps confidence into [0, 1] and treats non-numeric as 1.0', () => {
-    withMockGemini(JSON.stringify([
+    withMockOpenRouter(JSON.stringify([
       { kind: 'identity', fact: 'a', subject: 'self', confidence: -0.4 },
       { kind: 'identity', fact: 'b', subject: 'self', confidence: 5    },
       { kind: 'identity', fact: 'c', subject: 'self', confidence: 'x'  },
@@ -171,7 +171,7 @@ describe('extractFacts normalisation (Audit M9)', () => {
     // A mis-structured response like { subject: "ioana" } must NOT be
     // stored as an "other" row with subject_name absent — that's the
     // exact corruption the feature is meant to prevent.
-    withMockGemini(JSON.stringify([
+    withMockOpenRouter(JSON.stringify([
       { kind: 'identity', fact: 'lives in Cluj', subject: 'IOANA' },
     ]));
     return extractFacts([{ role: 'user', text: 'p' }]).then((out) => {
