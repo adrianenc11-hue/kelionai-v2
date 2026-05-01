@@ -44,7 +44,8 @@ Rules:
 - Max 8 items. Return [] if nothing durable.`;
 
 async function extractFacts(turns, options = {}) {
-  if (!config.gemini.apiKey) return [];
+  const openRouterKey = process.env.OPENROUTER_API_KEY;
+  if (!openRouterKey) return [];
   if (!Array.isArray(turns) || turns.length === 0) return [];
 
   // Compact transcript (trim to ~6k chars to stay cheap)
@@ -56,28 +57,33 @@ async function extractFacts(turns, options = {}) {
 
   if (!transcript) return [];
 
-  const model = options.model || 'gemini-2.5-flash';
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${config.gemini.apiKey}`;
+  const url = 'https://openrouter.ai/api/v1/chat/completions';
 
   const body = {
-    systemInstruction: { parts: [{ text: EXTRACTION_SYSTEM }] },
-    contents: [{ role: 'user', parts: [{ text: `Transcript:\n${transcript}` }] }],
-    generationConfig: {
-      temperature: 0.1,
-      responseMimeType: 'application/json',
-      maxOutputTokens: 600,
-    },
+    model: 'anthropic/claude-3.5-haiku', // fast, cheap, supports json mode via OR
+    messages: [
+      { role: 'system', content: EXTRACTION_SYSTEM },
+      { role: 'user', content: `Transcript:\n${transcript}` }
+    ],
+    response_format: { type: 'json_object' },
+    temperature: 0.1,
+    max_tokens: 600,
   };
 
   let raw;
   try {
     const r = await fetch(url, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${openRouterKey}`,
+        'HTTP-Referer': 'https://kelion.ai',
+        'X-Title': 'Kelion AI Memory'
+      },
       body: JSON.stringify(body),
     });
     if (!r.ok) {
-      console.warn('[factExtractor] Gemini HTTP', r.status);
+      console.warn('[factExtractor] OpenRouter HTTP', r.status, await r.text());
       return [];
     }
     raw = await r.json();
@@ -86,7 +92,7 @@ async function extractFacts(turns, options = {}) {
     return [];
   }
 
-  const text = raw?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  const text = raw?.choices?.[0]?.message?.content || '';
   let parsed;
   try { parsed = JSON.parse(text); } catch { return []; }
   if (!Array.isArray(parsed)) return [];
