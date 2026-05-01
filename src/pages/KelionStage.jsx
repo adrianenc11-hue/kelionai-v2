@@ -1061,13 +1061,16 @@ export default function KelionStage() {
           const txtContent = await attachedFile.text()
           finalPayload += `\n\n[Sistem: Utilizatorul a atașat fișierul text "${attachedFile.name}". Conținut:\n${txtContent}\n]`
         } else {
-          const b64 = await new Promise((res, rej) => {
-            const r = new FileReader()
-            r.onload = () => res(r.result.split(',')[1])
-            r.onerror = rej
-            r.readAsDataURL(attachedFile)
+          // Send binary to temp store
+          const req = await fetch('/api/tools/upload_temp', {
+            method: 'POST',
+            headers: { 'Content-Type': attachedFile.type || 'application/octet-stream', 'X-CSRF-Token': getCsrfToken() },
+            body: attachedFile
           })
-          finalPayload += `\n\n[Sistem: Utilizatorul a atașat fișierul "${attachedFile.name}". Ai mai jos conținutul în format base64. Dacă este PDF, folosește tool-ul 'read_pdf' (cu argumentul 'base64'). Dacă e DOCX folosește 'read_docx'. Dacă e imagine folosește 'ocr_image'. Pentru alte fișiere binare, poți folosi 'run_code' cu un script Python pentru a decoda și analiza acest string base64:\n\n${b64}\n]`
+          if (!req.ok) throw new Error('Upload temp failed')
+          const { id: file_id } = await req.json()
+          
+          finalPayload += `\n\n[Sistem: Utilizatorul a atașat fișierul "${attachedFile.name}". Acesta a fost salvat temporar cu file_id="${file_id}". Dacă este PDF, folosește tool-ul 'read_pdf' (cu argumentul 'file_id'). Dacă e DOCX folosește 'read_docx'. Dacă e imagine folosește 'ocr_image'.]`
         }
       } catch (err) {
         console.error('File read error', err)

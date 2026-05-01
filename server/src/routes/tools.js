@@ -235,6 +235,19 @@ router.post('/mcp/files', async (req, res) => {
   }
 });
 
+// ─── Temp file upload ─────────────────────────────────────────────
+router.post('/upload_temp', (req, res) => {
+  const ip = req.ip || 'anon';
+  if (!rateOk(`upload:${ip}`, 50, 60_000)) {
+    return res.status(429).json({ ok: false, error: 'Too many uploads.' });
+  }
+  const id = 'file_' + Date.now() + '_' + Math.random().toString(36).substring(2);
+  const { storeTempFile } = require('../services/realTools');
+  const mimeType = req.headers['content-type'] || 'application/octet-stream';
+  storeTempFile(id, req.body, mimeType);
+  res.json({ id });
+});
+
 // ─── Real-tool proxy (shared server-side executor) ────────────────
 // Voice sessions (Gemini Live) emit tool calls on the
 // client; src/lib/kelionTools.js runTool() proxies unknown names here so
