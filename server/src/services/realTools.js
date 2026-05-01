@@ -2782,6 +2782,8 @@ async function executeRealTool(name, args, ctx) {
     case 'read_calendar':     return toolReadCalendar(a, ctx);
     case 'read_email':        return toolReadEmail(a, ctx);
     case 'search_files':      return toolSearchFiles(a, ctx);
+    // ── Gemma 4 Deep Reasoning ──
+
     default:                  return null; // signal "not handled here"
   }
 }
@@ -2948,6 +2950,8 @@ async function toolLearnFromObservation(args, ctx) {
   }
 }
 
+
+
 // PR #8/N — Memory of Actions. Self-reflection tool: lets Kelion read
 // back its own recent tool calls for the signed-in user so it can
 // decide whether to re-run something or reference a prior result.
@@ -3012,6 +3016,8 @@ const REAL_TOOL_NAMES = [
   'remember_fact',
   // Live radio streaming via radio-browser.info
   'play_radio',
+  // Deep reasoning with Gemma 4
+  'deep_think',
 ];
 
 module.exports = {
