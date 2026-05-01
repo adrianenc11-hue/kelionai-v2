@@ -1049,6 +1049,25 @@ const KELION_TOOLS = [
     required: ['repo'],
   },
   {
+    name: 'list_github_repo_files',
+    description: "List the entire file tree of a GitHub repository. Use this to understand the structure of a project or find specific files before reading them. Note: returns up to 1000 files.",
+    properties: {
+      repo: { type: 'string', description: "Repo slug in the form `owner/name` (e.g. `facebook/react`)." },
+      branch: { type: 'string', description: "Optional branch name. Defaults to HEAD." },
+    },
+    required: ['repo'],
+  },
+  {
+    name: 'read_github_file',
+    description: "Read the source code of a specific file from a GitHub repository. Use this to audit or review specific code files. Max 50,000 chars returned per file.",
+    properties: {
+      repo: { type: 'string', description: "Repo slug in the form `owner/name` (e.g. `facebook/react`)." },
+      path: { type: 'string', description: "Exact path to the file in the repository (e.g. `src/index.js`)." },
+      branch: { type: 'string', description: "Optional branch name. Defaults to HEAD." },
+    },
+    required: ['repo', 'path'],
+  },
+  {
     name: 'npm_package_info',
     description: "Return metadata for a public npm package: latest version, description, homepage, license, last modified date, last 10 versions, and weekly downloads when the downloads API is reachable. Use for 'what version is …', 'is this package maintained', 'how popular is …'.",
     properties: {
