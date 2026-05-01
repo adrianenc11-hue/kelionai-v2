@@ -108,9 +108,9 @@ const router = Router();
 // implementation lives in ../middleware/optionalAuth so the chat route
 // can reuse it — see the module header for the numeric-sub guard.
 
-// Kelion persona — injected server-side into every Gemini Live session
+// Kelion persona — injected server-side into every Gemma4 Live session
 // so users cannot jailbreak by replacing the system prompt.
-// Stage 6 — M26: voice style presets. Each preset nudges Gemini Live's
+// Stage 6 — M26: voice style presets. Each preset nudges Gemma4 Live's
 // prosody / register / pace via system prompt (we keep the native low-latency
 // voice; layering Inworld/Sesame TTS would double our TTFA, not worth it yet).
 const VOICE_STYLES = {
@@ -367,11 +367,11 @@ function formatMemoryBlocks(memoryItems) {
 // Kelion tool catalog (provider-agnostic source of truth).
 //
 // We declare all tools once here in a neutral shape and ship adapters
-// for each provider format. The Gemini adapter builds
+// for each provider format. The Gemma4 adapter builds
 // `{ functionDeclarations: [...] }` with uppercase types; the Chat
 // Completions adapter builds `{ type: 'function', function: { ... } }`.
 //
-// Both adapters are pure functions — safe to call from /gemini-token.
+// Both adapters are pure functions — safe to call from /Gemma4-token.
 // If you add a new tool, add it to KELION_TOOLS only; the adapters
 // pick it up automatically.
 const KELION_TOOLS = [
@@ -434,17 +434,17 @@ const KELION_TOOLS = [
     },
     required: ['enabled'],
   },
-  // what_do_you_see REMOVED — Gemini Live receives camera frames
+  // what_do_you_see REMOVED — Gemma4 Live receives camera frames
   // natively via realtimeInput.video and can describe them directly.
   // No separate vision tool needed.
   {
     name: 'switch_voice',
-    description: "Switch Kelion's speaking voice. Call when user says 'folosește vocea mea clonată', 'use my cloned voice', 'schimbă vocea la a mea', 'switch to my voice', 'vocea ta normală', 'use your default voice'. Cloned mode uses ElevenLabs with the user's cloned voice ID. Default mode uses Gemini's built-in voice (Charon).",
+    description: "Switch Kelion's speaking voice. Call when user says 'folosește vocea mea clonată', 'use my cloned voice', 'schimbă vocea la a mea', 'switch to my voice', 'vocea ta normală', 'use your default voice'. Cloned mode uses ElevenLabs with the user's cloned voice ID. Default mode uses Gemma4's built-in voice (Charon).",
     properties: {
       mode: {
         type: 'string',
         enum: ['cloned', 'default'],
-        description: "'cloned' = switch to user's ElevenLabs cloned voice. 'default' = switch back to Gemini built-in voice.",
+        description: "'cloned' = switch to user's ElevenLabs cloned voice. 'default' = switch back to Gemma4 built-in voice.",
       },
     },
     required: ['mode'],
@@ -567,7 +567,7 @@ const KELION_TOOLS = [
     },
     required: ['route'],
   },
-  // plan_task REMOVED — Gemini Live handles multi-step planning
+  // plan_task REMOVED — Gemma4 Live handles multi-step planning
   // internally without a separate planner LLM.
   {
     name: 'get_action_history',
@@ -878,7 +878,7 @@ const KELION_TOOLS = [
     required: ['word'],
   },
 
-  // Groq-powered coding tools REMOVED — Gemini Live handles coding
+  // Groq-powered coding tools REMOVED — Gemma4 Live handles coding
   // questions directly without a secondary LLM.
   // ── PR B — documents + OCR ────────────────────────────────────────
   {
@@ -1081,29 +1081,29 @@ const KELION_TOOLS = [
   },
 ];
 
-// Gemini v1alpha BidiGenerateContent — JSON schema with UPPERCASE types and
-// declarations grouped under a single `functionDeclarations` array. Gemini
+// Gemma4 v1alpha BidiGenerateContent — JSON schema with UPPERCASE types and
+// declarations grouped under a single `functionDeclarations` array. Gemma4
 // rejects the setup frame outright if any ARRAY property is missing `items`
 // or any OBJECT property drops `properties`, so the converter walks the
 // schema recursively and carries those fields through.
-function toGeminiSchema(v) {
+function toGemma4Schema(v) {
   const up = (t) => (t || 'string').toString().toUpperCase();
   const type = up(v.type);
   const out = { type };
   if (v.description) out.description = v.description;
   if (v.enum) out.enum = v.enum;
   if (type === 'ARRAY') {
-    out.items = v.items ? toGeminiSchema(v.items) : { type: 'STRING' };
+    out.items = v.items ? toGemma4Schema(v.items) : { type: 'STRING' };
   }
   if (type === 'OBJECT') {
     out.properties = Object.fromEntries(
-      Object.entries(v.properties || {}).map(([k, sub]) => [k, toGeminiSchema(sub)])
+      Object.entries(v.properties || {}).map(([k, sub]) => [k, toGemma4Schema(sub)])
     );
     if (Array.isArray(v.required) && v.required.length) out.required = v.required;
   }
   return out;
 }
-function buildKelionToolsGemini() {
+function buildKelionToolsGemma4() {
   return [
     {
       functionDeclarations: KELION_TOOLS.map(t => ({
@@ -1112,14 +1112,14 @@ function buildKelionToolsGemini() {
         parameters: {
           type: 'OBJECT',
           properties: Object.fromEntries(
-            Object.entries(t.properties).map(([k, v]) => [k, toGeminiSchema(v)])
+            Object.entries(t.properties).map(([k, v]) => [k, toGemma4Schema(v)])
           ),
           required: t.required,
         },
       })),
     },
     // { googleSearch: {} } REMOVED — caused audio repetitions.
-    // Gemini's built-in grounding internally re-generates responses after
+    // Gemma4's built-in grounding internally re-generates responses after
     // searching, producing overlapping audio. Use the web_search function
     // tool instead for controlled search without audio side-effects.
   ];
@@ -1144,12 +1144,12 @@ function buildKelionToolsChatCompletions() {
   }));
 }
 
-// OpenAI Realtime token handler REMOVED — project uses Gemini Live only.
+// OpenAI Realtime token handler REMOVED — project uses Gemma4 Live only.
 
 
 // ──────────────────────────────────────────────────────────────────
-// Gemini Live — ephemeral token with Kelion config BAKED IN.
-// Docs: https://ai.google.dev/gemini-api/docs/ephemeral-tokens
+// Gemma4 Live — ephemeral token with Kelion config BAKED IN.
+// Docs: https://ai.google.dev/Gemma4-api/docs/ephemeral-tokens
 // Client cannot override system prompt / voice — stays secure.
 // ──────────────────────────────────────────────────────────────────
 // Trial quota state & helpers live in ../services/trialQuota so the
@@ -1174,11 +1174,11 @@ setInterval(() => {
 // so the auto-fallback path in KelionStage can transfer the current
 // session transcript to the incoming provider. GET keeps working exactly
 // as before (no body, no priorTurns block).
-const geminiTokenHandler = async (req, res) => {
+const Gemma4TokenHandler = async (req, res) => {
 
 
   const priorTurns = Array.isArray(req.body?.priorTurns) ? req.body.priorTurns : [];
-  // Backend selector. Default is `vertex` — GA `gemini-live-2.5-flash-
+  // Backend selector. Default is `vertex` — GA `Gemma4-live-2.5-flash-
   // native-audio` on Vertex AI via the `/api/realtime/vertex-live-ws`
   // proxy (OAuth service-account auth, Google Cloud SLA). The legacy
   // AI Studio ephemeral-token path is still wired as an emergency
@@ -1214,9 +1214,9 @@ const geminiTokenHandler = async (req, res) => {
       });
     }
   }
-  // Admin key-override path: when `GEMINI_API_KEY_ADMIN` is set AND the
+  // Admin key-override path: when `(process.env.GEMMA_4_API_KEY || process.env.GEMINI_API_KEY)_ADMIN` is set AND the
   // current caller is an admin, mint the ephemeral token against the
-  // admin's own GCP project. Rationale: Gemini Live (v1alpha, preview)
+  // admin's own GCP project. Rationale: Gemma4 Live (v1alpha, preview)
   // has strict per-project quotas — when public users exhaust them Google
   // closes the WS with code 1011 "You exceeded your current quota…". The
   // owner of the app should not be blocked by users' usage, so we let
@@ -1224,14 +1224,14 @@ const geminiTokenHandler = async (req, res) => {
   // sessions through it. Public users keep hitting the shared key.
   const adminUser = await peekSignedInUser(req);
   const isAdmin = await isAdminUser(adminUser);
-  const apiKey = (isAdmin && process.env.GEMINI_API_KEY_ADMIN)
-    ? process.env.GEMINI_API_KEY_ADMIN
-    : process.env.GEMINI_API_KEY;
+  const apiKey = (isAdmin && (process.env.GEMMA_4_API_KEY_ADMIN || process.env.GEMINI_API_KEY_ADMIN))
+    ? (process.env.GEMMA_4_API_KEY_ADMIN || process.env.GEMINI_API_KEY_ADMIN)
+    : (process.env.GEMMA_4_API_KEY || process.env.GEMINI_API_KEY);
   // The Vertex backend authenticates server-side via a GCP service
-  // account (see `vertexLiveProxy.js`) and does not need a GEMINI_API_KEY.
+  // account (see `vertexLiveProxy.js`) and does not need a GEMMA_4_API_KEY.
   // The legacy AI Studio path still does; we only 503 on its absence.
   if (backend !== 'vertex' && !apiKey) {
-    return res.status(503).json({ error: 'GEMINI_API_KEY not configured' });
+    return res.status(503).json({ error: 'GEMMA_4_API_KEY not configured' });
   }
 
   // Gating matrix:
@@ -1291,16 +1291,16 @@ const geminiTokenHandler = async (req, res) => {
 
   try {
     // Default voice for the Kelion avatar: `Charon` is a deeper, masculine
-    // Gemini Live prebuilt voice. The previous default `Kore` is clearly
+    // Gemma4 Live prebuilt voice. The previous default `Kore` is clearly
     // female — a voice/avatar mismatch Adrian flagged explicitly. The male
     // voice matches the avatar out of the box; operators can override via
-    // GEMINI_LIVE_VOICE_KELION. Other masculine Gemini Live options:
+    // Gemma4_LIVE_VOICE_KELION. Other masculine Gemma4 Live options:
     // `Puck` (bright, playful) and `Fenrir` (gravelly). Feminine options
     // include `Kore`, `Aoede`, `Leda`.
-    const voice = process.env.GEMINI_LIVE_VOICE_KELION || 'Charon';
-    // We tried `gemini-2.0-flash-live-001` in #112 hoping to escape the
+    const voice = process.env.Gemma4_LIVE_VOICE_KELION || 'Charon';
+    // We tried `Gemma4-2.0-flash-live-001` in #112 hoping to escape the
     // mid-session 1007 drift on preview, but Google's v1main
-    // bidiGenerateContent replied with 1008 "models/gemini-2.0-flash-
+    // bidiGenerateContent replied with 1008 "models/Gemma4-2.0-flash-
     // live-001 is not found for API version v1main, or is not supported
     // for bidiGenerateContent" (Adrian 2026-04-21 screenshot). The GA
     // id that Google's own Live docs advertise does not actually accept
@@ -1308,22 +1308,22 @@ const geminiTokenHandler = async (req, res) => {
     // that returns setupComplete on our key is the preview.
     // Reverting to the preview so the session at least opens again
     // while we wait for a newer stable model to be enabled on our key.
-    // Override via Railway env GEMINI_LIVE_MODEL when a newer stable
+    // Override via Railway env Gemma4_LIVE_MODEL when a newer stable
     // model is announced and actually enabled on our key.
-    // Docs: https://ai.google.dev/gemini-api/docs/live-api/ephemeral-tokens
-    // Previous fallback `gemini-live-2.5-flash-preview` also returned
+    // Docs: https://ai.google.dev/Gemma4-api/docs/live-api/ephemeral-tokens
+    // Previous fallback `Gemma4-live-2.5-flash-preview` also returned
     // 404 from the v1alpha auth_tokens provisioning endpoint.
     // Vertex AI Live API uses a different model id than AI Studio. The
-    // GA-on-Vertex model is `gemini-live-2.5-flash-native-audio` — Google's
+    // GA-on-Vertex model is `Gemma4-live-2.5-flash-native-audio` — Google's
     // own Vertex Live docs advertise it as the recommended production
     // target (native audio, 30 HD voices, 24 languages, affective dialog,
     // improved barge-in). We keep AI Studio on the preview model id that
     // actually accepts bidi traffic on our free-tier project, so the
     // legacy path keeps working unchanged until the default switches.
-    const defaultAiStudioModel = process.env.GEMINI_LIVE_MODEL || 'gemini-3.1-flash-live-preview';
-    const defaultVertexModel = process.env.GEMINI_LIVE_MODEL_VERTEX || 'gemini-live-2.5-flash-native-audio';
+    const defaultAiStudioModel = process.env.Gemma4_LIVE_MODEL || 'Gemma4-3.1-flash-live-preview';
+    const defaultVertexModel = process.env.Gemma4_LIVE_MODEL_VERTEX || 'Gemma4-live-2.5-flash-native-audio';
     const model = backend === 'vertex' ? defaultVertexModel : defaultAiStudioModel;
-    // Language resolution for Gemini Live. `speechConfig.languageCode`
+    // Language resolution for Gemma4 Live. `speechConfig.languageCode`
     // controls BOTH the TTS output voice locale AND biases the STT
     // model for the input audio — so if we hard-code en-US a user who
     // speaks Romanian gets their speech transcribed as garbled English
@@ -1334,7 +1334,7 @@ const geminiTokenHandler = async (req, res) => {
     // en-US. The "session used to pause on language auto-detection"
     // problem Adrian reported earlier is independently fixed by the
     // greet-first clientContent trigger the client sends on ws.open —
-    // see geminiLive.js. `KELION_FORCE_LANG` env var still overrides
+    // see Gemma4Live.js. `KELION_FORCE_LANG` env var still overrides
     // everything if the operator wants to lock one language.
     const browserLang = (req.query.lang || 'en-US').toString().slice(0, 16);
     const forcedLang = (process.env.KELION_FORCE_LANG || browserLang).toString().slice(0, 16);
@@ -1344,7 +1344,7 @@ const geminiTokenHandler = async (req, res) => {
     const styleFromQuery = (req.query.style || '').toString();
     const voiceStyle = resolveVoiceStyle(styleFromCookie || styleFromQuery);
 
-    // Stage 3 — pull memory for signed-in users so Gemini Live starts
+    // Stage 3 — pull memory for signed-in users so Gemma4 Live starts
     // with the user's durable facts already in the system prompt. Reuse
     // the `adminUser` we already peeked above for the admin-key decision.
     const user = adminUser;
@@ -1392,7 +1392,7 @@ const geminiTokenHandler = async (req, res) => {
     // features such as tuned models". Token constraints only accept a tiny
     // subset (model + responseModalities + temperature + sessionResumption)
     // per the official docs:
-    //   https://ai.google.dev/gemini-api/docs/ephemeral-tokens#create-ephemeral-token
+    //   https://ai.google.dev/Gemma4-api/docs/ephemeral-tokens#create-ephemeral-token
     // Trade-off: the persona text is now visible in the client Network tab.
     // Acceptable — the persona is a prompt, not a credential, and moving
     // it to the client is what finally unlocks voice chat end-to-end.
@@ -1419,7 +1419,7 @@ const geminiTokenHandler = async (req, res) => {
         responseModalities: ['AUDIO'],
         speechConfig: {
           voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } },
-          // Pass the browser's language through so Gemini can both
+          // Pass the browser's language through so Gemma4 can both
           // transcribe the input correctly and reply in the user's
           // locale. See the note above `forcedLang` for why we stopped
           // hard-coding en-US.
@@ -1449,14 +1449,14 @@ const geminiTokenHandler = async (req, res) => {
       // OUR backend via the client, which executes them and returns a
       // tool_response. The declarations themselves live in KELION_TOOLS
       // above (single source of truth);
-      // we only render them here in the Gemini-specific shape.
+      // we only render them here in the Gemma4-specific shape.
       //
       // NOTE: `{googleSearch: {}}` was removed earlier — it's a
       // project-scoped grounding feature that is rejected on ephemeral
       // token sessions with close code 1007. Web search is instead handled
       // by the `browse_web` function-declaration tool, which routes through
       // our own server (via `/api/tools/browse_web`).
-      tools: buildKelionToolsGemini(),
+      tools: buildKelionToolsGemma4(),
     };
 
     // Vertex short-circuit: the browser WebSocket will connect to our
@@ -1470,7 +1470,7 @@ const geminiTokenHandler = async (req, res) => {
         expiresAt: expireTime,
         model,
         voice,
-        provider: 'gemini',
+        provider: 'Gemma4',
         backend: 'vertex',
         signedIn: !!user,
         userName: user?.name || null,
@@ -1500,16 +1500,16 @@ const geminiTokenHandler = async (req, res) => {
     if (!r.ok) {
       const err = await r.text();
       // Log enough to diagnose without leaking the API key back to the client.
-      // Operators can grep Railway logs for "[realtime] Gemini ephemeral token error".
+      // Operators can grep Railway logs for "[realtime] Gemma4 ephemeral token error".
       console.error(
-        '[realtime] Gemini ephemeral token error:',
+        '[realtime] Gemma4 ephemeral token error:',
         'status=' + r.status,
         'model=' + model,
         'voice=' + voice,
         'lang=' + browserLang,
         'body=' + err.slice(0, 2000),
       );
-      return res.status(500).json({ error: 'Failed to create Gemini live session' });
+      return res.status(500).json({ error: 'Failed to create Gemma4 live session' });
     }
 
     const data = await r.json();
@@ -1518,7 +1518,7 @@ const geminiTokenHandler = async (req, res) => {
       expiresAt: expireTime,
       model,
       voice,
-      provider: 'gemini',
+      provider: 'Gemma4',
       backend: 'aistudio',
       signedIn: !!user,
       userName: user?.name || null,
@@ -1543,16 +1543,16 @@ const geminiTokenHandler = async (req, res) => {
     // Auto-remove after 30 min (max session duration).
     setTimeout(() => activeSessions.delete(sid), 30 * 60 * 1000).unref();
   } catch (err) {
-    console.error('[realtime] Gemini error:', err.message);
-    res.status(500).json({ error: 'Failed to create Gemini live session' });
+    console.error('[realtime] Gemma4 error:', err.message);
+    res.status(500).json({ error: 'Failed to create Gemma4 live session' });
   }
 };
-router.get('/gemini-token', geminiTokenHandler);
-router.post('/gemini-token', geminiTokenHandler);
+router.get('/Gemma4-token', Gemma4TokenHandler);
+router.post('/Gemma4-token', Gemma4TokenHandler);
 
 // ──────────────────────────────────────────────────────────────────
-// /vision — Gemini Flash camera frame description.
-// The client captures JPEG frames and POSTs them here. Gemini describes
+// /vision — Gemma4 Flash camera frame description.
+// The client captures JPEG frames and POSTs them here. Gemma4 describes
 // the scene in 1-2 sentences, and the client injects that description
 // back into the realtime session as context.
 // ──────────────────────────────────────────────────────────────────
@@ -1585,8 +1585,8 @@ router.post('/vision', visionLimiter, async (req, res) => {
   }
 
   try {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) return res.status(503).json({ error: 'GEMINI_API_KEY not configured' });
+    const apiKey = process.env.GEMMA_4_API_KEY || process.env.GEMINI_API_KEY;
+    if (!apiKey) return res.status(503).json({ error: 'GEMMA_4_API_KEY not configured' });
 
     // Build time-aware vision prompt
     let timeInfo = '';
@@ -1594,7 +1594,7 @@ router.post('/vision', visionLimiter, async (req, res) => {
       timeInfo = ` Current date: ${timeContext.date || 'unknown'}. Time: ${timeContext.time || 'unknown'} (${timeContext.timezone || 'unknown timezone'}). Time of day: ${timeContext.timeOfDay || 'unknown'}.`;
     }
 
-    const visionModel = process.env.GEMINI_VISION_MODEL || 'gemini-3.1-pro-preview';
+    const visionModel = process.env.GEMMA_4_VISION_MODEL || process.env.GEMINI_VISION_MODEL || 'gemini-3.1-pro-preview';
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${visionModel}:generateContent?key=${apiKey}`;
 
     const r = await fetch(url, {
@@ -1623,7 +1623,7 @@ router.post('/vision', visionLimiter, async (req, res) => {
 
     if (!r.ok) {
       const errText = await r.text();
-      throw new Error(`Gemini vision HTTP ${r.status}: ${errText.slice(0, 300)}`);
+      throw new Error(`Gemma4 vision HTTP ${r.status}: ${errText.slice(0, 300)}`);
     }
 
     const result = await r.json();
@@ -1659,23 +1659,23 @@ router.post('/vision', visionLimiter, async (req, res) => {
       console.warn('[vision] client sent invalid image:', err.message?.slice(0, 200));
       return res.status(400).json({ error: 'Invalid image. Please make sure your image is valid.' });
     }
-    console.error('[vision] Gemini error:', err.message);
+    console.error('[vision] Gemma4 error:', err.message);
     return res.status(500).json({ error: 'Vision processing failed' });
   }
 });
 
 // ──────────────────────────────────────────────────────────────────
-// /pipeline — Gemini Flash text-chat pipeline (tools supported).
-// For typed messages: text → Gemini chat → tool loop → text back.
-// Voice goes directly through Gemini Live WebSocket — not this route.
+// /pipeline — Gemma4 Flash text-chat pipeline (tools supported).
+// For typed messages: text → Gemma4 chat → tool loop → text back.
+// Voice goes directly through Gemma4 Live WebSocket — not this route.
 // ──────────────────────────────────────────────────────────────────
 router.post('/pipeline', async (req, res) => {
   const { history, textOverride, visionContext } = req.body || {};
   if (!textOverride) return res.status(400).json({ error: 'No text provided' });
 
   try {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) return res.status(503).json({ error: 'GEMINI_API_KEY not configured' });
+    const apiKey = process.env.GEMMA_4_API_KEY || process.env.GEMINI_API_KEY;
+    if (!apiKey) return res.status(503).json({ error: 'GEMMA_4_API_KEY not configured' });
 
     const userText = (typeof textOverride === 'string' ? textOverride : '').trim();
     if (!userText) {
@@ -1704,7 +1704,7 @@ router.post('/pipeline', async (req, res) => {
 
     const systemText = systemPrompt + '\n\nCRITICAL RULES:\n1. Maximum seriousness and professionalism at all times.\n2. NEVER fabricate, guess, or make up information. If you don\'t know something, USE YOUR TOOLS to find out.\n3. When asked about facts, news, people, places, events — ALWAYS use web_search or wikipedia_search to get real, current information. Do NOT answer from memory alone.\n4. Answer questions precisely and directly. No filler, no padding.\n5. Zero tolerance for hallucination or lies. If a tool search returns no results, say honestly that you couldn\'t find the information.\n6. You have tools: web_search, wikipedia_search, browse_web, calculate, get_weather, and many more. USE THEM proactively.';
 
-    // Build Gemini contents from history
+    // Build Gemma4 contents from history
     const contents = [];
     if (Array.isArray(history)) {
       for (const h of history.slice(-20)) {
@@ -1717,16 +1717,16 @@ router.post('/pipeline', async (req, res) => {
     }
     contents.push({ role: 'user', parts: [{ text: userText }] });
 
-    // Build tools in Gemini format
-    const geminiTools = buildKelionToolsGemini();
+    // Build tools in Gemma4 format
+    const Gemma4Tools = buildKelionToolsGemma4();
 
-    const chatModel = process.env.GEMMA_4_MODEL_ID || process.env.GEMINI_CHAT_MODEL || 'gemini-2.5-pro';
+    const chatModel = process.env.GEMMA_4_MODEL_ID || process.env.GEMMA_4_CHAT_MODEL || process.env.GEMINI_CHAT_MODEL || 'gemini-2.5-pro';
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${chatModel}:generateContent?key=${apiKey}`;
 
     const body = {
       systemInstruction: { parts: [{ text: systemText }] },
       contents,
-      tools: geminiTools,
+      tools: Gemma4Tools,
       generationConfig: {
         temperature: 0.7,
         maxOutputTokens: 2048,
@@ -1740,7 +1740,7 @@ router.post('/pipeline', async (req, res) => {
     });
     if (!completion.ok) {
       const errText = await completion.text();
-      throw new Error(`Gemini HTTP ${completion.status}: ${errText.slice(0, 300)}`);
+      throw new Error(`Gemma4 HTTP ${completion.status}: ${errText.slice(0, 300)}`);
     }
     let result = await completion.json();
 
@@ -1790,7 +1790,7 @@ router.post('/pipeline', async (req, res) => {
       // Add tool results to contents
       contents.push({ role: 'user', parts: toolResultParts });
 
-      // Re-call Gemini with tool results
+      // Re-call Gemma4 with tool results
       body.contents = contents;
       completion = await fetch(url, {
         method: 'POST',
@@ -1799,7 +1799,7 @@ router.post('/pipeline', async (req, res) => {
       });
       if (!completion.ok) {
         const errText = await completion.text();
-        throw new Error(`Gemini tool-round HTTP ${completion.status}: ${errText.slice(0, 300)}`);
+        throw new Error(`Gemma4 tool-round HTTP ${completion.status}: ${errText.slice(0, 300)}`);
       }
       result = await completion.json();
     }
@@ -1807,7 +1807,7 @@ router.post('/pipeline', async (req, res) => {
     // Extract final text
     const finalParts = result?.candidates?.[0]?.content?.parts || [];
     const assistantText = finalParts.map(p => p.text || '').join('').trim();
-    console.log('[pipeline] Gemini:', assistantText.slice(0, 100));
+    console.log('[pipeline] Gemma4:', assistantText.slice(0, 100));
 
     return res.json({
       ok: true,
@@ -1842,7 +1842,7 @@ module.exports.VOICE_STYLES = VOICE_STYLES;
 module.exports.resolveVoiceStyle = resolveVoiceStyle;
 // Exported for unit tests and shared tool catalog access.
 module.exports.KELION_TOOLS = KELION_TOOLS;
-module.exports.buildKelionToolsGemini = buildKelionToolsGemini;
+module.exports.buildKelionToolsGemma4 = buildKelionToolsGemma4;
 module.exports.buildKelionToolsChatCompletions = buildKelionToolsChatCompletions;
 module.exports.buildKelionPersona = buildKelionPersona;
 // Audit M9 — exported so chat.js renders memory with the same

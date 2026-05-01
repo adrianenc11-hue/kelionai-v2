@@ -17,7 +17,7 @@ import StudioDecor from '../components/stage/StudioDecor'
 import CameraRig from '../components/stage/CameraRig'
 import MonitorOverlay from '../components/stage/MonitorOverlay'
 import { TopBarIconButton, AdminTabBar, VisitorsAnalyticsPanel, PayoutsPanel, MenuItem, friendlyCreditStatus, uaIsBot, uaBrowser, uaOs, refHost, flagEmoji, RevenueChart, LiveSessionsPanel, ExportButtons } from '../components/stage/AdminPanels'
-import { useGeminiLive } from '../lib/geminiLive'
+import { useGemma4Live } from '../lib/Gemma4Live'
 import { useWakeWord } from '../lib/useWakeWord'
 import { useTrial } from '../lib/useTrial'
 import { useClientGeo } from '../lib/useClientGeo'
@@ -126,7 +126,7 @@ export default function KelionStage() {
   // one-time permission dialog. Coords are cached in localStorage so
   // refreshes don't re-ping the OS.
   // useClientGeo v2 exposes { coords, permission, lastError, requestNow }.
-  // We forward `coords` to the Gemini Live hook (the pipeline only needs
+  // We forward `coords` to the Gemma 4 Live hook (the pipeline only needs
   // lat/lon), and the top-level stage wires `requestNow` to the first
   // user gesture so iOS Safari actually shows the permission prompt —
   // see handling in onStageClick below.
@@ -864,7 +864,7 @@ export default function KelionStage() {
     if (resolved) setVoiceStyleState(resolved)
   }, [])
 
-  // Text input for typed messages (goes through Gemini Live WebSocket).
+  // Text input for typed messages (goes through Gemma 4 Live WebSocket).
   const [chatInput, setChatInput] = useState('')
   const [chatPanelOpen, setChatPanelOpen] = useState(false)
   const [chatError, setChatError] = useState(null)
@@ -923,11 +923,11 @@ export default function KelionStage() {
 
   const micMouthOpen = useLipSync(audioRef)
 
-  // statusRef and muteModeRef: declared before useGeminiLive to avoid TDZ.
+  // statusRef and muteModeRef: declared before useGemma4Live to avoid TDZ.
   const statusRef = useRef('idle')
   const muteModeRef = useRef(false)
 
-  // Single voice source — Gemini Live WebSocket audio drives the avatar mouth.
+  // Single voice source — Gemma 4 Live WebSocket audio drives the avatar mouth.
   const mouthOpen = micMouthOpen || 0
 
   // Track whether the half-page MonitorOverlay is currently rendered,
@@ -960,13 +960,13 @@ export default function KelionStage() {
 
   // Chat bubble auto-hide — fade the on-stage bubble out after 8s of
   // quiet so the avatar isn't cluttered. The timer resets on every new
-  // turn from the Gemini Live hook.
+  // turn from the Gemma 4 Live hook.
   const [bubbleVisible, setBubbleVisible] = useState(true)
   const bubbleHideTimerRef = useRef(null)
-  // NOTE: bubbleVisible useEffect moved after useGeminiLive (needs turns + status)
+  // NOTE: bubbleVisible useEffect moved after useGemma4Live (needs turns + status)
 
-  // Voice transport — Gemini Live (WebSocket) for live voice.
-  const liveHook = useGeminiLive({
+  // Voice transport — Gemma 4 Live (WebSocket) for live voice.
+  const liveHook = useGemma4Live({
     audioRef,
     coords: clientGeo,
     onBalanceUpdate: (minutes) => setBalance(minutes),
@@ -1002,7 +1002,7 @@ export default function KelionStage() {
   liveSendTextRef.current = liveSendText
 
   // Chat bubble auto-hide — fade the on-stage bubble out after 8s of
-  // quiet so the avatar isn't cluttered. Placed after useGeminiLive
+  // quiet so the avatar isn't cluttered. Placed after useGemma4Live
   // destructuring so `turns` and `status` are in scope.
   useEffect(() => {
     if (turns.length === 0) { setBubbleVisible(false); return }
@@ -1015,7 +1015,7 @@ export default function KelionStage() {
   // -- Mute mode ----------------------------------------------------------
   // Activated when the user explicitly says "nu mai vorbi", "mute",
   // "fii silentios", etc. Suppresses both ElevenLabs text-TTS and the
-  // Gemini Live voice gain. Deactivated on "stop", "reactiveaza", etc.
+  // Gemma 4 Live voice gain. Deactivated on "stop", "reactiveaza", etc.
   // muteModeRef is declared before the TTS useEffect (above) to avoid TDZ.
   const [muteMode, setMuteMode] = useState(false)
   useEffect(() => {
@@ -1106,7 +1106,7 @@ export default function KelionStage() {
       trialRefreshTimerRef.current = null
     }
   }, [])
-  // Kick the Gemini Live hook's local trial state when the server flips
+  // Kick the Gemma 4 Live hook's local trial state when the server flips
   // to exhausted on either surface — prevents a just-started voice
   // session from running past the shared quota that a text-chat user
   // might have burned down first.
@@ -1119,7 +1119,7 @@ export default function KelionStage() {
 
   // Auto-open the Buy Credits modal when the voice session errors out
   // with a credit-exhausted message (Adrian: "cind ajunge iar la 0 se
-  // trimite mesaj reincarca"). The Gemini Live hook already surfaces a
+  // trimite mesaj reincarca"). The Gemma 4 Live hook already surfaces a
   // clean message from the 402 token response; we match on it so a
   // typical credit-gate trip surfaces the package picker immediately
   // instead of leaving the user to find the Credits pill.
@@ -2156,7 +2156,7 @@ export default function KelionStage() {
         }}
       >
         {/* Single-LLM cleanup (2026-04): voice transport pill removed —
-            Gemini Live is the only provider, no UI swap. */}
+            Gemma 4 Live is the only provider, no UI swap. */}
         {/* Credits pill — hidden for admins (they have unlimited access and
             no billing; showing "0 min" confused Adrian in testing). For
             regular signed-in users we still show balance + open the Stripe
@@ -3283,7 +3283,7 @@ export default function KelionStage() {
           {/* Revenue-split panel — shows how much of the last 30 days of
               top-up revenue is earmarked for AI provider spend vs owner
               net, and compares against the known portion of that spend
-              (ElevenLabs via API; Gemini is manual). Renders above the
+              (ElevenLabs via API; Gemma 4 is manual). Renders above the
               provider cards so the admin sees the budget context first.
               */}
           {revenueSplitLoading && (
@@ -3364,7 +3364,7 @@ export default function KelionStage() {
                     ? (revenueSplit.spend?.elevenlabs?.estSpendDisplay || '—')
                     : 'not configured',
                   { dim: true })}
-                {row('  Gemini',
+                {row('  Gemma 4',
                   'manual — open GCP Billing',
                   { dim: true })}
                 <div style={{
@@ -4482,7 +4482,7 @@ export default function KelionStage() {
               nimic — odata configurat, fiecare top-up al unui user trece
               prin: Stripe Checkout ? Stripe balance ? payout automat (zilnic
               sau saptamânal, dupa setarea ta). Jumatate din fiecare top-up
-              e deja rezervata intern pentru costurile AI (Gemini,
+              e deja rezervata intern pentru costurile AI (Gemma 4,
               ElevenLabs), cealalta jumatate e profitul net.
             </div>
           </div>

@@ -1,6 +1,6 @@
 // Continuous narration mode — accessibility feature for visually-impaired
-// users. When enabled, the Gemini Live transport periodically pulls
-// a frame from the camera buffer, asks Gemini Vision to describe it, and
+// users. When enabled, the Gemma 4 Live transport periodically pulls
+// a frame from the camera buffer, asks Gemma 4 Vision to describe it, and
 // injects that description back into the voice session so Kelion speaks
 // a short natural narration. Adrian's requirement (2026-04-20):
 //   "aplicatia se va vinde si pentru cei cu deficiente de vedere"
@@ -9,7 +9,7 @@
 // Lifecycle is decoupled from the voice transport on purpose so the
 // `set_narration_mode` tool handler in src/lib/kelionTools.js can flip
 // state without importing the transport hook (no React dep). The
-// transport (src/lib/geminiLive.js) subscribes on mount and drives
+// transport (src/lib/Gemma 4Live.js) subscribes on mount and drives
 // the narration loop.
 
 const state = {

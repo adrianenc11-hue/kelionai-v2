@@ -17,7 +17,7 @@
 //     final result the user has usually already continued the sentence,
 //     which would delay activation by 1–2 s.
 //   * When a match lands we call `onDetect()` and stop the recogniser
-//     so it releases the microphone — `useGeminiLive.start()` will then
+//     so it releases the microphone — `useGemma4Live.start()` will then
 //     open its own `getUserMedia` stream. The parent flips `enabled`
 //     off (status leaves 'idle') so the effect below won't restart us
 //     mid-session (which would race the live mic).
@@ -28,9 +28,9 @@
 // Privacy note: the Web Speech API routes audio to the browser vendor
 // (Google for Chrome) for transcription. We only listen for the wake
 // word and never persist anything. The full conversation after the
-// wake word runs through the normal Gemini Live path.
+// wake word runs through the normal Gemma 4 Live path.
 //
-// Intentionally isolated from KelionStage / geminiLive — if this file
+// Intentionally isolated from KelionStage / Gemma4Live — if this file
 // breaks, delete the single `useWakeWord(...)` call in KelionStage.jsx
 // and the existing tap-to-talk flow is untouched.
 

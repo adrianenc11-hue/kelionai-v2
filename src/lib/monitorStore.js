@@ -1,5 +1,5 @@
 // Simple pub/sub store for what the avatar's stage monitor should display.
-// Gemini Live calls the `show_on_monitor` tool → kelionTools.js resolves the
+// Gemma 4 Live calls the `show_on_monitor` tool → kelionTools.js resolves the
 // payload → sets the store → KelionStage.jsx (StageMonitor) subscribes and
 // renders an iframe / image / video embed on the in-scene screen.
 //
