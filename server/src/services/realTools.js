@@ -3016,6 +3016,8 @@ const REAL_TOOL_NAMES = [
   'remember_fact',
   // Live radio streaming via radio-browser.info
   'play_radio',
+  // Deep reasoning with Gemma 4
+  'deep_think',
 ];
 
 module.exports = {

@@ -451,6 +451,14 @@ const KELION_TOOLS = [
   },
 
   {
+    name: 'deep_think',
+    description: "DELEGATE TO GEMMA 4 (EXPERT BRAIN): Call this tool when the user asks a highly complex question requiring deep reasoning, advanced math, long-form coding, or deep logical analysis. Do NOT answer complex problems yourself — delegate them to the Gemma 4 reasoning engine. Provide the user's full request and any necessary context. You will receive the expert's answer, which you should then present/read to the user.",
+    properties: {
+      prompt: { type: 'string', description: 'The detailed prompt, question, or problem to be analyzed by the Gemma 4 deep-thinking model.' },
+    },
+    required: ['prompt'],
+  },
+  {
     name: 'show_on_monitor',
 
     description: "Display something on the big presentation monitor in the scene behind you. Use whenever the user asks (in any language) to see / open / show / display a map, the weather, a video, an image, a Wikipedia / reference page, any web page, or to PLAY a live audio stream. Pick the right `kind` — the client resolves it to the best embed URL. Call again with a new query to swap the content on screen. For radio: first call play_radio to get the stream URL, then call show_on_monitor with kind='audio' query=<that URL> title=<station name> so the audio actually starts playing in the user's browser.",
