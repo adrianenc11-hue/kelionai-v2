@@ -825,7 +825,7 @@ const KELION_TOOLS = [
   },
   {
     name: 'search_github',
-    description: "Search public GitHub repositories via the GitHub REST API. Returns repo name, description, stars, URL. Respects GITHUB_TOKEN when set for higher rate limits.",
+    description: "Search public GitHub repositories via the GitHub REST API. Returns repo name, description, stars, URL. Respects GITHUB_TOKEN when set for higher rate limits. IMPORTANT: Use this ONLY to search for repositories by topic/name. If the user provides a specific repository URL and asks you to audit, review, or read its code, DO NOT use this tool. Instead, use `list_github_repo_files` and `read_github_file`.",
     properties: {
       query: { type: 'string', description: "Free-text search. Supports GitHub qualifiers (language:js, stars:>100)." },
       limit: { type: 'integer', description: "Max results (1-10, default 5)." },
@@ -1050,7 +1050,7 @@ const KELION_TOOLS = [
   },
   {
     name: 'list_github_repo_files',
-    description: "List the entire file tree of a GitHub repository. Use this to understand the structure of a project or find specific files before reading them. Note: returns up to 1000 files.",
+    description: "List the entire file tree of a GitHub repository. Use this FIRST when the user asks you to 'audit', 'review', or 'read' a repository. It helps you understand the project structure so you know which specific files to read next. Note: returns up to 1000 files.",
     properties: {
       repo: { type: 'string', description: "Repo slug in the form `owner/name` (e.g. `facebook/react`)." },
       branch: { type: 'string', description: "Optional branch name. Defaults to HEAD." },
@@ -1059,7 +1059,7 @@ const KELION_TOOLS = [
   },
   {
     name: 'read_github_file',
-    description: "Read the source code of a specific file from a GitHub repository. Use this to audit or review specific code files. Max 50,000 chars returned per file.",
+    description: "Read the source code of a specific file from a GitHub repository. Use this AFTER `list_github_repo_files` to actually read the code files you need to audit, debug, or review. Max 50,000 chars returned per file.",
     properties: {
       repo: { type: 'string', description: "Repo slug in the form `owner/name` (e.g. `facebook/react`)." },
       path: { type: 'string', description: "Exact path to the file in the repository (e.g. `src/index.js`)." },
