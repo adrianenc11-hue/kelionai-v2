@@ -129,8 +129,6 @@ const EXPECTED_TOOL_NAMES = [
   // ElevenLabs cloned voice toggle — switches Kelion's TTS between
   // Gemini built-in voice and the user's ElevenLabs cloned voice.
   'switch_voice',
-  // Deep reasoning with Gemma 4
-  'deep_think',
 ];
 
 describe('Kelion tool catalog', () => {

@@ -57,100 +57,35 @@ function cacheGet(id) {
  * which the same-origin client resolves against its own host.
  */
 async function generateImage({ prompt, size, publicBase } = {}) {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    return { ok: false, unavailable: true, error: 'Image generation unavailable: GEMINI_API_KEY is not configured.' };
-  }
   const cleanPrompt = typeof prompt === 'string' ? prompt.trim().slice(0, 4000) : '';
   if (!cleanPrompt) {
     return { ok: false, error: 'Missing prompt for image generation.' };
   }
 
-  const model = process.env.GEMINI_IMAGE_MODEL || 'gemini-3.1-flash-image-preview';
-
-  // 60 s timeout — image generation can take 15-30 s.
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 60_000);
-
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-
-  let r;
-  try {
-    r = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          parts: [{ text: cleanPrompt }],
-        }],
-        generationConfig: {
-          responseModalities: ['TEXT', 'IMAGE'],
-        },
-      }),
-      signal: controller.signal,
-    });
-  } catch (err) {
-    clearTimeout(timeout);
-    if (err?.name === 'AbortError') {
-      return { ok: false, error: 'Image generation timed out after 60 s.' };
-    }
-    return { ok: false, error: `Image generation network error: ${err?.message || err}` };
-  }
-  clearTimeout(timeout);
-
-  if (!r.ok) {
-    let detail = '';
-    try {
-      const j = await r.json();
-      detail = j?.error?.message || '';
-    } catch { /* ignore */ }
-    if (r.status === 400 && /safety|policy|moderation/i.test(detail)) {
-      return { ok: false, error: `Image rejected by safety system: ${detail}` };
-    }
-    return { ok: false, error: `Image upstream error ${r.status}: ${detail || 'unknown'}` };
+  // Pollinations.ai is a free, high-quality professional API (using FLUX/SD)
+  // that requires no authentication and returns the image stream directly.
+  const encodedPrompt = encodeURIComponent(cleanPrompt);
+  
+  // Try to parse width/height from size (e.g. "1024x768")
+  let width = 1024;
+  let height = 1024;
+  if (size && size.includes('x')) {
+    const parts = size.split('x');
+    width = parseInt(parts[0], 10) || 1024;
+    height = parseInt(parts[1], 10) || 1024;
   }
 
-  let payload = null;
-  try {
-    payload = await r.json();
-  } catch {
-    return { ok: false, error: 'Image API returned non-JSON payload.' };
-  }
+  const url = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${width}&height=${height}&nologo=true&enhance=true`;
 
-  // Extract the image from Gemini response parts
-  const parts = payload?.candidates?.[0]?.content?.parts || [];
-  let imageData = null;
-  let imageMimeType = 'image/png';
-  for (const part of parts) {
-    if (part.inlineData?.data) {
-      imageData = part.inlineData.data;
-      imageMimeType = part.inlineData.mimeType || 'image/png';
-      break;
-    }
-  }
-
-  if (!imageData) {
-    return { ok: false, error: 'Image API returned no image data.' };
-  }
-
-  let pngBuffer;
-  try {
-    pngBuffer = Buffer.from(imageData, 'base64');
-  } catch {
-    return { ok: false, error: 'Failed to decode image payload.' };
-  }
-
-  const id = cachePut({ pngBuffer, contentType: imageMimeType, prompt: cleanPrompt });
-  const path = `/api/generated-images/${id}`;
-  const finalUrl = publicBase ? new URL(path, publicBase).toString() : path;
+  // We don't need to cache the image locally because pollinations hosts it directly
   return {
     ok: true,
-    id,
-    url: finalUrl,
+    id: crypto.randomBytes(12).toString('hex'),
+    url: url,
     title: cleanPrompt.slice(0, 80),
     prompt: cleanPrompt,
     size: size || 'auto',
-    model,
+    model: 'pollinations-flux',
   };
 }
 

@@ -207,7 +207,7 @@ function MonitorOverlay() {
         {isHtml ? (
           <iframe
             title={m.title || 'Kelion — Demonstrație'}
-            sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation"
+            sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation allow-same-origin"
             style={{ width: '100%', height: '100%', border: 'none', background: '#0d0b1d', display: 'block' }}
             srcDoc={`<!DOCTYPE html><html><head><meta charset="utf-8">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
