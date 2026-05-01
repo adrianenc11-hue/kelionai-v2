@@ -1978,8 +1978,6 @@ export default function KelionStage() {
             startVoiceWithPriorTurns()
           } else {
             stop()
-            clearTurns()
-            savedUpToRef.current = 0
           }
         }}
         style={{
