@@ -110,7 +110,7 @@ app.use(
         baseUri:    ["'self'", "https:"],
         scriptSrc:  ["'self'", "'unsafe-inline'", "'wasm-unsafe-eval'", "blob:", "https://unpkg.com", "https://cdn.jsdelivr.net"],
         styleSrc:   ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://unpkg.com", "https://cdn.jsdelivr.net"],
-        fontSrc:    ["'self'", "https://fonts.gstatic.com"],
+        fontSrc:    ["'self'", "https:", "data:"],
         imgSrc:     ["'self'", "data:", "blob:", "https:"],
         connectSrc: ["'self'", "https://generativelanguage.googleapis.com", "wss://generativelanguage.googleapis.com", "https://raw.githack.com", "https://*.githubusercontent.com", "blob:", "https:", "wss:"],
         mediaSrc:   ["'self'", "blob:"],
