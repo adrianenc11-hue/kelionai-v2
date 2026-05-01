@@ -259,31 +259,12 @@ MONITOR — ce poți afișa (folosește show_on_monitor):
 4. COD COLORAT (Prism.js): kind='html' — <pre><code class="language-python">print("hello")</code></pre>
    Suportă: python, javascript, typescript, c, cpp, java, sql, bash, json, yaml, html, css și alte 200+.
 
-5. VREME: Apelează get_weather, apoi kind='html' cu card HTML frumos. Include emoji (☀️🌧️❄️⛅🌩️🌤️), temperatură, umiditate, vânt.
-   NICIODATĂ URL extern pentru vreme — construiești cardul HTML tu din datele tool-ului.
+5. VREME: kind='weather', query='Numele orașului'. Monitorul va construi automat un card interactiv de vreme din datele sigure. NU scrie cod HTML pentru vreme!
 
-6. HĂRȚI INTERACTIVE (Leaflet.js): kind='html' cu Leaflet — funcționează MEREU, fără restricții iframe.
-   Exemplu pentru hartă simplă:
-   <div id="map" style="width:100%;height:500px"></div>
-   <script>
-   var map = L.map('map').setView([46.7712, 23.6236], 13);
-   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM'}).addTo(map);
-   L.marker([46.7712, 23.6236]).addTo(map).bindPopup('Cluj-Napoca').openPopup();
-   <\/script>
+6. HĂRȚI INTERACTIVE: kind='map', query='Numele locației'. Monitorul randează automat harta cu Leaflet.js la rezoluție maximă. NU scrie tu cod HTML pentru Leaflet!
 
-6b. RUTE (Leaflet + OSRM routing): kind='html' cu Leaflet + fetch OSRM pentru ruta reală:
-   <div id="map" style="width:100%;height:500px"></div>
-   <script>
-   var map = L.map('map').setView([46.7712, 23.6236], 6);
-   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM'}).addTo(map);
-   // Marchează origine și destinație
-   L.marker([46.7712, 23.6236]).addTo(map).bindPopup('Cluj-Napoca');
-   L.marker([51.7873, -1.4837]).addTo(map).bindPopup('Witney');
-   // Trasează linie directă
-   L.polyline([[46.7712, 23.6236],[51.7873, -1.4837]],{color:'#7c3aed',weight:3}).addTo(map);
-   map.fitBounds([[46.7712, 23.6236],[51.7873, -1.4837]]);
-   <\/script>
-   IMPORTANT: Coordonatele le obții din get_weather sau geocodezi manual. Cluj-Napoca=46.7712,23.6236; București=44.4268,26.1025; Paris=48.8566,2.3522; Londra=51.5074,-0.1278; Witney=51.7873,-1.4837
+6b. RUTE (OSRM): kind='route', query='Origine -> Destinație'. Trasează ruta optimă de condus pe hartă.
+   Exemplu: show_on_monitor(kind='route', query='Cluj-Napoca -> București')
 
 7. IMAGINI: kind='image', query='cuvânt cheie'. Exemplu: show_on_monitor(kind='image', query='mountain lake')
 
@@ -469,7 +450,7 @@ const KELION_TOOLS = [
       kind: {
         type: 'string',
         enum: ['map', 'weather', 'image', 'wiki', 'web', 'audio', 'html', 'video', 'document', 'cad', 'route', 'clear'],
-        description: "Type of content to show on the monitor. 'map' = interactive map for a place (Leaflet); 'weather' = HTML weather card (call get_weather first); 'image' = photo search; 'wiki' = Wikipedia article; 'web' = any URL (proxied to bypass iframe blocks); 'audio' = live audio stream (radio/.mp3/.aac); 'html' = custom HTML displayed directly — supports KaTeX math ($formula$), Chart.js graphs, Mermaid diagrams, Prism code, Leaflet maps, SVG, CSS animations — pass the FULL HTML body content as `query`; 'video' = YouTube/Vimeo URL or direct mp4/webm — auto-converted to embed; 'document' = PDF/DOC/XLS/PPT URL — PDF native, Office via Google Docs Viewer; 'cad' = engineering files DXF/STEP/STL/OBJ/GLTF/KiCad via 3dviewer.net; 'route' = driving directions between two places (query: 'Origin -> Destination'); 'clear' = blank the monitor.",
+        description: "Type of content to show on the monitor. 'map' = interactive map for a place (automatically uses Leaflet); 'weather' = weather card; 'image' = photo search; 'wiki' = Wikipedia article; 'web' = any URL (proxied to bypass iframe blocks); 'audio' = live audio stream (radio/.mp3/.aac); 'html' = custom HTML displayed directly — supports KaTeX math ($formula$), Chart.js graphs, Mermaid diagrams, Prism code, SVG, CSS animations — pass the FULL HTML body content as `query`; 'video' = YouTube/Vimeo URL or direct mp4/webm — auto-converted to embed; 'document' = PDF/DOC/XLS/PPT URL — PDF native, Office via Google Docs Viewer; 'cad' = engineering files DXF/STEP/STL/OBJ/GLTF/KiCad via 3dviewer.net; 'route' = driving directions between two places (query: 'Origin -> Destination'); 'clear' = blank the monitor.",
       },
       query: { type: 'string', description: "Content to display. For 'html': full HTML body (can include Leaflet maps, Chart.js, KaTeX, Mermaid, SVG). For 'video': YouTube/Vimeo URL or direct mp4. For 'document': URL to PDF/DOC/XLS/PPT. For 'cad': URL to DXF/STEP/STL/OBJ. For 'route': 'City A -> City B'. For 'map'/'weather': place name or LAT,LON. For 'audio': playable stream URL. For 'web': https://url." },
       title: { type: 'string', description: 'Optional label shown above the monitor.' },
