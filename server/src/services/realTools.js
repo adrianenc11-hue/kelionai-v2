@@ -1787,7 +1787,50 @@ async function loadDocBuffer({ url, base64 }, maxBytes, timeoutMs) {
 async function toolReadPdf({ url, base64, max_chars, max_pages }) {
   const loaded = await loadDocBuffer({ url, base64 }, 25 * 1024 * 1024, 15000);
   if (!loaded.ok) return loaded;
-  const cap = Math.max(500, Math.min(50000, Number.parseInt(max_chars, 10) || 8000));
+  const cap = Math.max(500, Math.min(200000, Number.parseInt(max_chars, 10) || 100000)); // Cap marit pt analize profunde
+
+  try {
+    // Încercare de a folosi Gemini 2.5 Flash pentru analiză multimodală nativă (Text + Imagini)
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (apiKey) {
+      const base64Data = loaded.buffer.toString('base64');
+      const payload = {
+        contents: [{
+          parts: [
+            { text: "Extract ALL text from this PDF. For every image, schematic, circuit diagram, or technical drawing, provide an EXTREMELY detailed technical description (including component values, physics principles, relationships, and exact labels). Do not miss any technical detail. Assume the user is a Senior Engineer/Physicist and needs precise diagnostic and analytical information from the manual." },
+            { inlineData: { mimeType: 'application/pdf', data: base64Data } }
+          ]
+        }],
+        generationConfig: { temperature: 0.1 }
+      };
+
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        if (text) {
+          const truncated = text.length > cap;
+          return {
+            ok: true,
+            method: 'gemini-multimodal',
+            text: truncated ? text.slice(0, cap) + '… [truncated]' : text,
+            truncated,
+            chars: text.length,
+            bytes: loaded.buffer.length,
+          };
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[read_pdf] Gemini vision fallback failed:', err.message);
+  }
+
+  // Fallback: pdf-parse clasic (doar text) dacă Gemini pică sau nu e setat API KEY
   const maxPages = Math.max(1, Math.min(200, Number.parseInt(max_pages, 10) || 50));
   try {
     const pdfParse = require('pdf-parse');
