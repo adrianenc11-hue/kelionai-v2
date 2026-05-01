@@ -1765,7 +1765,26 @@ async function fetchBufferWithGuard(url, maxBytes, timeoutMs) {
   }
 }
 
-async function loadDocBuffer({ url, base64 }, maxBytes, timeoutMs) {
+const tempFileStore = new Map();
+function storeTempFile(id, buffer, mimeType) {
+  tempFileStore.set(id, { buffer, mimeType, time: Date.now() });
+  for (const [k, v] of tempFileStore.entries()) {
+    if (Date.now() - v.time > 60 * 60 * 1000) tempFileStore.delete(k); // 1 hour sweep
+  }
+}
+function getTempFile(id) {
+  return tempFileStore.get(id);
+}
+
+async function loadDocBuffer({ url, base64, file_id }, maxBytes, timeoutMs) {
+  if (file_id) {
+    const f = getTempFile(file_id);
+    if (!f) return { ok: false, error: 'Temporary file expired or not found' };
+    if (f.buffer.length > maxBytes) {
+      return { ok: false, error: `file too large (${f.buffer.length} bytes, max ${maxBytes})` };
+    }
+    return { ok: true, buffer: f.buffer, contentType: f.mimeType };
+  }
   if (base64) {
     const decoded = decodeBase64Source(base64);
     // Defense in depth: the URL path already enforces maxBytes in
@@ -1781,11 +1800,11 @@ async function loadDocBuffer({ url, base64 }, maxBytes, timeoutMs) {
     return decoded;
   }
   if (url) return fetchBufferWithGuard(String(url).trim(), maxBytes, timeoutMs);
-  return { ok: false, error: 'provide either url or base64' };
+  return { ok: false, error: 'provide either url, base64, or file_id' };
 }
 
-async function toolReadPdf({ url, base64, max_chars, max_pages }) {
-  const loaded = await loadDocBuffer({ url, base64 }, 25 * 1024 * 1024, 15000);
+async function toolReadPdf({ url, base64, file_id, max_chars, max_pages }) {
+  const loaded = await loadDocBuffer({ url, base64, file_id }, 25 * 1024 * 1024, 15000);
   if (!loaded.ok) return loaded;
   const cap = Math.max(500, Math.min(200000, Number.parseInt(max_chars, 10) || 100000)); // Cap marit pt analize profunde
 
@@ -1851,8 +1870,8 @@ async function toolReadPdf({ url, base64, max_chars, max_pages }) {
   }
 }
 
-async function toolReadDocx({ url, base64, max_chars }) {
-  const loaded = await loadDocBuffer({ url, base64 }, 25 * 1024 * 1024, 15000);
+async function toolReadDocx({ url, base64, file_id, max_chars }) {
+  const loaded = await loadDocBuffer({ url, base64, file_id }, 25 * 1024 * 1024, 15000);
   if (!loaded.ok) return loaded;
   const cap = Math.max(500, Math.min(50000, Number.parseInt(max_chars, 10) || 8000));
   try {
@@ -1882,8 +1901,8 @@ async function getTesseract() {
   return _tesseractModule;
 }
 
-async function toolOcrImage({ url, base64, lang, max_chars }) {
-  const loaded = await loadDocBuffer({ url, base64 }, 20 * 1024 * 1024, 20000);
+async function toolOcrImage({ url, base64, file_id, lang, max_chars }) {
+  const loaded = await loadDocBuffer({ url, base64, file_id }, 20 * 1024 * 1024, 20000);
   if (!loaded.ok) return loaded;
   const cap = Math.max(200, Math.min(20000, Number.parseInt(max_chars, 10) || 4000));
   // Accept only the leading run of [a-z+] after trim/lowercase so a value
@@ -3064,4 +3083,7 @@ module.exports = {
   toolRememberFact,
   // Faza A — global live radio search (radio-browser.info, ~50k stations)
   toolPlayRadio,
+  // Memory files
+  storeTempFile,
+  getTempFile,
 };

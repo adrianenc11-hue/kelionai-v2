@@ -174,6 +174,9 @@ const visionLimiter = (process.env.NODE_ENV === 'test') ? (req, res, next) => ne
 // stray ?retry=1 from Stripe wouldn't bypass the guard.
 app.use((req, res, next) => {
   if (req.path === '/api/credits/webhook') return next();
+  if (req.path === '/api/tools/upload_temp') {
+    return express.raw({ type: '*/*', limit: '25mb' })(req, res, next);
+  }
   // Voice-clone POST carries a base64-encoded audio sample (~30s at 128kbps =
   // ~480KB raw, ~640KB base64). 5 MB accommodates longer clips with headroom
   // while capping abuse surface (was 15 MB pre-audit).
