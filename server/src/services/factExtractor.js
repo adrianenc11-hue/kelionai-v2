@@ -60,12 +60,11 @@ async function extractFacts(turns, options = {}) {
   const url = 'https://openrouter.ai/api/v1/chat/completions';
 
   const body = {
-    model: 'anthropic/claude-3.5-haiku', // fast, cheap, supports json mode via OR
+    model: options.model || 'anthropic/claude-3.5-haiku', // fast, cheap, supports json mode via OR
     messages: [
       { role: 'system', content: EXTRACTION_SYSTEM },
       { role: 'user', content: `Transcript:\n${transcript}` }
     ],
-    response_format: { type: 'json_object' },
     temperature: 0.1,
     max_tokens: 600,
   };

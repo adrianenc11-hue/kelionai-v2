@@ -115,15 +115,37 @@ async function getFetch() {
   return nodeFetchPromise;
 }
 
-async function fetchWithTimeout(url, opts = {}, timeoutMs = 8000) {
+async function fetchWithTimeout(url, opts = {}, timeoutMs = 8000, retries = 2) {
   const fetchImpl = await getFetch();
-  const ctrl = typeof AbortController === 'function' ? new AbortController() : null;
-  const timer = ctrl ? setTimeout(() => ctrl.abort(), timeoutMs) : null;
-  try {
-    return await fetchImpl(url, ctrl ? { ...opts, signal: ctrl.signal } : opts);
-  } finally {
-    if (timer) clearTimeout(timer);
+  
+  let lastErr;
+  let lastStatus;
+  
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const ctrl = typeof AbortController === 'function' ? new AbortController() : null;
+    const timer = ctrl ? setTimeout(() => ctrl.abort(), timeoutMs) : null;
+    try {
+      const r = await fetchImpl(url, ctrl ? { ...opts, signal: ctrl.signal } : opts);
+      if (!r.ok && [502, 503, 504].includes(r.status) && attempt < retries) {
+        lastStatus = r.status;
+        await r.text().catch(() => ''); // drain body
+        await new Promise(res => setTimeout(res, 1000 * (attempt + 1))); // 1s, 2s backoff
+        continue;
+      }
+      return r;
+    } catch (err) {
+      lastErr = err;
+      if (attempt < retries) {
+        await new Promise(res => setTimeout(res, 1000 * (attempt + 1)));
+        continue;
+      }
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
   }
+  
+  if (lastErr) throw lastErr;
+  throw new Error(`Request failed after retries with status ${lastStatus}`);
 }
 
 // ──────────────────────────────────────────────────────────────────
@@ -2651,6 +2673,44 @@ async function toolGithubRepoInfo(args) {
   }
 }
 
+async function toolGetGithubIssues(args) {
+  let slug = String(args?.repo || args?.slug || '').trim();
+  if (!slug && args?.owner && args?.name) slug = `${args.owner}/${args.name}`;
+  slug = slug.replace(/^https?:\/\/github\.com\//i, '').replace(/\.git$/i, '').replace(/\/$/, '');
+  if (!validSlugRepo(slug)) return { ok: false, error: 'invalid repo slug (expected owner/name)' };
+  const state = ['open', 'closed', 'all'].includes(args?.state) ? args.state : 'open';
+  
+  const headers = { Accept: 'application/vnd.github+json', 'User-Agent': 'kelion-ai-tools' };
+  if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+  
+  try {
+    const url = `https://api.github.com/repos/${slug}/issues?state=${state}&sort=updated&direction=desc&per_page=10`;
+    const r = await fetchWithTimeout(url, { headers });
+    if (r.status === 404) return { ok: false, status: 404, error: 'repo not found or no issues access' };
+    if (!r.ok) return { ok: false, status: r.status, error: `GitHub HTTP ${r.status}` };
+    const j = await r.json();
+    if (!Array.isArray(j)) return { ok: false, error: 'unexpected GitHub response' };
+    
+    return {
+      ok: true,
+      repo: slug,
+      state: state,
+      issues: j.map(issue => ({
+        number: issue.number,
+        title: issue.title,
+        state: issue.state,
+        author: issue.user?.login,
+        comments: issue.comments,
+        created_at: issue.created_at,
+        url: issue.html_url,
+        body: issue.body ? (issue.body.slice(0, 300) + (issue.body.length > 300 ? '…' : '')) : null
+      }))
+    };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+}
+
 function validSlugNpm(s) {
   if (typeof s !== 'string' || !s) return false;
   if (s.length > 214) return false;
@@ -2745,7 +2805,101 @@ async function toolPypiPackageInfo(args) {
 }
 
 // ──────────────────────────────────────────────────────────────────
+// Local File and Git PR tools
+// ──────────────────────────────────────────────────────────────────
+const _path = require('path');
+const _fs = require('fs');
+const _cp = require('child_process');
+const _util = require('util');
+const _exec = _util.promisify(_cp.exec);
+
+// Path to the repository root
+const REPO_ROOT = _path.resolve(__dirname, '../../../../');
+
+async function toolListLocalFiles(args) {
+  try {
+    const dir = String(args?.dir || '.').trim();
+    const resolvedPath = _path.resolve(REPO_ROOT, dir);
+    if (!resolvedPath.startsWith(REPO_ROOT)) return { ok: false, error: 'access denied: path outside repository' };
+    if (!_fs.existsSync(resolvedPath)) return { ok: false, error: 'directory not found' };
+    
+    const entries = _fs.readdirSync(resolvedPath, { withFileTypes: true });
+    const files = entries.map(e => (e.isDirectory() ? e.name + '/' : e.name));
+    return { ok: true, dir, files };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
+async function toolReadLocalFile(args) {
+  try {
+    const filePath = String(args?.path || '').trim();
+    if (!filePath) return { ok: false, error: 'missing file path' };
+    const resolvedPath = _path.resolve(REPO_ROOT, filePath);
+    if (!resolvedPath.startsWith(REPO_ROOT)) return { ok: false, error: 'access denied: path outside repository' };
+    if (!_fs.existsSync(resolvedPath)) return { ok: false, error: 'file not found' };
+    
+    const content = _fs.readFileSync(resolvedPath, 'utf8');
+    const cap = 50000;
+    return { ok: true, path: filePath, content: content.length > cap ? content.slice(0, cap) + '\\n...[truncated]' : content };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
+async function toolEditLocalFile(args) {
+  try {
+    const filePath = String(args?.path || '').trim();
+    const content = String(args?.content || '');
+    if (!filePath) return { ok: false, error: 'missing file path' };
+    const resolvedPath = _path.resolve(REPO_ROOT, filePath);
+    if (!resolvedPath.startsWith(REPO_ROOT)) return { ok: false, error: 'access denied: path outside repository' };
+    
+    const dir = _path.dirname(resolvedPath);
+    if (!_fs.existsSync(dir)) _fs.mkdirSync(dir, { recursive: true });
+    
+    _fs.writeFileSync(resolvedPath, content, 'utf8');
+    return { ok: true, path: filePath };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
+async function toolCreateGithubPr(args) {
+  try {
+    const title = String(args?.title || 'Automated Kelion PR');
+    const branch = String(args?.branch || 'feat/kelion-auto-' + Date.now());
+    const message = String(args?.message || 'feat: automated updates');
+    
+    let gitStatus = '';
+    try {
+      const st = await _exec('git status --porcelain', { cwd: REPO_ROOT });
+      gitStatus = st.stdout;
+    } catch(e) { }
+    
+    if (!gitStatus.trim()) {
+      return { ok: false, error: 'No changes to commit' };
+    }
+    
+    await _exec(`git checkout -b ${branch}`, { cwd: REPO_ROOT });
+    await _exec(`git add .`, { cwd: REPO_ROOT });
+    await _exec(`git commit -m "${message.replace(/"/g, '\\"')}"`, { cwd: REPO_ROOT });
+    await _exec(`git push -u origin ${branch}`, { cwd: REPO_ROOT });
+    
+    try {
+      const { stdout: prUrl } = await _exec(`gh pr create --title "${title.replace(/"/g, '\\"')}" --body "Automated PR from Kelion."`, { cwd: REPO_ROOT });
+      return { ok: true, url: prUrl.trim() };
+    } catch (e) {
+      return { ok: true, url: `https://github.com/adrianenc11-hue/kelionai-v2/pull/new/${branch}` };
+    }
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────
 // Dispatch
+
 
 // F11 — Image generation. Returns a short-lived URL pointing at
 // the in-process cache served by routes/generatedImages.js — the voice
@@ -2819,10 +2973,16 @@ async function executeRealTool(name, args, ctx) {
     case 'create_calendar_ics':   return toolCreateCalendarIcs(a);
     case 'zapier_trigger':        return toolZapierTrigger(a);
     case 'github_repo_info':      return toolGithubRepoInfo(a);
+    case 'get_github_issues':     return toolGetGithubIssues(a);
     case 'list_github_repo_files': return toolListGithubRepoFiles(a);
     case 'read_github_file':      return toolReadGithubFile(a);
     case 'npm_package_info':      return toolNpmPackageInfo(a);
     case 'pypi_package_info':     return toolPypiPackageInfo(a);
+    // ── Local File tools ──
+    case 'read_local_file':   return toolReadLocalFile(a);
+    case 'list_local_files':  return toolListLocalFiles(a);
+    case 'edit_local_file':   return toolEditLocalFile(a);
+    case 'create_github_pr':  return toolCreateGithubPr(a);
     // ── PR C — sandbox + regex + user-intern ──
     case 'run_regex':         return toolRunRegex(a);
     case 'run_code':          return toolRunCode(a);
@@ -3064,7 +3224,7 @@ const REAL_TOOL_NAMES = [
   'run_regex', 'run_code', 'get_my_credits', 'get_my_usage', 'get_my_profile',
   // PR D — communications + automations + package info
   'send_email', 'send_sms', 'create_calendar_ics', 'zapier_trigger',
-  'github_repo_info', 'list_github_repo_files', 'read_github_file', 'npm_package_info', 'pypi_package_info',
+  'github_repo_info', 'get_github_issues', 'list_github_repo_files', 'read_github_file', 'npm_package_info', 'pypi_package_info',
   // F11 — image generation
   'generate_image',
   // PR 8/N — Memory of Actions. Read-only self-reflection: returns the
@@ -3141,6 +3301,10 @@ module.exports = {
   toolReadGithubFile,
   toolNpmPackageInfo,
   toolPypiPackageInfo,
+  toolReadLocalFile,
+  toolListLocalFiles,
+  toolEditLocalFile,
+  toolCreateGithubPr,
   // F11 — image generation
   toolGenerateImage,
   // PR 8/N — Memory of Actions
