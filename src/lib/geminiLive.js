@@ -321,6 +321,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
   // so that modelTurn.parts[].text arriving in a LATER frame is not
   // appended a second time. Reset on turnComplete.
   const turnHasTranscriptRef = useRef(false)
+  const turnHasAudioRef = useRef(false)
   // Buffer for cloned-voice TTS: accumulates outputTranscription chunks
   // across frames; flushed to ElevenLabs on turnComplete.
   const cloneTranscriptBufRef = useRef('')
@@ -359,6 +360,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
         cloneTranscriptBufRef.current = ''
         partTextBufRef.current = ''
         turnHasTranscriptRef.current = false
+        turnHasAudioRef.current = false
         lastActivityAtRef.current = Date.now()
         setStatus('listening')
         return
@@ -418,7 +420,13 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
             } else {
               const bytes = bytesFromBase64(inline.data)
               logAiEvent('audio_out', { bytes: bytes.length, source: 'gemini-native' })
+              if (!turnHasAudioRef.current) {
+                // Instantly log to the transcript the moment audio starts playing
+                // This guarantees the user sees EXACTLY when audio is received, even if the socket crashes before turnComplete
+                appendTurn('assistant', '[Pachet audio în curs de redare...]', false, '🔴 Live Audio Stream')
+              }
               enqueueAudio(bytes)
+              turnHasAudioRef.current = true
             }
           } else {
             logAiEvent('audio_skipped', { reason: 'cloned-voice-active' })
@@ -447,9 +455,13 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
             cloneTranscriptBufRef.current += partText
             console.log('[clonedTTS] using partText fallback:', partText.slice(0, 80))
           }
+        } else if (!hadTranscript && !partText && turnHasAudioRef.current) {
+          // Gemini API sometimes streams audio chunks but never fires outputTranscription or part.text
+          appendTurn('assistant', '[Gemini Audio - Fără transcript text returnat de API]', false, '🔊 Audio Only (No Text)')
         }
         // Reset all per-turn buffers
         turnHasTranscriptRef.current = false
+        turnHasAudioRef.current = false
         partTextBufRef.current = ''
         // Cloned voice: flush accumulated transcript to ElevenLabs TTS
          if (isClonedVoiceActive() && cloneTranscriptBufRef.current.trim()) {
