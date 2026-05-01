@@ -2257,9 +2257,9 @@ export default function KelionStage() {
               </MenuItem>
             </>
           )}
-          <MenuItem onClick={() => { screenStream ? stopScreen() : startScreen(); setMenuOpen(false) }}>
-            {screenStream ? t('stopScreen') : t('shareScreen')}
-          </MenuItem>
+
+          {/* ISOLATED: screen share hidden — AI will trigger automatically or hidden from menu */}
+
           {/* ISOLATED: transcript toggle hidden — live voice only */}
           <MenuItem onClick={() => { navigate('/contact'); setMenuOpen(false) }}>
             {t('contactUs')}
@@ -2271,34 +2271,11 @@ export default function KelionStage() {
               margin: '6px 8px',
             }}
           />
-          {/* Stage 6 — voice style submenu */}
-          <div
-            style={{
-              padding: '6px 10px 4px',
-              fontSize: 11,
-              letterSpacing: 0.6,
-              textTransform: 'uppercase',
-              color: 'rgba(237,233,254,0.45)',
-            }}
-          >
-            {t('voiceStyle')}
-          </div>
-          {VOICE_STYLE_OPTIONS.map((opt) => (
-            <MenuItem
-              key={opt.key}
-              onClick={() => { handleVoiceStyleChange(opt.key); setMenuOpen(false) }}
-            >
-              <span style={{ opacity: voiceStyle === opt.key ? 1 : 0.75 }}>
-                {voiceStyle === opt.key ? '? ' : '? '}
-                {t(opt.key) || opt.label}
-              </span>
-            </MenuItem>
-          ))}
-          {/* Cloned voice toggle — appears in the voice style section
-              when the user has a cloned voice. Shows the clone display
-              name and lets them enable/disable it inline without opening
-              the full VoiceCloneModal. */}
-          {clonedVoiceInfo && clonedVoiceInfo.voiceId && (
+
+          {/* ISOLATED: voice style submenu hidden — controlled automatically by AI */}
+
+          {/* Cloned voice toggle — only for admin */}
+          {isAdmin && clonedVoiceInfo && clonedVoiceInfo.voiceId && (
             <MenuItem
               onClick={() => {
                 toggleClonedVoice(!clonedVoiceInfo.enabled)
@@ -2323,6 +2300,7 @@ export default function KelionStage() {
               </span>
             </MenuItem>
           )}
+
           <div style={{ height: 6 }} />
           {/* Conversation history — works for guests (localStorage)
               and signed-in users (server). Above the auth gate so guests
@@ -2330,43 +2308,47 @@ export default function KelionStage() {
           {/* ISOLATED: conversation history hidden — live voice only */}
           {/* ISOLATED: new chat hidden — live voice only */}
           <div style={{ height: 6 }} />
+
           {/* Stage 3 — memory + passkey */}
           {authState.signedIn ? (
             <>
-              <MenuItem onClick={() => { openMemory(); setMenuOpen(false) }}>
-                {t('whatDoYouKnow')}
-              </MenuItem>
-              {/* Consensual voice clone — opens the multi-step modal
-                  (consent + record + manage). Signed-in only; the
-                  backend route is gated by requireAuth. */}
-              <MenuItem onClick={() => { setVoiceCloneOpen(true); setMenuOpen(false) }}>
-                {t('cloneMyVoice')}
-              </MenuItem>
-              {/* Stage 5 — proactive pings */}
-              {pushState.supported && (
-                pushState.enabled ? (
-                  <>
-                    <MenuItem
-                      onClick={() => { handleTestPing(); setMenuOpen(false) }}
-                      disabled={pushBusy}
-                    >
-                      {t('sendTestPing')}
-                    </MenuItem>
-                    <MenuItem
-                      onClick={() => { handleDisablePush(); setMenuOpen(false) }}
-                      disabled={pushBusy}
-                    >
-                      {pushBusy ? t('disablingPings') : t('disablePings')}
-                    </MenuItem>
-                  </>
-                ) : (
-                  <MenuItem
-                    onClick={() => { handleEnablePush(); setMenuOpen(false) }}
-                    disabled={pushBusy}
-                  >
-                    {pushBusy ? t('enablingPings') : t('enablePings')}
+              {/* ISOLATED: 'whatDoYouKnow' hidden from menu — AI uses memory automatically */}
+              
+              {/* Admin only features: Voice Clone and Pings */}
+              {isAdmin && (
+                <>
+                  {/* Consensual voice clone */}
+                  <MenuItem onClick={() => { setVoiceCloneOpen(true); setMenuOpen(false) }}>
+                    {t('cloneMyVoice')}
                   </MenuItem>
-                )
+                  
+                  {/* Stage 5 — proactive pings (admin only) */}
+                  {pushState.supported && (
+                    pushState.enabled ? (
+                      <>
+                        <MenuItem
+                          onClick={() => { handleTestPing(); setMenuOpen(false) }}
+                          disabled={pushBusy}
+                        >
+                          {t('sendTestPing')}
+                        </MenuItem>
+                        <MenuItem
+                          onClick={() => { handleDisablePush(); setMenuOpen(false) }}
+                          disabled={pushBusy}
+                        >
+                          {pushBusy ? t('disablingPings') : t('disablePings')}
+                        </MenuItem>
+                      </>
+                    ) : (
+                      <MenuItem
+                        onClick={() => { handleEnablePush(); setMenuOpen(false) }}
+                        disabled={pushBusy}
+                      >
+                        {pushBusy ? t('enablingPings') : t('enablePings')}
+                      </MenuItem>
+                    )
+                  )}
+                </>
               )}
               {/* Buy credits moved to the top-right action bar. */}
               {/* PWA install — only shows when the browser actually
