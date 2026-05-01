@@ -359,7 +359,7 @@ L.marker([${dest.lat},${dest.lon}],{icon:endIcon}).addTo(map).bindPopup('<b>Fini
 var coords=${routeCoords};
 var route=L.polyline(coords,{color:'#7c3aed',weight:5,opacity:0.85}).addTo(map);
 map.fitBounds(route.getBounds(),{padding:[50,50]});
-<\\/script>`;
+<\/script>`;
 
     setState({
       kind: 'map',
