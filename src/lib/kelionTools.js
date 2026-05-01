@@ -23,6 +23,7 @@ import {
   requestCameraStop,
   requestCameraZoom,
   getCurrentFacingMode,
+  getCameraController,
 } from './cameraControl'
 import { requestUINotify, requestUINavigate, listAllowedRoutes } from './uiActionStore'
 import { getCsrfToken } from './api'
@@ -592,6 +593,14 @@ function download(){
       const enabled = !!args?.enabled
       if (enabled) {
         console.warn('[set_narration_mode] AI tried to enable narration — only user-initiated requests should enable this.')
+        
+        // Block enabling narration if the camera is physically OFF,
+        // otherwise the AI will just loop endlessly saying "I can't see anything".
+        const ctrl = getCameraController()
+        const track = ctrl && typeof ctrl.getActiveTrack === 'function' ? ctrl.getActiveTrack() : null
+        if (!track) {
+          return 'Error: Camera is OFF. You cannot enable continuous narration without the camera. Tell the user to turn on the camera first.'
+        }
       }
       const interval = Number(args?.interval_s)
       const focus = typeof args?.focus === 'string' ? args.focus : ''
