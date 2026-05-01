@@ -2556,6 +2556,64 @@ function validSlugRepo(s) {
   return typeof s === 'string' && /^[a-zA-Z0-9._-]{1,100}\/[a-zA-Z0-9._-]{1,100}$/.test(s);
 }
 
+async function toolListGithubRepoFiles(args) {
+  let slug = String(args?.repo || args?.slug || '').trim();
+  if (!slug && args?.owner && args?.name) slug = `${args.owner}/${args.name}`;
+  slug = slug.replace(/^https?:\/\/github\.com\//i, '').replace(/\.git$/i, '').replace(/\/$/, '');
+  if (!validSlugRepo(slug)) return { ok: false, error: 'invalid repo slug (expected owner/name)' };
+  const headers = { Accept: 'application/vnd.github+json', 'User-Agent': 'kelion-ai-tools' };
+  if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+  const branch = args?.branch ? String(args.branch) : 'HEAD';
+  try {
+    const r = await fetchWithTimeout(`https://api.github.com/repos/${slug}/git/trees/${branch}?recursive=1`, { headers }, 15000);
+    if (r.status === 404) return { ok: false, status: 404, error: 'repo or branch not found' };
+    if (r.status === 403) return { ok: false, status: 403, error: 'rate limited by GitHub API' };
+    if (!r.ok) return { ok: false, status: r.status, error: `GitHub HTTP ${r.status}` };
+    const j = await r.json();
+    if (!j.tree) return { ok: false, error: 'no tree found' };
+    
+    // Filter out huge node_modules or .git paths, return only files
+    const files = j.tree
+      .filter(t => t.type === 'blob' && !t.path.includes('node_modules/') && !t.path.includes('.git/'))
+      .map(t => t.path);
+      
+    return { ok: true, repo: slug, branch: j.sha, fileCount: files.length, files: files.slice(0, 1000) }; // cap at 1000 to avoid giant responses
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+}
+
+async function toolReadGithubFile(args) {
+  let slug = String(args?.repo || args?.slug || '').trim();
+  if (!slug && args?.owner && args?.name) slug = `${args.owner}/${args.name}`;
+  slug = slug.replace(/^https?:\/\/github\.com\//i, '').replace(/\.git$/i, '').replace(/\/$/, '');
+  if (!validSlugRepo(slug)) return { ok: false, error: 'invalid repo slug (expected owner/name)' };
+  const path = String(args?.path || '').trim();
+  if (!path) return { ok: false, error: 'missing file path' };
+  const branch = args?.branch ? String(args.branch) : 'HEAD';
+  
+  const headers = { Accept: 'application/vnd.github.v3.raw', 'User-Agent': 'kelion-ai-tools' };
+  if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+  try {
+    const r = await fetchWithTimeout(`https://api.github.com/repos/${slug}/contents/${path}?ref=${branch}`, { headers }, 15000);
+    if (r.status === 404) return { ok: false, status: 404, error: 'file not found' };
+    if (r.status === 403) return { ok: false, status: 403, error: 'rate limited or file too large' };
+    if (!r.ok) return { ok: false, status: r.status, error: `GitHub HTTP ${r.status}` };
+    const content = await r.text();
+    const cap = 50000; // Cap to avoid blowing up context
+    const truncated = content.length > cap;
+    return {
+      ok: true,
+      repo: slug,
+      path: path,
+      content: truncated ? content.slice(0, cap) + '… [truncated]' : content,
+      truncated
+    };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+}
+
 async function toolGithubRepoInfo(args) {
   let slug = String(args?.repo || args?.slug || '').trim();
   if (!slug && args?.owner && args?.name) slug = `${args.owner}/${args.name}`;
@@ -2761,6 +2819,8 @@ async function executeRealTool(name, args, ctx) {
     case 'create_calendar_ics':   return toolCreateCalendarIcs(a);
     case 'zapier_trigger':        return toolZapierTrigger(a);
     case 'github_repo_info':      return toolGithubRepoInfo(a);
+    case 'list_github_repo_files': return toolListGithubRepoFiles(a);
+    case 'read_github_file':      return toolReadGithubFile(a);
     case 'npm_package_info':      return toolNpmPackageInfo(a);
     case 'pypi_package_info':     return toolPypiPackageInfo(a);
     // ── PR C — sandbox + regex + user-intern ──
@@ -3004,7 +3064,7 @@ const REAL_TOOL_NAMES = [
   'run_regex', 'run_code', 'get_my_credits', 'get_my_usage', 'get_my_profile',
   // PR D — communications + automations + package info
   'send_email', 'send_sms', 'create_calendar_ics', 'zapier_trigger',
-  'github_repo_info', 'npm_package_info', 'pypi_package_info',
+  'github_repo_info', 'list_github_repo_files', 'read_github_file', 'npm_package_info', 'pypi_package_info',
   // F11 — image generation
   'generate_image',
   // PR 8/N — Memory of Actions. Read-only self-reflection: returns the
@@ -3077,6 +3137,8 @@ module.exports = {
   toolCreateCalendarIcs,
   toolZapierTrigger,
   toolGithubRepoInfo,
+  toolListGithubRepoFiles,
+  toolReadGithubFile,
   toolNpmPackageInfo,
   toolPypiPackageInfo,
   // F11 — image generation

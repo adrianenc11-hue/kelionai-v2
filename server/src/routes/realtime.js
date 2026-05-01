@@ -825,7 +825,7 @@ const KELION_TOOLS = [
   },
   {
     name: 'search_github',
-    description: "Search public GitHub repositories via the GitHub REST API. Returns repo name, description, stars, URL. Respects GITHUB_TOKEN when set for higher rate limits.",
+    description: "Search public GitHub repositories via the GitHub REST API. Returns repo name, description, stars, URL. Respects GITHUB_TOKEN when set for higher rate limits. IMPORTANT: Use this ONLY to search for repositories by topic/name. If the user provides a specific repository URL and asks you to audit, review, or read its code, DO NOT use this tool. Instead, use `list_github_repo_files` and `read_github_file`.",
     properties: {
       query: { type: 'string', description: "Free-text search. Supports GitHub qualifiers (language:js, stars:>100)." },
       limit: { type: 'integer', description: "Max results (1-10, default 5)." },
@@ -1047,6 +1047,25 @@ const KELION_TOOLS = [
       repo: { type: 'string', description: "Repo slug in the form `owner/name` (e.g. `facebook/react`). A full github.com URL also works." },
     },
     required: ['repo'],
+  },
+  {
+    name: 'list_github_repo_files',
+    description: "List the entire file tree of a GitHub repository. Use this FIRST when the user asks you to 'audit', 'review', or 'read' a repository. It helps you understand the project structure so you know which specific files to read next. Note: returns up to 1000 files.",
+    properties: {
+      repo: { type: 'string', description: "Repo slug in the form `owner/name` (e.g. `facebook/react`)." },
+      branch: { type: 'string', description: "Optional branch name. Defaults to HEAD." },
+    },
+    required: ['repo'],
+  },
+  {
+    name: 'read_github_file',
+    description: "Read the source code of a specific file from a GitHub repository. Use this AFTER `list_github_repo_files` to actually read the code files you need to audit, debug, or review. Max 50,000 chars returned per file.",
+    properties: {
+      repo: { type: 'string', description: "Repo slug in the form `owner/name` (e.g. `facebook/react`)." },
+      path: { type: 'string', description: "Exact path to the file in the repository (e.g. `src/index.js`)." },
+      branch: { type: 'string', description: "Optional branch name. Defaults to HEAD." },
+    },
+    required: ['repo', 'path'],
   },
   {
     name: 'npm_package_info',
@@ -1585,8 +1604,8 @@ router.post('/vision', visionLimiter, async (req, res) => {
   }
 
   try {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) return res.status(503).json({ error: 'GEMINI_API_KEY not configured' });
+    const openRouterKey = process.env.OPENROUTER_API_KEY;
+    if (!openRouterKey) return res.status(503).json({ error: 'OPENROUTER_API_KEY not configured' });
 
     // Build time-aware vision prompt
     let timeInfo = '';
@@ -1594,40 +1613,50 @@ router.post('/vision', visionLimiter, async (req, res) => {
       timeInfo = ` Current date: ${timeContext.date || 'unknown'}. Time: ${timeContext.time || 'unknown'} (${timeContext.timezone || 'unknown timezone'}). Time of day: ${timeContext.timeOfDay || 'unknown'}.`;
     }
 
-    const visionModel = process.env.GEMINI_VISION_MODEL || 'gemini-3.1-pro-preview';
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${visionModel}:generateContent?key=${apiKey}`;
+    const url = 'https://openrouter.ai/api/v1/chat/completions';
+    
+    // Convert base64 data to OpenAI image_url format
+    const base64Data = `data:${mimeType || 'image/jpeg'};base64,${image}`;
 
     const r = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${openRouterKey}`,
+        'HTTP-Referer': 'https://kelion.ai',
+        'X-Title': 'Kelion AI Vision'
+      },
       body: JSON.stringify({
-        contents: [{
-          parts: [
-            {
-              text: `You are a vision system analyzing a real camera frame from a user's device. RULES:\n1. Describe ONLY what you can LITERALLY see in this image. Never invent, assume, or hallucinate details.\n2. If the image is blurry, dark, or unclear, say so honestly — do NOT guess what might be there.\n3. Focus on: people (position, clothing, actions), objects, text visible, environment (indoor/outdoor, vehicle, room type).\n4. If you see a steering wheel, dashboard, or road — the user is in a vehicle. Describe the driving scene.\n5. If you see a face close-up — this is likely a front-facing (selfie) camera.\n6. Keep to 1-2 factual sentences. No creative writing.${timeInfo}`,
-            },
-            {
-              inlineData: {
-                mimeType: mimeType || 'image/jpeg',
-                data: image,
+        model: 'anthropic/claude-3.5-sonnet',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: `You are a vision system analyzing a real camera frame from a user's device. RULES:\n1. Describe ONLY what you can LITERALLY see in this image. Never invent, assume, or hallucinate details.\n2. If the image is blurry, dark, or unclear, say so honestly — do NOT guess what might be there.\n3. Focus on: people (position, clothing, actions), objects, text visible, environment (indoor/outdoor, vehicle, room type).\n4. If you see a steering wheel, dashboard, or road — the user is in a vehicle. Describe the driving scene.\n5. If you see a face close-up — this is likely a front-facing (selfie) camera.\n6. Keep to 1-2 factual sentences. No creative writing.${timeInfo}`
               },
-            },
-          ],
-        }],
-        generationConfig: {
-          maxOutputTokens: 200,
-          temperature: 0.3,
-        },
+              {
+                type: 'image_url',
+                image_url: {
+                  url: base64Data
+                }
+              }
+            ]
+          }
+        ],
+        max_tokens: 200,
+        temperature: 0.3,
       }),
     });
 
     if (!r.ok) {
       const errText = await r.text();
-      throw new Error(`Gemini vision HTTP ${r.status}: ${errText.slice(0, 300)}`);
+      throw new Error(`OpenRouter vision HTTP ${r.status}: ${errText.slice(0, 300)}`);
     }
 
     const result = await r.json();
-    const description = result?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const description = result?.choices?.[0]?.message?.content || '';
 
     // Deduct credits AFTER successful API call (not before).
     // Track frames per user; deduct 1 minute every FRAMES_PER_MINUTE frames.

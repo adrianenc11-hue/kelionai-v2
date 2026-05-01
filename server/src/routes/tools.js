@@ -80,23 +80,20 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 // ─── browse_web (M19) ─────────────────────────────────────────────
-// Proxies to Browser Use Cloud (https://docs.cloud.browser-use.com).
-// Sync-style call: we poll the task until completion or timeout.
-// If BROWSER_USE_API_KEY is missing, return a clean "unavailable" so
-// Kelion tells the user "I can't browse the web yet, the agent isn't
-// connected" instead of silently failing.
+// Proxies to Jina AI (for fetching/searching) + OpenRouter (for reasoning)
+// Completely free, bypassing the paid Browser Use Cloud limits.
 router.post('/browser/browse', async (req, res) => {
   const ip = req.ip || 'anon';
   if (!rateOk(`browse:${ip}`, 20, 60 * 60 * 1000)) {
     return res.status(429).json({ ok: false, error: 'Too many browse tasks in the last hour.' });
   }
 
-  const apiKey = process.env.BROWSER_USE_API_KEY;
-  if (!apiKey) {
+  const openRouterKey = process.env.OPENROUTER_API_KEY;
+  if (!openRouterKey) {
     return res.status(200).json({
       ok: false,
       unavailable: true,
-      error: 'The web browsing agent is not connected yet (no BROWSER_USE_API_KEY on the server).',
+      error: 'The web browsing agent is not connected yet (no OPENROUTER_API_KEY on the server).',
     });
   }
 
@@ -105,59 +102,66 @@ router.post('/browser/browse', async (req, res) => {
     return res.status(400).json({ ok: false, error: 'Missing or empty task.' });
   }
 
-  const maxSteps = Math.min(Number(process.env.BROWSER_USE_MAX_STEPS) || 25, 50);
-  const base = process.env.BROWSER_USE_API_BASE || 'https://api.browser-use.com';
   try {
-    // Create a session (v3 API)
-    const createResp = await fetch(`${base}/api/v3/sessions`, {
-      method: 'POST',
-      headers: { 'X-Browser-Use-API-Key': apiKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        task: start_url ? `${task}\n\nStart at: ${start_url}` : task,
-      }),
-    });
-    if (!createResp.ok) {
-      const txt = await createResp.text().catch(() => '');
-      console.error('[tools/browse] create failed', createResp.status, txt);
-      return res.status(502).json({ ok: false, error: 'The web-browsing agent is not reachable right now.' });
-    }
-    const session = await createResp.json();
-    const sessionId = session.id;
-    if (!sessionId) {
-      return res.status(502).json({ ok: false, error: 'Web-browsing agent returned no session id.' });
+    let markdownContext = '';
+    let usedUrl = start_url;
+    
+    // Fetch content via Jina AI
+    if (start_url) {
+      const fetchReq = await fetch(`https://r.jina.ai/${encodeURIComponent(start_url)}`);
+      markdownContext = await fetchReq.text();
+    } else {
+      // If no start URL, use Jina Search
+      const fetchReq = await fetch(`https://s.jina.ai/${encodeURIComponent(task)}`);
+      markdownContext = await fetchReq.text();
+      usedUrl = 'Search Results';
     }
 
-    // Poll until completion or timeout (~90s)
-    const deadline = Date.now() + 90_000;
-    let finalStatus = null;
-    let result = null;
-    while (Date.now() < deadline) {
-      await new Promise((r) => setTimeout(r, 3_000));
-      const st = await fetch(`${base}/api/v3/sessions/${sessionId}`, {
-        headers: { 'X-Browser-Use-API-Key': apiKey },
-      });
-      if (!st.ok) continue;
-      const j = await st.json();
-      if (['completed', 'finished', 'failed', 'stopped', 'error'].includes(j.status)) {
-        finalStatus = j.status;
-        result = j;
-        break;
-      }
+    if (!markdownContext || markdownContext.trim() === '') {
+      return res.status(200).json({ ok: false, error: 'Could not fetch content for the requested task/URL.' });
     }
-    if (!finalStatus) {
-      return res.status(200).json({ ok: false, error: 'The web task took too long, I gave up waiting.' });
+
+    // Truncate to ~30k chars to avoid token limits
+    markdownContext = markdownContext.slice(0, 30000);
+
+    // Call OpenRouter
+    const orReq = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openRouterKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.3-70b-instruct:free',
+        messages: [
+          {
+            role: 'system',
+            content: "You are an AI browsing agent. You have been given the markdown content of a webpage or search results. Your job is to read this content and complete the user's task. Output ONLY the answer/summary required by the task, clearly and concisely."
+          },
+          {
+            role: 'user',
+            content: `Task: ${task}\n\nURL Context: ${usedUrl}\n\nWebpage Content:\n${markdownContext}`
+          }
+        ]
+      })
+    });
+
+    if (!orReq.ok) {
+      console.error('[tools/browse] OpenRouter error:', orReq.status, await orReq.text());
+      return res.status(200).json({ ok: false, error: 'OpenRouter processing failed.' });
     }
-    if (finalStatus === 'failed' || finalStatus === 'error' || finalStatus === 'stopped') {
-      return res.status(200).json({ ok: false, error: `Task ${finalStatus}: ${result?.lastStepSummary || result?.output || 'no details'}.` });
-    }
+
+    const orRes = await orReq.json();
+    const resultText = orRes.choices?.[0]?.message?.content || 'No output generated.';
+
     return res.json({
       ok: true,
-      result: String(result?.output || result?.lastStepSummary || 'Done, but the agent returned no summary.').slice(0, 4000),
-      live_url: result?.liveUrl || null,
+      result: resultText,
+      live_url: usedUrl || null,
     });
   } catch (err) {
     console.error('[tools/browse] error', err.message);
-    return res.status(502).json({ ok: false, error: 'The web-browsing agent failed.' });
+    return res.status(200).json({ ok: false, error: 'The web-browsing agent failed.' });
   }
 });
 

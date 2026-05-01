@@ -16,11 +16,11 @@
 // instead we fake the fetch so we can feed raw JSON strings through the
 // same parse path the production code takes.
 
-process.env.NODE_ENV       = 'test';
-process.env.JWT_SECRET     = 'test-jwt-secret-at-least-32-chars!!';
-process.env.SESSION_SECRET = 'test-session-secret-32chars-longx';
-process.env.DB_PATH        = '/tmp/kelion-memory-subject-test.db';
-process.env.GEMINI_API_KEY = 'test-dummy-key';
+process.env.NODE_ENV           = 'test';
+process.env.JWT_SECRET         = 'test-jwt-secret-at-least-32-chars!!';
+process.env.SESSION_SECRET     = 'test-session-secret-32chars-longx';
+process.env.DB_PATH            = '/tmp/kelion-memory-subject-test.db';
+process.env.OPENROUTER_API_KEY = 'test-dummy-key';
 
 const { formatMemoryBlocks } = require('../src/routes/realtime');
 const { extractFacts }       = require('../src/services/factExtractor');
@@ -97,7 +97,7 @@ describe('extractFacts normalisation (Audit M9)', () => {
     const fetchMock = jest.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
-        candidates: [{ content: { parts: [{ text: rawText }] } }],
+        choices: [{ message: { content: rawText } }],
       }),
     });
     // eslint-disable-next-line no-global-assign
