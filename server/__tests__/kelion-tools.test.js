@@ -64,6 +64,7 @@ const EXPECTED_TOOL_NAMES = [
   // (src/lib/kelionTools.js) and reach into module-level registries
   // (clientGeoProvider, cameraControl) rather than the server.
   'get_my_location',
+  'open_gps_app',
   'switch_camera',
   // PR #199 — verbal camera controls: on/off + digital zoom ("activează
   // camera spate", "oprește camera", "zoom 2x"). Client-handled via
