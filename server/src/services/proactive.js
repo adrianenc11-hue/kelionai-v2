@@ -63,6 +63,34 @@ function composeMessage(memoryItem) {
   }
 }
 
+// Global flag to ensure we only alert once per server lifecycle
+let _gemma4AlertSent = false;
+async function checkGemma4Availability() {
+  if (_gemma4AlertSent) return null;
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return null;
+  try {
+    const fetchImpl = typeof globalThis.fetch === 'function' ? globalThis.fetch : (await import('node-fetch')).default;
+    const res = await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const models = data.models || [];
+    // We check if any Gemma 4 model supports BidiGenerateContent (Live WebSocket)
+    const gemmaLive = models.find(m => 
+      m.name.toLowerCase().includes('gemma-4') && 
+      (m.supportedGenerationMethods || []).includes('bidiGenerateContent')
+    );
+    if (gemmaLive) {
+      _gemma4AlertSent = true;
+      console.log('🚨 [PROACTIVE] GEMMA 4 NATIVE AUDIO IS AVAILABLE! 🚨', gemmaLive.name);
+      return { title: 'Kelion AI Update', body: `Gemma 4 is ready for full voice replacement! Model: ${gemmaLive.displayName || gemmaLive.name}`, reason: 'system_alert:gemma4' };
+    }
+  } catch (err) {
+    // Ignore fetch errors to not pollute logs
+  }
+  return null;
+}
+
 async function runOnce({ webpush, now = new Date() } = {}) {
   if (!webpush) return { skipped: 'no-webpush' };
   if (!withinQuietHours(now)) return { skipped: 'quiet-hours', hour: now.getUTCHours() };
@@ -75,12 +103,20 @@ async function runOnce({ webpush, now = new Date() } = {}) {
   }
 
   const report = { users_considered: byUser.size, sent: 0, skipped_gap: 0, no_memory: 0, failed: 0 };
+  
+  // 1. Check for systemic alerts (like Gemma 4 Availability)
+  const systemAlertMsg = await checkGemma4Availability();
+
   for (const [userId, userSubs] of byUser) {
-    const recent = await recentProactiveForUser(userId, MIN_GAP_MS);
-    if (recent.length > 0) { report.skipped_gap += 1; continue; }
-    const mem = await pickMemoryForUser(userId);
-    if (!mem) { report.no_memory += 1; continue; }
-    const msg = composeMessage(mem);
+    let msg = systemAlertMsg;
+    if (!msg) {
+      const recent = await recentProactiveForUser(userId, MIN_GAP_MS);
+      if (recent.length > 0) { report.skipped_gap += 1; continue; }
+      const mem = await pickMemoryForUser(userId);
+      if (!mem) { report.no_memory += 1; continue; }
+      msg = composeMessage(mem);
+    }
+    
     const payload = JSON.stringify({ title: msg.title, body: msg.body, url: '/' });
     let delivered = false;
     for (const s of userSubs) {
