@@ -449,14 +449,7 @@ const KELION_TOOLS = [
     },
     required: ['mode'],
   },
-  {
-    name: 'deep_think',
-    description: "DELEGATE TO GEMMA 4 (EXPERT BRAIN): Call this tool when the user asks a highly complex question requiring deep reasoning, advanced math, long-form coding, or deep logical analysis. Do NOT answer complex problems yourself — delegate them to the Gemma 4 reasoning engine. Provide the user's full request and any necessary context. You will receive the expert's answer, which you should then present/read to the user.",
-    properties: {
-      prompt: { type: 'string', description: 'The detailed prompt, question, or problem to be analyzed by the Gemma 4 deep-thinking model.' },
-    },
-    required: ['prompt'],
-  },
+
   {
     name: 'show_on_monitor',
 
@@ -1727,7 +1720,7 @@ router.post('/pipeline', async (req, res) => {
     // Build tools in Gemini format
     const geminiTools = buildKelionToolsGemini();
 
-    const chatModel = process.env.GEMINI_CHAT_MODEL || 'gemini-3.1-pro-preview';
+    const chatModel = process.env.GEMMA_4_MODEL_ID || process.env.GEMINI_CHAT_MODEL || 'gemini-2.5-pro';
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${chatModel}:generateContent?key=${apiKey}`;
 
     const body = {

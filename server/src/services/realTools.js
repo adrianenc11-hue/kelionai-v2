@@ -2783,7 +2783,7 @@ async function executeRealTool(name, args, ctx) {
     case 'read_email':        return toolReadEmail(a, ctx);
     case 'search_files':      return toolSearchFiles(a, ctx);
     // ── Gemma 4 Deep Reasoning ──
-    case 'deep_think':        return toolDeepThink(a, ctx);
+
     default:                  return null; // signal "not handled here"
   }
 }
@@ -2950,55 +2950,7 @@ async function toolLearnFromObservation(args, ctx) {
   }
 }
 
-// Gemma 4 Deep Reasoning — acts as the "Brain" for highly complex logic.
-// The actual Vertex AI / Google AI endpoint for gemma-4-31b-dense.
-async function toolDeepThink(args, ctx) {
-  const prompt = typeof args?.prompt === 'string' ? args.prompt.trim() : '';
-  if (!prompt) return { ok: false, error: 'A prompt is required for deep thinking.' };
 
-  const apiKey = process.env.GEMINI_API_KEY; // Using AI Studio key for now
-  if (!apiKey) {
-    return { ok: false, unavailable: true, error: 'API key not configured.' };
-  }
-
-  try {
-    // In production, this would point to Vertex AI or Google AI Studio gemma-4 endpoint.
-    // For now we map to the closest text model on AI Studio if Gemma 4 isn't exposed yet.
-    // Using gemini-2.5-pro as a fallback if gemma-4 is not yet deployed on the specific project.
-    const modelId = process.env.GEMMA_4_MODEL_ID || 'gemini-2.5-pro';
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
-    
-    const reqBody = {
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: {
-        // Enforce Gemma 4's "Thinking Mode" equivalent (temperature 0.0 for pure logic)
-        temperature: 0.1, 
-        maxOutputTokens: 8192,
-      }
-    };
-
-    const res = await fetchWithTimeout(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(reqBody)
-    }, 45000); // 45 seconds timeout for deep thinking
-
-    if (!res.ok) {
-      const errTxt = await res.text().catch(() => '');
-      return { ok: false, error: `Gemma 4 reasoning failed: ${res.status} ${errTxt}` };
-    }
-
-    const data = await res.json();
-    const answer = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!answer) {
-      return { ok: false, error: 'Gemma 4 returned an empty response.' };
-    }
-
-    return { ok: true, result: answer.trim() };
-  } catch (err) {
-    return { ok: false, error: `Gemma 4 reasoning crashed: ${err.message}` };
-  }
-}
 
 // PR #8/N — Memory of Actions. Self-reflection tool: lets Kelion read
 // back its own recent tool calls for the signed-in user so it can
@@ -3064,8 +3016,6 @@ const REAL_TOOL_NAMES = [
   'remember_fact',
   // Live radio streaming via radio-browser.info
   'play_radio',
-  // Deep reasoning with Gemma 4
-  'deep_think',
 ];
 
 module.exports = {
@@ -3141,5 +3091,5 @@ module.exports = {
   storeTempFile,
   getTempFile,
   // Gemma 4 Deep Reasoning
-  toolDeepThink,
+
 };

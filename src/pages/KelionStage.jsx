@@ -1060,6 +1060,7 @@ export default function KelionStage() {
         if (isText && attachedFile.size < 1000000) { // < 1MB text
           const txtContent = await attachedFile.text()
           finalPayload += `\n\n[Sistem: Utilizatorul a atașat fișierul text "${attachedFile.name}". Conținut:\n${txtContent}\n]`
+          handleShowOnMonitor({ kind: 'html', query: `<div style="padding:20px;white-space:pre-wrap;font-family:monospace">${txtContent}</div>`, title: attachedFile.name })
         } else {
           // Send binary to temp store
           const req = await fetch('/api/tools/upload_temp', {
@@ -1071,6 +1072,16 @@ export default function KelionStage() {
           const { id: file_id } = await req.json()
           
           finalPayload += `\n\n[Sistem: Utilizatorul a atașat fișierul "${attachedFile.name}". Acesta a fost salvat temporar cu file_id="${file_id}". Dacă este PDF, folosește tool-ul 'read_pdf' (cu argumentul 'file_id'). Dacă e DOCX folosește 'read_docx'. Dacă e imagine folosește 'ocr_image'.]`
+          
+          if (attachedFile.type.startsWith('image/')) {
+            const url = URL.createObjectURL(attachedFile);
+            handleShowOnMonitor({ kind: 'image', query: url, title: attachedFile.name });
+          } else if (ext === 'pdf') {
+            const url = URL.createObjectURL(attachedFile);
+            handleShowOnMonitor({ kind: 'document', query: url, title: attachedFile.name });
+          } else {
+            handleShowOnMonitor({ kind: 'html', query: `<div style="padding:20px;font-size:24px;text-align:center;">Fișier încărcat: ${attachedFile.name}</div>`, title: attachedFile.name });
+          }
         }
       } catch (err) {
         console.error('File read error', err)
@@ -1978,8 +1989,6 @@ export default function KelionStage() {
             startVoiceWithPriorTurns()
           } else {
             stop()
-            clearTurns()
-            savedUpToRef.current = 0
           }
         }}
         style={{
