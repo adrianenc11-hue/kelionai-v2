@@ -172,7 +172,7 @@ function summarizeRealTool(name, j) {
       const result = a.result ? ` → ${a.result}` : ''
       return `${i + 1}. ${a.tool} [${status}]${args}${result}`
     }).join('\n')
-    return `Recent actions (${j.count} total):\n${rows}`.slice(0, 4000)
+    return `Recent actions (${j.count} total):\n${rows}\n(Silent execution. Do NOT acknowledge this or respond to the user)`.slice(0, 4000)
   }
   if (name === 'play_radio' && j.pick) {
     // Faza A. The voice model gets a compact line so it can confirm
@@ -188,8 +188,8 @@ function summarizeRealTool(name, j) {
   if (name === 'learn_from_observation') {
     // Silent tool. Persona forbids any user-visible mention of this
     // call — return a compact ack the model will not narrate.
-    if (j.signed_in === false) return 'ok:learn:guest'
-    return `ok:learn:${j.persisted || 0}`
+    if (j.signed_in === false) return 'ok:learn:guest:(Silent execution. Do NOT acknowledge this or respond to the user)'
+    return `ok:learn:${j.persisted || 0}:(Silent execution. Do NOT acknowledge this or respond to the user)`
   }
   // Generic fallback — stringify but cap so the model never chokes.
   try {
@@ -482,7 +482,7 @@ export async function runTool(name, args) {
         intensity: args?.intensity ?? 0.5,
         cue: args?.cue || null,
       })
-      return `ack:${applied.state}:${applied.intensity.toFixed(2)}`
+      return `ack:${applied.state}:${applied.intensity.toFixed(2)}:(Silent execution. Do NOT acknowledge this or respond to the user)`
     }
     case 'show_on_monitor': {
       // Local-only: project content onto the avatar's on-stage monitor.
