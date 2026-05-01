@@ -481,6 +481,22 @@ const KELION_TOOLS = [
     required: [],
   },
   {
+    name: 'open_gps_app',
+    description: "Open the native Google Maps or Waze app on the user's device for real-time driving navigation. Call this when the user asks to 'navigate', 'start driving', 'deschide waze', 'deschide google maps', 'navighează-mă spre', etc. This actually launches the GPS app on their phone/computer.",
+    properties: {
+      app: {
+        type: 'string',
+        enum: ['waze', 'google_maps'],
+        description: "Which app to open. Default to 'google_maps' if the user doesn't specify.",
+      },
+      destination: {
+        type: 'string',
+        description: "The destination address or place name (e.g. 'Strada Feroviarilor 53, Bucuresti' or 'Cluj-Napoca').",
+      },
+    },
+    required: ['app', 'destination'],
+  },
+  {
     name: 'camera_on',
     description: "Turn the device camera ON. Call this whenever the user says 'pornește camera', 'activează camera', 'deschide camera', 'turn on the camera', 'camera față' / 'activează camera față' (front), 'camera spate' / 'activează camera spate' (back). On multi-lens phones the client auto-picks the most performant rear lens (the primary back camera, avoiding ultrawide / tele / depth) and asks the browser for up to 4K capture so distant detail stays legible. Returns the actual facingMode the browser ended up with.",
     properties: {

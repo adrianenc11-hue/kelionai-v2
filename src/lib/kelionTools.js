@@ -637,6 +637,25 @@ function download(){
       }
       return `ok:voice_mode:${next}`
     }
+    case 'open_gps_app': {
+      const app = args?.app || 'google_maps'
+      const dest = args?.destination
+      if (!dest) return 'Error: no destination provided.'
+      
+      let url = ''
+      if (app === 'waze') {
+        url = `https://waze.com/ul?q=${encodeURIComponent(dest)}&navigate=yes`
+      } else {
+        url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(dest)}`
+      }
+      
+      try {
+        window.open(url, '_blank')
+      } catch (e) {
+        return `Error opening app: ${e.message}`
+      }
+      return `ok:opened_${app}`
+    }
     case 'get_my_location': {
       // Client-side GPS — on mobile this hits real GPS, on desktop the OS
       // WiFi-fused location. KelionStage registered a provider via
