@@ -1721,7 +1721,7 @@ export default function KelionStage() {
           Shows the last user utterance + the streaming assistant reply.
           Auto-hides 8s after the last turn.
           ISOLATED: text chat disabled — live voice only. */}
-      {false && turns.length > 0 && bubbleVisible && (() => {
+      {turns.length > 0 && bubbleVisible && (() => {
         const lastAssistant = [...turns].reverse().find((t) => t.role === 'assistant')
         const lastUser = [...turns].reverse().find((t) => t.role === 'user')
         return (
@@ -1746,7 +1746,7 @@ export default function KelionStage() {
               zIndex: bottomZIndex || 4,
             }}
           >
-            {lastUser && lastUser.text && (
+            {lastUser && (lastUser.text || lastUser.transcript) && (
               <div style={{
                 alignSelf: 'flex-end', maxWidth: '88%',
                 padding: '8px 12px', borderRadius: 12,
@@ -1755,9 +1755,9 @@ export default function KelionStage() {
                 fontSize: 13,
                 wordBreak: 'break-word',
                 overflowWrap: 'anywhere',
-              }}>{lastUser.text}</div>
+              }}>{lastUser.text || lastUser.transcript}</div>
             )}
-            {lastAssistant && lastAssistant.text && (
+            {lastAssistant && (lastAssistant.text || lastAssistant.transcript) && (
               <div style={{
                 alignSelf: 'flex-start', maxWidth: '92%',
                 padding: '8px 12px', borderRadius: 12,
@@ -1766,7 +1766,7 @@ export default function KelionStage() {
                 whiteSpace: 'pre-wrap',
                 wordBreak: 'break-word',
                 overflowWrap: 'anywhere',
-              }}>{lastAssistant.text}</div>
+              }}>{lastAssistant.text || lastAssistant.transcript}</div>
             )}
             {!lastAssistant && status === 'thinking' && (
               <div style={{
@@ -2289,7 +2289,9 @@ export default function KelionStage() {
 
           {/* ISOLATED: screen share hidden — AI will trigger automatically or hidden from menu */}
 
-          {/* ISOLATED: transcript toggle hidden — live voice only */}
+          <MenuItem onClick={() => { setTranscriptOpen(true); setMenuOpen(false) }}>
+            Transcript
+          </MenuItem>
           <MenuItem onClick={() => { navigate('/contact'); setMenuOpen(false) }}>
             {t('contactUs')}
           </MenuItem>
@@ -2488,9 +2490,8 @@ export default function KelionStage() {
 
       {/* Transcript drawer — opt-in, has X + backdrop + ESC to close.
           Previously the only way to close it was to re-open the ? menu
-          and pick "Hide transcript", which was not discoverable.
-          ISOLATED: transcript disabled — live voice only. */}
-      {false && transcriptOpen && (
+          and pick "Hide transcript", which was not discoverable. */}
+      {transcriptOpen && (
         <div
           onClick={() => setTranscriptOpen(false)}
           style={{
@@ -2500,7 +2501,7 @@ export default function KelionStage() {
           }}
         />
       )}
-      {false && transcriptOpen && (
+      {transcriptOpen && (
         <div
           onClick={(e) => e.stopPropagation()}
           style={{
@@ -2513,6 +2514,8 @@ export default function KelionStage() {
             overflowY: 'auto',
             fontFamily: 'system-ui, -apple-system, sans-serif',
             zIndex: 24,
+            userSelect: 'text',
+            WebkitUserSelect: 'text',
           }}
         >
           <div style={{
@@ -2520,14 +2523,32 @@ export default function KelionStage() {
             marginBottom: 12,
           }}>
             <div style={{ fontSize: 11, opacity: 0.6, letterSpacing: '0.15em' }}>TRANSCRIPT</div>
-            <button
-              onClick={() => setTranscriptOpen(false)}
-              style={{
-                background: 'transparent', border: 'none', color: '#ede9fe',
-                fontSize: 20, cursor: 'pointer', opacity: 0.7,
-              }}
-              aria-label="Close transcript"
-            >×</button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              {turns.length > 0 && (
+                <button
+                  onClick={() => {
+                    const text = turns.map(t => `${t.role === 'user' ? 'YOU' : 'KELION'}:\n${t.text || t.transcript || '...'}`).join('\n\n')
+                    navigator.clipboard.writeText(text).catch(() => {})
+                    // Optional visual feedback could go here
+                  }}
+                  style={{
+                    background: 'rgba(167, 139, 250, 0.15)', border: '1px solid rgba(167, 139, 250, 0.3)',
+                    color: '#ede9fe', fontSize: 12, padding: '4px 8px', borderRadius: 6,
+                    cursor: 'pointer', transition: 'background 0.2s'
+                  }}
+                >
+                  Copy All
+                </button>
+              )}
+              <button
+                onClick={() => setTranscriptOpen(false)}
+                style={{
+                  background: 'transparent', border: 'none', color: '#ede9fe',
+                  fontSize: 20, cursor: 'pointer', opacity: 0.7,
+                }}
+                aria-label="Close transcript"
+              >×</button>
+            </div>
           </div>
           {turns.length === 0 && (
             <div style={{ opacity: 0.5, fontSize: 14 }}>Conversation will appear here.</div>
@@ -2540,10 +2561,11 @@ export default function KelionStage() {
               borderLeft: `2px solid ${t.role === 'user' ? '#a78bfa' : '#60a5fa'}`,
               fontSize: 14, lineHeight: 1.5,
             }}>
-              <div style={{ fontSize: 10, opacity: 0.55, marginBottom: 4, letterSpacing: '0.1em' }}>
-                {t.role === 'user' ? 'YOU' : 'KELION'}
+              <div style={{ fontSize: 10, opacity: 0.55, marginBottom: 4, letterSpacing: '0.1em', display: 'flex', justifyContent: 'space-between' }}>
+                <span>{t.role === 'user' ? 'YOU' : 'KELION'}</span>
+                {isAdmin && t.source && <span style={{ opacity: 0.8, color: t.role === 'user' ? '#d8b4fe' : '#93c5fd', fontWeight: 500 }}>{t.source}</span>}
               </div>
-              {t.text || <i style={{ opacity: 0.4 }}>…</i>}
+              {t.text || t.transcript || <i style={{ opacity: 0.4 }}>…</i>}
             </div>
           ))}
         </div>
