@@ -222,7 +222,7 @@ function MonitorOverlay() {
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>
 
 <style>
-  ${m.kind === 'map' ? `
+  ${(m.kind === 'map' || m.kind === 'route' || (m.kind === 'html' && m.src && (m.src.includes('L.map') || m.src.includes('leaflet')))) ? `
   body { margin: 0; padding: 0; background: #0d0b1d; overflow: hidden; }
   ` : `
   * { box-sizing: border-box; margin: 0; padding: 0; }
