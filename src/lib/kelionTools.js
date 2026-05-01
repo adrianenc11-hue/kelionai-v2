@@ -643,18 +643,36 @@ function download(){
       if (!dest) return 'Error: no destination provided.'
       
       let url = ''
+      let appName = ''
       if (app === 'waze') {
         url = `https://waze.com/ul?q=${encodeURIComponent(dest)}&navigate=yes`
+        appName = 'Waze'
       } else {
         url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(dest)}`
+        appName = 'Google Maps'
       }
       
-      try {
-        window.open(url, '_blank')
-      } catch (e) {
-        return `Error opening app: ${e.message}`
-      }
-      return `ok:opened_${app}`
+      const html = `
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;background:#0a0a0f;color:white;font-family:sans-serif;text-align:center;padding:20px;">
+          <div style="background:#1c1c28;padding:40px;border-radius:24px;box-shadow:0 10px 30px rgba(0,0,0,0.5);max-width:90%;">
+            <div style="font-size:48px;margin-bottom:20px;">🚗</div>
+            <h2 style="margin:0 0 10px 0;font-size:24px;">Traseu pregătit</h2>
+            <p style="color:#a1a1aa;margin:0 0 30px 0;font-size:16px;">Către: <strong>${dest.replace(/</g, '&lt;')}</strong></p>
+            <a href="${url}" target="_blank" style="display:inline-block;background:#3b82f6;color:white;text-decoration:none;padding:16px 32px;border-radius:12px;font-size:18px;font-weight:bold;box-shadow:0 4px 15px rgba(59,130,246,0.4);transition:all 0.2s;">
+              Deschide în ${appName}
+            </a>
+            <p style="color:#71717a;margin-top:24px;font-size:12px;">Browser-ul necesită o atingere pentru a deschide aplicația.</p>
+          </div>
+        </div>
+      `;
+      
+      handleShowOnMonitor({
+        kind: 'html',
+        query: html,
+        title: `Navigare \u2014 ${appName}`
+      });
+      
+      return `ok:prepared_${app}_on_monitor`
     }
     case 'get_my_location': {
       // Client-side GPS — on mobile this hits real GPS, on desktop the OS
