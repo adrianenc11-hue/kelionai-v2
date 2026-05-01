@@ -1720,7 +1720,7 @@ router.post('/pipeline', async (req, res) => {
     const openRouterTools = buildKelionToolsChatCompletions();
 
     const openRouterKey = process.env.OPENROUTER_API_KEY || apiKey; // Fallback to process.env if needed, but we will add OPENROUTER_API_KEY to .env
-    const chatModel = process.env.OPENROUTER_MODEL || 'deepseek/deepseek-r1';
+    const chatModel = process.env.OPENROUTER_MODEL || 'deepseek/deepseek-r1:free';
     const url = 'https://openrouter.ai/api/v1/chat/completions';
 
     const body = {
