@@ -570,6 +570,40 @@ const KELION_TOOLS = [
   // plan_task REMOVED — Gemini Live handles multi-step planning
   // internally without a separate planner LLM.
   {
+    name: 'read_local_file',
+    description: "Read the content of a local file from the repository. Use this to inspect code, configuration, or text files.",
+    properties: {
+      path: { type: 'string', description: "Path to the file relative to the repository root (e.g. 'server/src/index.js')." },
+    },
+    required: ['path'],
+  },
+  {
+    name: 'list_local_files',
+    description: "List files and directories in a given path within the repository.",
+    properties: {
+      dir: { type: 'string', description: "Directory path relative to the repo root. Leave empty to list the root." },
+    },
+    required: [],
+  },
+  {
+    name: 'edit_local_file',
+    description: "Edit the content of a local file. Use this to fix bugs or update code. IMPORTANT: Provide the full new content or a precise replacement block.",
+    properties: {
+      path: { type: 'string', description: "Path to the file to edit." },
+      content: { type: 'string', description: "The new content to write to the file." },
+    },
+    required: ['path', 'content'],
+  },
+  {
+    name: 'create_github_pr',
+    description: "Commit the current local changes and create a Pull Request on GitHub. Use this after making edits to fix bugs.",
+    properties: {
+      title: { type: 'string', description: "Title of the Pull Request." },
+      body: { type: 'string', description: "Description of what was fixed." },
+    },
+    required: ['title', 'body'],
+  },
+  {
     name: 'get_action_history',
     description: "Look up your OWN recent tool calls for the signed-in user before deciding whether to re-run one. Call this whenever the user asks 'did you already …?' / 'ai făcut deja …?', whenever you're about to repeat an action that might have just happened (send the same email twice, re-open the same page on the monitor, re-run a search you already did this session), or at the start of a follow-up ask like 'fă din nou ce ai făcut înainte'. Returns an ordered list of previous tool invocations with short result summaries. Guests get { ok:false, signed_in:false } — in that case tell the user you can only remember actions once they sign in. Never invent a history: if this tool returns 0 rows, say honestly 'I haven't done anything like that yet'.",
     properties: {
