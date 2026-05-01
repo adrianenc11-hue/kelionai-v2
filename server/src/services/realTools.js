@@ -3305,10 +3305,6 @@ module.exports = {
   toolListLocalFiles,
   toolEditLocalFile,
   toolCreateGithubPr,
-  toolReadLocalFile,
-  toolListLocalFiles,
-  toolEditLocalFile,
-  toolCreateGithubPr,
   // F11 — image generation
   toolGenerateImage,
   // PR 8/N — Memory of Actions
