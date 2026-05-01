@@ -97,7 +97,7 @@ describe('extractFacts normalisation (Audit M9)', () => {
     const fetchMock = jest.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
-        candidates: [{ content: { parts: [{ text: rawText }] } }],
+        choices: [{ message: { content: rawText } }],
       }),
     });
     // eslint-disable-next-line no-global-assign
