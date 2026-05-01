@@ -1704,43 +1704,48 @@ router.post('/pipeline', async (req, res) => {
 
     const systemText = systemPrompt + '\n\nCRITICAL RULES:\n1. Maximum seriousness and professionalism at all times.\n2. NEVER fabricate, guess, or make up information. If you don\'t know something, USE YOUR TOOLS to find out.\n3. When asked about facts, news, people, places, events — ALWAYS use web_search or wikipedia_search to get real, current information. Do NOT answer from memory alone.\n4. Answer questions precisely and directly. No filler, no padding.\n5. Zero tolerance for hallucination or lies. If a tool search returns no results, say honestly that you couldn\'t find the information.\n6. You have tools: web_search, wikipedia_search, browse_web, calculate, get_weather, and many more. USE THEM proactively.';
 
-    // Build Gemini contents from history
-    const contents = [];
+    // Build messages in OpenAI/OpenRouter format
+    const messages = [{ role: 'system', content: systemText }];
     if (Array.isArray(history)) {
       for (const h of history.slice(-20)) {
-        const role = h.role === 'assistant' ? 'model' : 'user';
-        contents.push({ role, parts: [{ text: h.text || h.content || '' }] });
+        const role = h.role === 'model' ? 'assistant' : (h.role === 'assistant' ? 'assistant' : 'user');
+        messages.push({ role, content: h.text || h.content || '' });
       }
     }
     if (visionContext && typeof visionContext === 'string' && visionContext.trim()) {
-      contents.push({ role: 'user', parts: [{ text: `[Live camera feed observations: ${visionContext}]` }] });
+      messages.push({ role: 'user', content: `[Live camera feed observations: ${visionContext}]` });
     }
-    contents.push({ role: 'user', parts: [{ text: userText }] });
+    messages.push({ role: 'user', content: userText });
 
-    // Build tools in Gemini format
-    const geminiTools = buildKelionToolsGemini();
+    // Build tools in OpenAI format
+    const openRouterTools = buildKelionToolsChatCompletions();
 
-    const chatModel = process.env.GEMMA_4_MODEL_ID || process.env.GEMINI_CHAT_MODEL || 'gemini-2.5-pro';
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${chatModel}:generateContent?key=${apiKey}`;
+    const openRouterKey = process.env.OPENROUTER_API_KEY || apiKey; // Fallback to process.env if needed, but we will add OPENROUTER_API_KEY to .env
+    const chatModel = process.env.OPENROUTER_MODEL || 'deepseek/deepseek-r1:free';
+    const url = 'https://openrouter.ai/api/v1/chat/completions';
 
     const body = {
-      systemInstruction: { parts: [{ text: systemText }] },
-      contents,
-      tools: geminiTools,
-      generationConfig: {
-        temperature: 0.7,
-        maxOutputTokens: 2048,
-      },
+      model: chatModel,
+      messages,
+      tools: openRouterTools,
+      temperature: 0.6,
+      max_tokens: 4000,
     };
 
     let completion = await fetch(url, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${openRouterKey}`,
+        'HTTP-Referer': 'https://kelion.ai', // Optional but recommended by OpenRouter
+        'X-Title': 'Kelion AI'
+      },
       body: JSON.stringify(body),
     });
+    
     if (!completion.ok) {
       const errText = await completion.text();
-      throw new Error(`Gemini HTTP ${completion.status}: ${errText.slice(0, 300)}`);
+      throw new Error(`OpenRouter HTTP ${completion.status}: ${errText.slice(0, 300)}`);
     }
     let result = await completion.json();
 
@@ -1749,21 +1754,23 @@ router.post('/pipeline', async (req, res) => {
 
     // Tool call loop (up to 3 rounds)
     while (rounds < 3) {
-      const candidate = result?.candidates?.[0];
-      const parts = candidate?.content?.parts || [];
-      const fnCalls = parts.filter(p => p.functionCall);
-
-      if (fnCalls.length === 0) break;
+      const message = result.choices?.[0]?.message;
+      if (!message) break;
+      
+      const fnCalls = message.tool_calls;
+      if (!fnCalls || fnCalls.length === 0) break;
+      
       rounds++;
 
-      // Add model response to contents
-      contents.push({ role: 'model', parts });
+      // Add assistant message with tool calls to history
+      messages.push(message);
 
       // Execute each tool call
-      const toolResultParts = [];
       for (const fc of fnCalls) {
-        const name = fc.functionCall.name;
-        const args = fc.functionCall.args || {};
+        if (fc.type !== 'function') continue;
+        const name = fc.function.name;
+        let args = {};
+        try { args = JSON.parse(fc.function.arguments || '{}'); } catch(e){}
         toolCalls.push({ name, args });
 
         let toolResult = { status: 'tool_not_found' };
@@ -1779,35 +1786,39 @@ router.post('/pipeline', async (req, res) => {
           toolResult = { error: err.message };
         }
 
-        toolResultParts.push({
-          functionResponse: {
-            name,
-            response: toolResult || { ok: true },
-          },
+        // Add tool result to messages
+        messages.push({
+          role: 'tool',
+          tool_call_id: fc.id,
+          name: name,
+          content: JSON.stringify(toolResult || { ok: true })
         });
       }
 
-      // Add tool results to contents
-      contents.push({ role: 'user', parts: toolResultParts });
-
-      // Re-call Gemini with tool results
-      body.contents = contents;
+      // Re-call OpenRouter with tool results
+      body.messages = messages;
       completion = await fetch(url, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${openRouterKey}`,
+          'HTTP-Referer': 'https://kelion.ai',
+          'X-Title': 'Kelion AI'
+        },
         body: JSON.stringify(body),
       });
       if (!completion.ok) {
         const errText = await completion.text();
-        throw new Error(`Gemini tool-round HTTP ${completion.status}: ${errText.slice(0, 300)}`);
+        throw new Error(`OpenRouter tool-round HTTP ${completion.status}: ${errText.slice(0, 300)}`);
       }
       result = await completion.json();
     }
 
     // Extract final text
-    const finalParts = result?.candidates?.[0]?.content?.parts || [];
-    const assistantText = finalParts.map(p => p.text || '').join('').trim();
-    console.log('[pipeline] Gemini:', assistantText.slice(0, 100));
+    const finalMessage = result.choices?.[0]?.message;
+    // For DeepSeek Reasoner, the thinking process might be in finalMessage.reasoning_content, we only return content
+    const assistantText = (finalMessage?.content || '').trim();
+    console.log('[pipeline] OpenRouter:', assistantText.slice(0, 100));
 
     return res.json({
       ok: true,

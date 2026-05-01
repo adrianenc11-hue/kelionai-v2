@@ -3092,6 +3092,4 @@ module.exports = {
   // Memory files
   storeTempFile,
   getTempFile,
-  // Gemma 4 Deep Reasoning
-
 };

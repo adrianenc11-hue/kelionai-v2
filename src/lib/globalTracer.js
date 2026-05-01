@@ -1,6 +1,8 @@
 export function installGlobalTracers() {
-  return;
-  if (window.__TRACERS_INSTALLED) return;  const getStackTrace = () => {
+  if (window.__TRACERS_INSTALLED) return;
+  window.__TRACERS_INSTALLED = true;
+
+  const getStackTrace = () => {
     try {
       const err = new Error();
       const stack = err.stack || '';
