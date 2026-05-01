@@ -604,6 +604,31 @@ const KELION_TOOLS = [
     required: ['title', 'body'],
   },
   {
+    name: 'run_terminal_command',
+    description: "Execute a command in the local terminal. Use this to run tests (e.g. 'npm test'), install packages, or build the project. The working directory is the repository root. You have 30s timeout.",
+    properties: {
+      command: { type: 'string', description: "The shell command to execute." },
+    },
+    required: ['command'],
+  },
+  {
+    name: 'ask_expert_coder',
+    description: "Consult an expert coding model (Qwen 2.5 Coder 32B) on OpenRouter to solve complex programming problems, bugs, or architecture questions you are unsure about. Provide it with the context and the exact question.",
+    properties: {
+      question: { type: 'string', description: "The exact problem or question for the expert." },
+      context: { type: 'string', description: "Relevant code snippets, error messages, or file contents." },
+    },
+    required: ['question', 'context'],
+  },
+  {
+    name: 'fetch_documentation',
+    description: "Fetch and read the documentation of any API or tool from the web, cleanly converted to Markdown by Jina AI. Use this when you need to learn how a 3rd party tool works.",
+    properties: {
+      url: { type: 'string', description: "The URL of the documentation to read." },
+    },
+    required: ['url'],
+  },
+  {
     name: 'get_action_history',
     description: "Look up your OWN recent tool calls for the signed-in user before deciding whether to re-run one. Call this whenever the user asks 'did you already …?' / 'ai făcut deja …?', whenever you're about to repeat an action that might have just happened (send the same email twice, re-open the same page on the monitor, re-run a search you already did this session), or at the start of a follow-up ask like 'fă din nou ce ai făcut înainte'. Returns an ordered list of previous tool invocations with short result summaries. Guests get { ok:false, signed_in:false } — in that case tell the user you can only remember actions once they sign in. Never invent a history: if this tool returns 0 rows, say honestly 'I haven't done anything like that yet'.",
     properties: {

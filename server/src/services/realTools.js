@@ -2814,7 +2814,68 @@ const _util = require('util');
 const _exec = _util.promisify(_cp.exec);
 
 // Path to the repository root
-const REPO_ROOT = _path.resolve(__dirname, '../../../../');
+const REPO_ROOT = _path.resolve(__dirname, '../../../');
+
+async function toolRunTerminalCommand(args) {
+  try {
+    const cmd = String(args?.command || '').trim();
+    if (!cmd) return { ok: false, error: 'No command provided' };
+    
+    // Safety check: block extremely dangerous commands
+    if (cmd.includes('rm -rf /') || cmd.includes('mkfs')) {
+      return { ok: false, error: 'Command blocked for security reasons.' };
+    }
+
+    const { stdout, stderr } = await _exec(cmd, { cwd: REPO_ROOT, timeout: 30000 });
+    return { ok: true, stdout: stdout.slice(0, 5000), stderr: stderr.slice(0, 5000) };
+  } catch (err) {
+    return { ok: false, error: err.message, stdout: err.stdout, stderr: err.stderr };
+  }
+}
+
+async function toolAskExpertCoder(args) {
+  try {
+    const question = String(args?.question || '');
+    const context = String(args?.context || '');
+    if (!question) return { ok: false, error: 'Question is required' };
+    
+    const OR_KEY = process.env.OPENROUTER_API_KEY;
+    if (!OR_KEY) return { ok: false, error: 'OPENROUTER_API_KEY is not set' };
+
+    const prompt = `You are an expert coder. Answer the question precisely.\n\nContext:\n${context}\n\nQuestion:\n${question}`;
+    
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OR_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'qwen/qwen-2.5-coder-32b-instruct',
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    
+    const data = await res.json();
+    if (data.error) return { ok: false, error: data.error.message };
+    return { ok: true, answer: data.choices[0].message.content };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
+async function toolFetchDocumentation(args) {
+  try {
+    const url = String(args?.url || '');
+    if (!url || !url.startsWith('http')) return { ok: false, error: 'Valid URL is required' };
+    
+    const res = await fetch(`https://r.jina.ai/${url}`);
+    const text = await res.text();
+    return { ok: true, content: text.slice(0, 15000) };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
 
 async function toolListLocalFiles(args) {
   try {
@@ -2983,6 +3044,10 @@ async function executeRealTool(name, args, ctx) {
     case 'list_local_files':  return toolListLocalFiles(a);
     case 'edit_local_file':   return toolEditLocalFile(a);
     case 'create_github_pr':  return toolCreateGithubPr(a);
+    // ── Agentic Expert Tools ──
+    case 'run_terminal_command': return toolRunTerminalCommand(a);
+    case 'ask_expert_coder':     return toolAskExpertCoder(a);
+    case 'fetch_documentation':  return toolFetchDocumentation(a);
     // ── PR C — sandbox + regex + user-intern ──
     case 'run_regex':         return toolRunRegex(a);
     case 'run_code':          return toolRunCode(a);
@@ -3225,6 +3290,8 @@ const REAL_TOOL_NAMES = [
   // PR D — communications + automations + package info
   'send_email', 'send_sms', 'create_calendar_ics', 'zapier_trigger',
   'github_repo_info', 'get_github_issues', 'list_github_repo_files', 'read_github_file', 'npm_package_info', 'pypi_package_info',
+  // Agentic Expert Tools
+  'run_terminal_command', 'ask_expert_coder', 'fetch_documentation',
   // F11 — image generation
   'generate_image',
   // PR 8/N — Memory of Actions. Read-only self-reflection: returns the
@@ -3305,6 +3372,9 @@ module.exports = {
   toolListLocalFiles,
   toolEditLocalFile,
   toolCreateGithubPr,
+  toolRunTerminalCommand,
+  toolAskExpertCoder,
+  toolFetchDocumentation,
   // F11 — image generation
   toolGenerateImage,
   // PR 8/N — Memory of Actions
