@@ -70,7 +70,8 @@ const REAL_TOOL_NAMES = new Set([
   'run_code',
   'read_pdf', 'read_docx', 'ocr_image', 'ocr_passport',
   'send_email', 'create_calendar_ics', 'zapier_trigger',
-  'github_repo_info', 'npm_package_info', 'pypi_package_info',
+  'github_repo_info', 'get_github_issues', 'list_github_repo_files', 'read_github_file', 'npm_package_info', 'pypi_package_info',
+  'read_local_file', 'list_local_files', 'edit_local_file', 'create_github_pr',
   'run_regex', 'get_my_credits', 'get_my_usage', 'get_my_profile',
   'generate_image',
   // PR 8/N — Memory of Actions.
@@ -161,6 +162,18 @@ function summarizeRealTool(name, j) {
   }
   if (name === 'translate' && j.translated) {
     return j.translated
+  }
+  if (name === 'read_local_file' && j.content) {
+    return `File ${j.path} content:\n${j.content}`.slice(0, 10000)
+  }
+  if (name === 'list_local_files' && j.files) {
+    return `Files in ${j.dir || 'root'}:\n${j.files.slice(0, 100).join('\n')}`
+  }
+  if (name === 'edit_local_file') {
+    return j.ok ? `File ${j.path} updated successfully.` : `Edit failed: ${j.error}`
+  }
+  if (name === 'create_github_pr') {
+    return j.ok ? `PR Created: ${j.url}` : `PR failed: ${j.error}`
   }
   if (name === 'get_action_history' && Array.isArray(j.actions)) {
     if (!j.actions.length) {
