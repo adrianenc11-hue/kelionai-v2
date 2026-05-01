@@ -166,7 +166,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
   const TOOL_LOOP_MAX = 3
   const TOOL_LOOP_WINDOW_MS = 5000
 
-  const appendTurn = useCallback((role, delta, finalize = false) => {
+  const appendTurn = useCallback((role, delta, finalize = false, source = null) => {
     // When a role speaks, finalize the OTHER role's bubble so they don't merge infinitely.
     turnActiveRef.current[role === 'user' ? 'assistant' : 'user'] = null;
     
@@ -175,10 +175,11 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
       if (active !== null && prev[active] && prev[active].role === role) {
         const next = [...prev]
         next[active] = { role, text: (next[active].text || '') + (delta || '') }
+        if (source && !next[active].source) next[active].source = source
         if (finalize) turnActiveRef.current[role] = null
         return next
       }
-      const next = [...prev, { role, text: delta || '' }]
+      const next = [...prev, { role, text: delta || '', source }]
       turnActiveRef.current[role] = next.length - 1
       if (finalize) turnActiveRef.current[role] = null
       return next
@@ -371,7 +372,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
           logAiEvent('transcript_in', { text: sc.inputTranscription.text, source: 'narration-synthetic-skipped' })
         } else {
           userHasSpokenRef.current = true
-          appendTurn('user', sc.inputTranscription.text, false)
+          appendTurn('user', sc.inputTranscription.text, false, '🎤 Voice (Mic)')
           logAiEvent('transcript_in', { text: sc.inputTranscription.text })
           lastActivityAtRef.current = Date.now()
           // Detect language from what the user says (first word heuristic)
@@ -388,7 +389,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
           // Do NOT appendTurn or buffer for cloned TTS — the suppressed
           // turn must be invisible in the UI.
         } else {
-          appendTurn('assistant', sc.outputTranscription.text, false)
+          appendTurn('assistant', sc.outputTranscription.text, false, '🔊 AI Voice')
           logAiEvent('transcript_out', { text: sc.outputTranscription.text, source: 'gemini-live' })
           // Accumulate for cloned TTS flush on turnComplete
           if (isClonedVoiceActive()) {
@@ -441,7 +442,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
         // Resolve: if outputTranscription came → partText is redundant (no doubling).
         // If not → partText is the only text we have; show it + use for TTS.
         if (!hadTranscript && partText) {
-          appendTurn('assistant', partText, false)
+          appendTurn('assistant', partText, false, '💬 AI Text')
           if (isClonedVoiceActive()) {
             cloneTranscriptBufRef.current += partText
             console.log('[clonedTTS] using partText fallback:', partText.slice(0, 80))
@@ -475,7 +476,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
                 // Show error visibly so user knows why cloned voice failed
                 let reason = errText
                 try { reason = JSON.parse(errText)?.error || errText } catch {}
-                appendTurn('assistant', `⚠️ Voce clonată: ${reason || 'eroare necunoscută (HTTP ' + r.status + ')'}`, true)
+                appendTurn('assistant', `⚠️ Voce clonată: ${reason || 'eroare necunoscută (HTTP ' + r.status + ')'}`, true, '⚙️ System')
                 setStatus('listening')
                 return
               }
@@ -485,7 +486,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
 
               if (audioData.byteLength < 100) {
                 console.warn('[clonedTTS] audio response too small, likely empty')
-                appendTurn('assistant', `⚠️ Voce clonată: răspuns audio gol (${audioData.byteLength} bytes)`, true)
+                appendTurn('assistant', `⚠️ Voce clonată: răspuns audio gol (${audioData.byteLength} bytes)`, true, '⚙️ System')
                 setStatus('listening')
                 return
               }
@@ -523,7 +524,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
                 }
                 audioEl.onerror = (e) => {
                   console.error('[clonedTTS] audioEl error:', e)
-                  appendTurn('assistant', `⚠️ Voce clonată: eroare la redare audio`, true)
+                  appendTurn('assistant', `⚠️ Voce clonată: eroare la redare audio`, true, '⚙️ System')
                   URL.revokeObjectURL(blobUrl)
                   audioEl.src = ''
                   audioEl.srcObject = prevSrcObject
@@ -540,7 +541,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
                   fallback.onended = () => { URL.revokeObjectURL(blobUrl); setStatus('listening') }
                   fallback.play().catch((e2) => {
                     console.error('[clonedTTS] fallback play also failed:', e2?.message)
-                    appendTurn('assistant', `⚠️ Voce clonată: browser blochează redarea (${e2?.message})`, true)
+                    appendTurn('assistant', `⚠️ Voce clonată: browser blochează redarea (${e2?.message})`, true, '⚙️ System')
                     setStatus('listening')
                   })
                 })
@@ -552,7 +553,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
               }
             } catch (err) {
               console.error('[geminiLive] cloned TTS failed', err)
-              appendTurn('assistant', `⚠️ Voce clonată: ${err?.message || 'eroare de rețea'}`, true)
+              appendTurn('assistant', `⚠️ Voce clonată: ${err?.message || 'eroare de rețea'}`, true, '⚙️ System')
               setStatus('listening')
             }
           })()
@@ -575,7 +576,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
       // (audio narration is handled by the model itself per the persona).
       for (const fc of fcs) {
         logAiEvent('tool_call', { name: fc.name, args: fc.args })
-        appendTurn('assistant', `[tool: ${fc.name}]`, true)
+        appendTurn('assistant', `[tool: ${fc.name}]`, true, '⚙️ Tool Call')
       }
       try {
         const responses = await Promise.all(fcs.map(async (fc) => {
@@ -1510,7 +1511,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
     const clean = (text || '').trim()
     if (!clean) return
     userHasSpokenRef.current = true
-    appendTurn('user', clean, true)
+    appendTurn('user', clean, true, '⌨️ Keyboard')
     logAiEvent('text_sent', { text: clean })
     try {
       ws.send(JSON.stringify({
