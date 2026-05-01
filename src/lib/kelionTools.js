@@ -72,6 +72,7 @@ const REAL_TOOL_NAMES = new Set([
   'send_email', 'create_calendar_ics', 'zapier_trigger',
   'github_repo_info', 'get_github_issues', 'list_github_repo_files', 'read_github_file', 'npm_package_info', 'pypi_package_info',
   'read_local_file', 'list_local_files', 'edit_local_file', 'create_github_pr',
+  'run_terminal_command', 'ask_expert_coder', 'fetch_documentation',
   'run_regex', 'get_my_credits', 'get_my_usage', 'get_my_profile',
   'generate_image',
   // PR 8/N — Memory of Actions.
@@ -174,6 +175,15 @@ function summarizeRealTool(name, j) {
   }
   if (name === 'create_github_pr') {
     return j.ok ? `PR Created: ${j.url}` : `PR failed: ${j.error}`
+  }
+  if (name === 'run_terminal_command') {
+    return j.ok ? `Command executed. STDOUT:\n${j.stdout}\nSTDERR:\n${j.stderr}` : `Command failed: ${j.error}\nSTDOUT:\n${j.stdout}\nSTDERR:\n${j.stderr}`
+  }
+  if (name === 'ask_expert_coder') {
+    return j.ok ? `Expert Answer:\n${j.answer}` : `Expert failed: ${j.error}`
+  }
+  if (name === 'fetch_documentation') {
+    return j.ok ? `Documentation Content:\n${j.content}` : `Fetch failed: ${j.error}`
   }
   if (name === 'get_action_history' && Array.isArray(j.actions)) {
     if (!j.actions.length) {
