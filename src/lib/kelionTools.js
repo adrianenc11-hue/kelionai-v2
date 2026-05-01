@@ -672,7 +672,7 @@ function download(){
         title: `Navigare \u2014 ${appName}`
       });
       
-      return `ok:prepared_${app}_on_monitor`
+      return `Succes. Am afișat butonul de ${appName} pe monitor. Instruiește utilizatorul vocal să apese pe butonul de pe ecran pentru a lansa navigația. IMPORTANT: NU apela tu show_on_monitor, deoarece cardul este deja afișat!`
     }
     case 'get_my_location': {
       // Client-side GPS — on mobile this hits real GPS, on desktop the OS

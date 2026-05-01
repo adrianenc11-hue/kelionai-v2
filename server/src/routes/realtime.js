@@ -482,7 +482,7 @@ const KELION_TOOLS = [
   },
   {
     name: 'open_gps_app',
-    description: "Open the native Google Maps or Waze app on the user's device for real-time driving navigation. Call this when the user asks to 'navigate', 'start driving', 'deschide waze', 'deschide google maps', 'navighează-mă spre', etc. This actually launches the GPS app on their phone/computer.",
+    description: "Prepare the native Google Maps or Waze app for real-time driving navigation. Call this when the user asks to 'navigate', 'start driving', 'deschide waze', 'deschide google maps', 'navighează-mă spre', etc. IMPORTANT: This tool AUTOMATICALLY displays a launch button on the user's monitor. You MUST NOT call show_on_monitor yourself after calling this tool.",
     properties: {
       app: {
         type: 'string',
