@@ -107,8 +107,8 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc:  ["'self'", "'unsafe-inline'", "'wasm-unsafe-eval'", "blob:"],
-        styleSrc:   ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        scriptSrc:  ["'self'", "'unsafe-inline'", "'wasm-unsafe-eval'", "blob:", "https://unpkg.com", "https://cdn.jsdelivr.net"],
+        styleSrc:   ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://unpkg.com", "https://cdn.jsdelivr.net"],
         fontSrc:    ["'self'", "https://fonts.gstatic.com"],
         imgSrc:     ["'self'", "data:", "blob:", "https:"],
         connectSrc: ["'self'", "https://generativelanguage.googleapis.com", "wss://generativelanguage.googleapis.com", "https://raw.githack.com", "https://*.githubusercontent.com", "blob:", "https:", "wss:"],
