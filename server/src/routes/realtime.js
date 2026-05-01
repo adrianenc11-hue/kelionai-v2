@@ -1732,22 +1732,51 @@ router.post('/pipeline', async (req, res) => {
       max_tokens: 4000,
     };
 
-    let completion = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${openRouterKey}`,
-        'HTTP-Referer': 'https://kelion.ai', // Optional but recommended by OpenRouter
-        'X-Title': 'Kelion AI'
-      },
-      body: JSON.stringify(body),
-    });
-    
-    if (!completion.ok) {
-      const errText = await completion.text();
-      throw new Error(`OpenRouter HTTP ${completion.status}: ${errText.slice(0, 300)}`);
+    let currentModel = chatModel;
+    let fallbackTriggered = false;
+
+    async function fetchOpenRouter(reqBody) {
+      reqBody.model = currentModel;
+      let r = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${openRouterKey}`,
+          'HTTP-Referer': 'https://kelion.ai',
+          'X-Title': 'Kelion AI'
+        },
+        body: JSON.stringify(reqBody),
+      });
+
+      // If out of credits, fallback to free model
+      if (!r.ok && r.status === 402 && !fallbackTriggered) {
+        console.warn('[pipeline] OpenRouter 402 Payment Required. Falling back to free model.');
+        fallbackTriggered = true;
+        currentModel = 'meta-llama/llama-3.3-70b-instruct:free';
+        reqBody.model = currentModel;
+        
+        // Retry with free model
+        r = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${openRouterKey}`,
+            'HTTP-Referer': 'https://kelion.ai',
+            'X-Title': 'Kelion AI'
+          },
+          body: JSON.stringify(reqBody),
+        });
+      }
+
+      if (!r.ok) {
+        const errText = await r.text();
+        throw new Error(`OpenRouter HTTP ${r.status}: ${errText.slice(0, 300)}`);
+      }
+
+      return await r.json();
     }
-    let result = await completion.json();
+
+    let result = await fetchOpenRouter(body);
 
     const toolCalls = [];
     let rounds = 0;
@@ -1797,27 +1826,16 @@ router.post('/pipeline', async (req, res) => {
 
       // Re-call OpenRouter with tool results
       body.messages = messages;
-      completion = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${openRouterKey}`,
-          'HTTP-Referer': 'https://kelion.ai',
-          'X-Title': 'Kelion AI'
-        },
-        body: JSON.stringify(body),
-      });
-      if (!completion.ok) {
-        const errText = await completion.text();
-        throw new Error(`OpenRouter tool-round HTTP ${completion.status}: ${errText.slice(0, 300)}`);
-      }
-      result = await completion.json();
+      result = await fetchOpenRouter(body);
     }
 
     // Extract final text
     const finalMessage = result.choices?.[0]?.message;
     // For DeepSeek Reasoner, the thinking process might be in finalMessage.reasoning_content, we only return content
-    const assistantText = (finalMessage?.content || '').trim();
+    let assistantText = (finalMessage?.content || '').trim();
+    if (fallbackTriggered) {
+      assistantText = "[SISTEM: Contul OpenRouter a rămas fără credit! Am trecut automat pe modelul gratuit Llama.]\n" + assistantText;
+    }
     console.log('[pipeline] OpenRouter:', assistantText.slice(0, 100));
 
     return res.json({
