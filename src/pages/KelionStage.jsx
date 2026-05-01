@@ -921,13 +921,37 @@ export default function KelionStage() {
   const liveSendTextRef = useRef(null)
   const sendTextMessage = useCallback(async () => {
     const text = chatInput.trim()
-    if (!text) return
-    applyMuteCommand(text)
+    if (!text && !attachedFile) return
+
+    let finalPayload = text
+    if (attachedFile) {
+      try {
+        const ext = attachedFile.name.split('.').pop().toLowerCase()
+        const isText = ['txt', 'md', 'csv', 'json', 'js', 'py', 'html', 'css', 'jsx', 'ts', 'tsx'].includes(ext)
+        
+        if (isText && attachedFile.size < 1000000) { // < 1MB text
+          const txtContent = await attachedFile.text()
+          finalPayload += `\n\n[Sistem: Utilizatorul a atașat fișierul text "${attachedFile.name}". Conținut:\n${txtContent}\n]`
+        } else {
+          const b64 = await new Promise((res, rej) => {
+            const r = new FileReader()
+            r.onload = () => res(r.result.split(',')[1])
+            r.onerror = rej
+            r.readAsDataURL(attachedFile)
+          })
+          finalPayload += `\n\n[Sistem: Utilizatorul a atașat fișierul "${attachedFile.name}". Ai mai jos conținutul în format base64. Dacă este PDF, folosește tool-ul 'read_pdf' (cu argumentul 'base64'). Dacă e DOCX folosește 'read_docx'. Dacă e imagine folosește 'ocr_image'. Pentru alte fișiere binare, poți folosi 'run_code' cu un script Python pentru a decoda și analiza acest string base64:\n\n${b64}\n]`
+        }
+      } catch (err) {
+        console.error('File read error', err)
+      }
+    }
+
+    applyMuteCommand(finalPayload)
     setChatError(null)
     setChatInput('')
     setAttachedFile(null)
-    if (liveSendTextRef.current) await liveSendTextRef.current(text)
-  }, [chatInput])
+    if (liveSendTextRef.current) await liveSendTextRef.current(finalPayload.trim())
+  }, [chatInput, attachedFile, applyMuteCommand])
 
   const micMouthOpen = useLipSync(audioRef)
 
@@ -1786,7 +1810,7 @@ export default function KelionStage() {
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*,application/pdf,text/plain,.txt,.md,.csv,.json"
+          accept="*/*"
           style={{ display: 'none' }}
           onChange={(e) => {
             const f = e.target.files && e.target.files[0]
