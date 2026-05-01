@@ -100,6 +100,13 @@ const EXPECTED_TOOL_NAMES = [
   // F11 — AI image generation (Gemini native). Graceful fallback when
   // GEMINI_API_KEY is absent.
   'generate_image',
+  // PR #388 — local file tools + GitHub PR creation. Lets the Kelion
+  // agent inspect the repo, edit files, and open a Pull Request after
+  // making changes.
+  'read_local_file',
+  'list_local_files',
+  'edit_local_file',
+  'create_github_pr',
   // PR #8/N — Memory of Actions. Read-only self-reflection tool: the
   // voice model queries action_history for the signed-in user before
   // repeating a tool call. Guests receive { ok:false, signed_in:false }.
