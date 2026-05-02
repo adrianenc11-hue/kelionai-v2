@@ -2973,6 +2973,29 @@ async function toolCreateGithubPr(args) {
   }
 }
 
+async function toolManageGithubPrs(args) {
+  try {
+    const action = args?.action;
+    const prNumber = args?.pr_number;
+    
+    if (action === 'list') {
+      const { stdout } = await _exec('gh pr list --state open --json number,title,url', { cwd: REPO_ROOT });
+      return { ok: true, prs: JSON.parse(stdout || '[]') };
+    } else if (action === 'merge') {
+      if (!prNumber) return { ok: false, error: 'pr_number is required to merge' };
+      const { stdout } = await _exec(`gh pr merge ${prNumber} --merge --admin`, { cwd: REPO_ROOT });
+      return { ok: true, result: stdout };
+    } else if (action === 'close') {
+      if (!prNumber) return { ok: false, error: 'pr_number is required to close' };
+      const { stdout } = await _exec(`gh pr close ${prNumber}`, { cwd: REPO_ROOT });
+      return { ok: true, result: stdout };
+    } else {
+      return { ok: false, error: 'Unknown action. Use list, merge, or close.' };
+    }
+  } catch (err) {
+    return { ok: false, error: 'GitHub CLI (gh) execution failed. You might need to authenticate using "gh auth login" in terminal. Details: ' + err.message };
+  }
+}
 // ──────────────────────────────────────────────────────────────────
 // Dispatch
 
@@ -3059,6 +3082,7 @@ async function executeRealTool(name, args, ctx) {
     case 'list_local_files':  return toolListLocalFiles(a);
     case 'edit_local_file':   return toolEditLocalFile(a);
     case 'create_github_pr':  return toolCreateGithubPr(a);
+    case 'manage_github_prs': return toolManageGithubPrs(a);
     // ── Agentic Expert Tools ──
     case 'run_terminal_command': return toolRunTerminalCommand(a);
     case 'ask_expert_coder':     return toolAskExpertCoder(a);

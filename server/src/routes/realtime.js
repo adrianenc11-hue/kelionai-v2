@@ -604,6 +604,15 @@ const KELION_TOOLS = [
     required: ['title', 'body'],
   },
   {
+    name: 'manage_github_prs',
+    description: "Manage GitHub Pull Requests. Allows you to list open PRs, merge PRs automatically, or close them.",
+    properties: {
+      action: { type: 'string', enum: ['list', 'merge', 'close'], description: "Action to perform." },
+      pr_number: { type: 'string', description: "The PR number to merge or close (e.g., '123'). Required for merge or close." },
+    },
+    required: ['action'],
+  },
+  {
     name: 'run_terminal_command',
     description: "Execute a command in the local terminal. You have UNIVERSAL WORKSPACE permissions. You can navigate anywhere using the cwd argument. Use this to create new apps (npx create-next-app), install packages, or deploy.",
     properties: {
