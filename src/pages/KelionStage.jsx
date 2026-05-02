@@ -2388,16 +2388,7 @@ export default function KelionStage() {
                   {t('installApp')}
                 </MenuItem>
               )}
-              {/* Admin-only — unified dashboard. One entry that opens the
-                  admin shell with tabs for Business, AI credits, Visitors,
-                  Users, and Payouts. Replaces the three separate menu
-                  entries that used to live here (2026-04-20 Adrian:
-                  "management de admin integrat intr-un singur buton"). */}
-              {isAdmin && (
-                <MenuItem onClick={() => { switchAdminTab('business'); setMenuOpen(false) }}>
-                  {t('adminDashboard')}
-                </MenuItem>
-              )}
+
               {/* Sign out moved to the top-right action bar. */}
             </>
           ) : (

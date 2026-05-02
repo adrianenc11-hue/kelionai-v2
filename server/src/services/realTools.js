@@ -2866,7 +2866,7 @@ async function toolAskExpertCoder(args) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'qwen/qwen-2.5-coder-32b-instruct',
+        model: args?.model || 'qwen/qwen-2.5-coder-32b-instruct',
         messages: [{ role: 'user', content: prompt }]
       })
     });
