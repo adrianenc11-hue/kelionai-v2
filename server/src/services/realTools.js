@@ -2892,6 +2892,27 @@ async function toolFetchDocumentation(args) {
   }
 }
 
+async function toolBrowseWeb(args) {
+  try {
+    const { task, start_url } = args || {};
+    let markdownContext = '';
+    let usedUrl = start_url;
+    if (start_url) {
+      const fetchReq = await fetch(`https://r.jina.ai/${encodeURIComponent(start_url)}`);
+      markdownContext = await fetchReq.text();
+    } else if (task) {
+      const fetchReq = await fetch(`https://s.jina.ai/${encodeURIComponent(task)}`);
+      markdownContext = await fetchReq.text();
+      usedUrl = 'Search Results';
+    } else {
+      return { ok: false, error: 'Either task or start_url is required' };
+    }
+    return { ok: true, url: usedUrl, content: markdownContext.slice(0, 15000) };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
 async function toolListLocalFiles(args) {
   try {
     const dir = String(args?.dir || '.').trim();
@@ -2936,6 +2957,50 @@ async function toolEditLocalFile(args) {
     
     _fs.writeFileSync(resolvedPath, content, 'utf8');
     return { ok: true, path: filePath };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
+async function toolSearchCodebase(args) {
+  try {
+    const query = String(args?.query || '');
+    if (!query) return { ok: false, error: 'Query is required' };
+    // Using git grep for lightning fast search inside the repository.
+    // Replace quotes carefully to prevent command injection, though _exec runs in a shell.
+    const safeQuery = query.replace(/"/g, '\\"');
+    const { stdout } = await _exec(`git grep -nI "${safeQuery}"`, { cwd: REPO_ROOT });
+    // Truncate output to prevent huge context responses
+    const lines = stdout.trim().split('\n');
+    const matches = lines.slice(0, 100).join('\n');
+    return { ok: true, matches: matches || 'No matches found.', truncated: lines.length > 100 };
+  } catch (err) {
+    // git grep returns exit code 1 if no matches are found, which rejects the promise
+    return { ok: true, matches: 'No matches found.' };
+  }
+}
+
+async function toolReplaceInFile(args) {
+  try {
+    const filePath = String(args?.path || '').trim();
+    const targetText = String(args?.target_text || '');
+    const replacementText = String(args?.replacement_text || '');
+    
+    if (!filePath || !targetText) return { ok: false, error: 'path and target_text are required' };
+    const resolvedPath = _path.resolve(REPO_ROOT, filePath);
+    if (!isPathSafe(resolvedPath)) return { ok: false, error: 'access denied: restricted directory' };
+    if (!_fs.existsSync(resolvedPath)) return { ok: false, error: 'File does not exist' };
+    
+    const content = _fs.readFileSync(resolvedPath, 'utf8');
+    if (!content.includes(targetText)) {
+      return { ok: false, error: 'Target text not found in the file. It must match exactly.' };
+    }
+    
+    // Strict replacement of the first occurrence (or all, but usually targeted)
+    const newContent = content.replace(targetText, replacementText);
+    _fs.writeFileSync(resolvedPath, newContent, 'utf8');
+    
+    return { ok: true, path: filePath, status: 'Replaced successfully' };
   } catch (err) {
     return { ok: false, error: err.message };
   }
@@ -3080,12 +3145,15 @@ async function executeRealTool(name, args, ctx) {
     case 'read_local_file':   return toolReadLocalFile(a);
     case 'list_local_files':  return toolListLocalFiles(a);
     case 'edit_local_file':   return toolEditLocalFile(a);
+    case 'search_codebase':   return toolSearchCodebase(a);
+    case 'replace_in_file':   return toolReplaceInFile(a);
     case 'create_github_pr':  return toolCreateGithubPr(a);
     case 'manage_github_prs': return toolManageGithubPrs(a);
     // ── Agentic Expert Tools ──
     case 'run_terminal_command': return toolRunTerminalCommand(a);
     case 'ask_expert_coder':     return toolAskExpertCoder(a);
     case 'fetch_documentation':  return toolFetchDocumentation(a);
+    case 'browse_web':           return toolBrowseWeb(a);
     // ── PR C — sandbox + regex + user-intern ──
     case 'run_regex':         return toolRunRegex(a);
     case 'run_code':          return toolRunCode(a);
