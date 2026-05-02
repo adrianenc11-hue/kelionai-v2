@@ -44,7 +44,7 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       # Sync gate — wait until Railway has finished rolling out the
       # commit that triggered this workflow. Without this, CI on master
