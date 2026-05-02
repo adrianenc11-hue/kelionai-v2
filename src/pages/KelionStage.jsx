@@ -1000,8 +1000,6 @@ export default function KelionStage() {
   } = liveHook
   statusRef.current = status
   liveSendTextRef.current = liveSendText
-  const startRef = useRef(null)
-  startRef.current = start
 
   // Chat bubble auto-hide — fade the on-stage bubble out after 8s of
   // quiet so the avatar isn't cluttered. Placed after useGeminiLive
@@ -1083,16 +1081,7 @@ export default function KelionStage() {
     setChatError(null)
     setChatInput('')
     setAttachedFile(null)
-    const payloadStr = finalPayload.trim()
-    if (statusRef.current === 'idle' || statusRef.current === 'error') {
-      const clean = turnsRef.current
-        .filter((t) => t && t.role && t.text && String(t.text).trim())
-        .map((t) => ({ role: t.role === 'assistant' ? 'assistant' : 'user', text: String(t.text) }))
-        .slice(-20)
-      if (startRef.current) startRef.current({ textOnly: true, priorTurns: clean, initialText: payloadStr })
-    } else {
-      if (liveSendTextRef.current) await liveSendTextRef.current(payloadStr)
-    }
+    if (liveSendTextRef.current) await liveSendTextRef.current(finalPayload.trim())
   }, [chatInput, attachedFile, applyMuteCommand])
   const trialHud = useTrial({ signedIn: !!authState.signedIn })
   const trialRemainingMs = trialHud.remainingMs
