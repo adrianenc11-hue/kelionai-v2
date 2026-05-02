@@ -93,6 +93,8 @@ jobs:
       # the real acceptance.
       - name: Run acceptance — ${{ matrix.capability }}
         if: github.event_name != 'pull_request'
+        env:
+          ACCEPTANCE_TOKEN: ${{ secrets.ACCEPTANCE_TOKEN }}
         run: |
           echo "Running e2e/acceptance/${{ matrix.capability }}.cjs against $ACCEPTANCE_BASE"
           node e2e/acceptance/${{ matrix.capability }}.cjs
