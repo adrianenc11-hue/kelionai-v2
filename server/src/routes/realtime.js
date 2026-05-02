@@ -384,6 +384,43 @@ function formatMemoryBlocks(memoryItems) {
 // If you add a new tool, add it to KELION_TOOLS only; the adapters
 // pick it up automatically.
 const KELION_TOOLS = [
+    {
+      name: 'run_command',
+      description: 'Run a shell command on the host. Use for OS interaction, starting servers, running build scripts, etc.',
+      properties: {
+        command: { type: 'string', description: 'The shell command to execute.' },
+        cwd: { type: 'string', description: 'Working directory for the command.' }
+      },
+      required: ['command']
+    },
+    {
+      name: 'write_to_file',
+      description: 'Create or overwrite a file with given content. WARNING: Replaces entire file.',
+      properties: {
+        path: { type: 'string', description: 'Absolute or relative path.' },
+        content: { type: 'string', description: 'Complete file content.' }
+      },
+      required: ['path', 'content']
+    },
+    {
+      name: 'replace_file_content',
+      description: 'Replace a specific block of text in a file.',
+      properties: {
+        path: { type: 'string', description: 'Path to file.' },
+        target_content: { type: 'string', description: 'Exact text to replace.' },
+        replacement_content: { type: 'string', description: 'New text.' }
+      },
+      required: ['path', 'target_content', 'replacement_content']
+    },
+    {
+      name: 'multi_replace_file_content',
+      description: 'Apply multiple replacements to a file.',
+      properties: {
+        path: { type: 'string', description: 'Path to file.' },
+        replacements: { type: 'string', description: 'JSON string of array of replacements [{target_content, replacement_content}].' }
+      },
+      required: ['path', 'replacements']
+    },
   {
     name: 'browse_web',
     description: 'Run an autonomous web-browsing agent in a real browser. Use when the user asks Kelion to open a site, fill a form, extract info from a page behind JS, compare products, book/reserve, etc. Returns a short summary + optional URL.',

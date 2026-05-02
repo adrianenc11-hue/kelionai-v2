@@ -1,0 +1,12 @@
+{
+  "system": {
+    "disk_free_space_bytes": 834015547392,
+    "disk_free_space_gb": 776.73
+  },
+  "external": {
+    "location": "Tokyo",
+    "temperature_celsius": 20,
+    "temperature_fahrenheit": 69,
+    "condition": "mostly clear"
+  }
+}

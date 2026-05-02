@@ -3076,6 +3076,42 @@ async function toolGenerateImage(args) {
   return generateImage({ prompt, size });
 }
 
+async function toolAskExpertCoder(args) {
+  try {
+    const query = String(args?.query || '');
+    if (!query) return { ok: false, error: 'query is required' };
+    
+    const openRouterKey = process.env.OPENROUTER_API_KEY || '';
+    if (!openRouterKey) return { ok: false, error: 'OPENROUTER_API_KEY missing' };
+    
+    const reqBody = {
+      model: process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.3-70b-instruct:free',
+      messages: [{ role: 'user', content: query }],
+      temperature: 0.2,
+      max_tokens: 4000
+    };
+    
+    const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${openRouterKey}`
+      },
+      body: JSON.stringify(reqBody)
+    });
+    
+    if (!r.ok) {
+      const err = await r.text();
+      return { ok: false, error: `Expert Coder API error: ${r.status} ${err}` };
+    }
+    
+    const data = await r.json();
+    return { ok: true, answer: data.choices[0].message.content };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
 async function executeRealTool(name, args, ctx) {
   // Strip any leading-underscore keys from caller-supplied args. These are
   // reserved for internal wrappers (e.g. toolGetForecast passes `_maxDays`
