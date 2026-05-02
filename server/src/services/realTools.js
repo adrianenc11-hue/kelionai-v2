@@ -2829,7 +2829,7 @@ async function toolRunTerminalCommand(args) {
     const { stdout, stderr } = await _exec(cmd, { cwd: REPO_ROOT, timeout: 30000 });
     return { ok: true, stdout: stdout.slice(0, 5000), stderr: stderr.slice(0, 5000) };
   } catch (err) {
-    return { ok: false, error: err.message, stdout: err.stdout, stderr: err.stderr };
+    return { ok: false, error: err.message, stdout: err.stdout || '', stderr: err.stderr || '' };
   }
 }
 
