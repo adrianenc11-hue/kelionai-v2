@@ -71,8 +71,8 @@ const REAL_TOOL_NAMES = new Set([
   'read_pdf', 'read_docx', 'ocr_image', 'ocr_passport',
   'send_email', 'create_calendar_ics', 'zapier_trigger',
   'github_repo_info', 'get_github_issues', 'list_github_repo_files', 'read_github_file', 'npm_package_info', 'pypi_package_info',
-  'read_local_file', 'list_local_files', 'edit_local_file', 'create_github_pr',
-  'run_terminal_command', 'ask_expert_coder', 'fetch_documentation',
+  'read_local_file', 'list_local_files', 'edit_local_file', 'search_codebase', 'replace_in_file', 'create_github_pr',
+  'run_terminal_command', 'ask_expert_coder', 'fetch_documentation', 'browse_web',
   'run_regex', 'get_my_credits', 'get_my_usage', 'get_my_profile',
   'generate_image',
   // PR 8/N — Memory of Actions.
@@ -173,6 +173,12 @@ function summarizeRealTool(name, j) {
   if (name === 'edit_local_file') {
     return j.ok ? `File ${j.path} updated successfully.` : `Edit failed: ${j.error}`
   }
+  if (name === 'search_codebase') {
+    return j.ok ? `Matches:\n${j.matches}${j.truncated ? '\n(Truncated)' : ''}` : `Search failed: ${j.error}`
+  }
+  if (name === 'replace_in_file') {
+    return j.ok ? `File ${j.path} updated successfully.` : `Replace failed: ${j.error}`
+  }
   if (name === 'create_github_pr') {
     return j.ok ? `PR Created: ${j.url}` : `PR failed: ${j.error}`
   }
@@ -181,6 +187,9 @@ function summarizeRealTool(name, j) {
   }
   if (name === 'ask_expert_coder') {
     return j.ok ? `Expert Answer:\n${j.answer}` : `Expert failed: ${j.error}`
+  }
+  if (name === 'browse_web') {
+    return j.ok ? `Web Content (${j.url}):\n${j.content}` : `Browse failed: ${j.error}`
   }
   if (name === 'fetch_documentation') {
     return j.ok ? `Documentation Content:\n${j.content}` : `Fetch failed: ${j.error}`
@@ -479,13 +488,6 @@ function autoDisplayOnMonitor(name, j, args) {
 
 export async function runTool(name, args) {
   switch (name) {
-    case 'browse_web': {
-      const j = await postJSON('/api/tools/browser/browse', {
-        task: args?.task,
-        start_url: args?.start_url || null,
-      })
-      return summarize(j)
-    }
     case 'read_calendar':
       return summarizeRealTool('read_calendar', await postJSON('/api/tools/execute', { name: 'read_calendar', args: args || {} }))
     case 'read_email':

@@ -106,6 +106,8 @@ const EXPECTED_TOOL_NAMES = [
   'read_local_file',
   'list_local_files',
   'edit_local_file',
+  'search_codebase',
+  'replace_in_file',
   'create_github_pr',
   'manage_github_prs',
   // Agentic

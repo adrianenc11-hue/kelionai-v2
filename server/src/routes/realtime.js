@@ -595,6 +595,24 @@ const KELION_TOOLS = [
     required: ['path', 'content'],
   },
   {
+    name: 'search_codebase',
+    description: "Search for a text snippet or regex pattern across the entire local codebase using grep. Extremely fast. Use this to find where functions are defined or used.",
+    properties: {
+      query: { type: 'string', description: "The text or regex to search for." },
+    },
+    required: ['query'],
+  },
+  {
+    name: 'replace_in_file',
+    description: "Like str_replace_editor. Replaces a specific block of text in a local file. Perfect for targeted code edits without rewriting the whole file.",
+    properties: {
+      path: { type: 'string', description: "Path to the file to edit." },
+      target_text: { type: 'string', description: "The exact text block to replace. Must match the file content exactly." },
+      replacement_text: { type: 'string', description: "The new text block to insert." },
+    },
+    required: ['path', 'target_text', 'replacement_text'],
+  },
+  {
     name: 'create_github_pr',
     description: "Commit the current local changes and create a Pull Request on GitHub. Use this after making edits to fix bugs.",
     properties: {
