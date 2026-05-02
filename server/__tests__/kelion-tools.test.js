@@ -107,6 +107,7 @@ const EXPECTED_TOOL_NAMES = [
   'list_local_files',
   'edit_local_file',
   'create_github_pr',
+  'manage_github_prs',
   // Agentic
   'run_terminal_command',
   'ask_expert_coder',
