@@ -120,6 +120,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
   // translatorModeRef — set in start() before the WS opens so handleMessage
   // can read it inside setupComplete without a closure/scope issue.
   const translatorModeRef = useRef(false)
+  const initialTextRef = useRef(null)
 
   const wsRef = useRef(null)
   const audioCtxRef = useRef(null)       // 16kHz capture context for Gemini — MUST match SAMPLE_RATE_IN
@@ -639,6 +640,13 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
     if (msg.setupComplete) {
       logAiEvent('setup_complete', {})
       setStatus('listening')
+      if (initialTextRef.current && ws && ws.readyState === WebSocket.OPEN) {
+        try {
+          ws.send(JSON.stringify({ clientContent: { turns: [{ role: 'user', parts: [{ text: initialTextRef.current }] }], turnComplete: true } }))
+          setStatus('thinking')
+          initialTextRef.current = null
+        } catch (_) {}
+      }
       // Translator mode kickstart — only fires when the user explicitly
       // selected translator mode from the menu. Normal sessions start
       // silent: Kelion listens and detects the user's language.
@@ -694,6 +702,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
     // can read it (handleMessage is defined outside start(), so local vars
     // declared here are not in its closure).
     translatorModeRef.current = opts.translatorMode || false
+    initialTextRef.current = opts.initialText || null
     const textOnly = !!opts.textOnly
     // If a previous ws is still live (or in CONNECTING), tear it down
     // before opening a new one — otherwise the old handlers keep firing
@@ -1563,3 +1572,4 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
     loadTurns,
   }
 }
+

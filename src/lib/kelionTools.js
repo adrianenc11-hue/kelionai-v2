@@ -72,6 +72,7 @@ const REAL_TOOL_NAMES = new Set([
   'send_email', 'create_calendar_ics', 'zapier_trigger',
   'github_repo_info', 'get_github_issues', 'list_github_repo_files', 'read_github_file', 'npm_package_info', 'pypi_package_info',
   'read_local_file', 'list_local_files', 'edit_local_file', 'search_codebase', 'replace_in_file', 'create_github_pr',
+  'run_command', 'write_to_file', 'replace_file_content', 'multi_replace_file_content',
   'run_terminal_command', 'ask_expert_coder', 'fetch_documentation', 'browse_web',
   'run_regex', 'get_my_credits', 'get_my_usage', 'get_my_profile',
   'generate_image',
