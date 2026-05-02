@@ -107,6 +107,10 @@ const EXPECTED_TOOL_NAMES = [
   'list_local_files',
   'edit_local_file',
   'create_github_pr',
+  // Agentic
+  'run_terminal_command',
+  'ask_expert_coder',
+  'fetch_documentation',
   // PR #8/N — Memory of Actions. Read-only self-reflection tool: the
   // voice model queries action_history for the signed-in user before
   // repeating a tool call. Guests receive { ok:false, signed_in:false }.
