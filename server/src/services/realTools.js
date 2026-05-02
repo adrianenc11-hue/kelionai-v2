@@ -115,15 +115,37 @@ async function getFetch() {
   return nodeFetchPromise;
 }
 
-async function fetchWithTimeout(url, opts = {}, timeoutMs = 8000) {
+async function fetchWithTimeout(url, opts = {}, timeoutMs = 8000, retries = 2) {
   const fetchImpl = await getFetch();
-  const ctrl = typeof AbortController === 'function' ? new AbortController() : null;
-  const timer = ctrl ? setTimeout(() => ctrl.abort(), timeoutMs) : null;
-  try {
-    return await fetchImpl(url, ctrl ? { ...opts, signal: ctrl.signal } : opts);
-  } finally {
-    if (timer) clearTimeout(timer);
+  
+  let lastErr;
+  let lastStatus;
+  
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const ctrl = typeof AbortController === 'function' ? new AbortController() : null;
+    const timer = ctrl ? setTimeout(() => ctrl.abort(), timeoutMs) : null;
+    try {
+      const r = await fetchImpl(url, ctrl ? { ...opts, signal: ctrl.signal } : opts);
+      if (!r.ok && [502, 503, 504].includes(r.status) && attempt < retries) {
+        lastStatus = r.status;
+        await r.text().catch(() => ''); // drain body
+        await new Promise(res => setTimeout(res, 1000 * (attempt + 1))); // 1s, 2s backoff
+        continue;
+      }
+      return r;
+    } catch (err) {
+      lastErr = err;
+      if (attempt < retries) {
+        await new Promise(res => setTimeout(res, 1000 * (attempt + 1)));
+        continue;
+      }
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
   }
+  
+  if (lastErr) throw lastErr;
+  throw new Error(`Request failed after retries with status ${lastStatus}`);
 }
 
 // ──────────────────────────────────────────────────────────────────
@@ -2651,6 +2673,44 @@ async function toolGithubRepoInfo(args) {
   }
 }
 
+async function toolGetGithubIssues(args) {
+  let slug = String(args?.repo || args?.slug || '').trim();
+  if (!slug && args?.owner && args?.name) slug = `${args.owner}/${args.name}`;
+  slug = slug.replace(/^https?:\/\/github\.com\//i, '').replace(/\.git$/i, '').replace(/\/$/, '');
+  if (!validSlugRepo(slug)) return { ok: false, error: 'invalid repo slug (expected owner/name)' };
+  const state = ['open', 'closed', 'all'].includes(args?.state) ? args.state : 'open';
+  
+  const headers = { Accept: 'application/vnd.github+json', 'User-Agent': 'kelion-ai-tools' };
+  if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+  
+  try {
+    const url = `https://api.github.com/repos/${slug}/issues?state=${state}&sort=updated&direction=desc&per_page=10`;
+    const r = await fetchWithTimeout(url, { headers });
+    if (r.status === 404) return { ok: false, status: 404, error: 'repo not found or no issues access' };
+    if (!r.ok) return { ok: false, status: r.status, error: `GitHub HTTP ${r.status}` };
+    const j = await r.json();
+    if (!Array.isArray(j)) return { ok: false, error: 'unexpected GitHub response' };
+    
+    return {
+      ok: true,
+      repo: slug,
+      state: state,
+      issues: j.map(issue => ({
+        number: issue.number,
+        title: issue.title,
+        state: issue.state,
+        author: issue.user?.login,
+        comments: issue.comments,
+        created_at: issue.created_at,
+        url: issue.html_url,
+        body: issue.body ? (issue.body.slice(0, 300) + (issue.body.length > 300 ? '…' : '')) : null
+      }))
+    };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+}
+
 function validSlugNpm(s) {
   if (typeof s !== 'string' || !s) return false;
   if (s.length > 214) return false;
@@ -2745,7 +2805,177 @@ async function toolPypiPackageInfo(args) {
 }
 
 // ──────────────────────────────────────────────────────────────────
+// Local File and Git PR tools
+// ──────────────────────────────────────────────────────────────────
+const _path = require('path');
+const _fs = require('fs');
+const _cp = require('child_process');
+const _util = require('util');
+const _exec = _util.promisify(_cp.exec);
+
+// Path to the repository root
+const REPO_ROOT = _path.resolve(__dirname, '../../../');
+
+function isPathSafe(p) {
+  const normalized = p.toLowerCase();
+  if (normalized.includes('c:\\windows')) return false;
+  if (normalized.includes('system32')) return false;
+  return true;
+}
+
+async function toolRunTerminalCommand(args) {
+  try {
+    const cmd = String(args?.command || '').trim();
+    if (!cmd) return { ok: false, error: 'No command provided' };
+    
+    // Safety check: block extremely dangerous commands
+    if (cmd.includes('rm -rf /') || cmd.includes('mkfs')) {
+      return { ok: false, error: 'Command blocked for security reasons.' };
+    }
+    
+    let targetCwd = REPO_ROOT;
+    if (args?.cwd) {
+      targetCwd = _path.resolve(REPO_ROOT, args.cwd);
+      if (!_fs.existsSync(targetCwd)) {
+        _fs.mkdirSync(targetCwd, { recursive: true });
+      }
+    }
+
+    const { stdout, stderr } = await _exec(cmd, { cwd: targetCwd, timeout: 30000 });
+    return { ok: true, stdout: stdout.slice(0, 5000), stderr: stderr.slice(0, 5000) };
+  } catch (err) {
+    return { ok: false, error: err.message, stdout: err.stdout, stderr: err.stderr };
+  }
+}
+
+async function toolAskExpertCoder(args) {
+  try {
+    const question = String(args?.question || '');
+    const context = String(args?.context || '');
+    if (!question) return { ok: false, error: 'Question is required' };
+    
+    const OR_KEY = process.env.OPENROUTER_API_KEY;
+    if (!OR_KEY) return { ok: false, error: 'OPENROUTER_API_KEY is not set' };
+
+    const prompt = `You are an expert coder. Answer the question precisely.\n\nContext:\n${context}\n\nQuestion:\n${question}`;
+    
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OR_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'qwen/qwen-2.5-coder-32b-instruct',
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    
+    const data = await res.json();
+    if (data.error) return { ok: false, error: data.error.message };
+    return { ok: true, answer: data.choices[0].message.content };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
+async function toolFetchDocumentation(args) {
+  try {
+    const url = String(args?.url || '');
+    if (!url || !url.startsWith('http')) return { ok: false, error: 'Valid URL is required' };
+    
+    const res = await fetch(`https://r.jina.ai/${url}`);
+    const text = await res.text();
+    return { ok: true, content: text.slice(0, 15000) };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
+async function toolListLocalFiles(args) {
+  try {
+    const dir = String(args?.dir || '.').trim();
+    const resolvedPath = _path.resolve(REPO_ROOT, dir);
+    if (!isPathSafe(resolvedPath)) return { ok: false, error: 'access denied: path points to a restricted OS directory' };
+    if (!_fs.existsSync(resolvedPath)) return { ok: false, error: 'directory not found' };
+    
+    const entries = _fs.readdirSync(resolvedPath, { withFileTypes: true });
+    const files = entries.map(e => (e.isDirectory() ? e.name + '/' : e.name));
+    return { ok: true, dir, files };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
+async function toolReadLocalFile(args) {
+  try {
+    const filePath = String(args?.path || '').trim();
+    if (!filePath) return { ok: false, error: 'missing file path' };
+    const resolvedPath = _path.resolve(REPO_ROOT, filePath);
+    if (!isPathSafe(resolvedPath)) return { ok: false, error: 'access denied: path points to a restricted OS directory' };
+    if (!_fs.existsSync(resolvedPath)) return { ok: false, error: 'file not found' };
+    
+    const content = _fs.readFileSync(resolvedPath, 'utf8');
+    const cap = 50000;
+    return { ok: true, path: filePath, content: content.length > cap ? content.slice(0, cap) + '\\n...[truncated]' : content };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
+async function toolEditLocalFile(args) {
+  try {
+    const filePath = String(args?.path || '').trim();
+    const content = String(args?.content || '');
+    if (!filePath) return { ok: false, error: 'missing file path' };
+    const resolvedPath = _path.resolve(REPO_ROOT, filePath);
+    if (!isPathSafe(resolvedPath)) return { ok: false, error: 'access denied: path points to a restricted OS directory' };
+    
+    const dir = _path.dirname(resolvedPath);
+    if (!_fs.existsSync(dir)) _fs.mkdirSync(dir, { recursive: true });
+    
+    _fs.writeFileSync(resolvedPath, content, 'utf8');
+    return { ok: true, path: filePath };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
+async function toolCreateGithubPr(args) {
+  try {
+    const title = String(args?.title || 'Automated Kelion PR');
+    const branch = String(args?.branch || 'feat/kelion-auto-' + Date.now());
+    const message = String(args?.message || 'feat: automated updates');
+    
+    let gitStatus = '';
+    try {
+      const st = await _exec('git status --porcelain', { cwd: REPO_ROOT });
+      gitStatus = st.stdout;
+    } catch(e) { }
+    
+    if (!gitStatus.trim()) {
+      return { ok: false, error: 'No changes to commit' };
+    }
+    
+    await _exec(`git checkout -b ${branch}`, { cwd: REPO_ROOT });
+    await _exec(`git add .`, { cwd: REPO_ROOT });
+    await _exec(`git commit -m "${message.replace(/"/g, '\\"')}"`, { cwd: REPO_ROOT });
+    await _exec(`git push -u origin ${branch}`, { cwd: REPO_ROOT });
+    
+    try {
+      const { stdout: prUrl } = await _exec(`gh pr create --title "${title.replace(/"/g, '\\"')}" --body "Automated PR from Kelion."`, { cwd: REPO_ROOT });
+      return { ok: true, url: prUrl.trim() };
+    } catch (e) {
+      return { ok: true, url: `https://github.com/adrianenc11-hue/kelionai-v2/pull/new/${branch}` };
+    }
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────
 // Dispatch
+
 
 // F11 — Image generation. Returns a short-lived URL pointing at
 // the in-process cache served by routes/generatedImages.js — the voice
@@ -2823,6 +3053,15 @@ async function executeRealTool(name, args, ctx) {
     case 'read_github_file':      return toolReadGithubFile(a);
     case 'npm_package_info':      return toolNpmPackageInfo(a);
     case 'pypi_package_info':     return toolPypiPackageInfo(a);
+    // ── Local File tools ──
+    case 'read_local_file':   return toolReadLocalFile(a);
+    case 'list_local_files':  return toolListLocalFiles(a);
+    case 'edit_local_file':   return toolEditLocalFile(a);
+    case 'create_github_pr':  return toolCreateGithubPr(a);
+    // ── Agentic Expert Tools ──
+    case 'run_terminal_command': return toolRunTerminalCommand(a);
+    case 'ask_expert_coder':     return toolAskExpertCoder(a);
+    case 'fetch_documentation':  return toolFetchDocumentation(a);
     // ── PR C — sandbox + regex + user-intern ──
     case 'run_regex':         return toolRunRegex(a);
     case 'run_code':          return toolRunCode(a);
@@ -3141,6 +3380,13 @@ module.exports = {
   toolReadGithubFile,
   toolNpmPackageInfo,
   toolPypiPackageInfo,
+  toolReadLocalFile,
+  toolListLocalFiles,
+  toolEditLocalFile,
+  toolCreateGithubPr,
+  toolRunTerminalCommand,
+  toolAskExpertCoder,
+  toolFetchDocumentation,
   // F11 — image generation
   toolGenerateImage,
   // PR 8/N — Memory of Actions
