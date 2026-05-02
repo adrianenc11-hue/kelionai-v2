@@ -2849,34 +2849,55 @@ async function toolRunTerminalCommand(args) {
 }
 
 async function toolAskExpertCoder(args) {
-  try {
-    const question = String(args?.question || '');
-    const context = String(args?.context || '');
-    if (!question) return { ok: false, error: 'Question is required' };
-    
-    const OR_KEY = process.env.OPENROUTER_API_KEY;
-    if (!OR_KEY) return { ok: false, error: 'OPENROUTER_API_KEY is not set' };
+  const question = String(args?.question || '');
+  const context = String(args?.context || '');
+  if (!question) return { ok: false, error: 'Question is required' };
+  
+  const OR_KEY = process.env.OPENROUTER_API_KEY;
+  if (!OR_KEY) return { ok: false, error: 'OPENROUTER_API_KEY is not set' };
 
-    const prompt = `You are an expert coder. Answer the question precisely.\n\nContext:\n${context}\n\nQuestion:\n${question}`;
-    
-    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OR_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: args?.model || 'qwen/qwen-2.5-coder-32b-instruct',
-        messages: [{ role: 'user', content: prompt }]
-      })
-    });
-    
-    const data = await res.json();
-    if (data.error) return { ok: false, error: data.error.message };
-    return { ok: true, answer: data.choices[0].message.content };
-  } catch (err) {
-    return { ok: false, error: err.message };
+  const prompt = `You are an expert coder. Answer the question precisely.\n\nContext:\n${context}\n\nQuestion:\n${question}`;
+  
+  // Fallback chain: try preferred model first, then alternatives
+  const MODELS = [
+    args?.model || 'qwen/qwen-2.5-coder-32b-instruct',
+    'deepseek/deepseek-r1',
+    'meta-llama/llama-3.3-70b-instruct:free',
+  ];
+  // Deduplicate in case args.model matches one of the fallbacks
+  const uniqueModels = [...new Set(MODELS)];
+  const errors = [];
+  
+  for (const model of uniqueModels) {
+    try {
+      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${OR_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: 'user', content: prompt }]
+        })
+      });
+      
+      if (!res.ok) {
+        errors.push(`${model}: HTTP ${res.status}`);
+        continue;
+      }
+      
+      const data = await res.json();
+      if (data.error) {
+        errors.push(`${model}: ${data.error.message}`);
+        continue;
+      }
+      return { ok: true, model, answer: data.choices[0].message.content };
+    } catch (err) {
+      errors.push(`${model}: ${err.message}`);
+    }
   }
+  return { ok: false, error: `All expert models failed: ${errors.join(' | ')}` };
 }
 
 async function toolFetchDocumentation(args) {
@@ -2921,7 +2942,18 @@ async function toolListLocalFiles(args) {
     if (!_fs.existsSync(resolvedPath)) return { ok: false, error: 'directory not found' };
     
     const entries = _fs.readdirSync(resolvedPath, { withFileTypes: true });
-    const files = entries.map(e => (e.isDirectory() ? e.name + '/' : e.name));
+    const files = entries.map(e => {
+      const full = _path.join(resolvedPath, e.name);
+      if (e.isDirectory()) {
+        return { name: e.name + '/', type: 'dir' };
+      }
+      try {
+        const st = _fs.statSync(full);
+        return { name: e.name, type: 'file', size: st.size };
+      } catch (_) {
+        return { name: e.name, type: 'file' };
+      }
+    });
     return { ok: true, dir, files };
   } catch (err) {
     return { ok: false, error: err.message };
@@ -2936,9 +2968,21 @@ async function toolReadLocalFile(args) {
     if (!isPathSafe(resolvedPath)) return { ok: false, error: 'access denied: path points to a restricted OS directory' };
     if (!_fs.existsSync(resolvedPath)) return { ok: false, error: 'file not found' };
     
-    const content = _fs.readFileSync(resolvedPath, 'utf8');
+    const raw = _fs.readFileSync(resolvedPath, 'utf8');
+    const allLines = raw.split('\n');
+    const totalLines = allLines.length;
+    
+    // Support line-range reading for large files
+    const startLine = Math.max(1, parseInt(args?.start_line, 10) || 1);
+    const endLine = Math.min(totalLines, parseInt(args?.end_line, 10) || totalLines);
+    const sliced = allLines.slice(startLine - 1, endLine);
+    
+    // Add line numbers for precision editing
+    const numbered = sliced.map((line, i) => `${startLine + i}: ${line}`).join('\n');
     const cap = 50000;
-    return { ok: true, path: filePath, content: content.length > cap ? content.slice(0, cap) + '\\n...[truncated]' : content };
+    const content = numbered.length > cap ? numbered.slice(0, cap) + '\n...[truncated]' : numbered;
+    
+    return { ok: true, path: filePath, totalLines, showing: `${startLine}-${endLine}`, content };
   } catch (err) {
     return { ok: false, error: err.message };
   }
@@ -2966,17 +3010,16 @@ async function toolSearchCodebase(args) {
   try {
     const query = String(args?.query || '');
     if (!query) return { ok: false, error: 'Query is required' };
-    // Using git grep for lightning fast search inside the repository.
-    // Replace quotes carefully to prevent command injection, though _exec runs in a shell.
     const safeQuery = query.replace(/"/g, '\\"');
-    const { stdout } = await _exec(`git grep -nI "${safeQuery}"`, { cwd: REPO_ROOT });
-    // Truncate output to prevent huge context responses
+    // Support file-type filtering via include glob (e.g. '*.js', '*.jsx')
+    const includeGlob = args?.include ? ` -- '${String(args.include).replace(/'/g, '')}'` : '';
+    const caseSensitive = args?.case_sensitive === false ? '-i ' : '';
+    const { stdout } = await _exec(`git grep -nI ${caseSensitive}"${safeQuery}"${includeGlob}`, { cwd: REPO_ROOT });
     const lines = stdout.trim().split('\n');
     const matches = lines.slice(0, 100).join('\n');
-    return { ok: true, matches: matches || 'No matches found.', truncated: lines.length > 100 };
+    return { ok: true, matches: matches || 'No matches found.', total: lines.length, truncated: lines.length > 100 };
   } catch (err) {
-    // git grep returns exit code 1 if no matches are found, which rejects the promise
-    return { ok: true, matches: 'No matches found.' };
+    return { ok: true, matches: 'No matches found.', total: 0 };
   }
 }
 
@@ -3149,6 +3192,33 @@ async function executeRealTool(name, args, ctx) {
     case 'replace_in_file':   return toolReplaceInFile(a);
     case 'create_github_pr':  return toolCreateGithubPr(a);
     case 'manage_github_prs': return toolManageGithubPrs(a);
+    // ── God Mode aliases (declared in KELION_TOOLS, route to existing impls) ──
+    case 'run_command':              return toolRunTerminalCommand(a);
+    case 'write_to_file':            return toolEditLocalFile(a);
+    case 'replace_file_content':     return toolReplaceInFile(a);
+    case 'multi_replace_file_content': {
+      // Accepts { path, replacements: '[{target_content,replacement_content},...]' }
+      try {
+        const filePath = String(a?.path || '').trim();
+        const reps = JSON.parse(a?.replacements || '[]');
+        if (!filePath) return { ok: false, error: 'path is required' };
+        const resolvedPath = _path.resolve(REPO_ROOT, filePath);
+        if (!isPathSafe(resolvedPath)) return { ok: false, error: 'access denied' };
+        if (!_fs.existsSync(resolvedPath)) return { ok: false, error: 'file not found' };
+        let content = _fs.readFileSync(resolvedPath, 'utf8');
+        let applied = 0;
+        for (const r of reps) {
+          if (r.target_content && content.includes(r.target_content)) {
+            content = content.replace(r.target_content, r.replacement_content || '');
+            applied++;
+          }
+        }
+        _fs.writeFileSync(resolvedPath, content, 'utf8');
+        return { ok: true, path: filePath, applied, total: reps.length };
+      } catch (err) {
+        return { ok: false, error: err.message };
+      }
+    }
     // ── Agentic Expert Tools ──
     case 'run_terminal_command': return toolRunTerminalCommand(a);
     case 'ask_expert_coder':     return toolAskExpertCoder(a);
