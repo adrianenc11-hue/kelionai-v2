@@ -617,9 +617,11 @@ const KELION_TOOLS = [
   // internally without a separate planner LLM.
   {
     name: 'read_local_file',
-    description: "Read the content of a local file. You have UNIVERSAL WORKSPACE permissions. Use this to inspect code anywhere on the system.",
+    description: "Read the content of a local file with line numbers. You have UNIVERSAL WORKSPACE permissions. For large files, use start_line/end_line to read specific sections instead of loading everything.",
     properties: {
       path: { type: 'string', description: "Path to the file. Can be absolute or relative to the repo root." },
+      start_line: { type: 'integer', description: "First line to read (1-indexed). Omit to start from line 1." },
+      end_line: { type: 'integer', description: "Last line to read (1-indexed, inclusive). Omit to read to end of file." },
     },
     required: ['path'],
   },
@@ -642,9 +644,11 @@ const KELION_TOOLS = [
   },
   {
     name: 'search_codebase',
-    description: "Search for a text snippet or regex pattern across the entire local codebase using grep. Extremely fast. Use this to find where functions are defined or used.",
+    description: "Search for a text snippet or regex pattern across the local codebase using git grep. Returns file paths and line numbers. Extremely fast. Use this to find where functions are defined or used.",
     properties: {
       query: { type: 'string', description: "The text or regex to search for." },
+      include: { type: 'string', description: "Optional glob filter for file types, e.g. '*.js', '*.jsx', '*.py'. Limits search to matching files only." },
+      case_sensitive: { type: 'boolean', description: "Set to false for case-insensitive search. Default true." },
     },
     required: ['query'],
   },
