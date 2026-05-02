@@ -3108,6 +3108,131 @@ async function toolManageGithubPrs(args) {
 // Dispatch
 
 
+// ── Agentic Loop: execute_plan ──────────────────────────────────
+// Runs a sequence of tool calls server-side, passing results between
+// steps. Each step can reference previous results via {{step_N}} in
+// its args. On failure, optionally consults ask_expert_coder and
+// retries. Returns a full execution report.
+// Max 15 steps, 120s total timeout.
+async function toolExecutePlan(args, ctx) {
+  const MAX_STEPS = 15;
+  const MAX_TOTAL_MS = 120000;
+  let steps;
+  try {
+    steps = typeof args?.steps === 'string' ? JSON.parse(args.steps) : args?.steps;
+  } catch (e) {
+    return { ok: false, error: 'Invalid steps JSON: ' + e.message };
+  }
+  if (!Array.isArray(steps) || !steps.length) {
+    return { ok: false, error: 'steps must be a non-empty array of { tool, args, on_fail? }' };
+  }
+  if (steps.length > MAX_STEPS) {
+    return { ok: false, error: `Too many steps (max ${MAX_STEPS}). Split into multiple plans.` };
+  }
+
+  const report = [];
+  const startTime = Date.now();
+
+  // Interpolate {{step_N}} and {{step_N.field}} placeholders in a string
+  function interpolate(str, results) {
+    if (typeof str !== 'string') return str;
+    return str.replace(/\{\{step_(\d+)(?:\.(\w+))?\}\}/g, (_, idx, field) => {
+      const r = results[parseInt(idx, 10)];
+      if (!r) return `[step_${idx}: not yet executed]`;
+      if (field) {
+        const val = r.result?.[field];
+        return val !== undefined ? String(val) : `[step_${idx}.${field}: not found]`;
+      }
+      // Return a compact JSON of the result
+      try { return JSON.stringify(r.result).slice(0, 2000); }
+      catch (_) { return '[unparseable]'; }
+    });
+  }
+
+  // Deep-interpolate all string values in an args object
+  function interpolateArgs(obj, results) {
+    if (typeof obj === 'string') return interpolate(obj, results);
+    if (Array.isArray(obj)) return obj.map(v => interpolateArgs(v, results));
+    if (obj && typeof obj === 'object') {
+      const out = {};
+      for (const [k, v] of Object.entries(obj)) out[k] = interpolateArgs(v, results);
+      return out;
+    }
+    return obj;
+  }
+
+  for (let i = 0; i < steps.length; i++) {
+    // Timeout guard
+    if (Date.now() - startTime > MAX_TOTAL_MS) {
+      report.push({ step: i, tool: steps[i]?.tool, status: 'skipped', reason: 'total timeout exceeded' });
+      continue;
+    }
+
+    const step = steps[i];
+    const toolName = String(step?.tool || '').trim();
+    if (!toolName) {
+      report.push({ step: i, tool: '(empty)', status: 'error', error: 'missing tool name' });
+      continue;
+    }
+
+    const rawArgs = step.args || {};
+    const finalArgs = interpolateArgs(rawArgs, report);
+
+    let result;
+    try {
+      result = await executeRealTool(toolName, finalArgs, ctx);
+      if (result === null) {
+        result = { ok: false, error: `Tool '${toolName}' not found in executor` };
+      }
+    } catch (err) {
+      result = { ok: false, error: err.message };
+    }
+
+    const succeeded = result?.ok !== false;
+    report.push({ step: i, tool: toolName, status: succeeded ? 'ok' : 'error', result });
+
+    // Auto-heal on failure: consult expert and retry once
+    if (!succeeded && step.on_fail !== 'skip' && step.on_fail !== 'stop') {
+      const errorMsg = result?.error || result?.stderr || JSON.stringify(result).slice(0, 500);
+      // Try to get a fix from the expert
+      const expertResult = await toolAskExpertCoder({
+        question: `A tool call failed. How should I fix this and retry?\n\nTool: ${toolName}\nArgs: ${JSON.stringify(finalArgs).slice(0, 1000)}\nError: ${errorMsg}`,
+        context: `This is step ${i} of an automated plan. The goal is: ${args?.goal || 'complete the plan successfully'}.`,
+      });
+
+      if (expertResult?.ok && expertResult.answer) {
+        report[report.length - 1].auto_heal = {
+          consulted: true,
+          suggestion: expertResult.answer.slice(0, 500),
+        };
+        // Retry the same step once with original args (expert advice is for the model's next plan)
+        try {
+          const retryResult = await executeRealTool(toolName, finalArgs, ctx);
+          if (retryResult?.ok !== false) {
+            report[report.length - 1].status = 'ok_after_retry';
+            report[report.length - 1].result = retryResult;
+          }
+        } catch (_) { /* keep original error */ }
+      }
+    }
+
+    // Stop execution if step failed and on_fail === 'stop'
+    if (!succeeded && step.on_fail === 'stop') {
+      report.push({ step: i + 1, status: 'aborted', reason: 'previous step failed with on_fail=stop' });
+      break;
+    }
+  }
+
+  const elapsed = Date.now() - startTime;
+  const okCount = report.filter(r => r.status === 'ok' || r.status === 'ok_after_retry').length;
+  return {
+    ok: okCount > 0,
+    summary: `${okCount}/${steps.length} steps succeeded in ${(elapsed / 1000).toFixed(1)}s`,
+    steps: report,
+  };
+}
+
+
 // F11 — Image generation. Returns a short-lived URL pointing at
 // the in-process cache served by routes/generatedImages.js — the voice
 // model's read-back stays tiny while the client gets a real PNG URL to
@@ -3243,6 +3368,8 @@ async function executeRealTool(name, args, ctx) {
     case 'read_calendar':     return toolReadCalendar(a, ctx);
     case 'read_email':        return toolReadEmail(a, ctx);
     case 'search_files':      return toolSearchFiles(a, ctx);
+    // ── Agentic Loop ──
+    case 'execute_plan':      return toolExecutePlan(a, ctx);
     // ── Gemma 4 Deep Reasoning ──
 
     default:                  return null; // signal "not handled here"

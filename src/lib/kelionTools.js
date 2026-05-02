@@ -76,6 +76,7 @@ const REAL_TOOL_NAMES = new Set([
   'run_terminal_command', 'ask_expert_coder', 'fetch_documentation', 'browse_web',
   'run_regex', 'get_my_credits', 'get_my_usage', 'get_my_profile',
   'generate_image',
+  'execute_plan',
   // PR 8/N — Memory of Actions.
   'get_action_history',
   // Silent vision auto-learn (PR #210).

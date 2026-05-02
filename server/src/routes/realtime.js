@@ -1236,6 +1236,15 @@ const KELION_TOOLS = [
     },
     required: ['prompt'],
   },
+  {
+    name: 'execute_plan',
+    description: "Execute a multi-step plan of tool calls sequentially on the server. Use this when you need to chain multiple actions (e.g. read file → find bug → edit file → run tests → verify). Each step can reference results from previous steps using {{step_N}} or {{step_N.field}} placeholders in its args. If a step fails, the system automatically consults ask_expert_coder for a fix and retries once. Max 15 steps, 120s total. Use on_fail='stop' to abort on critical failures, on_fail='skip' to continue past non-critical ones.",
+    properties: {
+      goal: { type: 'string', description: "High-level description of what this plan aims to achieve. Used for context when auto-healing failures." },
+      steps: { type: 'string', description: 'JSON array of step objects. Each step: { "tool": "tool_name", "args": { ... }, "on_fail": "stop"|"skip"|"heal" }. Args can contain {{step_0}}, {{step_1.stdout}} etc. to reference previous results.' },
+    },
+    required: ['steps'],
+  },
 ];
 
 // Gemini v1alpha BidiGenerateContent — JSON schema with UPPERCASE types and
