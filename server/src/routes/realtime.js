@@ -1109,15 +1109,6 @@ const KELION_TOOLS = [
     required: ['repo'],
   },
   {
-    name: 'get_github_issues',
-    description: "Fetch recent open issues from a GitHub repository. Use when the user asks 'what are the issues', 'read the issues', 'what is failing'. Returns the title, number, state, and a short body for the top 10 most recently updated issues.",
-    properties: {
-      repo: { type: 'string', description: "Repo slug in the form `owner/name` (e.g. `facebook/react`)." },
-      state: { type: 'string', description: "State of issues to fetch: 'open', 'closed', or 'all'. Defaults to 'open'." },
-    },
-    required: ['repo'],
-  },
-  {
     name: 'list_github_repo_files',
     description: "List the entire file tree of a GitHub repository. Use this FIRST when the user asks you to 'audit', 'review', or 'read' a repository. It helps you understand the project structure so you know which specific files to read next. Note: returns up to 1000 files.",
     properties: {
