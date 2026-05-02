@@ -2814,13 +2814,89 @@ const _util = require('util');
 const _exec = _util.promisify(_cp.exec);
 
 // Path to the repository root
-const REPO_ROOT = _path.resolve(__dirname, '../../../../');
+const REPO_ROOT = _path.resolve(__dirname, '../../../');
+
+function isPathSafe(p) {
+  const normalized = p.toLowerCase();
+  if (normalized.includes('c:\\windows')) return false;
+  if (normalized.includes('system32')) return false;
+  return true;
+}
+
+async function toolRunTerminalCommand(args) {
+  try {
+    const cmd = String(args?.command || '').trim();
+    if (!cmd) return { ok: false, error: 'No command provided' };
+    
+    // Safety check: block extremely dangerous commands
+    if (cmd.includes('rm -rf /') || cmd.includes('mkfs')) {
+      return { ok: false, error: 'Command blocked for security reasons.' };
+    }
+    
+    let targetCwd = REPO_ROOT;
+    if (args?.cwd) {
+      targetCwd = _path.resolve(REPO_ROOT, args.cwd);
+      if (!_fs.existsSync(targetCwd)) {
+        _fs.mkdirSync(targetCwd, { recursive: true });
+      }
+    }
+
+    const { stdout, stderr } = await _exec(cmd, { cwd: targetCwd, timeout: 30000 });
+    return { ok: true, stdout: stdout.slice(0, 5000), stderr: stderr.slice(0, 5000) };
+  } catch (err) {
+    return { ok: false, error: err.message, stdout: err.stdout, stderr: err.stderr };
+  }
+}
+
+async function toolAskExpertCoder(args) {
+  try {
+    const question = String(args?.question || '');
+    const context = String(args?.context || '');
+    if (!question) return { ok: false, error: 'Question is required' };
+    
+    const OR_KEY = process.env.OPENROUTER_API_KEY;
+    if (!OR_KEY) return { ok: false, error: 'OPENROUTER_API_KEY is not set' };
+
+    const prompt = `You are an expert coder. Answer the question precisely.\n\nContext:\n${context}\n\nQuestion:\n${question}`;
+    
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OR_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'qwen/qwen-2.5-coder-32b-instruct',
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    
+    const data = await res.json();
+    if (data.error) return { ok: false, error: data.error.message };
+    return { ok: true, answer: data.choices[0].message.content };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
+async function toolFetchDocumentation(args) {
+  try {
+    const url = String(args?.url || '');
+    if (!url || !url.startsWith('http')) return { ok: false, error: 'Valid URL is required' };
+    
+    const res = await fetch(`https://r.jina.ai/${url}`);
+    const text = await res.text();
+    return { ok: true, content: text.slice(0, 15000) };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
 
 async function toolListLocalFiles(args) {
   try {
     const dir = String(args?.dir || '.').trim();
     const resolvedPath = _path.resolve(REPO_ROOT, dir);
-    if (!resolvedPath.startsWith(REPO_ROOT)) return { ok: false, error: 'access denied: path outside repository' };
+    if (!isPathSafe(resolvedPath)) return { ok: false, error: 'access denied: path points to a restricted OS directory' };
     if (!_fs.existsSync(resolvedPath)) return { ok: false, error: 'directory not found' };
     
     const entries = _fs.readdirSync(resolvedPath, { withFileTypes: true });
@@ -2836,7 +2912,7 @@ async function toolReadLocalFile(args) {
     const filePath = String(args?.path || '').trim();
     if (!filePath) return { ok: false, error: 'missing file path' };
     const resolvedPath = _path.resolve(REPO_ROOT, filePath);
-    if (!resolvedPath.startsWith(REPO_ROOT)) return { ok: false, error: 'access denied: path outside repository' };
+    if (!isPathSafe(resolvedPath)) return { ok: false, error: 'access denied: path points to a restricted OS directory' };
     if (!_fs.existsSync(resolvedPath)) return { ok: false, error: 'file not found' };
     
     const content = _fs.readFileSync(resolvedPath, 'utf8');
@@ -2853,7 +2929,7 @@ async function toolEditLocalFile(args) {
     const content = String(args?.content || '');
     if (!filePath) return { ok: false, error: 'missing file path' };
     const resolvedPath = _path.resolve(REPO_ROOT, filePath);
-    if (!resolvedPath.startsWith(REPO_ROOT)) return { ok: false, error: 'access denied: path outside repository' };
+    if (!isPathSafe(resolvedPath)) return { ok: false, error: 'access denied: path points to a restricted OS directory' };
     
     const dir = _path.dirname(resolvedPath);
     if (!_fs.existsSync(dir)) _fs.mkdirSync(dir, { recursive: true });
@@ -2897,6 +2973,29 @@ async function toolCreateGithubPr(args) {
   }
 }
 
+async function toolManageGithubPrs(args) {
+  try {
+    const action = args?.action;
+    const prNumber = args?.pr_number;
+    
+    if (action === 'list') {
+      const { stdout } = await _exec('gh pr list --state open --json number,title,url', { cwd: REPO_ROOT });
+      return { ok: true, prs: JSON.parse(stdout || '[]') };
+    } else if (action === 'merge') {
+      if (!prNumber) return { ok: false, error: 'pr_number is required to merge' };
+      const { stdout } = await _exec(`gh pr merge ${prNumber} --merge --admin`, { cwd: REPO_ROOT });
+      return { ok: true, result: stdout };
+    } else if (action === 'close') {
+      if (!prNumber) return { ok: false, error: 'pr_number is required to close' };
+      const { stdout } = await _exec(`gh pr close ${prNumber}`, { cwd: REPO_ROOT });
+      return { ok: true, result: stdout };
+    } else {
+      return { ok: false, error: 'Unknown action. Use list, merge, or close.' };
+    }
+  } catch (err) {
+    return { ok: false, error: 'GitHub CLI (gh) execution failed. You might need to authenticate using "gh auth login" in terminal. Details: ' + err.message };
+  }
+}
 // ──────────────────────────────────────────────────────────────────
 // Dispatch
 
@@ -2973,7 +3072,6 @@ async function executeRealTool(name, args, ctx) {
     case 'create_calendar_ics':   return toolCreateCalendarIcs(a);
     case 'zapier_trigger':        return toolZapierTrigger(a);
     case 'github_repo_info':      return toolGithubRepoInfo(a);
-    case 'get_github_issues':     return toolGetGithubIssues(a);
     case 'list_github_repo_files': return toolListGithubRepoFiles(a);
     case 'read_github_file':      return toolReadGithubFile(a);
     case 'npm_package_info':      return toolNpmPackageInfo(a);
@@ -2983,6 +3081,11 @@ async function executeRealTool(name, args, ctx) {
     case 'list_local_files':  return toolListLocalFiles(a);
     case 'edit_local_file':   return toolEditLocalFile(a);
     case 'create_github_pr':  return toolCreateGithubPr(a);
+    case 'manage_github_prs': return toolManageGithubPrs(a);
+    // ── Agentic Expert Tools ──
+    case 'run_terminal_command': return toolRunTerminalCommand(a);
+    case 'ask_expert_coder':     return toolAskExpertCoder(a);
+    case 'fetch_documentation':  return toolFetchDocumentation(a);
     // ── PR C — sandbox + regex + user-intern ──
     case 'run_regex':         return toolRunRegex(a);
     case 'run_code':          return toolRunCode(a);
@@ -3224,7 +3327,7 @@ const REAL_TOOL_NAMES = [
   'run_regex', 'run_code', 'get_my_credits', 'get_my_usage', 'get_my_profile',
   // PR D — communications + automations + package info
   'send_email', 'send_sms', 'create_calendar_ics', 'zapier_trigger',
-  'github_repo_info', 'get_github_issues', 'list_github_repo_files', 'read_github_file', 'npm_package_info', 'pypi_package_info',
+  'github_repo_info', 'list_github_repo_files', 'read_github_file', 'npm_package_info', 'pypi_package_info',
   // F11 — image generation
   'generate_image',
   // PR 8/N — Memory of Actions. Read-only self-reflection: returns the
@@ -3305,6 +3408,9 @@ module.exports = {
   toolListLocalFiles,
   toolEditLocalFile,
   toolCreateGithubPr,
+  toolRunTerminalCommand,
+  toolAskExpertCoder,
+  toolFetchDocumentation,
   // F11 — image generation
   toolGenerateImage,
   // PR 8/N — Memory of Actions

@@ -571,25 +571,25 @@ const KELION_TOOLS = [
   // internally without a separate planner LLM.
   {
     name: 'read_local_file',
-    description: "Read the content of a local file from the repository. Use this to inspect code, configuration, or text files.",
+    description: "Read the content of a local file. You have UNIVERSAL WORKSPACE permissions. Use this to inspect code anywhere on the system.",
     properties: {
-      path: { type: 'string', description: "Path to the file relative to the repository root (e.g. 'server/src/index.js')." },
+      path: { type: 'string', description: "Path to the file. Can be absolute or relative to the repo root." },
     },
     required: ['path'],
   },
   {
     name: 'list_local_files',
-    description: "List files and directories in a given path within the repository.",
+    description: "List files and directories in a given path. You have UNIVERSAL WORKSPACE permissions. You can explore outside the repository using absolute paths (e.g. C:/Projects) or relative paths (../).",
     properties: {
-      dir: { type: 'string', description: "Directory path relative to the repo root. Leave empty to list the root." },
+      dir: { type: 'string', description: "Directory path. Leave empty to list the repo root." },
     },
     required: [],
   },
   {
     name: 'edit_local_file',
-    description: "Edit the content of a local file. Use this to fix bugs or update code. IMPORTANT: Provide the full new content or a precise replacement block.",
+    description: "Edit the content of a local file. You have UNIVERSAL WORKSPACE permissions. IMPORTANT: Provide the full new content or a precise replacement block.",
     properties: {
-      path: { type: 'string', description: "Path to the file to edit." },
+      path: { type: 'string', description: "Path to the file to edit. Can be absolute or relative." },
       content: { type: 'string', description: "The new content to write to the file." },
     },
     required: ['path', 'content'],
@@ -602,6 +602,41 @@ const KELION_TOOLS = [
       body: { type: 'string', description: "Description of what was fixed." },
     },
     required: ['title', 'body'],
+  },
+  {
+    name: 'manage_github_prs',
+    description: "Manage GitHub Pull Requests. Allows you to list open PRs, merge PRs automatically, or close them.",
+    properties: {
+      action: { type: 'string', enum: ['list', 'merge', 'close'], description: "Action to perform." },
+      pr_number: { type: 'string', description: "The PR number to merge or close (e.g., '123'). Required for merge or close." },
+    },
+    required: ['action'],
+  },
+  {
+    name: 'run_terminal_command',
+    description: "Execute a command in the local terminal. You have UNIVERSAL WORKSPACE permissions. You can navigate anywhere using the cwd argument. Use this to create new apps (npx create-next-app), install packages, or deploy.",
+    properties: {
+      command: { type: 'string', description: "The shell command to execute." },
+      cwd: { type: 'string', description: "Optional working directory for the command. Can be absolute or relative. Defaults to repo root." },
+    },
+    required: ['command'],
+  },
+  {
+    name: 'ask_expert_coder',
+    description: "Consult an expert coding model (Qwen 2.5 Coder 32B) on OpenRouter to solve complex programming problems, bugs, or architecture questions you are unsure about. Provide it with the context and the exact question.",
+    properties: {
+      question: { type: 'string', description: "The exact problem or question for the expert." },
+      context: { type: 'string', description: "Relevant code snippets, error messages, or file contents." },
+    },
+    required: ['question', 'context'],
+  },
+  {
+    name: 'fetch_documentation',
+    description: "Fetch and read the documentation of any API or tool from the web, cleanly converted to Markdown by Jina AI. Use this when you need to learn how a 3rd party tool works.",
+    properties: {
+      url: { type: 'string', description: "The URL of the documentation to read." },
+    },
+    required: ['url'],
   },
   {
     name: 'get_action_history',
@@ -1079,15 +1114,6 @@ const KELION_TOOLS = [
     description: "Return public metadata for a GitHub repository: description, stars, forks, open issues, language, license, default branch, topics. Use when the user asks 'what does this repo do', 'how popular is it', 'when was it updated last'. No authentication required (GITHUB_TOKEN, if set, just raises the unauth rate limit).",
     properties: {
       repo: { type: 'string', description: "Repo slug in the form `owner/name` (e.g. `facebook/react`). A full github.com URL also works." },
-    },
-    required: ['repo'],
-  },
-  {
-    name: 'get_github_issues',
-    description: "Fetch recent open issues from a GitHub repository. Use when the user asks 'what are the issues', 'read the issues', 'what is failing'. Returns the title, number, state, and a short body for the top 10 most recently updated issues.",
-    properties: {
-      repo: { type: 'string', description: "Repo slug in the form `owner/name` (e.g. `facebook/react`)." },
-      state: { type: 'string', description: "State of issues to fetch: 'open', 'closed', or 'all'. Defaults to 'open'." },
     },
     required: ['repo'],
   },

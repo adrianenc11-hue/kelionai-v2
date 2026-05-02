@@ -96,7 +96,7 @@ const EXPECTED_TOOL_NAMES = [
   'get_my_profile',
   // PR D — communications + automations + package info.
   'send_email', 'create_calendar_ics', 'zapier_trigger',
-  'github_repo_info', 'get_github_issues', 'list_github_repo_files', 'read_github_file', 'npm_package_info', 'pypi_package_info',
+  'github_repo_info', 'list_github_repo_files', 'read_github_file', 'npm_package_info', 'pypi_package_info',
   // F11 — AI image generation (Gemini native). Graceful fallback when
   // GEMINI_API_KEY is absent.
   'generate_image',
@@ -107,6 +107,11 @@ const EXPECTED_TOOL_NAMES = [
   'list_local_files',
   'edit_local_file',
   'create_github_pr',
+  'manage_github_prs',
+  // Agentic
+  'run_terminal_command',
+  'ask_expert_coder',
+  'fetch_documentation',
   // PR #8/N — Memory of Actions. Read-only self-reflection tool: the
   // voice model queries action_history for the signed-in user before
   // repeating a tool call. Guests receive { ok:false, signed_in:false }.
