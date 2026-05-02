@@ -78,7 +78,11 @@ function fail(reason, detail) {
 }
 
 async function getJson(path) {
-  const r = await fetch(BASE + path);
+  const headers = {};
+  if (process.env.ACCEPTANCE_TOKEN) {
+    headers['Authorization'] = 'Bearer ' + process.env.ACCEPTANCE_TOKEN;
+  }
+  const r = await fetch(BASE + path, { headers });
   const text = await r.text();
   let body = null;
   try { body = JSON.parse(text); } catch (_) { /* body may be non-JSON */ }
