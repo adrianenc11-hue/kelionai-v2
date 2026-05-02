@@ -22,6 +22,10 @@ const {
 
 const EXPECTED_TOOL_NAMES = [
   'browse_web',
+  'run_command',
+  'write_to_file',
+  'replace_file_content',
+  'multi_replace_file_content',
   'read_calendar',
   'read_email',
   'search_files',
