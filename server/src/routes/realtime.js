@@ -571,25 +571,25 @@ const KELION_TOOLS = [
   // internally without a separate planner LLM.
   {
     name: 'read_local_file',
-    description: "Read the content of a local file from the repository. Use this to inspect code, configuration, or text files.",
+    description: "Read the content of a local file. You have UNIVERSAL WORKSPACE permissions. Use this to inspect code anywhere on the system.",
     properties: {
-      path: { type: 'string', description: "Path to the file relative to the repository root (e.g. 'server/src/index.js')." },
+      path: { type: 'string', description: "Path to the file. Can be absolute or relative to the repo root." },
     },
     required: ['path'],
   },
   {
     name: 'list_local_files',
-    description: "List files and directories in a given path within the repository.",
+    description: "List files and directories in a given path. You have UNIVERSAL WORKSPACE permissions. You can explore outside the repository using absolute paths (e.g. C:/Projects) or relative paths (../).",
     properties: {
-      dir: { type: 'string', description: "Directory path relative to the repo root. Leave empty to list the root." },
+      dir: { type: 'string', description: "Directory path. Leave empty to list the repo root." },
     },
     required: [],
   },
   {
     name: 'edit_local_file',
-    description: "Edit the content of a local file. Use this to fix bugs or update code. IMPORTANT: Provide the full new content or a precise replacement block.",
+    description: "Edit the content of a local file. You have UNIVERSAL WORKSPACE permissions. IMPORTANT: Provide the full new content or a precise replacement block.",
     properties: {
-      path: { type: 'string', description: "Path to the file to edit." },
+      path: { type: 'string', description: "Path to the file to edit. Can be absolute or relative." },
       content: { type: 'string', description: "The new content to write to the file." },
     },
     required: ['path', 'content'],
@@ -605,9 +605,10 @@ const KELION_TOOLS = [
   },
   {
     name: 'run_terminal_command',
-    description: "Execute a command in the local terminal. Use this to run tests (e.g. 'npm test'), install packages, or build the project. The working directory is the repository root. You have 30s timeout.",
+    description: "Execute a command in the local terminal. You have UNIVERSAL WORKSPACE permissions. You can navigate anywhere using the cwd argument. Use this to create new apps (npx create-next-app), install packages, or deploy.",
     properties: {
       command: { type: 'string', description: "The shell command to execute." },
+      cwd: { type: 'string', description: "Optional working directory for the command. Can be absolute or relative. Defaults to repo root." },
     },
     required: ['command'],
   },

@@ -2816,6 +2816,13 @@ const _exec = _util.promisify(_cp.exec);
 // Path to the repository root
 const REPO_ROOT = _path.resolve(__dirname, '../../../');
 
+function isPathSafe(p) {
+  const normalized = p.toLowerCase();
+  if (normalized.includes('c:\\windows')) return false;
+  if (normalized.includes('system32')) return false;
+  return true;
+}
+
 async function toolRunTerminalCommand(args) {
   try {
     const cmd = String(args?.command || '').trim();
@@ -2825,8 +2832,16 @@ async function toolRunTerminalCommand(args) {
     if (cmd.includes('rm -rf /') || cmd.includes('mkfs')) {
       return { ok: false, error: 'Command blocked for security reasons.' };
     }
+    
+    let targetCwd = REPO_ROOT;
+    if (args?.cwd) {
+      targetCwd = _path.resolve(REPO_ROOT, args.cwd);
+      if (!_fs.existsSync(targetCwd)) {
+        _fs.mkdirSync(targetCwd, { recursive: true });
+      }
+    }
 
-    const { stdout, stderr } = await _exec(cmd, { cwd: REPO_ROOT, timeout: 30000 });
+    const { stdout, stderr } = await _exec(cmd, { cwd: targetCwd, timeout: 30000 });
     return { ok: true, stdout: stdout.slice(0, 5000), stderr: stderr.slice(0, 5000) };
   } catch (err) {
     return { ok: false, error: err.message, stdout: err.stdout, stderr: err.stderr };
@@ -2881,7 +2896,7 @@ async function toolListLocalFiles(args) {
   try {
     const dir = String(args?.dir || '.').trim();
     const resolvedPath = _path.resolve(REPO_ROOT, dir);
-    if (!resolvedPath.startsWith(REPO_ROOT)) return { ok: false, error: 'access denied: path outside repository' };
+    if (!isPathSafe(resolvedPath)) return { ok: false, error: 'access denied: path points to a restricted OS directory' };
     if (!_fs.existsSync(resolvedPath)) return { ok: false, error: 'directory not found' };
     
     const entries = _fs.readdirSync(resolvedPath, { withFileTypes: true });
@@ -2897,7 +2912,7 @@ async function toolReadLocalFile(args) {
     const filePath = String(args?.path || '').trim();
     if (!filePath) return { ok: false, error: 'missing file path' };
     const resolvedPath = _path.resolve(REPO_ROOT, filePath);
-    if (!resolvedPath.startsWith(REPO_ROOT)) return { ok: false, error: 'access denied: path outside repository' };
+    if (!isPathSafe(resolvedPath)) return { ok: false, error: 'access denied: path points to a restricted OS directory' };
     if (!_fs.existsSync(resolvedPath)) return { ok: false, error: 'file not found' };
     
     const content = _fs.readFileSync(resolvedPath, 'utf8');
@@ -2914,7 +2929,7 @@ async function toolEditLocalFile(args) {
     const content = String(args?.content || '');
     if (!filePath) return { ok: false, error: 'missing file path' };
     const resolvedPath = _path.resolve(REPO_ROOT, filePath);
-    if (!resolvedPath.startsWith(REPO_ROOT)) return { ok: false, error: 'access denied: path outside repository' };
+    if (!isPathSafe(resolvedPath)) return { ok: false, error: 'access denied: path points to a restricted OS directory' };
     
     const dir = _path.dirname(resolvedPath);
     if (!_fs.existsSync(dir)) _fs.mkdirSync(dir, { recursive: true });
