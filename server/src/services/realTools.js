@@ -3072,7 +3072,6 @@ async function executeRealTool(name, args, ctx) {
     case 'create_calendar_ics':   return toolCreateCalendarIcs(a);
     case 'zapier_trigger':        return toolZapierTrigger(a);
     case 'github_repo_info':      return toolGithubRepoInfo(a);
-    case 'get_github_issues':     return toolGetGithubIssues(a);
     case 'list_github_repo_files': return toolListGithubRepoFiles(a);
     case 'read_github_file':      return toolReadGithubFile(a);
     case 'npm_package_info':      return toolNpmPackageInfo(a);
@@ -3328,9 +3327,7 @@ const REAL_TOOL_NAMES = [
   'run_regex', 'run_code', 'get_my_credits', 'get_my_usage', 'get_my_profile',
   // PR D — communications + automations + package info
   'send_email', 'send_sms', 'create_calendar_ics', 'zapier_trigger',
-  'github_repo_info', 'get_github_issues', 'list_github_repo_files', 'read_github_file', 'npm_package_info', 'pypi_package_info',
-  // Agentic Expert Tools
-  'run_terminal_command', 'ask_expert_coder', 'fetch_documentation',
+  'github_repo_info', 'list_github_repo_files', 'read_github_file', 'npm_package_info', 'pypi_package_info',
   // F11 — image generation
   'generate_image',
   // PR 8/N — Memory of Actions. Read-only self-reflection: returns the
