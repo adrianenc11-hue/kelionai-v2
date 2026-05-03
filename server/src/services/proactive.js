@@ -24,15 +24,51 @@ const {
 
 const TICK_MS = Number(process.env.PROACTIVE_TICK_MS) || 15 * 60 * 1000; // 15 min
 const MIN_GAP_MS = Number(process.env.PROACTIVE_MIN_GAP_MS) || 18 * 60 * 60 * 1000;
-const QUIET_START_HOUR = Number(process.env.PROACTIVE_START_HOUR ?? 9);
-const QUIET_END_HOUR   = Number(process.env.PROACTIVE_END_HOUR   ?? 21);
+const QUIET_START_LOCAL = Number(process.env.PROACTIVE_START_HOUR ?? 9);
+const QUIET_END_LOCAL   = Number(process.env.PROACTIVE_END_HOUR   ?? 21);
+
+// Estimate a user's UTC offset from their last known longitude.
+// Every 15° of longitude ≈ 1 hour offset from UTC. This is a rough
+// approximation (ignores DST and political timezone boundaries) but
+// is good enough for quiet-hours gating and avoids adding a timezone
+// column or a heavy tz library.
+function estimateUtcOffsetFromLng(lng) {
+  if (typeof lng !== 'number' || !Number.isFinite(lng)) return 0;
+  return Math.round(lng / 15);
+}
+
+// Fetch the most recent longitude for a user from memory_items or
+// action_log (geo tools store lat/lng in args). Returns null if
+// no geo data is available.
+async function getUserLng(userId) {
+  const db = getDb();
+  if (!db) return null;
+  try {
+    // Check action_log for recent geo-aware tool calls
+    const row = await db.get(
+      `SELECT args FROM action_log
+       WHERE user_id = ? AND args LIKE '%lng%'
+       ORDER BY created_at DESC LIMIT 1`,
+      [userId]
+    );
+    if (row?.args) {
+      try {
+        const parsed = JSON.parse(row.args);
+        if (typeof parsed.lng === 'number') return parsed.lng;
+        if (typeof parsed.longitude === 'number') return parsed.longitude;
+      } catch { /* ignore parse errors */ }
+    }
+  } catch { /* action_log may not exist yet */ }
+  return null;
+}
+
+function withinQuietHours(date = new Date(), utcOffset = 0) {
+  // Convert UTC hour to user's local hour
+  const localHour = (date.getUTCHours() + utcOffset + 24) % 24;
+  return localHour >= QUIET_START_LOCAL && localHour < QUIET_END_LOCAL;
+}
 
 const KIND_WEIGHT = { goal: 5, routine: 4, relationship: 3, preference: 2, skill: 2, context: 1, identity: 0, fact: 1 };
-
-function withinQuietHours(date = new Date()) {
-  const h = date.getUTCHours();
-  return h >= QUIET_START_HOUR && h < QUIET_END_HOUR;
-}
 
 async function pickMemoryForUser(userId) {
   const db = getDb();
@@ -93,7 +129,10 @@ async function checkGemma4Availability() {
 
 async function runOnce({ webpush, now = new Date() } = {}) {
   if (!webpush) return { skipped: 'no-webpush' };
-  if (!withinQuietHours(now)) return { skipped: 'quiet-hours', hour: now.getUTCHours() };
+  // Global quiet-hours check (server default) — per-user override below
+  // For the global check we use UTC offset 0; individual users get their
+  // own offset inside the loop.
+  if (!withinQuietHours(now, 0)) return { skipped: 'quiet-hours', hour: now.getUTCHours() };
 
   const subs = await listActivePushSubscriptions();
   const byUser = new Map();
@@ -108,10 +147,16 @@ async function runOnce({ webpush, now = new Date() } = {}) {
   const systemAlertMsg = await checkGemma4Availability();
 
   for (const [userId, userSubs] of byUser) {
-    let msg = systemAlertMsg;
+      let msg = systemAlertMsg;
     if (!msg) {
       const recent = await recentProactiveForUser(userId, MIN_GAP_MS);
       if (recent.length > 0) { report.skipped_gap += 1; continue; }
+
+      // Per-user quiet-hours: skip if user's local time is outside window
+      const lng = await getUserLng(userId);
+      const userOffset = estimateUtcOffsetFromLng(lng);
+      if (!withinQuietHours(now, userOffset)) { report.skipped_gap += 1; continue; }
+
       const mem = await pickMemoryForUser(userId);
       if (!mem) { report.no_memory += 1; continue; }
       msg = composeMessage(mem);
@@ -154,4 +199,4 @@ function stop() {
   if (intervalHandle) { clearInterval(intervalHandle); intervalHandle = null; }
 }
 
-module.exports = { runOnce, start, stop, pickMemoryForUser, composeMessage, withinQuietHours };
+module.exports = { runOnce, start, stop, pickMemoryForUser, composeMessage, withinQuietHours, estimateUtcOffsetFromLng };

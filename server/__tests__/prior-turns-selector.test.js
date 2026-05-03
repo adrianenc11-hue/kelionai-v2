@@ -100,21 +100,15 @@ describe('selectPriorTurns — cross-mode voice handoff', () => {
 
 // The ESM copy under src/lib is what Vite bundles for the browser.
 // We cannot `require()` it here (no ESM transform), so compare source
-// text against the CJS twin to catch drift. The parity check is
-// skipped with a clear message when the frontend file is not present
-// so standalone server-side CI keeps working.
+// text against the CJS twin to catch drift.
 describe('selectPriorTurns — frontend/backend parity', () => {
   const frontendPath = path.join(
     __dirname,
     '..', '..', 'src', 'lib', 'priorTurnsSelector.js'
   );
-  let frontendSource = '';
-  try { frontendSource = fs.readFileSync(frontendPath, 'utf8'); } catch (_) {}
+  const frontendSource = fs.readFileSync(frontendPath, 'utf8');
 
-  const hasFrontend = Boolean(frontendSource);
-  const test = hasFrontend ? it : it.skip;
-
-  test('frontend copy exports a function with the same rules', () => {
+  it('frontend copy exports a function with the same rules', () => {
     expect(frontendSource).toContain('export function selectPriorTurns');
     expect(frontendSource).toContain('chatMessages');
     expect(frontendSource).toContain('voiceTurns');
