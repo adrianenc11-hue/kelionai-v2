@@ -47,7 +47,13 @@ export function logAiEvent(type, data = {}) {
       default:               return JSON.stringify(data).slice(0, 100)
     }
   })()
-  console.log(`${label} ${summary}`)
+  // Suppress console output for high-frequency events that fire dozens of
+  // times per second during active sessions. They're still captured in the
+  // in-memory `events` array for __kelionDiag access from DevTools.
+  const QUIET_TYPES = new Set(['audio_out', 'audio_skipped', 'status'])
+  if (!QUIET_TYPES.has(type)) {
+    console.log(`${label} ${summary}`)
+  }
 }
 
 export function onAiEvent(fn) {

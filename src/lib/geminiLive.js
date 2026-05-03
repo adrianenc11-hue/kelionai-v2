@@ -1025,14 +1025,13 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
         // setupComplete), keep the error visible rather than bouncing back
         // to the "Tap to talk" label — otherwise the user thinks nothing
         // happened.
-        const neverOpened = statusRef.current === 'connecting' || statusRef.current === 'requesting'
-        // Protocol / auth / quota failures must never silently bounce to
-        // 'idle' — the wake-word is armed on 'idle' and will re-fire
-        // start(), which opens a new WS that hits the same 1007/1008/1011
-        // in a loop (Adrian 2026-04-20, "crapa dupa 2 min de funtionare
-        // 1007"). Surface the error and require a manual tap to retry.
-        const PROTOCOL_FAILURES = new Set([1007, 1008, 1011])
-        if (neverOpened || PROTOCOL_FAILURES.has(e?.code)) {
+        // Protocol / auth / quota / billing / any abnormal failures must
+        // never silently bounce to 'idle' — the wake-word and auto-start
+        // are armed on 'idle' and will re-fire start(), which opens a new
+        // WS that hits the same error in a loop. Only a CLEAN close
+        // (code 1000 with no error) should go to idle. Everything else
+        // stays on 'error' and requires a manual tap/reload to retry.
+        if (neverOpened || (e?.code && e.code !== 1000)) {
           setError(`Connection closed (${e?.code || 'unknown'})${e?.reason ? `: ${e.reason}` : ''}`)
           setStatus('error')
           return
