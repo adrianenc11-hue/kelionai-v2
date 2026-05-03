@@ -31,6 +31,7 @@ const diagRouter       = require('./routes/diag');
 const generatedImagesRouter = require('./routes/generatedImages');
 const voiceCloneRouter = require('./routes/voiceClone');
 const demoRouter       = require('./routes/demo');
+const chatRouter       = require('./routes/chat');
 const proxyRouter      = require('./routes/proxy');
 const { attachVertexLiveProxy } = require('./routes/vertexLiveProxy');
 const proactive        = require('./services/proactive');
@@ -292,6 +293,7 @@ app.use('/api/admin', requireAuth, adminRouter);
 // hand back short-lived tokens; persona + config are baked in server-side.
 // Vision frames have their own limiter inside the router (see realtime.js).
 app.use('/api/realtime', chatLimiter, realtimeRouter);
+app.use('/api/chat', chatLimiter, chatRouter);
 
 // Trial status — public endpoint the client polls to drive the top-right
 // countdown HUD. Read-only; never stamps. Returns { applicable, allowed,

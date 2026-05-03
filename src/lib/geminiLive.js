@@ -1536,26 +1536,50 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
   // clientContent turn. The model responds with voice + transcript just
   // like a spoken turn. Enables the chat panel (⌨ button) to work.
   const sendText = useCallback(async (text) => {
-    const ws = wsRef.current
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
-      console.warn('[geminiLive] sendText: no open WebSocket')
-      return
-    }
     const clean = (text || '').trim()
     if (!clean) return
     userHasSpokenRef.current = true
     appendTurn('user', clean, true, '⌨️ Keyboard')
     logAiEvent('text_sent', { text: clean })
-    try {
-      ws.send(JSON.stringify({
-        clientContent: {
-          turns: [{ role: 'user', parts: [{ text: clean }] }],
-          turnComplete: true,
-        },
-      }))
+
+    const ws = wsRef.current
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      // Live WebSocket path
+      try {
+        ws.send(JSON.stringify({
+          clientContent: {
+            turns: [{ role: 'user', parts: [{ text: clean }] }],
+            turnComplete: true,
+          },
+        }))
+        setStatus('thinking')
+      } catch (err) {
+        console.error('[geminiLive] sendText failed', err)
+      }
+    } else {
+      // HTTP fallback — Gemma 4 text chat via /api/chat
       setStatus('thinking')
-    } catch (err) {
-      console.error('[geminiLive] sendText failed', err)
+      try {
+        const r = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ message: clean }),
+        })
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({ error: 'Chat failed' }))
+          appendTurn('assistant', err.error || 'Sorry, something went wrong.', true)
+          setStatus('idle')
+          return
+        }
+        const data = await r.json()
+        appendTurn('assistant', data.reply || 'No response.', true, data.model ? `🤖 ${data.model}` : undefined)
+        setStatus('idle')
+      } catch (err) {
+        console.error('[geminiLive] HTTP chat fallback failed', err)
+        appendTurn('assistant', 'Connection error. Please try again.', true)
+        setStatus('idle')
+      }
     }
   }, [appendTurn])
 
