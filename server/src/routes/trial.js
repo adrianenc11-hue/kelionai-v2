@@ -52,16 +52,18 @@ router.get('/status', async (req, res) => {
     });
   }
   const ip = ipGeo.clientIp(req) || req.ip || '';
-  // Trial is DISABLED — all guests must sign in and purchase credits.
+  // Guest trial: 15 min/day, 7-day lifetime per IP.
+  const status = await trialStatus(ip);
   return res.json({
-    applicable:   true,
-    allowed:      false,
-    reason:       'trial_disabled',
-    remainingMs:  0,
-    windowMs:     TRIAL_WINDOW_MS,
-    lifetimeMs:   TRIAL_LIFETIME_MS,
-    lifetimeRemainingMs: 0,
-    stamped:      false,
+    applicable:          true,
+    allowed:             status.allowed,
+    reason:              status.reason || undefined,
+    remainingMs:         status.remainingMs,
+    windowMs:            TRIAL_WINDOW_MS,
+    lifetimeMs:          TRIAL_LIFETIME_MS,
+    lifetimeRemainingMs: status.lifetimeRemainingMs ?? TRIAL_LIFETIME_MS,
+    stamped:             !status.fresh,
+    nextWindowMs:        status.nextWindowMs || undefined,
   });
 });
 

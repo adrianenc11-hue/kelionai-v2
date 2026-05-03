@@ -97,8 +97,8 @@ async function resolveLockedLangTag({ req, user, forcedLang }) {
 }
 const { requireAuth } = require('../middleware/auth');
 const { peekSignedInUser, isAdminUser } = require('../middleware/optionalAuth');
+const { trialStatus, stampTrialIfFresh } = require('../services/trialQuota');
 const ipGeo = require('../services/ipGeo');
-const trialQuota = require('../services/trialQuota');
 const { buildSanitizedPriorTurnsBlock } = require('../utils/sanitizePriorTurns');
 const router = Router();
 
@@ -1322,7 +1322,7 @@ function buildKelionToolsChatCompletions() {
 // text chat route can share the same per-IP window. See that module
 // for semantics. We pull out the constants + functions we need here.
 // isAdminUser / peekSignedInUser now come from ../middleware/optionalAuth.
-const { TRIAL_WINDOW_MS, trialStatus, stampTrialIfFresh } = trialQuota;
+const { TRIAL_WINDOW_MS } = require('../services/trialQuota');
 
 // Live session registry — admin dashboard reads this to show who's online.
 if (!global.__kelionActiveSessions) global.__kelionActiveSessions = new Map();
@@ -1411,11 +1411,19 @@ const geminiTokenHandler = async (req, res) => {
   const isGuest = !adminUser;
   let trial = null;
   if (isGuest && !isAdmin) {
-    // NO FREE TRIAL — all guests must sign in and buy credits.
-    return res.status(401).json({
-      error: 'Please sign in and purchase credits to use Kelion.',
-      trial: { allowed: false, reason: 'trial_disabled', remainingMs: 0 },
-    });
+    // Guest trial: 15 min/day, 7-day lifetime per IP.
+    const guestIp = ipGeo.clientIp(req) || req.ip || '';
+    trial = await trialStatus(guestIp);
+    if (!trial.allowed) {
+      return res.status(401).json({
+        error: trial.reason === 'lifetime_expired'
+          ? 'Free trial expired. Create an account and buy credits to continue.'
+          : 'Daily free trial used up. Come back tomorrow or sign in.',
+        trial: { allowed: false, reason: trial.reason, remainingMs: 0 },
+      });
+    }
+    // Stamp the trial start on first interaction
+    await stampTrialIfFresh(guestIp, trial);
   } else if (adminUser && !isAdmin) {
     // Non-admin with a stale JWT whose `sub` is not a numeric row id
     // (pre-Postgres UUID). Without an id we can't look up a credits
