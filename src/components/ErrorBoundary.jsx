@@ -11,7 +11,7 @@ import { Component } from 'react'
 export default class ErrorBoundary extends Component {
   constructor(props) {
     super(props)
-    this.state = { hasError: false, error: null }
+    this.state = { hasError: false, error: null, retryCount: 0 }
     this._retryTimer = null
   }
 
@@ -21,11 +21,19 @@ export default class ErrorBoundary extends Component {
 
   componentDidCatch(error, info) {
     console.error('[ErrorBoundary]', error, info.componentStack)
-    // Auto-retry after 3s for transient errors (WebGL context loss etc.)
+    // Auto-retry with exponential backoff, but STOP after 3 attempts.
+    // Without this cap, a persistent error (e.g. billing block causing
+    // auto-start → crash → retry → auto-start → crash) loops forever
+    // at 100% CPU. After 3 retries the user must manually reload.
+    const MAX_RETRIES = 3
     if (this._retryTimer) clearTimeout(this._retryTimer)
-    this._retryTimer = setTimeout(() => {
-      this.setState({ hasError: false, error: null })
-    }, 3000)
+    if (this.state.retryCount < MAX_RETRIES) {
+      const delay = 3000 * (this.state.retryCount + 1) // 3s, 6s, 9s
+      this._retryTimer = setTimeout(() => {
+        this.setState((prev) => ({ hasError: false, error: null, retryCount: prev.retryCount + 1 }))
+      }, delay)
+    }
+    // else: no more auto-retries — only manual reload button
   }
 
   componentWillUnmount() {
@@ -55,9 +63,15 @@ export default class ErrorBoundary extends Component {
             <p style={{ color: '#888', fontSize: '15px', lineHeight: '1.6', margin: '0 0 8px' }}>
               An unexpected error occurred. This might be a temporary issue with your browser or graphics driver.
             </p>
-            <p style={{ color: '#666', fontSize: '13px', lineHeight: '1.5', margin: '0 0 24px' }}>
-              Retrying automatically…
-            </p>
+            {this.state.retryCount < 3 ? (
+              <p style={{ color: '#666', fontSize: '13px', lineHeight: '1.5', margin: '0 0 24px' }}>
+                Retrying automatically… (attempt {this.state.retryCount + 1}/3)
+              </p>
+            ) : (
+              <p style={{ color: '#ef4444', fontSize: '13px', lineHeight: '1.5', margin: '0 0 24px' }}>
+                Auto-retry exhausted. Please reload the page.
+              </p>
+            )}
             <button
               onClick={() => window.location.reload()}
               style={{

@@ -754,17 +754,17 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
       const geoQuery = (coords && Number.isFinite(coords.lat) && Number.isFinite(coords.lon))
         ? `&lat=${coords.lat.toFixed(6)}&lon=${coords.lon.toFixed(6)}&acc=${Math.round(coords.accuracy || 0)}`
         : ''
-      // Backend selector. Default is `vertex` — GA `gemini-live-2.5-flash-
-      // native-audio` on Vertex AI via the same-origin proxy at
-      // `/api/realtime/vertex-live-ws`. `?liveBackend=aistudio` (or
-      // `localStorage.kelion_live_backend = 'aistudio'`) forces the legacy
-      // preview AI Studio ephemeral-token path — kept as an operator-only
-      // escape hatch in case the Vertex proxy is unreachable.
-      let liveBackend = 'vertex'
+      // Backend selector. Default is `aistudio` — uses GEMINI_API_KEY with
+      // ephemeral tokens via AI Studio. Matches the server default
+      // (realtime.js). `?liveBackend=vertex` (or
+      // `localStorage.kelion_live_backend = 'vertex'`) forces the Vertex AI
+      // proxy path — requires GCP billing to be enabled.
+      let liveBackend = 'aistudio'
       try {
         const fromUrl = new URL(window.location.href).searchParams.get('liveBackend')
         const fromStorage = window.localStorage?.getItem('kelion_live_backend')
         const raw = (fromUrl || fromStorage || '').toString().toLowerCase()
+        if (raw === 'vertex') liveBackend = 'vertex'
         if (raw === 'aistudio') liveBackend = 'aistudio'
       } catch (_) { /* window/localStorage missing in SSR — default stays */ }
       const backendQuery = liveBackend === 'aistudio' ? '&backend=aistudio' : '&backend=vertex'
@@ -1026,13 +1026,15 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
         // to the "Tap to talk" label — otherwise the user thinks nothing
         // happened.
         const neverOpened = statusRef.current === 'connecting' || statusRef.current === 'requesting'
-        // Protocol / auth / quota failures must never silently bounce to
-        // 'idle' — the wake-word is armed on 'idle' and will re-fire
-        // start(), which opens a new WS that hits the same 1007/1008/1011
-        // in a loop (Adrian 2026-04-20, "crapa dupa 2 min de funtionare
-        // 1007"). Surface the error and require a manual tap to retry.
-        const PROTOCOL_FAILURES = new Set([1007, 1008, 1011])
-        if (neverOpened || PROTOCOL_FAILURES.has(e?.code)) {
+        // Protocol / auth / quota / billing failures must never silently
+        // bounce to 'idle' — the wake-word and auto-start are armed on
+        // 'idle' and will re-fire start(), creating a reconnection loop.
+        // Only specific fatal codes stay on 'error'. Codes like 1005 (no
+        // status) and 1006 (abnormal / idle timeout) are normal — Google
+        // sends these on idle timeout or network blip and should allow
+        // reconnection via tap-to-talk.
+        const FATAL_CODES = new Set([1007, 1008, 1011])
+        if (neverOpened || FATAL_CODES.has(e?.code)) {
           setError(`Connection closed (${e?.code || 'unknown'})${e?.reason ? `: ${e.reason}` : ''}`)
           setStatus('error')
           return

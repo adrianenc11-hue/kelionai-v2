@@ -16,19 +16,14 @@ export function installGlobalTracers() {
   // 1. WebSocket Tracer
   const OriginalWebSocket = window.WebSocket;
   window.WebSocket = function(url, protocols) {
-    console.warn(`[TRACER-NET] 🌐 NEW WebSocket connection opened to: ${url}\nStack: ${getStackTrace()}`);
+    console.warn(`[TRACER-NET] 🌐 NEW WebSocket connection opened to: ${url}`);
     const ws = new OriginalWebSocket(url, protocols);
-    
-    // Intercept send to see if any unknown data is pushed
-    const origSend = ws.send;
-    ws.send = function(data) {
-      // Don't spam binary audio chunks unless we really want to, keep it lightweight
-      if (typeof data === 'string') {
-        const preview = data.length > 200 ? data.slice(0, 200) + '...' : data;
-        console.info(`[TRACER-NET] ⬆️ WS Send to ${url}: ${preview}`);
-      }
-      return origSend.call(this, data);
-    };
+    // NOTE: send() interception REMOVED — it generated hundreds of
+    // console.info messages per second during active sessions (audio PCM
+    // chunks at 60fps + video JPEG frames at 15fps), each with a full
+    // `new Error().stack` trace. This was one of the primary causes of
+    // CPU waste and console spam. Connection open/close is sufficient
+    // for diagnosing connectivity issues.
     return ws;
   };
   Object.assign(window.WebSocket, OriginalWebSocket);
@@ -51,17 +46,10 @@ export function installGlobalTracers() {
     function TracedAudioContext(...args) {
       console.warn(`[TRACER-AUDIO] 🎛️ NEW AudioContext created!\nStack: ${getStackTrace()}`);
       const ctx = new OrigAudioContext(...args);
-      
-      const origCreateBufferSource = ctx.createBufferSource;
-      ctx.createBufferSource = function() {
-        const src = origCreateBufferSource.call(this);
-        const origStart = src.start;
-        src.start = function(when, offset, duration) {
-          console.warn(`[TRACER-AUDIO] 🔊 AudioContext buffer started playing! scheduled at: ${when || 'now'} (ctx time: ${ctx.currentTime})\nStack: ${getStackTrace()}`);
-          return origStart.call(this, when, offset, duration);
-        };
-        return src;
-      };
+      // NOTE: createBufferSource tracing REMOVED — it fired 40-60 times
+      // per second during AI voice playback (every PCM chunk → new
+      // BufferSource → .start()), each with a stack trace. This was a
+      // major source of console spam and CPU overhead.
       return ctx;
     }
     TracedAudioContext.prototype = OrigAudioContext.prototype;

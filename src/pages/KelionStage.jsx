@@ -1172,9 +1172,14 @@ export default function KelionStage() {
   const hasBeenSignedInRef = useRef(false)
   useEffect(() => {
     if (cameraAutoStartedRef.current) return
+    // Survive ErrorBoundary re-mounts (same session)
+    try {
+      if (sessionStorage.getItem('kelion_cam_auto_started') === '1') { cameraAutoStartedRef.current = true; return }
+    } catch (_) {}
     if (cameraStream) return // already running (manual toggle or prior mount)
     if (typeof startCamera !== 'function') return
     cameraAutoStartedRef.current = true
+    try { sessionStorage.setItem('kelion_cam_auto_started', '1') } catch (_) {}
     // First-visit Chrome/Safari gate getUserMedia behind a user-gesture,
     // so the bare mount-time attempt below can fail silently (the user
     // never clicked yet). We attempt immediately for return visitors who
@@ -1590,16 +1595,41 @@ export default function KelionStage() {
   // --- Auto-start: launch session automatically on page load ---
   // Fires once after mount. If the session is idle it starts voice.
   // The user can then mute the mic (micOff) to go text-only.
+  //
+  // CRITICAL: uses sessionStorage (not useRef) so the flag survives
+  // ErrorBoundary retry re-mounts. Previously, useRef(false) reset on
+  // every re-mount, causing: auto-start → billing error → crash →
+  // ErrorBoundary retry → re-mount → auto-start → same error → ∞
+  // The sessionStorage key is cleared on manual page reload (user action)
+  // so they can retry if the underlying issue was fixed.
   const autoStartFiredRef = useRef(false)
   useEffect(() => {
     if (autoStartFiredRef.current) return
+    // Check sessionStorage to survive ErrorBoundary re-mounts
+    try {
+      const fired = sessionStorage.getItem('kelion_auto_start_fired')
+      if (fired === '1') { autoStartFiredRef.current = true; return }
+    } catch (_) { /* sessionStorage blocked — proceed with ref guard only */ }
     if (status === 'idle' && startRef.current) {
       autoStartFiredRef.current = true
+      try { sessionStorage.setItem('kelion_auto_start_fired', '1') } catch (_) {}
       // Small delay to let the page fully render + avoid gesture issues
       const t = setTimeout(() => startVoiceWithPriorTurns(), 800)
       return () => clearTimeout(t)
     }
   }, [status, startVoiceWithPriorTurns])
+  // Clear the auto-start guard on manual user reload (navigation.type
+  // 'reload') so they can retry after a fix is deployed. The guard
+  // persists across ErrorBoundary retries (which are NOT a reload)
+  // but clears on F5 / Ctrl+R / pull-to-refresh.
+  useEffect(() => {
+    try {
+      const navType = performance?.getEntriesByType?.('navigation')?.[0]?.type
+      if (navType === 'reload') {
+        sessionStorage.removeItem('kelion_auto_start_fired')
+      }
+    } catch (_) { /* ignore */ }
+  }, [])
 
   const onStageClick = useCallback(() => {
     if (menuOpen) return setMenuOpen(false)
