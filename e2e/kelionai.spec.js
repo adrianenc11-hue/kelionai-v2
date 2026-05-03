@@ -106,25 +106,33 @@ test.describe('Kelion Studio API (DS-1 / DS-3) wiring', () => {
 });
 
 test.describe('Gemini Live token endpoint (Stage 1 precondition)', () => {
-  test('Vertex default returns either a valid setup (prod) or an honest 503 (unconfigured CI)', async ({ request }) => {
-    // The default backend is Vertex AI (see server/src/routes/realtime.js).
-    // Vertex authenticates server-side via a GCP service account in the WS
-    // proxy; the token endpoint intentionally returns `token: null` because
-    // the browser does not need an ephemeral credential.
+  test('Default (aistudio) returns a token (prod) or honest 503 (unconfigured CI)', async ({ request }) => {
+    // The default backend is AI Studio (see server/src/routes/realtime.js).
+    // It uses GEMINI_API_KEY to mint an ephemeral token via the
+    // generativelanguage.googleapis.com API.
     //
     // Shape depends on deployment:
-    //   - Production (has GOOGLE_CLOUD_PROJECT or project_id in
-    //     GCP_SERVICE_ACCOUNT_JSON): 200 with backend='vertex', token=null,
-    //     and a setup block whose model is the fully-qualified
-    //     `projects/<P>/locations/<L>/publishers/google/models/<M>` path.
-    //   - CI / fresh dev box (neither env): 503 with a clear message
-    //     explaining that Vertex is unconfigured and how to escape-hatch
-    //     via `?backend=aistudio`. This is the new guard added alongside
-    //     the default flip — previously the handler would silently return
-    //     200 with a bare `models/<M>` path that Vertex then rejects with
-    //     close code 1007. Catching it here turns a silent misconfig into
-    //     a loud, actionable error.
+    //   - Production (GEMINI_API_KEY set): 200 with backend='aistudio',
+    //     a token string, and a setup block.
+    //   - CI / fresh dev box (no key): 503 with a clear error.
     const res = await request.get(`${BASE}/api/realtime/gemini-token?lang=en-US`);
+    if (res.status() === 503) {
+      const body = await res.json();
+      expect(body.error).toMatch(/GEMINI_API_KEY/i);
+      return;
+    }
+    expect(res.status()).toBe(200);
+    const body = await res.json();
+    expect(body.backend).toBe('aistudio');
+    expect(typeof body.token).toBe('string');
+    expect(body.token.length).toBeGreaterThan(0);
+  });
+
+  test('Forcing ?backend=vertex exercises the Vertex AI path', async ({ request }) => {
+    // On CI neither GOOGLE_CLOUD_PROJECT nor GCP_SERVICE_ACCOUNT_JSON
+    // is set → 503 is the honest response. In production with the project
+    // configured we accept a 200 with token=null and a setup block.
+    const res = await request.get(`${BASE}/api/realtime/gemini-token?lang=en-US&backend=vertex`);
     if (res.status() === 503) {
       const body = await res.json();
       expect(body.error).toMatch(/Vertex backend is unconfigured/i);
@@ -139,21 +147,5 @@ test.describe('Gemini Live token endpoint (Stage 1 precondition)', () => {
     expect(body.setup.model).toMatch(
       /^projects\/[^/]+\/locations\/[^/]+\/publishers\/google\/models\/.+$/,
     );
-  });
-
-  test('Forcing ?backend=aistudio exercises the AI Studio ephemeral-token path', async ({ request }) => {
-    const res = await request.get(`${BASE}/api/realtime/gemini-token?lang=en-US&backend=aistudio`);
-    // On CI GEMINI_API_KEY is unset → 503 is the honest, documented response.
-    // If a future CI configuration sets the key we accept a 200 with a token.
-    if (res.status() === 503) {
-      const body = await res.json();
-      expect(body.error).toMatch(/GEMINI_API_KEY/i);
-    } else {
-      expect(res.status()).toBe(200);
-      const body = await res.json();
-      expect(body.backend).toBe('aistudio');
-      expect(typeof body.token).toBe('string');
-      expect(body.token.length).toBeGreaterThan(0);
-    }
   });
 });

@@ -1344,18 +1344,16 @@ const geminiTokenHandler = async (req, res) => {
 
 
   const priorTurns = Array.isArray(req.body?.priorTurns) ? req.body.priorTurns : [];
-  // Backend selector. Default is `vertex` — GA `gemini-live-2.5-flash-
-  // native-audio` on Vertex AI via the `/api/realtime/vertex-live-ws`
-  // proxy (OAuth service-account auth, Google Cloud SLA). The legacy
-  // AI Studio ephemeral-token path is still wired as an emergency
-  // escape hatch and can be forced per-request via `?backend=aistudio`
-  // or `{ backend: 'aistudio' }` — useful if a Vertex incident takes
-  // down Adrian's project while the preview AI Studio endpoint is
-  // still responding. No UI exposes the override; it's operator-only.
+  // Backend selector. Default is `aistudio` — uses GEMINI_API_KEY with
+  // the generativelanguage.googleapis.com endpoint (no billing required).
+  // Vertex AI path (`vertex`) uses OAuth service-account auth and requires
+  // billing enabled on the GCP project. Override via GEMINI_LIVE_BACKEND
+  // env var on Railway, or per-request via `?backend=vertex`.
   const rawBackend = ((req.body && req.body.backend)
     || req.query.backend
+    || process.env.GEMINI_LIVE_BACKEND
     || '').toString().toLowerCase();
-  const backend = rawBackend === 'aistudio' ? 'aistudio' : 'vertex';
+  const backend = rawBackend === 'vertex' ? 'vertex' : 'aistudio';
   // For Vertex we need a project id to build the fully-qualified
   // `projects/<P>/locations/<L>/publishers/google/models/<M>` path
   // that Vertex BidiGenerateContent reads from the first setup frame.
