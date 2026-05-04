@@ -4,7 +4,6 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import ErrorBoundary from './components/ErrorBoundary'
 import { installErrorReporter } from './lib/errorReporter'
 import { getCsrfToken } from './lib/api'
-import { installGlobalTracers } from './lib/globalTracer'
 import './index.css'
 
 // Audit H4: install global safety net on the client side. Before this,
@@ -16,11 +15,6 @@ import './index.css'
 // /api/diag/client-error so it shows up in Railway logs the same way
 // server errors do.
 installErrorReporter({ csrfToken: getCsrfToken })
-
-// Audit: Install absolute global audio and network tracers. This will intercept
-// all window.WebSocket, window.fetch, AudioContext and HTMLAudioElement usages
-// directly at the lowest browser API level. If any ghost voice plays, it will be logged.
-installGlobalTracers()
 
 // Silence a single-line noise warning emitted from THREE r183's
 // `Clock` constructor every time @react-three/fiber boots its render

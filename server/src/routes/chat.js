@@ -51,7 +51,7 @@ router.post('/', async (req, res) => {
       await stampTrialIfFresh(guestIp, trial);
     }
 
-    const { message, sessionId, toolResponses, image } = req.body || {};
+    const { message, sessionId, toolResponses, image, lat, lon } = req.body || {};
     if (!message && !toolResponses) {
       return res.status(400).json({ error: 'message or toolResponses is required' });
     }
@@ -99,7 +99,13 @@ router.post('/', async (req, res) => {
     }
 
     const { buildKelionToolsChatCompletions } = require('./realtime');
+    // Inject the coordinates into the tools builder if the backend supports it,
+    // though OpenRouter tools might not implicitly use it. The system prompt is safer.
     const openRouterTools = buildKelionToolsChatCompletions();
+
+    const locationContext = (lat && lon) 
+      ? `\n\n[SYSTEM CONTEXT: The user's current GPS coordinates are: Latitude ${lat}, Longitude ${lon}. If asked about location, weather, or directions, you have access to this.]` 
+      : '';
 
     // Convert Gemini history to OpenAI format
     const messages = [
@@ -107,7 +113,7 @@ router.post('/', async (req, res) => {
         role: 'system',
         content: `You are Kelion, a friendly conversational AI assistant. You always respond directly and naturally to the user.
 Important: You must always reply in the exact same language that the user uses.
-Your replies must be direct, conversational, and concise.`
+Your replies must be direct, conversational, and concise.${locationContext}`
       }
     ];
 

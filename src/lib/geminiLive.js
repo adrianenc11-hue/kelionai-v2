@@ -121,6 +121,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
   // can read it inside setupComplete without a closure/scope issue.
   const translatorModeRef = useRef(false)
   const initialTextRef = useRef(null)
+  const sessionIdRef = useRef(null)
 
   const wsRef = useRef(null)
   const audioCtxRef = useRef(null)       // 16kHz capture context for Gemini — MUST match SAMPLE_RATE_IN
@@ -829,6 +830,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
         }
 
         const rec = new SR();
+        window.__restRecRef = rec; // Keep a reference to stop it properly later
         rec.continuous = false;
         rec.interimResults = true; // Use interim results to animate soundbars
         rec.lang = navigator.language || 'ro-RO';
@@ -850,11 +852,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
           if (!ev.results[0].isFinal) return; // Wait for final transcript
           
           const transcript = ev.results[0][0].transcript;
-          if (!transcript) {
-            setStatus('idle');
-            setUserLevel(0);
-            return;
-          }
+          if (!transcript) return;
           
           setStatus('thinking');
           setUserLevel(0);
@@ -886,7 +884,11 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
             setError('Microphone error: ' + ev.error);
             setStatus('error');
           } else {
-            setStatus('idle');
+            // Keep listening if still supposed to be listening
+            if (statusRef.current === 'listening') {
+              try { rec.start(); } catch(e) {}
+              startFakeAnim();
+            }
           }
         };
         
@@ -894,7 +896,9 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
           if (fakeAnimFrame) cancelAnimationFrame(fakeAnimFrame);
           setUserLevel(0);
           if (statusRef.current === 'listening') {
-            setStatus('idle');
+             // Restart seamlessly without dropping to idle
+             try { rec.start(); } catch(e) {}
+             startFakeAnim();
           }
         };
         
@@ -1412,6 +1416,10 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
       micStreamRef.current.getTracks().forEach((t) => t.stop())
       micStreamRef.current = null
     }
+    if (window.__restRecRef) {
+      try { window.__restRecRef.stop() } catch {}
+      window.__restRecRef = null
+    }
     // Stage 2: also stop camera + screen
     stopFrameSender('camera')
     stopFrameSender('screen')
@@ -1633,12 +1641,24 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
         let finalReply = '';
         let finalModel = '';
         
+        // Use an existing session ID if possible or generate one for this hook instance
+        if (!sessionIdRef.current) {
+          sessionIdRef.current = 'ses_' + Math.random().toString(36).substring(2, 10);
+        }
+        
         while (maxLoops-- > 0) {
           const r = await fetch('/api/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
             credentials: 'include',
-            body: JSON.stringify({ message: currentMessage, toolResponses, image: currentImage }),
+            body: JSON.stringify({ 
+              message: currentMessage, 
+              toolResponses, 
+              image: currentImage,
+              sessionId: sessionIdRef.current,
+              lat: coords?.lat,
+              lon: coords?.lon
+            }),
           })
           if (!r.ok) {
             const err = await r.json().catch(() => ({ error: 'Chat failed' }))
@@ -1679,34 +1699,31 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
             })
             if (r.ok) {
               const audioData = await r.arrayBuffer()
+              if (audioData.byteLength < 100) {
+                appendTurn('assistant', `⚠️ Eroare audio: Răspunsul vocal a fost gol. Verificați cota ElevenLabs.`, true, '⚙️ System')
+                setStatus('idle')
+                return
+              }
               const blob = new Blob([audioData], { type: 'audio/mpeg' })
               const blobUrl = URL.createObjectURL(blob)
               
-              if (audioRef.current) {
-                const prevMuted = audioRef.current.muted
-                const prevSrcObject = audioRef.current.srcObject
-                audioRef.current.srcObject = null
-                audioRef.current.src = blobUrl
-                audioRef.current.muted = false
-                audioRef.current.volume = 1.0
-                audioRef.current.onended = () => {
-                  URL.revokeObjectURL(blobUrl)
-                  audioRef.current.src = ''
-                  audioRef.current.srcObject = prevSrcObject
-                  audioRef.current.muted = prevMuted
-                  setStatus('idle')
-                }
-                await audioRef.current.play().catch(() => setStatus('idle'))
-              } else {
-                const fallback = new Audio(blobUrl)
-                fallback.onended = () => { URL.revokeObjectURL(blobUrl); setStatus('idle') }
-                fallback.play().catch(() => setStatus('idle'))
+              const audioEl = new window.Audio(blobUrl)
+              audioEl.onended = () => {
+                URL.revokeObjectURL(blobUrl)
+                setStatus('idle')
               }
+              audioEl.onerror = () => {
+                URL.revokeObjectURL(blobUrl)
+                setStatus('idle')
+              }
+              
+              audioEl.play().catch(() => {
+                setStatus('idle')
+              })
             } else {
               setStatus('idle')
             }
           } catch(e) {
-            console.error('TTS failed', e)
             setStatus('idle')
           }
         } else {
