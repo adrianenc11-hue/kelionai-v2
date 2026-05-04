@@ -840,13 +840,8 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
       if (tokenBody?.model?.includes('gemma') || tokenBody?.model?.includes('llama') || tokenBody?.model?.includes('deepseek')) {
         // OpenRouter REST Voice Mode
         console.log('[geminiLive] OpenRouter model detected, switching to REST Voice Mode');
-        startInFlightRef.current = false;
-        
-        // Stop the continuous mic stream that was started for WebRTC
-        if (micStreamRef.current) {
-          micStreamRef.current.getTracks().forEach(t => t.stop());
-          micStreamRef.current = null;
-        }
+        // We MUST NOT stop micStreamRef.current here because if the soundbars are flat,
+        // the user thinks the app is dead and clicks the button again!
 
         const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (!SR) {
@@ -855,15 +850,35 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
 
         const rec = new SR();
         rec.continuous = false;
-        rec.interimResults = false;
+        rec.interimResults = true; // Use interim results to animate soundbars
         rec.lang = navigator.language || 'ro-RO';
         
+        let fakeAnimFrame = null;
+        const startFakeAnim = () => {
+          if (statusRef.current === 'listening') {
+            setUserLevel(0.2 + Math.random() * 0.4);
+            fakeAnimFrame = requestAnimationFrame(() => setTimeout(startFakeAnim, 100));
+          } else {
+            setUserLevel(0);
+          }
+        };
+        startFakeAnim();
+        
         rec.onresult = async (ev) => {
+          setUserLevel(0.6 + Math.random() * 0.4);
+          
+          if (!ev.results[0].isFinal) return; // Wait for final transcript
+          
           const transcript = ev.results[0][0].transcript;
           if (!transcript) {
             setStatus('idle');
+            setUserLevel(0);
             return;
           }
+          
+          setStatus('thinking');
+          setUserLevel(0);
+          if (fakeAnimFrame) cancelAnimationFrame(fakeAnimFrame);
           
           let base64Image = null;
           if (cameraStreamRef.current) {
@@ -885,6 +900,8 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
         };
         
         rec.onerror = (ev) => {
+          if (fakeAnimFrame) cancelAnimationFrame(fakeAnimFrame);
+          setUserLevel(0);
           if (ev.error !== 'no-speech') {
             setError('Microphone error: ' + ev.error);
             setStatus('error');
@@ -894,6 +911,8 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
         };
         
         rec.onend = () => {
+          if (fakeAnimFrame) cancelAnimationFrame(fakeAnimFrame);
+          setUserLevel(0);
           if (statusRef.current === 'listening') {
             setStatus('idle');
           }
