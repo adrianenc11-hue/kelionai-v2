@@ -1588,9 +1588,9 @@ const geminiTokenHandler = async (req, res) => {
     const fullSetup = {
       model: setupModelPath,
       generationConfig: {
-        responseModalities: ['AUDIO'],
+        responseModalities: ['TEXT'],
+        // Audio playback migrated to ElevenLabs REST TTS; voiceConfig omitted.
         speechConfig: {
-          voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } },
           // Pass the browser's language through so Gemini can both
           // transcribe the input correctly and reply in the user's
           // locale. See the note above `forcedLang` for why we stopped

@@ -335,7 +335,7 @@ router.post('/tts', async (req, res) => {
   const userId = uidOf(req);
   if (!userId) return res.status(401).json({ error: 'Not authenticated.' });
 
-  const { text, speed = 1.0 } = req.body || {};
+  const { text, speed = 1.0, lang } = req.body || {};
   if (!text || typeof text !== 'string' || !text.trim()) {
     return res.status(400).json({ error: 'text is required.' });
   }
@@ -346,9 +346,21 @@ router.post('/tts', async (req, res) => {
   } catch (err) {
     return res.status(500).json({ error: 'Failed to load voice clone state.' });
   }
+  
   const isNative = req.query.native === 'true';
+  let nativeVoiceId = process.env.ELEVENLABS_NATIVE_VOICE_ID || 'pNInz6obpgDQGcFmaJcg'; // Default to Adam (male)
+  
+  if (isNative && lang) {
+    const l = lang.toLowerCase();
+    if (l.startsWith('ro')) nativeVoiceId = process.env.ELEVENLABS_NATIVE_VOICE_ID_RO || nativeVoiceId;
+    else if (l.startsWith('es')) nativeVoiceId = process.env.ELEVENLABS_NATIVE_VOICE_ID_ES || nativeVoiceId;
+    else if (l.startsWith('fr')) nativeVoiceId = process.env.ELEVENLABS_NATIVE_VOICE_ID_FR || nativeVoiceId;
+    else if (l.startsWith('de')) nativeVoiceId = process.env.ELEVENLABS_NATIVE_VOICE_ID_DE || nativeVoiceId;
+    else if (l.startsWith('it')) nativeVoiceId = process.env.ELEVENLABS_NATIVE_VOICE_ID_IT || nativeVoiceId;
+  }
+  
   const voiceId = isNative 
-    ? (process.env.ELEVENLABS_NATIVE_VOICE_ID || 'pNInz6obpgDQGcFmaJcg') // Default to Adam (male)
+    ? nativeVoiceId
     : (cloneInfo?.voiceId || process.env.ELEVENLABS_CLONED_VOICE_ID);
     
   if (!voiceId) {

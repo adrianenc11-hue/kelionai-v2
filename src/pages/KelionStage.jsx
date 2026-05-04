@@ -1587,6 +1587,20 @@ export default function KelionStage() {
     catch (_) { /* banner surfaces failure */ }
   }, [start])
 
+  const [intendedVoiceActive, setIntendedVoiceActive] = useState(false)
+
+  // Auto-restart if intended to be active and it drops
+  useEffect(() => {
+    if (intendedVoiceActive && (status === 'idle' || status === 'error')) {
+      const timer = setTimeout(() => {
+        if (intendedVoiceActive && (status === 'idle' || status === 'error')) {
+          startVoiceWithPriorTurns()
+        }
+      }, 1000)
+      return () => clearTimeout(timer)
+    }
+  }, [intendedVoiceActive, status, startVoiceWithPriorTurns])
+
   // --- Auto-start DISABLED ---
   // Previously fired start() on page load to open a WebSocket. Disabled
   // because the Gemini Live token endpoint is returning 500 and this
@@ -1621,6 +1635,7 @@ export default function KelionStage() {
       try { requestGeo() } catch { /* ignore — hook logs internally */ }
     }
     if (status === 'idle' || status === 'error') {
+      setIntendedVoiceActive(true)
       startVoiceWithPriorTurns()
       // Tap-to-talk is a gated guest action — refresh the trial HUD so
       // the top-right countdown starts ticking immediately once the
@@ -1660,6 +1675,7 @@ export default function KelionStage() {
     enabled: status === 'idle',
     onDetect: () => {
       if (status === 'idle') {
+        setIntendedVoiceActive(true)
         startVoiceWithPriorTurns()
         if (!authState.signedIn) {
           if (trialRefreshTimerRef.current) clearTimeout(trialRefreshTimerRef.current)
@@ -2015,13 +2031,15 @@ export default function KelionStage() {
       <button
         onClick={(e) => {
           e.stopPropagation()
-          if (status === 'idle' || status === 'error') {
-            // Session not running — start it
-            startVoiceWithPriorTurns()
-            setMicOff(false)
+          if (!intendedVoiceActive) {
+            setIntendedVoiceActive(true)
+            if (status === 'idle' || status === 'error') {
+              startVoiceWithPriorTurns()
+              setMicOff(false)
+            }
           } else {
-            // Session running — toggle mic on/off (keep session alive)
-            setMicOff((v) => !v)
+            setIntendedVoiceActive(false)
+            if (typeof stop === 'function') stop()
           }
         }}
         style={{
@@ -2030,18 +2048,14 @@ export default function KelionStage() {
           display: 'flex', alignItems: 'center', gap: '10px',
           padding: '10px 24px',
           borderRadius: 999,
-          background: (status === 'idle' || status === 'error')
+          background: (!intendedVoiceActive)
             ? 'rgba(30, 30, 40, 0.65)'
-            : micOff
-              ? 'rgba(239, 68, 68, 0.25)'
-              : 'linear-gradient(135deg, #7c3aed, #a78bfa)',
+            : 'linear-gradient(135deg, #7c3aed, #a78bfa)',
           backdropFilter: 'blur(12px)',
-          border: (status === 'idle' || status === 'error')
+          border: (!intendedVoiceActive)
             ? '1px solid rgba(255, 255, 255, 0.1)'
-            : micOff
-              ? '1px solid rgba(239, 68, 68, 0.5)'
-              : '1px solid #c4b5fd',
-          color: (status === 'idle' || status === 'error') ? '#9ca3af' : '#ffffff',
+            : '1px solid #c4b5fd',
+          color: (!intendedVoiceActive) ? '#9ca3af' : '#ffffff',
           fontSize: 15, fontFamily: 'system-ui, -apple-system, sans-serif',
           fontWeight: 600,
           letterSpacing: '0.04em',

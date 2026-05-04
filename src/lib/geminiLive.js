@@ -7,7 +7,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { runTool } from './kelionTools'
-import { isClonedVoiceActive, setDetectedLang } from './voiceModeStore'
+import { isClonedVoiceActive, setDetectedLang, getDetectedLang } from './voiceModeStore'
 import { setCameraController, setCurrentFacingMode } from './cameraControl'
 import { getCsrfToken } from './api'
 import { subscribeNarrationMode, getNarrationMode } from './narrationMode'
@@ -394,11 +394,9 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
         } else {
           appendTurn('assistant', sc.outputTranscription.text, false, '🔊 AI Voice')
           logAiEvent('transcript_out', { text: sc.outputTranscription.text, source: 'gemini-live' })
-          // Accumulate for cloned TTS flush on turnComplete
-          if (isClonedVoiceActive()) {
-            cloneTranscriptBufRef.current += sc.outputTranscription.text
-            console.log('[clonedTTS] buffered outputTranscription:', sc.outputTranscription.text.slice(0, 80))
-          }
+          // Accumulate for TTS flush on turnComplete (cloned and native REST)
+          cloneTranscriptBufRef.current += sc.outputTranscription.text
+          console.log('[tts] buffered outputTranscription:', sc.outputTranscription.text.slice(0, 80))
         }
         // ALWAYS mark that we received a transcript for this turn —
         // even for suppressed turns. This prevents the partText fallback
@@ -413,26 +411,8 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
       for (const part of parts) {
         const inline = part.inlineData || part.inline_data
         if (inline?.data && inline.mimeType?.startsWith('audio/')) {
-          if (!isClonedVoiceActive()) {
-            // Suppress audio before the user has spoken — prevents
-            // unsolicited model greetings from playing.
-            if (!userHasSpokenRef.current) {
-              logAiEvent('audio_skipped', { reason: 'pre-user-greeting-suppressed' })
-            } else {
-              const bytes = bytesFromBase64(inline.data)
-              logAiEvent('audio_out', { bytes: bytes.length, source: 'gemini-native' })
-              if (!turnHasAudioRef.current) {
-                // Instantly log to the transcript the moment audio starts playing
-                // This guarantees the user sees EXACTLY when audio is received, even if the socket crashes before turnComplete
-                appendTurn('assistant', '[Pachet audio în curs de redare...]', false, '🔴 Live Audio Stream')
-              }
-              enqueueAudio(bytes)
-              turnHasAudioRef.current = true
-            }
-          } else {
-            logAiEvent('audio_skipped', { reason: 'cloned-voice-active' })
-            console.log('[clonedTTS] skipped Gemini PCM chunk (cloned voice active)')
-          }
+          logAiEvent('audio_skipped', { reason: 'migrated-to-rest-tts' })
+          console.log('[geminiLive] skipped Gemini PCM chunk (migrated to REST TTS)')
         }
         // DO NOT append part.text immediately — accumulate silently.
         // outputTranscription is the clean, post-processed version and
@@ -452,10 +432,8 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
         // If not → partText is the only text we have; show it + use for TTS.
         if (!hadTranscript && partText) {
           appendTurn('assistant', partText, false, '💬 AI Text')
-          if (isClonedVoiceActive()) {
-            cloneTranscriptBufRef.current += partText
-            console.log('[clonedTTS] using partText fallback:', partText.slice(0, 80))
-          }
+          cloneTranscriptBufRef.current += partText
+          console.log('[tts] using partText fallback:', partText.slice(0, 80))
         } else if (!hadTranscript && !partText && turnHasAudioRef.current) {
           // Gemini API sometimes streams audio chunks but never fires outputTranscription or part.text
           appendTurn('assistant', '[Gemini Audio - Fără transcript text returnat de API]', false, '🔊 Audio Only (No Text)')
@@ -464,32 +442,34 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
         turnHasTranscriptRef.current = false
         turnHasAudioRef.current = false
         partTextBufRef.current = ''
-        // Cloned voice: flush accumulated transcript to ElevenLabs TTS
-         if (isClonedVoiceActive() && cloneTranscriptBufRef.current.trim()) {
+        // Voice: flush accumulated transcript to REST TTS
+         if (cloneTranscriptBufRef.current.trim()) {
           const textToSpeak = cloneTranscriptBufRef.current.trim()
           cloneTranscriptBufRef.current = ''
           ;(async () => {
             try {
               setStatus('speaking')
-              logAiEvent('clone_tts_req', { text: textToSpeak })
+              logAiEvent('tts_req', { text: textToSpeak })
               const ttsStart = Date.now()
-              const r = await fetch('/api/voice/clone/tts', {
+              const isNative = !isClonedVoiceActive();
+              const ttsUrl = isNative ? '/api/voice/clone/tts?native=true' : '/api/voice/clone/tts';
+              const r = await fetch(ttsUrl, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
                   'X-CSRF-Token': getCsrfToken(),
                 },
                 credentials: 'include',
-                body: JSON.stringify({ text: textToSpeak }),
+                body: JSON.stringify({ text: textToSpeak, lang: getDetectedLang() }),
               })
               if (!r.ok) {
                 const errText = await r.text().catch(() => '')
-                logAiEvent('clone_tts_err', { error: `HTTP ${r.status}: ${errText}` })
-                console.error('[geminiLive] cloned TTS error', r.status, errText)
-                // Show error visibly so user knows why cloned voice failed
+                logAiEvent('tts_err', { error: `HTTP ${r.status}: ${errText}` })
+                console.error('[geminiLive] TTS error', r.status, errText)
+                // Show error visibly so user knows why voice failed
                 let reason = errText
                 try { reason = JSON.parse(errText)?.error || errText } catch {}
-                appendTurn('assistant', `⚠️ Voce clonată: ${reason || 'eroare necunoscută (HTTP ' + r.status + ')'}`, true, '⚙️ System')
+                appendTurn('assistant', `⚠️ Eroare audio: ${reason || 'eroare necunoscută (HTTP ' + r.status + ')'}`, true, '⚙️ System')
                 setStatus('listening')
                 return
               }
@@ -1695,7 +1675,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
               credentials: 'include',
-              body: JSON.stringify({ text: finalReply }),
+              body: JSON.stringify({ text: finalReply, lang: getDetectedLang() }),
             })
             if (r.ok) {
               const audioData = await r.arrayBuffer()
