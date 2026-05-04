@@ -1718,7 +1718,7 @@ export default function KelionStage() {
         <fog attach="fog" args={['#0e0b20', 6, 14]} />
         <CameraRig />
         <Suspense fallback={null}>
-          <Environment preset="city" environmentIntensity={0.6} />
+          <Environment files="https://raw.githubusercontent.com/pmndrs/drei-assets/master/environments/potsdamer_platz_1k.hdr" environmentIntensity={0.6} />
           <StudioDecor />
           {/* Halo removed — Adrian asked to stop the pulsating circle behind
               the avatar; it was too busy. Status color is still conveyed

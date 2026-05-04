@@ -95,9 +95,9 @@ router.post('/', async (req, res) => {
     if (!r.ok) {
       const errText = await r.text();
       console.error('[chat] Gemma 4 generateContent failed:', r.status, errText.slice(0, 500));
-      // Fallback to smaller Gemma 4 variant if primary fails
-      if (model === 'gemma-4-31b-it') {
-        const fallbackModel = 'gemma-4-26b-a4b-it';
+      // Fallback model if primary fails
+      const fallbackModel = process.env.GEMINI_FALLBACK_MODEL || 'gemma-4-26b-a4b-it';
+      if (model !== fallbackModel) {
         const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/${fallbackModel}:generateContent?key=${encodeURIComponent(apiKey)}`;
         const r2 = await fetch(fallbackUrl, {
           method: 'POST',
