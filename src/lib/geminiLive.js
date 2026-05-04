@@ -1687,108 +1687,47 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
         
         if (playAudio) {
           setStatus('speaking')
-          if (isClonedVoiceActive()) {
-            try {
-              const r = await fetch('/api/voice/clone/tts', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
-                credentials: 'include',
-                body: JSON.stringify({ text: finalReply }),
-              })
-              if (r.ok) {
-                const audioData = await r.arrayBuffer()
-                const blob = new Blob([audioData], { type: 'audio/mpeg' })
-                const blobUrl = URL.createObjectURL(blob)
-                
-                if (audioRef.current) {
-                  const prevMuted = audioRef.current.muted
-                  const prevSrcObject = audioRef.current.srcObject
-                  audioRef.current.srcObject = null
-                  audioRef.current.src = blobUrl
-                  audioRef.current.muted = false
-                  audioRef.current.volume = 1.0
-                  audioRef.current.onended = () => {
-                    URL.revokeObjectURL(blobUrl)
-                    audioRef.current.src = ''
-                    audioRef.current.srcObject = prevSrcObject
-                    audioRef.current.muted = prevMuted
-                    setStatus('idle')
-                  }
-                  await audioRef.current.play().catch(() => setStatus('idle'))
-                } else {
-                  const fallback = new Audio(blobUrl)
-                  fallback.onended = () => { URL.revokeObjectURL(blobUrl); setStatus('idle') }
-                  fallback.play().catch(() => setStatus('idle'))
+          const isNative = !isClonedVoiceActive();
+          const ttsUrl = isNative ? '/api/voice/clone/tts?native=true' : '/api/voice/clone/tts';
+          
+          try {
+            const r = await fetch(ttsUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+              credentials: 'include',
+              body: JSON.stringify({ text: finalReply }),
+            })
+            if (r.ok) {
+              const audioData = await r.arrayBuffer()
+              const blob = new Blob([audioData], { type: 'audio/mpeg' })
+              const blobUrl = URL.createObjectURL(blob)
+              
+              if (audioRef.current) {
+                const prevMuted = audioRef.current.muted
+                const prevSrcObject = audioRef.current.srcObject
+                audioRef.current.srcObject = null
+                audioRef.current.src = blobUrl
+                audioRef.current.muted = false
+                audioRef.current.volume = 1.0
+                audioRef.current.onended = () => {
+                  URL.revokeObjectURL(blobUrl)
+                  audioRef.current.src = ''
+                  audioRef.current.srcObject = prevSrcObject
+                  audioRef.current.muted = prevMuted
+                  setStatus('idle')
                 }
+                await audioRef.current.play().catch(() => setStatus('idle'))
               } else {
-                setStatus('idle')
+                const fallback = new Audio(blobUrl)
+                fallback.onended = () => { URL.revokeObjectURL(blobUrl); setStatus('idle') }
+                fallback.play().catch(() => setStatus('idle'))
               }
-            } catch(e) {
-              console.error('TTS failed', e)
+            } else {
               setStatus('idle')
             }
-          } else {
-            // Voce Nativa (Browser TTS)
-            const utterance = new SpeechSynthesisUtterance(finalReply);
-            utterance.lang = navigator.language || 'ro-RO';
-            
-            // Try to pick a decent male native voice
-            const voices = window.speechSynthesis.getVoices();
-            const targetLang = utterance.lang.split('-')[0].toLowerCase();
-            
-            // Look for voices matching the target language first
-            const langVoices = voices.filter(v => v.lang.toLowerCase().startsWith(targetLang));
-            
-            // Extensive list of male names/terms across languages
-            const maleKeywords = [
-              'male', 'bărbat', 'barbat', 'andrei', 'bogdan', 'paul', 'george', 'ion', 'alex', 'david', 'mac',
-              'homme', 'hombre', 'masculino', 'männlich', 'mann', 'uomo', 'maschio',
-              'mark', 'brian', 'fred', 'daniel', 'arthur', 'carlos', 'juan', 'pierre', 'giovanni',
-              'hans', 'klaus', 'igor', 'ivan', 'taro', 'ken', 'li', 'wei'
-            ];
-            
-            let selectedVoice = null;
-            if (langVoices.length > 0) {
-              selectedVoice = langVoices.find(v => maleKeywords.some(keyword => v.name.toLowerCase().includes(keyword)));
-              if (!selectedVoice) selectedVoice = langVoices[0]; // Fallback to first voice in that language
-            } else {
-              // Fallback to any male voice if no language match
-              selectedVoice = voices.find(v => maleKeywords.some(keyword => v.name.toLowerCase().includes(keyword)));
-            }
-            
-            if (selectedVoice) {
-              utterance.voice = selectedVoice;
-            }
-            
-            utterance.onend = () => {
-              setStatus('idle');
-            };
-            utterance.onerror = (e) => {
-              console.error('Native TTS error', e);
-              setStatus('idle');
-            };
-            
-            // Artificially animate soundbars for Native TTS since it doesn't feed audioRef
-            let fakeAnimFrame = null;
-            const animateBars = () => {
-              if (statusRef.current === 'speaking') {
-                setUserLevel(0.3 + Math.random() * 0.5);
-                fakeAnimFrame = requestAnimationFrame(() => setTimeout(animateBars, 100));
-              } else {
-                setUserLevel(0);
-              }
-            };
-            animateBars();
-            
-            const cleanupAnim = () => {
-              if (fakeAnimFrame) cancelAnimationFrame(fakeAnimFrame);
-              setUserLevel(0);
-            };
-            
-            utterance.addEventListener('end', cleanupAnim);
-            utterance.addEventListener('error', cleanupAnim);
-            
-            window.speechSynthesis.speak(utterance);
+          } catch(e) {
+            console.error('TTS failed', e)
+            setStatus('idle')
           }
         } else {
           setStatus('idle')

@@ -346,11 +346,13 @@ router.post('/tts', async (req, res) => {
   } catch (err) {
     return res.status(500).json({ error: 'Failed to load voice clone state.' });
   }
-  // Fallback: if DB lost the voiceId (Railway SQLite wipe), use env var.
-  // This is the admin's cloned voice — shared with all authenticated users.
-  const voiceId = cloneInfo?.voiceId || process.env.ELEVENLABS_CLONED_VOICE_ID;
+  const isNative = req.query.native === 'true';
+  const voiceId = isNative 
+    ? (process.env.ELEVENLABS_NATIVE_VOICE_ID || 'pNInz6obpgDQGcFmaJcg') // Default to Adam (male)
+    : (cloneInfo?.voiceId || process.env.ELEVENLABS_CLONED_VOICE_ID);
+    
   if (!voiceId) {
-    return res.status(404).json({ error: 'No cloned voice configured. Set ELEVENLABS_CLONED_VOICE_ID env var.' });
+    return res.status(404).json({ error: 'No voice configured.' });
   }
 
   const apiKey = process.env.ELEVENLABS_API_KEY;
