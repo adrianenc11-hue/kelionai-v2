@@ -90,8 +90,10 @@ router.post('/', async (req, res) => {
       session.history = session.history.slice(-MAX_HISTORY * 2);
     }
 
-    // Model: prefer Gemma 4 on OpenRouter
-    const model = process.env.CHAT_MODEL || process.env.OPENROUTER_MODEL || 'google/gemma-3-27b-it';
+    // Model: must support OpenAI-style function calling (tool_calls).
+    // gemma-3-27b-it does NOT support tool_calls — it outputs JSON as text.
+    // google/gemini-2.0-flash supports tool_calls natively via OpenRouter.
+    const model = process.env.CHAT_MODEL || process.env.OPENROUTER_MODEL || 'google/gemini-2.0-flash-001';
     const url = 'https://openrouter.ai/api/v1/chat/completions';
     const orKey = process.env.OPENROUTER_API_KEY;
     if (!orKey) {
