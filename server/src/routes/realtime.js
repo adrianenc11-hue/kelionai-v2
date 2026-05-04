@@ -1492,7 +1492,7 @@ const geminiTokenHandler = async (req, res) => {
     // improved barge-in). We keep AI Studio on the preview model id that
     // actually accepts bidi traffic on our free-tier project, so the
     // legacy path keeps working unchanged until the default switches.
-    const defaultAiStudioModel = process.env.GEMINI_LIVE_MODEL || 'gemini-3.1-flash-live-preview';
+    const defaultAiStudioModel = process.env.GEMINI_LIVE_MODEL || 'gemma-4-31b-it';
     const defaultVertexModel = process.env.GEMINI_LIVE_MODEL_VERTEX || 'gemini-live-2.5-flash-native-audio';
     const model = backend === 'vertex' ? defaultVertexModel : defaultAiStudioModel;
     // Language resolution for Gemini Live. `speechConfig.languageCode`

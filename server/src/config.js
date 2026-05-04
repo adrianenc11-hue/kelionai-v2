@@ -79,7 +79,7 @@ module.exports = {
 
   gemini: {
     apiKey:       optional('GEMINI_API_KEY'),
-    chatModel:    optional('GEMINI_CHAT_MODEL', 'gemini-3.1-pro-preview'),
+    chatModel:    optional('GEMINI_CHAT_MODEL', 'gemma-4-31b-it'),
     // Keep this default in sync with server/src/routes/realtime.js — both
     // read GEMINI_LIVE_MODEL directly, so the fallbacks must match.
     //
@@ -92,8 +92,8 @@ module.exports = {
     // preview`) so admin can talk to Kelion again while we swap the
     // preview`) so admin can talk to Kelion again.
     // Override via Railway env GEMINI_LIVE_MODEL.
-    liveModel:    optional('GEMINI_LIVE_MODEL', 'gemini-3.1-flash-live-preview'),
-    ttsModel:     optional('GEMINI_TTS_MODEL', 'gemini-3.1-flash-tts-preview'),
+    liveModel:    optional('GEMINI_LIVE_MODEL', 'gemma-4-31b-it'),
+    ttsModel:     optional('GEMINI_TTS_MODEL', 'gemma-4-31b-it'),
     ttsVoiceKelion: optional('GEMINI_TTS_VOICE_KELION', 'Kore'),
   },
 
