@@ -1639,7 +1639,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
             credentials: 'include',
-            body: JSON.stringify({ message: currentMessage, sessionId: wsSessionIdRef.current, toolResponses, image: currentImage }),
+            body: JSON.stringify({ message: currentMessage, toolResponses, image: currentImage }),
           })
           if (!r.ok) {
             const err = await r.json().catch(() => ({ error: 'Chat failed' }))
