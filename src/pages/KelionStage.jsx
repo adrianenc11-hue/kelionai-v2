@@ -1092,15 +1092,10 @@ export default function KelionStage() {
     setChatInput('')
     setAttachedFile(null)
     const payloadStr = finalPayload.trim()
-    if (statusRef.current === 'idle' || statusRef.current === 'error') {
-      const clean = turnsRef.current
-        .filter((t) => t && t.role && t.text && String(t.text).trim())
-        .map((t) => ({ role: t.role === 'assistant' ? 'assistant' : 'user', text: String(t.text) }))
-        .slice(-20)
-      if (startRef.current) startRef.current({ textOnly: true, priorTurns: clean, initialText: payloadStr })
-    } else {
-      if (liveSendTextRef.current) await liveSendTextRef.current(payloadStr)
-    }
+    // Always use liveSendText — it tries WebSocket first, then falls back
+    // to /api/chat HTTP endpoint (Gemma 4). Never call start() for text-only
+    // messages; start() fetches a Gemini Live token which may fail (500/1008).
+    if (liveSendTextRef.current) await liveSendTextRef.current(payloadStr)
   }, [chatInput, attachedFile, applyMuteCommand])
   const trialHud = useTrial({ signedIn: !!authState.signedIn })
   const trialRemainingMs = trialHud.remainingMs
@@ -1592,32 +1587,14 @@ export default function KelionStage() {
     catch (_) { /* banner surfaces failure */ }
   }, [start])
 
-  // --- Auto-start: launch session automatically on page load ---
-  // Fires once after mount. If the session is idle it starts voice.
-  // The user can then mute the mic (micOff) to go text-only.
-  //
-  // CRITICAL: uses sessionStorage (not useRef) so the flag survives
-  // ErrorBoundary retry re-mounts. Previously, useRef(false) reset on
-  // every re-mount, causing: auto-start → billing error → crash →
-  // ErrorBoundary retry → re-mount → auto-start → same error → ∞
-  // The sessionStorage key is cleared on manual page reload (user action)
-  // so they can retry if the underlying issue was fixed.
+  // --- Auto-start DISABLED ---
+  // Previously fired start() on page load to open a WebSocket. Disabled
+  // because the Gemini Live token endpoint is returning 500 and this
+  // burns trial minutes on every page load. Users tap "OPRIT" to start
+  // voice, or type in the chat input which goes through /api/chat HTTP.
   const autoStartFiredRef = useRef(false)
-  useEffect(() => {
-    if (autoStartFiredRef.current) return
-    // Check sessionStorage to survive ErrorBoundary re-mounts
-    try {
-      const fired = sessionStorage.getItem('kelion_auto_start_fired')
-      if (fired === '1') { autoStartFiredRef.current = true; return }
-    } catch (_) { /* sessionStorage blocked — proceed with ref guard only */ }
-    if (status === 'idle' && startRef.current) {
-      autoStartFiredRef.current = true
-      try { sessionStorage.setItem('kelion_auto_start_fired', '1') } catch (_) {}
-      // Small delay to let the page fully render + avoid gesture issues
-      const t = setTimeout(() => startVoiceWithPriorTurns(), 800)
-      return () => clearTimeout(t)
-    }
-  }, [status, startVoiceWithPriorTurns])
+  // eslint-disable-next-line no-unused-vars
+  const _autoStartEffect = null // placeholder — re-enable when WS is fixed
   // Clear the auto-start guard on manual user reload (navigation.type
   // 'reload') so they can retry after a fix is deployed. The guard
   // persists across ErrorBoundary retries (which are NOT a reload)
