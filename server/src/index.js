@@ -203,6 +203,7 @@ app.use(csrfSeed);
 // protected.
 app.use((req, res, next) => {
   if (req.path === '/api/credits/webhook') return next();
+  if (req.path === '/api/chat' || req.path === '/api/chat/voice') return next();
   return csrfProtection(req, res, next);
 });
 
