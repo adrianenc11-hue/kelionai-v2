@@ -131,28 +131,43 @@ Your replies must be direct, conversational, and concise.${locationContext}`
         }
         messages.push({ role: 'user', content });
       } else if (h.role === 'model') {
-        if (h.parts[0].functionCall) {
-          messages.push({
-            role: 'assistant',
-            content: null,
-            tool_calls: [{
+        const tool_calls = [];
+        let textContent = '';
+        for (const p of h.parts) {
+          if (p.functionCall) {
+            tool_calls.push({
+              id: `call_${p.functionCall.name}`,
               type: 'function',
               function: {
-                name: h.parts[0].functionCall.name,
-                arguments: JSON.stringify(h.parts[0].functionCall.args)
+                name: p.functionCall.name,
+                arguments: JSON.stringify(p.functionCall.args)
               }
-            }]
+            });
+          } else if (p.text) {
+            textContent += p.text;
+          }
+        }
+        
+        if (tool_calls.length > 0) {
+          messages.push({
+            role: 'assistant',
+            content: textContent || null,
+            tool_calls
           });
         } else {
-          messages.push({ role: 'assistant', content: h.parts[0].text || '' });
+          messages.push({ role: 'assistant', content: textContent });
         }
       } else if (h.role === 'function') {
-        const fr = h.parts[0].functionResponse;
-        messages.push({
-          role: 'tool',
-          name: fr.name,
-          content: JSON.stringify(fr.response)
-        });
+        for (const p of h.parts) {
+          if (p.functionResponse) {
+            messages.push({
+              role: 'tool',
+              tool_call_id: `call_${p.functionResponse.name}`,
+              name: p.functionResponse.name,
+              content: JSON.stringify(p.functionResponse.response)
+            });
+          }
+        }
       }
     }
 
@@ -211,7 +226,7 @@ Your replies must be direct, conversational, and concise.${locationContext}`
     res.json({ reply, model });
   } catch (err) {
     console.error('[chat] error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Internal server error', details: err.message, stack: err.stack });
   }
 });
 
