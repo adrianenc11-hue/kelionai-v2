@@ -1712,18 +1712,27 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
                 URL.revokeObjectURL(blobUrl)
                 setStatus('idle')
               }
-              audioEl.onerror = () => {
+              audioEl.onerror = (e) => {
+                console.error('[geminiLive] Audio playback error:', e)
+                appendTurn('assistant', `⚠️ Eroare la redarea audio în browser.`, true, '⚙️ System')
                 URL.revokeObjectURL(blobUrl)
                 setStatus('idle')
               }
               
-              audioEl.play().catch(() => {
+              audioEl.play().catch((e) => {
+                console.error('[geminiLive] Audio play() blocked:', e)
+                appendTurn('assistant', `⚠️ Browserul a blocat redarea audio automată.`, true, '⚙️ System')
                 setStatus('idle')
               })
             } else {
+              const errText = await r.text().catch(() => '')
+              console.error('[geminiLive] TTS network error:', r.status, errText)
+              appendTurn('assistant', `⚠️ Eroare rețea voce (${r.status}): ${errText.slice(0, 100)}`, true, '⚙️ System')
               setStatus('idle')
             }
           } catch(e) {
+            console.error('[geminiLive] TTS catch error:', e)
+            appendTurn('assistant', `⚠️ Eroare internă voce: ${e.message}`, true, '⚙️ System')
             setStatus('idle')
           }
         } else {

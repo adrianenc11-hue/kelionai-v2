@@ -395,9 +395,14 @@ router.post('/tts', async (req, res) => {
     if (!r.ok) {
       const errText = await r.text().catch(() => '');
       console.error(`[voice/tts] ElevenLabs ${r.status}: ${errText.slice(0, 500)}`);
-      return res.status(r.status === 401 ? 401 : 502).json({
-        error: r.status === 401 ? 'ElevenLabs API key invalid.' : `TTS failed (${r.status}).`,
-      });
+      
+      let userError = `Eroare generare voce (${r.status}).`;
+      if (r.status === 401) userError = 'Cheie API ElevenLabs invalidă.';
+      else if (r.status === 429 || errText.toLowerCase().includes('quota') || errText.toLowerCase().includes('insufficient')) {
+        userError = 'Fonduri insuficiente ElevenLabs. Vă rugăm să reîncărcați contul ElevenLabs.';
+      }
+      
+      return res.status(r.status === 401 ? 401 : 502).json({ error: userError });
     }
 
     res.setHeader('Content-Type', 'audio/mpeg');

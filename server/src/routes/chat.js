@@ -193,7 +193,11 @@ Your replies must be direct, conversational, and concise.${locationContext}`
     if (!r.ok) {
       const errText = await r.text();
       console.error('[chat] OpenRouter generation failed:', r.status, errText.slice(0, 500));
-      return res.status(500).json({ error: 'AI generation failed' });
+      let userError = 'Eroare generare AI.';
+      if (r.status === 402 || r.status === 429 || errText.toLowerCase().includes('insufficient_quota')) {
+        userError = 'Fonduri insuficiente OpenRouter. Vă rugăm să reîncărcați contul AI respectiv.';
+      }
+      return res.status(500).json({ error: userError });
     }
 
     const data = await r.json();
