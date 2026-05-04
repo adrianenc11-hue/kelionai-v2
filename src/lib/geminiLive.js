@@ -829,6 +829,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
         }
 
         const rec = new SR();
+        window.__restRecRef = rec; // Keep a reference to stop it properly later
         rec.continuous = false;
         rec.interimResults = true; // Use interim results to animate soundbars
         rec.lang = navigator.language || 'ro-RO';
@@ -850,11 +851,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
           if (!ev.results[0].isFinal) return; // Wait for final transcript
           
           const transcript = ev.results[0][0].transcript;
-          if (!transcript) {
-            setStatus('idle');
-            setUserLevel(0);
-            return;
-          }
+          if (!transcript) return;
           
           setStatus('thinking');
           setUserLevel(0);
@@ -886,7 +883,11 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
             setError('Microphone error: ' + ev.error);
             setStatus('error');
           } else {
-            setStatus('idle');
+            // Keep listening if still supposed to be listening
+            if (statusRef.current === 'listening') {
+              try { rec.start(); } catch(e) {}
+              startFakeAnim();
+            }
           }
         };
         
@@ -894,7 +895,9 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
           if (fakeAnimFrame) cancelAnimationFrame(fakeAnimFrame);
           setUserLevel(0);
           if (statusRef.current === 'listening') {
-            setStatus('idle');
+             // Restart seamlessly without dropping to idle
+             try { rec.start(); } catch(e) {}
+             startFakeAnim();
           }
         };
         
@@ -1411,6 +1414,10 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
     if (micStreamRef.current) {
       micStreamRef.current.getTracks().forEach((t) => t.stop())
       micStreamRef.current = null
+    }
+    if (window.__restRecRef) {
+      try { window.__restRecRef.stop() } catch {}
+      window.__restRecRef = null
     }
     // Stage 2: also stop camera + screen
     stopFrameSender('camera')
