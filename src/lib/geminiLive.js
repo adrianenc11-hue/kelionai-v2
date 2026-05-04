@@ -1562,7 +1562,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
       try {
         const r = await fetch('/api/chat', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
           credentials: 'include',
           body: JSON.stringify({ message: clean }),
         })
