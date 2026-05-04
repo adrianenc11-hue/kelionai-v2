@@ -1734,20 +1734,25 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
             
             // Try to pick a decent male native voice
             const voices = window.speechSynthesis.getVoices();
+            const targetLang = utterance.lang.split('-')[0].toLowerCase();
             
-            // Look for Romanian voices first
-            const roVoices = voices.filter(v => v.lang.startsWith('ro'));
+            // Look for voices matching the target language first
+            const langVoices = voices.filter(v => v.lang.toLowerCase().startsWith(targetLang));
             
-            // Try to find a male voice among the Romanian ones
-            // Web Speech API doesn't have a gender property, so we guess by name
-            const maleKeywords = ['male', 'bărbat', 'barbat', 'andrei', 'bogdan', 'paul', 'george', 'ion', 'alex', 'david', 'mac'];
+            // Extensive list of male names/terms across languages
+            const maleKeywords = [
+              'male', 'bărbat', 'barbat', 'andrei', 'bogdan', 'paul', 'george', 'ion', 'alex', 'david', 'mac',
+              'homme', 'hombre', 'masculino', 'männlich', 'mann', 'uomo', 'maschio',
+              'mark', 'brian', 'fred', 'daniel', 'arthur', 'carlos', 'juan', 'pierre', 'giovanni',
+              'hans', 'klaus', 'igor', 'ivan', 'taro', 'ken', 'li', 'wei'
+            ];
             
             let selectedVoice = null;
-            if (roVoices.length > 0) {
-              selectedVoice = roVoices.find(v => maleKeywords.some(keyword => v.name.toLowerCase().includes(keyword)));
-              if (!selectedVoice) selectedVoice = roVoices[0]; // Fallback to first ro voice
+            if (langVoices.length > 0) {
+              selectedVoice = langVoices.find(v => maleKeywords.some(keyword => v.name.toLowerCase().includes(keyword)));
+              if (!selectedVoice) selectedVoice = langVoices[0]; // Fallback to first voice in that language
             } else {
-              // Fallback to any male voice if no RO voice
+              // Fallback to any male voice if no language match
               selectedVoice = voices.find(v => maleKeywords.some(keyword => v.name.toLowerCase().includes(keyword)));
             }
             
