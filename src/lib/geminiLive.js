@@ -1685,46 +1685,87 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
         }
         appendTurn('assistant', finalReply, true, finalModel ? `🤖 ${finalModel}` : undefined)
         
-        if (playAudio || isClonedVoiceActive()) {
+        if (playAudio) {
           setStatus('speaking')
-          try {
-            const r = await fetch('/api/voice/clone/tts', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
-              credentials: 'include',
-              body: JSON.stringify({ text: finalReply }),
-            })
-            if (r.ok) {
-              const audioData = await r.arrayBuffer()
-              const blob = new Blob([audioData], { type: 'audio/mpeg' })
-              const blobUrl = URL.createObjectURL(blob)
-              
-              if (audioRef.current) {
-                const prevMuted = audioRef.current.muted
-                const prevSrcObject = audioRef.current.srcObject
-                audioRef.current.srcObject = null
-                audioRef.current.src = blobUrl
-                audioRef.current.muted = false
-                audioRef.current.volume = 1.0
-                audioRef.current.onended = () => {
-                  URL.revokeObjectURL(blobUrl)
-                  audioRef.current.src = ''
-                  audioRef.current.srcObject = prevSrcObject
-                  audioRef.current.muted = prevMuted
-                  setStatus('idle')
+          if (isClonedVoiceActive()) {
+            try {
+              const r = await fetch('/api/voice/clone/tts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+                credentials: 'include',
+                body: JSON.stringify({ text: finalReply }),
+              })
+              if (r.ok) {
+                const audioData = await r.arrayBuffer()
+                const blob = new Blob([audioData], { type: 'audio/mpeg' })
+                const blobUrl = URL.createObjectURL(blob)
+                
+                if (audioRef.current) {
+                  const prevMuted = audioRef.current.muted
+                  const prevSrcObject = audioRef.current.srcObject
+                  audioRef.current.srcObject = null
+                  audioRef.current.src = blobUrl
+                  audioRef.current.muted = false
+                  audioRef.current.volume = 1.0
+                  audioRef.current.onended = () => {
+                    URL.revokeObjectURL(blobUrl)
+                    audioRef.current.src = ''
+                    audioRef.current.srcObject = prevSrcObject
+                    audioRef.current.muted = prevMuted
+                    setStatus('idle')
+                  }
+                  await audioRef.current.play().catch(() => setStatus('idle'))
+                } else {
+                  const fallback = new Audio(blobUrl)
+                  fallback.onended = () => { URL.revokeObjectURL(blobUrl); setStatus('idle') }
+                  fallback.play().catch(() => setStatus('idle'))
                 }
-                await audioRef.current.play().catch(() => setStatus('idle'))
               } else {
-                const fallback = new Audio(blobUrl)
-                fallback.onended = () => { URL.revokeObjectURL(blobUrl); setStatus('idle') }
-                fallback.play().catch(() => setStatus('idle'))
+                setStatus('idle')
               }
-            } else {
+            } catch(e) {
+              console.error('TTS failed', e)
               setStatus('idle')
             }
-          } catch(e) {
-            console.error('TTS failed', e)
-            setStatus('idle')
+          } else {
+            // Voce Nativa (Browser TTS)
+            const utterance = new SpeechSynthesisUtterance(finalReply);
+            utterance.lang = navigator.language || 'ro-RO';
+            
+            // Try to pick a decent native voice
+            const voices = window.speechSynthesis.getVoices();
+            const roVoice = voices.find(v => v.lang.startsWith('ro'));
+            if (roVoice) utterance.voice = roVoice;
+            
+            utterance.onend = () => {
+              setStatus('idle');
+            };
+            utterance.onerror = (e) => {
+              console.error('Native TTS error', e);
+              setStatus('idle');
+            };
+            
+            // Artificially animate soundbars for Native TTS since it doesn't feed audioRef
+            let fakeAnimFrame = null;
+            const animateBars = () => {
+              if (statusRef.current === 'speaking') {
+                setUserLevel(0.3 + Math.random() * 0.5);
+                fakeAnimFrame = requestAnimationFrame(() => setTimeout(animateBars, 100));
+              } else {
+                setUserLevel(0);
+              }
+            };
+            animateBars();
+            
+            const cleanupAnim = () => {
+              if (fakeAnimFrame) cancelAnimationFrame(fakeAnimFrame);
+              setUserLevel(0);
+            };
+            
+            utterance.addEventListener('end', cleanupAnim);
+            utterance.addEventListener('error', cleanupAnim);
+            
+            window.speechSynthesis.speak(utterance);
           }
         } else {
           setStatus('idle')
