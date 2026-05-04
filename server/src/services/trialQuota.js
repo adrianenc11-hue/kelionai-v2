@@ -79,7 +79,7 @@ async function saveToDb(ip, rec) {
        ON CONFLICT (ip) DO UPDATE SET
          first_ever_stamp_at = EXCLUDED.first_ever_stamp_at,
          first_stamp_at = EXCLUDED.first_stamp_at`,
-      ip, rec.firstEverStampAt, rec.firstStampAt,
+      [ip, rec.firstEverStampAt, rec.firstStampAt]
     );
   } catch (e) {
     console.error('[trialQuota] DB write failed:', e.message);
