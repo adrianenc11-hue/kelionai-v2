@@ -348,7 +348,7 @@ router.post('/tts', async (req, res) => {
   }
   
   const isNative = req.query.native === 'true';
-  let nativeVoiceId = process.env.ELEVENLABS_NATIVE_VOICE_ID || 'pNInz6obpgDQGcFmaJcg'; // Default to Adam (male)
+  let nativeVoiceId = process.env.ELEVENLABS_NATIVE_VOICE_ID || null;
   
   if (isNative && lang) {
     const l = lang.toLowerCase();
@@ -359,20 +359,40 @@ router.post('/tts', async (req, res) => {
     else if (l.startsWith('it')) nativeVoiceId = process.env.ELEVENLABS_NATIVE_VOICE_ID_IT || nativeVoiceId;
   }
   
-  const voiceId = isNative 
+  let voiceId = isNative 
     ? nativeVoiceId
     : (cloneInfo?.voiceId || process.env.ELEVENLABS_CLONED_VOICE_ID);
-    
-  if (!voiceId) {
-    return res.status(404).json({ error: 'No voice configured.' });
-  }
 
   const apiKey = process.env.ELEVENLABS_API_KEY;
   if (!apiKey) return res.status(503).json({ error: 'ElevenLabs not configured on server.' });
 
-  try {
-    const r = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}/stream`,
+  // Auto-discover a voice if none is configured
+  if (!voiceId) {
+    try {
+      const vr = await fetch('https://api.elevenlabs.io/v1/voices', {
+        headers: { 'xi-api-key': apiKey },
+      });
+      if (vr.ok) {
+        const vd = await vr.json();
+        const voices = vd.voices || [];
+        // Prefer a male voice, fall back to any
+        const male = voices.find(v => v.labels?.gender === 'male');
+        voiceId = (male || voices[0])?.voice_id;
+        if (voiceId) console.log(`[voice/tts] Auto-discovered voice: ${voiceId} (${(male || voices[0])?.name})`);
+      }
+    } catch (e) {
+      console.error('[voice/tts] Voice auto-discovery failed:', e.message);
+    }
+  }
+    
+  if (!voiceId) {
+    return res.status(500).json({ error: 'Nu s-a găsit nicio voce configurată sau disponibilă în ElevenLabs.' });
+  }
+
+  // Helper to call TTS with a given voiceId
+  async function callTTS(vid) {
+    return fetch(
+      `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(vid)}/stream`,
       {
         method: 'POST',
         headers: {
@@ -391,6 +411,31 @@ router.post('/tts', async (req, res) => {
         }),
       }
     );
+  }
+
+  try {
+    let r = await callTTS(voiceId);
+
+    // If 404 voice_not_found, auto-discover and retry once
+    if (r.status === 404) {
+      console.warn(`[voice/tts] Voice ${voiceId} not found, auto-discovering...`);
+      try {
+        const vr = await fetch('https://api.elevenlabs.io/v1/voices', {
+          headers: { 'xi-api-key': apiKey },
+        });
+        if (vr.ok) {
+          const vd = await vr.json();
+          const voices = vd.voices || [];
+          const male = voices.find(v => v.labels?.gender === 'male');
+          const fallback = (male || voices[0])?.voice_id;
+          if (fallback && fallback !== voiceId) {
+            console.log(`[voice/tts] Retrying with discovered voice: ${fallback}`);
+            r = await callTTS(fallback);
+            voiceId = fallback;
+          }
+        }
+      } catch (_) { /* ignore discovery error, will fall through to error handler below */ }
+    }
 
     if (!r.ok) {
       const errText = await r.text().catch(() => '');
@@ -398,7 +443,7 @@ router.post('/tts', async (req, res) => {
       
       let userError = `Eroare generare voce (${r.status}).`;
       if (r.status === 401) userError = 'Cheie API ElevenLabs invalidă.';
-      else if (r.status === 404) userError = 'ID-ul vocii nu a fost găsit în ElevenLabs. Verifică setările (ELEVENLABS_NATIVE_VOICE_ID).';
+      else if (r.status === 404) userError = 'Nicio voce disponibilă în contul ElevenLabs.';
       else if (r.status === 429 || errText.toLowerCase().includes('quota') || errText.toLowerCase().includes('insufficient')) {
         userError = 'Fonduri insuficiente ElevenLabs. Vă rugăm să reîncărcați contul ElevenLabs.';
       }
@@ -410,8 +455,8 @@ router.post('/tts', async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     // Log audit event (fire-and-forget)
     logVoiceCloneEvent({
-      userId, action: 'synthesize', voiceId: cloneInfo.voiceId,
-      consentVersion: cloneInfo.consentVersion || null,
+      userId, action: 'synthesize', voiceId: voiceId,
+      consentVersion: cloneInfo?.consentVersion || null,
       ip: ipOf(req), userAgent: uaOf(req),
       note: `chars:${text.trim().length}`,
     }).catch(() => {});
