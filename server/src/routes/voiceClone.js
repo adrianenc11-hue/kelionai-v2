@@ -398,11 +398,12 @@ router.post('/tts', async (req, res) => {
       
       let userError = `Eroare generare voce (${r.status}).`;
       if (r.status === 401) userError = 'Cheie API ElevenLabs invalidă.';
+      else if (r.status === 404) userError = 'ID-ul vocii nu a fost găsit în ElevenLabs. Verifică setările (ELEVENLABS_NATIVE_VOICE_ID).';
       else if (r.status === 429 || errText.toLowerCase().includes('quota') || errText.toLowerCase().includes('insufficient')) {
         userError = 'Fonduri insuficiente ElevenLabs. Vă rugăm să reîncărcați contul ElevenLabs.';
       }
       
-      return res.status(r.status === 401 ? 401 : 502).json({ error: userError });
+      return res.status(r.status === 401 ? 401 : 500).json({ error: userError });
     }
 
     res.setHeader('Content-Type', 'audio/mpeg');
