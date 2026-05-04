@@ -121,6 +121,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
   // can read it inside setupComplete without a closure/scope issue.
   const translatorModeRef = useRef(false)
   const initialTextRef = useRef(null)
+  const sessionIdRef = useRef(null)
 
   const wsRef = useRef(null)
   const audioCtxRef = useRef(null)       // 16kHz capture context for Gemini — MUST match SAMPLE_RATE_IN
@@ -1640,12 +1641,24 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
         let finalReply = '';
         let finalModel = '';
         
+        // Use an existing session ID if possible or generate one for this hook instance
+        if (!sessionIdRef.current) {
+          sessionIdRef.current = 'ses_' + Math.random().toString(36).substring(2, 10);
+        }
+        
         while (maxLoops-- > 0) {
           const r = await fetch('/api/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
             credentials: 'include',
-            body: JSON.stringify({ message: currentMessage, toolResponses, image: currentImage }),
+            body: JSON.stringify({ 
+              message: currentMessage, 
+              toolResponses, 
+              image: currentImage,
+              sessionId: sessionIdRef.current,
+              lat: coords?.lat,
+              lon: coords?.lon
+            }),
           })
           if (!r.ok) {
             const err = await r.json().catch(() => ({ error: 'Chat failed' }))
