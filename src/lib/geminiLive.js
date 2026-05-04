@@ -1732,10 +1732,28 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
             const utterance = new SpeechSynthesisUtterance(finalReply);
             utterance.lang = navigator.language || 'ro-RO';
             
-            // Try to pick a decent native voice
+            // Try to pick a decent male native voice
             const voices = window.speechSynthesis.getVoices();
-            const roVoice = voices.find(v => v.lang.startsWith('ro'));
-            if (roVoice) utterance.voice = roVoice;
+            
+            // Look for Romanian voices first
+            const roVoices = voices.filter(v => v.lang.startsWith('ro'));
+            
+            // Try to find a male voice among the Romanian ones
+            // Web Speech API doesn't have a gender property, so we guess by name
+            const maleKeywords = ['male', 'bărbat', 'barbat', 'andrei', 'bogdan', 'paul', 'george', 'ion', 'alex', 'david', 'mac'];
+            
+            let selectedVoice = null;
+            if (roVoices.length > 0) {
+              selectedVoice = roVoices.find(v => maleKeywords.some(keyword => v.name.toLowerCase().includes(keyword)));
+              if (!selectedVoice) selectedVoice = roVoices[0]; // Fallback to first ro voice
+            } else {
+              // Fallback to any male voice if no RO voice
+              selectedVoice = voices.find(v => maleKeywords.some(keyword => v.name.toLowerCase().includes(keyword)));
+            }
+            
+            if (selectedVoice) {
+              utterance.voice = selectedVoice;
+            }
             
             utterance.onend = () => {
               setStatus('idle');
