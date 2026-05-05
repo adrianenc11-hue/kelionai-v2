@@ -7,7 +7,6 @@ export function externalCardCopy(m) {
   let host = ''
   try { host = new URL(src).hostname.toLowerCase() } catch { /* ignore */ }
 
-  // video kind removed (2026-04-28) — YouTube integration dropped.
 
   // WebVM / CheerpX / JSLinux / v86 — these *legitimately* need cross-
   // origin isolation and we cannot render them in-app. Keep the specific

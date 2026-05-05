@@ -1,7 +1,7 @@
 'use strict';
 
 // Unit tests for the admin-identity helpers in middleware/optionalAuth.js
-// — the single file /gemini-token and /openai-live-token rely on to tell
+// — the single file /gemini-token relies on to tell
 // guests, paying users, and admins apart. The tests lock in the F1+F2
 // contract from the 2026-04-20 admin audit:
 //   • peekSignedInUser never returns null for a JWT that verifies, even

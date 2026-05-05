@@ -1,7 +1,7 @@
-// Gemini 3.1 Flash Live client hook.
-// Manages: mic capture → WebSocket → audio playback → lipsync driver → transcript.
-// Stage 1 modules: M3 (mic+VAD), M4 (Gemini Live loop), M5 (auto-language),
-//   M6 (turn-taking via server VAD + interrupt), M8 (Kelion persona).
+// Kelion voice client hook (Gemma 4 via OpenRouter REST + Browser SpeechRecognition).
+// Manages: mic capture → SpeechRecognition → OpenRouter → TTS playback → lipsync → transcript.
+// Stage 1 modules: M3 (mic+VAD), M4 (voice loop), M5 (auto-language),
+//   M6 (turn-taking), M8 (Kelion persona).
 // Stage 2 modules: M9 (camera live stream w/ visible preview), M10 (screen share),
 //   M11 (vision reasoning via multimodal frames), M12 (emotion mirror via persona).
 
@@ -13,8 +13,8 @@ import { getCsrfToken } from './api'
 import { subscribeNarrationMode, getNarrationMode } from './narrationMode'
 import { logAiEvent } from './aiEventLog'
 
-const SAMPLE_RATE_IN = 16000   // Gemini Live expects 16kHz PCM16 mic
-const SAMPLE_RATE_OUT = 24000  // Gemini Live returns 24kHz PCM16 audio
+const SAMPLE_RATE_IN = 16000   // Mic capture rate for SpeechRecognition
+const SAMPLE_RATE_OUT = 24000  // TTS playback rate (ElevenLabs/Gemini REST)
 
 function floatTo16BitPCM(float32) {
   const out = new Int16Array(float32.length)
@@ -69,7 +69,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
   // server then skips the deduction, preventing the idle drain Adrian
   // reported (-1 min x 28 min at idle).
   const lastActivityAtRef = useRef(Date.now())
-  // Credits heartbeat (signed-in non-admin only). While a Gemini Live
+  // Credits heartbeat (signed-in non-admin only). While a voice
   // session is open we POST /api/credits/consume every 60s to deduct
   // one minute from the user's balance. When the server reports
   // `exhausted: true` (balance hit 0) or returns 402 we close the
@@ -108,7 +108,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
   // the system instruction and Gemini would re-greet anyway, defeating F4.
   // handleMessage reads this ref to decide whether to skip the kickstart.
   const handoffSessionRef = useRef(false)
-  // Anti-double-greeting guard. Gemini Live models sometimes generate
+  // Anti-double-greeting guard. The model sometimes generates
   // an unsolicited greeting even when the system prompt says "don't
   // speak first". We suppress ALL model audio/text until the user has
   // spoken at least once. Becomes true on first inputTranscription.
@@ -560,7 +560,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
       }
     }
 
-    // Stage 4 — Gemini Live asks us to run a function tool.
+    // Stage 4 — The model asks us to run a function tool.
     // Each functionCall carries { id, name, args }. We route to the right
     // /api/tools/* backend endpoint, then send back a toolResponse with the
     // matching id so Gemini can continue the turn with the result.
@@ -610,7 +610,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
               functionResponses: fcs.map((fc) => ({
                 id: fc.id,
                 name: fc.name,
-                response: { result: `Tool error: ${err.message || 'unknown'}. Tell the user honestly and move on.` },
+                response: { result: `Tool error: ${err.message || 'unknown'}. Explain briefly to the user WHY this failed, what is missing or broken, and suggest an alternative if possible.` },
               })),
             },
           }))
@@ -818,7 +818,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
         setTrial(null)
       }
 
-      if (tokenBody?.model?.includes('gemma') || tokenBody?.model?.includes('llama') || tokenBody?.model?.includes('deepseek')) {
+      if (tokenBody?.model?.includes('gemma')) {
         // OpenRouter REST Voice Mode
         console.log('[geminiLive] OpenRouter model detected, switching to REST Voice Mode');
         // We MUST NOT stop micStreamRef.current here because if the soundbars are flat,
@@ -1671,7 +1671,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
             const results = [];
             for (const call of data.toolCalls) {
               const res = await runTool(call.name, call.args);
-              results.push({ name: call.name, response: res });
+              results.push({ name: call.name, response: res, id: call.id });
             }
             toolResponses = results;
             currentMessage = undefined; // Do not send message again
@@ -1707,7 +1707,8 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
               const blob = new Blob([audioData], { type: 'audio/mpeg' })
               const blobUrl = URL.createObjectURL(blob)
               
-              const audioEl = new window.Audio(blobUrl)
+              const audioEl = (audioRef && audioRef.current) ? audioRef.current : new window.Audio();
+              audioEl.src = blobUrl;
               audioEl.onended = () => {
                 URL.revokeObjectURL(blobUrl)
                 setStatus('idle')

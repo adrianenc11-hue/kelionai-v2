@@ -2,7 +2,7 @@
 
 // POST /api/chat — text chat using Gemma 4 via generateContent API.
 // This is a fallback/primary text chat route that does NOT require
-// the Gemini Live WebSocket. Works with any model that supports
+// This is the primary text chat route using Gemma 4 via OpenRouter.
 // generateContent, including Gemma 4.
 
 const { Router } = require('express');
@@ -28,9 +28,9 @@ setInterval(() => {
 
 router.post('/', async (req, res) => {
   try {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return res.status(503).json({ error: 'GEMINI_API_KEY not configured' });
+    const orKey = process.env.OPENROUTER_API_KEY;
+    if (!orKey) {
+      return res.status(503).json({ error: 'OPENROUTER_API_KEY not configured' });
     }
 
     // Auth / trial gating (same logic as realtime)
@@ -71,7 +71,8 @@ router.post('/', async (req, res) => {
         parts: toolResponses.map(tr => ({
           functionResponse: {
             name: tr.name,
-            response: { result: tr.response }
+            response: { result: tr.response },
+            id: tr.id
           }
         }))
       });
@@ -90,15 +91,9 @@ router.post('/', async (req, res) => {
       session.history = session.history.slice(-MAX_HISTORY * 2);
     }
 
-    // Model: must support OpenAI-style function calling (tool_calls).
-    // gemma-3-27b-it does NOT support tool_calls — it outputs JSON as text.
-    // google/gemini-2.0-flash supports tool_calls natively via OpenRouter.
-    const model = process.env.CHAT_MODEL || process.env.OPENROUTER_MODEL || 'google/gemini-2.0-flash-001';
+    // Model: Gemma 4 31B via OpenRouter — supports tool_calls natively.
+    const model = process.env.CHAT_MODEL || process.env.OPENROUTER_MODEL || 'google/gemma-4-31b-it';
     const url = 'https://openrouter.ai/api/v1/chat/completions';
-    const orKey = process.env.OPENROUTER_API_KEY;
-    if (!orKey) {
-      return res.status(503).json({ error: 'OPENROUTER_API_KEY not configured' });
-    }
 
     const { buildKelionToolsChatCompletions } = require('./realtime');
     // Inject the coordinates into the tools builder if the backend supports it,
@@ -138,7 +133,7 @@ Your replies must be direct, conversational, and concise.${locationContext}`
         for (const p of h.parts) {
           if (p.functionCall) {
             tool_calls.push({
-              id: `call_${p.functionCall.name}`,
+              id: p.functionCall.id || `call_${p.functionCall.name}`,
               type: 'function',
               function: {
                 name: p.functionCall.name,
@@ -164,7 +159,7 @@ Your replies must be direct, conversational, and concise.${locationContext}`
           if (p.functionResponse) {
             messages.push({
               role: 'tool',
-              tool_call_id: `call_${p.functionResponse.name}`,
+              tool_call_id: p.functionResponse.id || `call_${p.functionResponse.name}`,
               name: p.functionResponse.name,
               content: JSON.stringify(p.functionResponse.response)
             });
@@ -181,16 +176,24 @@ Your replies must be direct, conversational, and concise.${locationContext}`
       max_tokens: 1024,
     };
 
-    const r = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${orKey}`,
-        'HTTP-Referer': 'https://kelion.ai',
-        'X-Title': 'Kelion AI'
-      },
-      body: JSON.stringify(body),
-    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 30_000);
+    let r;
+    try {
+      r = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${orKey}`,
+          'HTTP-Referer': 'https://kelion.ai',
+          'X-Title': 'Kelion AI'
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
 
     if (!r.ok) {
       const errText = await r.text();
@@ -213,7 +216,7 @@ Your replies must be direct, conversational, and concise.${locationContext}`
       const toolCalls = choice.tool_calls.map(tc => {
         let args = {};
         try { args = JSON.parse(tc.function.arguments); } catch(e){}
-        return { name: tc.function.name, args };
+        return { name: tc.function.name, args, id: tc.id };
       });
       
       // Save the model's turn so history is valid

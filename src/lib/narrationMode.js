@@ -1,5 +1,5 @@
 // Continuous narration mode — accessibility feature for visually-impaired
-// users. When enabled, the Gemini Live transport periodically pulls
+// users. When enabled, the voice transport periodically pulls
 // a frame from the camera buffer, asks Gemini Vision to describe it, and
 // injects that description back into the voice session so Kelion speaks
 // a short natural narration. Adrian's requirement (2026-04-20):

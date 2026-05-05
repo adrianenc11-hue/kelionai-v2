@@ -369,5 +369,5 @@ describe('PUT /api/admin/users/:id/subscription', () => {
   });
 });
 
-// NOTE: /api/payments/* mock routes removed (2026-04-25 audit).
-// Real Stripe checkout is tested via /api/credits/* test suite.
+
+

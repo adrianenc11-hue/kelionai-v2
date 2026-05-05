@@ -3,7 +3,7 @@
 // Stage 3 — M15: Fact extraction.
 //
 // Given a list of conversation turns (role + text), distills durable
-// facts about the user via a Gemini Flash call. Durable = "worth
+// facts about the user via a Gemma 4 call. Durable = "worth
 // remembering next week", not "Kelion said hi".
 //
 // Returns an array of { kind, fact } objects, bounded to a small size.
@@ -60,7 +60,7 @@ async function extractFacts(turns, options = {}) {
   const url = 'https://openrouter.ai/api/v1/chat/completions';
 
   const body = {
-    model: options.model || 'anthropic/claude-3.5-haiku', // fast, cheap, supports json mode via OR
+    model: options.model || 'google/gemma-4-31b-it', // Gemma 4 — project-wide default via OpenRouter
     messages: [
       { role: 'system', content: EXTRACTION_SYSTEM },
       { role: 'user', content: `Transcript:\n${transcript}` }

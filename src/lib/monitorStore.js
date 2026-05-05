@@ -1,5 +1,5 @@
 // Simple pub/sub store for what the avatar's stage monitor should display.
-// Gemini Live calls the `show_on_monitor` tool → kelionTools.js resolves the
+// The model calls the `show_on_monitor` tool → kelionTools.js resolves the
 // payload → sets the store → KelionStage.jsx (StageMonitor) subscribes and
 // renders an iframe / image / video embed on the in-scene screen.
 //
@@ -52,7 +52,7 @@ export const EXTERNAL_ONLY_HOSTS = new Set([
 const NON_EMBEDDABLE_HOST_SUFFIXES = [
   'google.com',
   'google.co.uk',
-  // youtube.com removed (2026-04-28) — YouTube integration dropped.
+
   'facebook.com',
   'instagram.com',
   'twitter.com',
@@ -370,7 +370,7 @@ map.fitBounds(route.getBounds(),{padding:[50,50]});
   } catch { /* ignore */ }
 }
 
-// YouTube integration removed (2026-04-28).
+
 
 function safeUrl(u) {
   if (!u || typeof u !== 'string') return null;
@@ -549,7 +549,7 @@ L.marker([${lat},${lon}]).addTo(map).bindPopup(${JSON.stringify(name)}).openPopu
       };
     }
 
-    // case 'video' removed (2026-04-28) — YouTube integration dropped.
+
 
     // VIDEO — restored with full format support (2026-04-29).
     // Supports: MP4, WebM, OGG (native player), YouTube, Vimeo (iframe embed),

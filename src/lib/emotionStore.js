@@ -1,5 +1,5 @@
 // Stage 6 — M27: emotion mirroring store.
-// observe_user_emotion tool calls from Gemini Live land here. The avatar
+// observe_user_emotion tool calls from the voice model land here. The avatar
 // subscribes via useEmotion() and nudges morph targets + halo tint.
 //
 // We keep the surface tiny on purpose: the LLM already has the hard part

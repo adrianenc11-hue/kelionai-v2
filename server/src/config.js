@@ -75,24 +75,13 @@ module.exports = {
 
   dbPath: optional('DB_PATH', './data/kelion.db'),
 
-  // openai config REMOVED — project uses Gemini only.
-
   gemini: {
     apiKey:       optional('GEMINI_API_KEY'),
     chatModel:    optional('GEMINI_CHAT_MODEL', 'gemma-4-31b-it'),
     // Keep this default in sync with server/src/routes/realtime.js — both
-    // read GEMINI_LIVE_MODEL directly, so the fallbacks must match.
-    //
-    // We tried `gemini-2.0-flash-live-001` in #112 to escape the preview
-    // protocol drift, but Google's v1main bidiGenerateContent rejected it
-    // with 1008 "models/gemini-2.0-flash-live-001 is not found for API
-    // version v1main, or is not supported for bidiGenerateContent" — that
-    // exact model id does not exist on v1main Live. Reverting to the
-    // preview that at least opens the session (`gemini-3.1-flash-live-
-    // preview`) so admin can talk to Kelion again while we swap the
-    // preview`) so admin can talk to Kelion again.
-    // Override via Railway env GEMINI_LIVE_MODEL.
-    liveModel:    optional('GEMINI_LIVE_MODEL', 'gemma-4-31b-it'),
+    // read OPENROUTER_MODEL directly, so the fallbacks must match.
+    // Override via Railway env OPENROUTER_MODEL.
+    liveModel:    optional('OPENROUTER_MODEL', 'google/gemma-4-31b-it'),
     ttsModel:     optional('GEMINI_TTS_MODEL', 'gemma-4-31b-it'),
     ttsVoiceKelion: optional('GEMINI_TTS_VOICE_KELION', 'Kore'),
   },

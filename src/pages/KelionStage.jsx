@@ -126,7 +126,7 @@ export default function KelionStage() {
   // one-time permission dialog. Coords are cached in localStorage so
   // refreshes don't re-ping the OS.
   // useClientGeo v2 exposes { coords, permission, lastError, requestNow }.
-  // We forward `coords` to the Gemini Live hook (the pipeline only needs
+  // We forward `coords` to the voice hook (the pipeline only needs
   // lat/lon), and the top-level stage wires `requestNow` to the first
   // user gesture so iOS Safari actually shows the permission prompt —
   // see handling in onStageClick below.
@@ -864,7 +864,7 @@ export default function KelionStage() {
     if (resolved) setVoiceStyleState(resolved)
   }, [])
 
-  // Text input for typed messages (goes through Gemini Live WebSocket).
+  // Text input for typed messages (goes through Gemma 4 REST pipeline).
   const [chatInput, setChatInput] = useState('')
   const [chatPanelOpen, setChatPanelOpen] = useState(false)
   const [chatError, setChatError] = useState(null)
@@ -927,7 +927,7 @@ export default function KelionStage() {
   const statusRef = useRef('idle')
   const muteModeRef = useRef(false)
 
-  // Single voice source — Gemini Live WebSocket audio drives the avatar mouth.
+  // Single voice source — TTS audio drives the avatar mouth.
   const mouthOpen = micMouthOpen || 0
 
   // Track whether the half-page MonitorOverlay is currently rendered,
@@ -960,12 +960,12 @@ export default function KelionStage() {
 
   // Chat bubble auto-hide — fade the on-stage bubble out after 8s of
   // quiet so the avatar isn't cluttered. The timer resets on every new
-  // turn from the Gemini Live hook.
+  // turn from the voice hook.
   const [bubbleVisible, setBubbleVisible] = useState(true)
   const bubbleHideTimerRef = useRef(null)
   // NOTE: bubbleVisible useEffect moved after useGeminiLive (needs turns + status)
 
-  // Voice transport — Gemini Live (WebSocket) for live voice.
+  // Voice transport — Gemma 4 REST (SpeechRecognition → OpenRouter → TTS).
   const liveHook = useGeminiLive({
     audioRef,
     coords: clientGeo,
@@ -1025,7 +1025,7 @@ export default function KelionStage() {
   // -- Mute mode ----------------------------------------------------------
   // Activated when the user explicitly says "nu mai vorbi", "mute",
   // "fii silentios", etc. Suppresses both ElevenLabs text-TTS and the
-  // Gemini Live voice gain. Deactivated on "stop", "reactiveaza", etc.
+  // Voice gain. Deactivated on "stop", "reactiveaza", etc.
   // muteModeRef is declared before the TTS useEffect (above) to avoid TDZ.
   const [muteMode, setMuteMode] = useState(false)
   useEffect(() => {
@@ -1094,7 +1094,7 @@ export default function KelionStage() {
     const payloadStr = finalPayload.trim()
     // Always use liveSendText — it tries WebSocket first, then falls back
     // to /api/chat HTTP endpoint (Gemma 4). Never call start() for text-only
-    // messages; start() fetches a Gemini Live token which may fail (500/1008).
+    // messages; start() fetches a voice token which may fail (500).
     if (liveSendTextRef.current) await liveSendTextRef.current(payloadStr)
   }, [chatInput, attachedFile, applyMuteCommand])
   const trialHud = useTrial({ signedIn: !!authState.signedIn })
@@ -1109,7 +1109,7 @@ export default function KelionStage() {
       trialRefreshTimerRef.current = null
     }
   }, [])
-  // Kick the Gemini Live hook's local trial state when the server flips
+  // Kick the voice hook's local trial state when the server flips
   // to exhausted on either surface — prevents a just-started voice
   // session from running past the shared quota that a text-chat user
   // might have burned down first.
@@ -1122,7 +1122,7 @@ export default function KelionStage() {
 
   // Auto-open the Buy Credits modal when the voice session errors out
   // with a credit-exhausted message (Adrian: "cind ajunge iar la 0 se
-  // trimite mesaj reincarca"). The Gemini Live hook already surfaces a
+  // trimite mesaj reincarca"). The voice hook already surfaces a
   // clean message from the 402 token response; we match on it so a
   // typical credit-gate trip surfaces the package picker immediately
   // instead of leaving the user to find the Credits pill.
@@ -1603,7 +1603,7 @@ export default function KelionStage() {
 
   // --- Auto-start DISABLED ---
   // Previously fired start() on page load to open a WebSocket. Disabled
-  // because the Gemini Live token endpoint is returning 500 and this
+  // because the voice token endpoint is returning 500 and this
   // burns trial minutes on every page load. Users tap "OPRIT" to start
   // voice, or type in the chat input which goes through /api/chat HTTP.
   const autoStartFiredRef = useRef(false)
@@ -1737,9 +1737,7 @@ export default function KelionStage() {
           <ambientLight intensity={0.5} />
           <directionalLight position={[10, 10, 5]} intensity={1} />
           <StudioDecor />
-          {/* Halo removed — Adrian asked to stop the pulsating circle behind
-              the avatar; it was too busy. Status color is still conveyed
-              through the spotlights + status-dot in the HUD. */}
+
           <group position={[1.6, 0, 0]}>
             {/* `presenting` flips true whenever Kelion is speaking an answer
                 — that's when we have (or will have) content on the monitor
@@ -2218,8 +2216,7 @@ export default function KelionStage() {
           display: 'flex', alignItems: 'center', gap: 8,
         }}
       >
-        {/* Single-LLM cleanup (2026-04): voice transport pill removed —
-            Gemini Live is the only provider, no UI swap. */}
+
         {/* Credits pill — hidden for admins (they have unlimited access and
             no billing; showing "0 min" confused Adrian in testing). For
             regular signed-in users we still show balance + open the Stripe
@@ -2490,14 +2487,7 @@ export default function KelionStage() {
           so the SPA stays mounted and auth state survives the browser
           back button. */}
 
-      {/* F17 — camera self-view removed from the page per Adrian's request:
-          "am cerut sa nu fie vizibila informatia pe pagina". The camera
-          stream still runs (frames feed the vision pipeline for Kelion),
-          but there is no visible preview thumbnail. We still mount a
-          hidden <video> element so the MediaStream attachment lifecycle
-          (srcObject assignment + play() trigger) works the same way it
-          did with a visible preview — some browsers stall the track if
-          no element ever consumes the stream. Hidden via display:none. */}
+      {/* Hidden video element — keeps camera MediaStream alive for vision pipeline */}
       {cameraStream && (
         <video
           ref={cameraVideoRef}

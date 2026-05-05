@@ -1,14 +1,12 @@
 'use strict';
 
 // Unit tests for the provider-agnostic Kelion tool catalog and its
-// shape adapters. Guards against drift between the Gemini Live and
+// shape adapters. Guards against drift between the Gemini and
 // Chat Completions renderings when a new tool is added to KELION_TOOLS
 // — both shapes must still emit the exact set of tool names and the
 // same required-argument contracts.
 //
-// Single-LLM cleanup (2026-04): the OpenAI Realtime renderer was
-// removed along with the OpenAI voice transport. Only Gemini and the
-// shared Chat Completions adapter remain.
+// Only Gemini and the shared Chat Completions adapter remain.
 
 // Minimal env so `src/routes/realtime` loads without exploding on
 // config-required vars.
@@ -178,7 +176,7 @@ describe('buildKelionToolsGemini', () => {
     expect(Array.isArray(rendered)).toBe(true);
     expect(rendered).toHaveLength(1);
     expect(rendered[0]).toHaveProperty('functionDeclarations');
-    // googleSearch was removed to prevent audio repetitions.
+
     expect(Array.isArray(rendered[0].functionDeclarations)).toBe(true);
     expect(rendered[0].functionDeclarations).toHaveLength(EXPECTED_TOOL_NAMES.length);
   });

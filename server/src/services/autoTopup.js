@@ -12,7 +12,7 @@
  * Design:
  *   - Only providers with a *real* numeric balance ratio can trigger
  *     auto-topup. Today only ElevenLabs exposes that (characters left
- *     / character_limit). Gemini/OpenAI/Groq have no machine-readable
+ *     / character_limit). Gemini has no machine-readable
  *     balance, so we never auto-charge for them — admin tops those up
  *     manually via the top-up link on each card.
  *   - Config is pure env (no DB schema change for this PR). When the

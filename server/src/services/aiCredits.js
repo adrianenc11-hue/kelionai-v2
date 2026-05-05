@@ -85,26 +85,8 @@ async function probeGemini() {
   return card;
 }
 
-// probeOpenAI REMOVED — project uses Gemini only.
 
-// probeGroq REMOVED — Groq coding tools were removed.
-// Keeping the function as a no-op for backwards compat if anything calls it.
-async function probeGroq() {
-  return {
-    id: 'groq',
-    name: 'Groq',
-    subtitle: 'Removed — coding tools consolidated into Gemini Live',
-    configured: false,
-    keyFingerprint: null,
-    balance: null,
-    balanceDisplay: 'N/A',
-    unit: null,
-    status: 'unconfigured',
-    message: 'Groq coding tools removed — Gemini Live handles coding directly.',
-    topUpUrl: null,
-    billingUrl: null,
-  };
-}
+
 
 async function probeElevenLabs() {
   const apiKey = process.env.ELEVENLABS_API_KEY || '';
@@ -244,17 +226,14 @@ async function probeRailway() {
  * order. Safe to call in parallel — each probe handles its own errors.
  */
 async function getAllCredits() {
-  // Order is display order in the admin grid. Groq sits next to the
-  // other AI providers so admins can eyeball "is every AI brain we
-  // call actually reachable" in a single glance.
-  const [gemini, groq, elevenlabs, stripe, railway] = await Promise.all([
+  // Order is display order in the admin grid.
+  const [gemini, elevenlabs, stripe, railway] = await Promise.all([
     probeGemini(),
-    probeGroq(),
     probeElevenLabs(),
     probeStripe(),
     probeRailway(),
   ]);
-  return [gemini, groq, elevenlabs, stripe, railway];
+  return [gemini, elevenlabs, stripe, railway];
 }
 
 /**
@@ -433,7 +412,7 @@ async function buildRevenueSplit(revenueSummary, { days = 30, currency = 'gbp' }
 module.exports = {
   getAllCredits,
   probeGemini,
-  probeGroq,
+
   probeElevenLabs,
   probeStripe,
   probeRailway,

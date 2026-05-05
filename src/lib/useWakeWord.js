@@ -28,7 +28,7 @@
 // Privacy note: the Web Speech API routes audio to the browser vendor
 // (Google for Chrome) for transcription. We only listen for the wake
 // word and never persist anything. The full conversation after the
-// wake word runs through the normal Gemini Live path.
+// wake word runs through the normal voice path.
 //
 // Intentionally isolated from KelionStage / geminiLive — if this file
 // breaks, delete the single `useWakeWord(...)` call in KelionStage.jsx

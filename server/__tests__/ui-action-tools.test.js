@@ -61,9 +61,9 @@ describe('PR #200 — UI action tools', () => {
     expect(d).toMatch(/do not guess|rejected|hallucinat/);
   });
 
-  test('OpenAI adapter surfaces both UI tools', () => {
-    const openaiTools = buildKelionToolsChatCompletions();
-    const names = openaiTools.map((t) => t.name || t.function?.name).filter(Boolean);
+  test('Chat Completions adapter surfaces both UI tools', () => {
+    const ccTools = buildKelionToolsChatCompletions();
+    const names = ccTools.map((t) => t.name || t.function?.name).filter(Boolean);
     expect(names).toContain('ui_notify');
     expect(names).toContain('ui_navigate');
   });

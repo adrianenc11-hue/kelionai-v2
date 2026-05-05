@@ -24,9 +24,9 @@ describe('PR #139 — mobile GPS + camera voice tools', () => {
     expect((tool.required || []).length).toBe(0)
   })
 
-  test('OpenAI adapter surfaces both new tools in the function catalog', () => {
-    const openaiTools = buildKelionToolsChatCompletions()
-    const names = openaiTools.map((t) => t.name || t.function?.name).filter(Boolean)
+  test('Chat Completions adapter surfaces both new tools in the function catalog', () => {
+    const ccTools = buildKelionToolsChatCompletions()
+    const names = ccTools.map((t) => t.name || t.function?.name).filter(Boolean)
     expect(names).toContain('get_my_location')
     expect(names).toContain('switch_camera')
   })
@@ -40,7 +40,7 @@ describe('PR #139 — mobile GPS + camera voice tools', () => {
     expect(names).toContain('switch_camera')
   })
 
-  test('persona prompt mentions both tools so Gemini/OpenAI know to call them', () => {
+  test('persona prompt mentions both tools so Gemini knows to call them', () => {
     const realtime = require('../src/routes/realtime')
     // buildKelionPersona isn't exported directly but the prompt text
     // lives in this file — grep the module source at require time via

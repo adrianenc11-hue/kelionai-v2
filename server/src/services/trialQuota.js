@@ -3,7 +3,7 @@
 // Guest trial quota — two-layer IP-based gating.
 //
 // Layer 1 (daily):     15 minutes of Kelion per IP per 24 hours,
-//                      shared across voice chat (Gemini Live) AND
+//                      shared across voice chat and
 //                      text chat (/api/chat) AND TTS (/api/tts).
 //
 // Layer 2 (lifetime):  after 7 calendar days from the FIRST EVER stamp

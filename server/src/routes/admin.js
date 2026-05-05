@@ -310,7 +310,7 @@ router.get('/credits', async (req, res) => {
     _pruneAlertCooldown(now);
     for (const c of cards) {
       if (c.kind === 'revenue') continue; // revenue providers don't trigger low alerts
-      // `unconfigured` = opt-in provider (e.g. Groq) that the admin
+      // `unconfigured` = opt-in provider that the admin
       // intentionally hasn't set up. Admin still sees the red card in the
       // dashboard, but we don't spam their inbox every 6h about it.
       if (c.status !== 'low' && c.status !== 'error') continue;

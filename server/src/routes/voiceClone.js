@@ -348,7 +348,7 @@ router.post('/tts', async (req, res) => {
   }
   
   const isNative = req.query.native === 'true';
-  let nativeVoiceId = process.env.ELEVENLABS_NATIVE_VOICE_ID || null;
+  let nativeVoiceId = process.env.ELEVENLABS_NATIVE_VOICE_ID || 'pNInz6obpgDQGcFmaJgB'; // Adam - Professional, deep male voice
   
   if (isNative && lang) {
     const l = lang.toLowerCase();

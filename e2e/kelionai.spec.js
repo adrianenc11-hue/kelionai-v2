@@ -17,9 +17,8 @@ import { test, expect } from '@playwright/test';
  *   1. The server is alive (/health, /ping).
  *   2. The homepage HTML actually renders the Kelion shell (root div + JS).
  *   3. Old product routes do not leave the user on an admin/chat/plans page.
- *   4. The Gemini Live token endpoint responds with a structured JSON error
- *      when GEMINI_API_KEY is not set (the CI case) and does NOT crash the
- *      server or leak a stack trace.
+ *   4. The voice token endpoint responds with a structured JSON response
+ *      containing the Gemma 4 model info for REST Voice Mode.
  */
 
 const BASE = process.env.BASE_URL || 'http://127.0.0.1:5173';
@@ -105,16 +104,11 @@ test.describe('Kelion Studio API (DS-1 / DS-3) wiring', () => {
   });
 });
 
-test.describe('Gemini Live token endpoint (Stage 1 precondition)', () => {
-  test('Default (aistudio) returns a token (prod) or honest 503 (unconfigured CI)', async ({ request }) => {
-    // The default backend is AI Studio (see server/src/routes/realtime.js).
-    // It uses GEMINI_API_KEY to mint an ephemeral token via the
-    // generativelanguage.googleapis.com API.
-    //
-    // Shape depends on deployment:
-    //   - Production (GEMINI_API_KEY set): 200 with backend='aistudio',
-    //     a token string, and a setup block.
-    //   - CI / fresh dev box (no key): 503 with a clear error.
+test.describe('Voice session token endpoint (Gemma 4)', () => {
+  test('Returns Gemma 4 model with openrouter backend', async ({ request }) => {
+    // The voice token endpoint now returns Gemma 4 model info for REST
+    // Voice Mode (SpeechRecognition → OpenRouter → TTS).
+    // No ephemeral token is minted — model name triggers REST mode on client.
     const res = await request.get(`${BASE}/api/realtime/gemini-token?lang=en-US`);
     if (res.status() === 503) {
       const body = await res.json();
@@ -123,29 +117,8 @@ test.describe('Gemini Live token endpoint (Stage 1 precondition)', () => {
     }
     expect(res.status()).toBe(200);
     const body = await res.json();
-    expect(body.backend).toBe('aistudio');
-    expect(typeof body.token).toBe('string');
-    expect(body.token.length).toBeGreaterThan(0);
-  });
-
-  test('Forcing ?backend=vertex exercises the Vertex AI path', async ({ request }) => {
-    // On CI neither GOOGLE_CLOUD_PROJECT nor GCP_SERVICE_ACCOUNT_JSON
-    // is set → 503 is the honest response. In production with the project
-    // configured we accept a 200 with token=null and a setup block.
-    const res = await request.get(`${BASE}/api/realtime/gemini-token?lang=en-US&backend=vertex`);
-    if (res.status() === 503) {
-      const body = await res.json();
-      expect(body.error).toMatch(/Vertex backend is unconfigured/i);
-      return;
-    }
-    expect(res.status()).toBe(200);
-    const body = await res.json();
-    expect(body.backend).toBe('vertex');
+    expect(body.backend).toBe('openrouter');
+    expect(body.model).toContain('gemma');
     expect(body.token).toBeNull();
-    expect(body.setup).toBeTruthy();
-    expect(typeof body.setup.systemInstruction.parts[0].text).toBe('string');
-    expect(body.setup.model).toMatch(
-      /^projects\/[^/]+\/locations\/[^/]+\/publishers\/google\/models\/.+$/,
-    );
   });
 });

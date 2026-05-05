@@ -176,7 +176,7 @@ async function initDb() {
   // Stage 3 — M14/M15: Long-term memory store. One row per extracted fact
   // about the user. We keep it simple (no embeddings yet — retrieval dumps
   // the most-recent-N facts into the system prompt, which fits within
-  // Gemini Live's budget for typical user memory sizes).
+  // the model's budget for typical user memory sizes).
   //
   // Audit M8 (tier / last_affirmed_at / archived_at) — the consolidator
   // in services/memoryConsolidator.js reads these columns to detect
