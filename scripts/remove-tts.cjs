@@ -20,7 +20,7 @@ console.log(`Removing TTS useEffect: chars ${globalStart}-${globalEnd} (${global
 
 const replacement = `useEffect(() => {
     // PHYSICALLY REMOVED: TTS (/api/tts + speechSynthesis).
-    // Voice comes ONLY from Canal B (Gemini Live WebSocket).
+    // Voice comes ONLY from Canal B (Gemma 4 Voice WebSocket).
   }, [${depsStr}`;
 
 code = code.substring(0, globalStart) + replacement + code.substring(globalEnd);

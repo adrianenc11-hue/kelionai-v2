@@ -5,7 +5,7 @@
  * ACCEPTANCE: voice-roundtrip
  *
  * Kelion is "Alive" (Stage 1) only if a real user — with no account —
- * can open https://kelionai.app, tap-to-talk, and receive Gemini Live
+ * can open https://kelionai.app, tap-to-talk, and receive Gemma 4 Voice
  * audio back. This acceptance script validates the server-side
  * precondition for that flow: the ephemeral-token endpoint must mint
  * a valid token that the browser can use to open a WebSocket to
@@ -14,18 +14,18 @@
  * What this script asserts:
  *
  *   1. /health is reachable on https://kelionai.app and reports
- *      services.gemini === "configured". Kept as a gate because text
- *      chat + fact extraction still depend on GEMINI_API_KEY even
+ *      services.google === "configured". Kept as a gate because text
+ *      chat + fact extraction still depend on GOOGLE_API_KEY even
  *      though the live voice path no longer does.
  *
- *   2. GET /api/realtime/gemini-token returns HTTP 200 with one of
+ *   2. GET /api/realtime/voice-token returns HTTP 200 with one of
  *      two shapes depending on the resolved backend:
  *
  *      a) Vertex AI (GA, production default since PR #207):
  *           { backend: "vertex",
  *             token: null,                    // proxy authenticates
  *             expiresAt: ISO-8601 in future,
- *             provider: "gemini",
+ *             provider: "google",
  *             model: string (non-empty),
  *             voice: string (non-empty),
  *             voiceStyle: string (non-empty),
@@ -45,7 +45,7 @@
  *         deployments that have not flipped the default):
  *           { backend: "aistudio",
  *             token: "auth_tokens/<id>",     // browser swaps for WS
- *             expiresAt, provider: "gemini", model, voice, voiceStyle }
+ *             expiresAt, provider: "google", model, voice, voiceStyle }
  *
  *      If this call returns 500, tap-to-talk is broken end-to-end for
  *      every user — fail here.
@@ -64,7 +64,7 @@
  *     require OAuth credentials in CI and a live Google Cloud call.
  *
  * A real response means: the token handler can mint a session the
- * browser can use to open Gemini Live. That is the operative
+ * browser can use to open Gemma 4 Voice. That is the operative
  * definition of "Kelion can speak" on the server side.
  */
 
@@ -90,55 +90,55 @@ async function getJson(path) {
 }
 
 (async () => {
-  // 1. /health must be green and advertise Gemini as configured.
+  // 1. /health must be green and advertise Gemma 4 as configured.
   const health = await getJson('/health');
   if (health.status !== 200) {
     return fail('/health not 200', 'status=' + health.status + ' body=' + health.text.slice(0, 400));
   }
-  const gemini = health.body?.services?.gemini;
-  if (gemini !== 'configured') {
+  const Gemma 4 = health.body?.services?.Gemma 4;
+  if (Gemma 4 !== 'configured') {
     return fail(
-      '/health reports services.gemini != "configured"',
+      '/health reports services.google != "configured"',
       'services=' + JSON.stringify(health.body?.services || null),
     );
   }
 
-  // 2. /api/realtime/gemini-token must return a valid session bootstrap.
+  // 2. /api/realtime/voice-token must return a valid session bootstrap.
   //    The exact shape depends on the resolved backend (see header comment):
   //      - vertex   → token:null, setup with projects/.../models/... path
   //      - aistudio → token:"auth_tokens/<id>"
-  const token = await getJson('/api/realtime/gemini-token');
+  const token = await getJson('/api/realtime/voice-token');
   if (token.status !== 200) {
     return fail(
-      'gemini-token did not return 200',
+      'voice-token did not return 200',
       'status=' + token.status + ' body=' + token.text.slice(0, 400),
     );
   }
 
   const body = token.body || {};
-  if (body.provider !== 'gemini') {
-    return fail('gemini-token "provider" is not "gemini"', 'got=' + body.provider);
+  if (body.provider !== 'google') {
+    return fail('voice-token "provider" is not "Gemma 4"', 'got=' + body.provider);
   }
   if (!body.expiresAt) {
-    return fail('gemini-token response missing "expiresAt"', JSON.stringify(body));
+    return fail('voice-token response missing "expiresAt"', JSON.stringify(body));
   }
   const exp = Date.parse(body.expiresAt);
   if (Number.isNaN(exp) || exp <= Date.now()) {
-    return fail('gemini-token "expiresAt" is not a future ISO-8601 timestamp', 'got=' + body.expiresAt);
+    return fail('voice-token "expiresAt" is not a future ISO-8601 timestamp', 'got=' + body.expiresAt);
   }
   if (!body.model || typeof body.model !== 'string') {
-    return fail('gemini-token response missing string "model"', JSON.stringify(body));
+    return fail('voice-token response missing string "model"', JSON.stringify(body));
   }
   if (!body.voice || typeof body.voice !== 'string') {
-    return fail('gemini-token response missing string "voice"', JSON.stringify(body));
+    return fail('voice-token response missing string "voice"', JSON.stringify(body));
   }
   if (!body.voiceStyle || typeof body.voiceStyle !== 'string') {
-    return fail('gemini-token response missing string "voiceStyle"', JSON.stringify(body));
+    return fail('voice-token response missing string "voiceStyle"', JSON.stringify(body));
   }
 
   const backend = body.backend;
   if (backend !== 'vertex' && backend !== 'aistudio') {
-    return fail('gemini-token "backend" is not "vertex" or "aistudio"', 'got=' + backend);
+    return fail('voice-token "backend" is not "vertex" or "aistudio"', 'got=' + backend);
   }
 
   if (backend === 'vertex') {
@@ -147,14 +147,14 @@ async function getJson(path) {
     // that would mean the field is missing entirely, which would be a
     // client-facing shape regression).
     if (body.token !== null) {
-      return fail('vertex gemini-token "token" must be null', 'got=' + JSON.stringify(body.token));
+      return fail('vertex voice-token "token" must be null', 'got=' + JSON.stringify(body.token));
     }
     const setup = body.setup;
     if (!setup || typeof setup !== 'object') {
-      return fail('vertex gemini-token response missing "setup" object', JSON.stringify(body));
+      return fail('vertex voice-token response missing "setup" object', JSON.stringify(body));
     }
     if (typeof setup.model !== 'string' || !setup.model) {
-      return fail('vertex gemini-token "setup.model" missing or not a string', JSON.stringify(setup));
+      return fail('vertex voice-token "setup.model" missing or not a string', JSON.stringify(setup));
     }
     // Vertex BidiGenerateContent rejects `models/<m>` with close code
     // 1007 — the path must be the fully-qualified
@@ -163,28 +163,28 @@ async function getJson(path) {
     // acceptance build.
     if (!/^projects\/[^/]+\/locations\/[^/]+\/publishers\/google\/models\/.+$/.test(setup.model)) {
       return fail(
-        'vertex gemini-token "setup.model" is not a fully-qualified Vertex path',
+        'vertex voice-token "setup.model" is not a fully-qualified Vertex path',
         'got=' + setup.model + ' (expected projects/<P>/locations/<L>/publishers/google/models/<M>)',
       );
     }
     const sysText = setup?.systemInstruction?.parts?.[0]?.text;
     if (typeof sysText !== 'string' || !sysText) {
-      return fail('vertex gemini-token "setup.systemInstruction" missing persona text', JSON.stringify(setup));
+      return fail('vertex voice-token "setup.systemInstruction" missing persona text', JSON.stringify(setup));
     }
   } else {
     // AI Studio — legacy path, mints an auth_tokens/<id> handle.
     if (!body.token || typeof body.token !== 'string') {
-      return fail('aistudio gemini-token response missing string "token"', JSON.stringify(body));
+      return fail('aistudio voice-token response missing string "token"', JSON.stringify(body));
     }
     if (!body.token.startsWith('auth_tokens/')) {
       return fail(
-        'aistudio gemini-token "token" does not look like a Google auth_tokens handle',
+        'aistudio voice-token "token" does not look like a Google auth_tokens handle',
         'got=' + body.token,
       );
     }
   }
 
-  // Everything the browser needs to open Gemini Live is present.
+  // Everything the browser needs to open Gemma 4 Voice is present.
   process.stdout.write('ACCEPTANCE PASS: voice-roundtrip\n');
   process.stdout.write('  base:       ' + BASE + '\n');
   process.stdout.write('  backend:    ' + backend + '\n');

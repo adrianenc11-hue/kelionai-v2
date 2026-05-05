@@ -87,8 +87,8 @@ const BASE = 'https://kelionai.app';
   const health = await healthResp.json();
   log('\n/health = ' + JSON.stringify(health));
   check('/health returns ok', health.status === 'ok');
-  check('/health ai_provider=gemini', health.services.ai_provider === 'gemini');
-  check('/health gemini=configured', health.services.gemini === 'configured');
+  check('/health ai_provider=google', health.services.ai_provider === 'google');
+  check('/health google=configured', health.services.google === 'configured');
   check('/health database=connected', health.services.database === 'connected');
 
   // ---- 6. /api/realtime/token  (without auth → 401) ----
