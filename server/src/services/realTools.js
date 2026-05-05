@@ -1844,7 +1844,7 @@ async function toolReadPdf({ url, base64, file_id, max_chars, max_pages }) {
         generationConfig: { temperature: 0.1 }
       };
 
-      const gemmaModel = process.env.GOOGLE_CHAT_MODEL || 'gemma-4-31b-it';
+      const gemmaModel = process.env.GOOGLE_CHAT_MODEL || 'google/gemma-2-27b-it';
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${gemmaModel}:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2858,9 +2858,9 @@ async function toolAskExpertCoder(args) {
   
   // Fallback chain: try preferred model first, then alternatives
   const MODELS = [
-    args?.model || 'google/gemma-4-31b-it',
-    'google/gemma-4-31b-it',
-    'google/gemma-4-26b-a4b-it',
+    args?.model || 'google/gemma-2-27b-it',
+    'google/gemma-2-27b-it',
+    'google/gemma-2-27b-it',
   ];
   // Deduplicate in case args.model matches one of the fallbacks
   const uniqueModels = [...new Set(MODELS)];

@@ -689,11 +689,11 @@ const KELION_TOOLS = [
   },
   {
     name: 'ask_expert_coder',
-    description: "Consult an expert coding model on OpenRouter to solve complex programming problems or do deep reasoning. Use 'google/gemma-4-31b-it' for strong reasoning and code generation.",
+    description: "Consult an expert coding model on OpenRouter to solve complex programming problems or do deep reasoning. Use 'google/gemma-2-27b-it' for strong reasoning and code generation.",
     properties: {
       question: { type: 'string', description: "The exact problem or question for the expert." },
       context: { type: 'string', description: "Relevant code snippets, error messages, or file contents." },
-      model: { type: 'string', enum: ['google/gemma-4-31b-it', 'google/gemma-4-26b-a4b-it'], description: "Which model to use. Default is gemma-4-31b-it." },
+      model: { type: 'string', enum: ['google/gemma-2-27b-it', 'google/gemma-2-27b-it'], description: "Which model to use. Default is google/gemma-2-27b-it." },
     },
     required: ['question', 'context'],
   },
@@ -1447,7 +1447,7 @@ const voiceTokenHandler = async (req, res) => {
     //   Browser SpeechRecognition → /api/realtime/pipeline (Gemma 4 via
     //   OpenRouter) → /api/voice/clone/tts (ElevenLabs TTS).
     // We still build the full persona + tools so /pipeline can use them.
-    const chatModel = process.env.OPENROUTER_MODEL || 'google/gemma-4-27b-it:free';
+    const chatModel = process.env.OPENROUTER_MODEL || 'google/gemma-2-27b-it';
     
     // Restore variables needed for JSON payload
     const user = adminUser;
@@ -1456,7 +1456,7 @@ const voiceTokenHandler = async (req, res) => {
     const voiceStyle = resolveVoiceStyle(styleFromCookie || '');
     let memoryItems = [];
     try {
-      memoryItems = await getFactMemory(user?.id);
+      memoryItems = await listMemoryItems(user?.id);
     } catch (err) {
       console.warn('[realtime] failed to fetch user facts', err.message);
     }
@@ -1554,7 +1554,7 @@ router.post('/vision', visionLimiter, async (req, res) => {
         'X-Title': 'Kelion AI Vision'
       },
       body: JSON.stringify({
-        model: 'google/gemma-4-31b-it',
+        model: 'google/gemma-2-27b-it',
         messages: [
           {
             role: 'user',
@@ -1676,7 +1676,7 @@ router.post('/pipeline', async (req, res) => {
     // Build tools in OpenAI format
     const openRouterTools = buildKelionToolsChatCompletions();
 
-    const chatModel = process.env.OPENROUTER_MODEL || 'google/gemma-4-27b-it:free';
+    const chatModel = process.env.OPENROUTER_MODEL || 'google/gemma-2-27b-it';
     const url = 'https://openrouter.ai/api/v1/chat/completions';
 
     const body = {
@@ -1707,7 +1707,7 @@ router.post('/pipeline', async (req, res) => {
       if (!r.ok && r.status === 402 && !fallbackTriggered) {
         console.warn('[pipeline] OpenRouter 402 Payment Required. Falling back to free model.');
         fallbackTriggered = true;
-        currentModel = 'google/gemma-4-31b-it';
+        currentModel = 'google/gemma-2-27b-it';
         reqBody.model = currentModel;
         
         // Retry with free model
