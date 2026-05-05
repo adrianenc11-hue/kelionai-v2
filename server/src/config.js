@@ -45,9 +45,9 @@ module.exports = {
     clientSecret: optional('GOOGLE_CLIENT_SECRET'),
     redirectUri:  optional('GOOGLE_REDIRECT_URI', ''),
     apiKey:       optional('GOOGLE_API_KEY'),
-    chatModel:    optional('GOOGLE_CHAT_MODEL', 'gemma-4-31b-it'),
-    liveModel:    optional('OPENROUTER_MODEL', 'google/gemma-4-31b-it'),
-    ttsModel:     optional('GOOGLE_TTS_MODEL', 'gemma-4-31b-it'),
+    chatModel:    optional('GOOGLE_CHAT_MODEL', 'gemini-2.0-flash-exp:free'),
+    liveModel:    optional('OPENROUTER_MODEL', 'google/gemini-2.0-flash-exp:free'),
+    ttsModel:     optional('GOOGLE_TTS_MODEL', 'gemini-2.0-flash-exp:free'),
     ttsVoiceKelion: optional('GOOGLE_TTS_VOICE_KELION', 'Kore'),
   },
 

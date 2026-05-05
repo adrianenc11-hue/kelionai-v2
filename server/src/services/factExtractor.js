@@ -60,7 +60,7 @@ async function extractFacts(turns, options = {}) {
   const url = 'https://openrouter.ai/api/v1/chat/completions';
 
   const body = {
-    model: options.model || 'google/gemma-4-31b-it', // Gemma 4 — project-wide default via OpenRouter
+    model: options.model || 'google/gemini-2.0-flash-exp:free', // Gemma 4 — project-wide default via OpenRouter
     messages: [
       { role: 'system', content: EXTRACTION_SYSTEM },
       { role: 'user', content: `Transcript:\n${transcript}` }
