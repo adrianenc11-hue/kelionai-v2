@@ -67,7 +67,7 @@
 #### 8. **Health Check Endpoint**
 - ✅ GET /health - Service status check
 - ✅ Database connection status
-- ✅ Gemini configuration status
+- ✅ Google AI configuration status
 - ✅ ElevenLabs configuration status
 
 ### ✅ Frontend Complet
@@ -145,7 +145,7 @@ cd ..
 **server/.env**:
 ```env
 # Required
-GEMINI_API_KEY=...
+GOOGLE_API_KEY=...
 OPENROUTER_API_KEY=...
 ELEVENLABS_API_KEY=...
 GOOGLE_CLIENT_ID=...
@@ -259,7 +259,7 @@ npm run test:e2e
 ## 🎯 NEXT STEPS
 
 ### 1. Get API Keys (If Testing Locally)
-- [Gemini API Key](https://aistudio.google.com/apikey)
+- [Google API Key](https://aistudio.google.com/apikey)
 - [ElevenLabs API Key](https://elevenlabs.io/app/settings)
 - [Google OAuth Credentials](https://console.cloud.google.com/apis/credentials)
 

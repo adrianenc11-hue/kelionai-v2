@@ -8,7 +8,7 @@
  * bubbled an unawaited rejection (e.g. a fetch with no `.catch`, a
  * setTimeout callback that threw, a background job) would trigger a
  * default Node 15+ behaviour: *terminate the process*. Railway would
- * restart within a few seconds, but every in-flight WebSocket (Gemini
+ * restart within a few seconds, but every in-flight WebSocket (voice
  * Live) would get a mid-sentence disconnect and the
  * user would see a cryptic "reconnecting…" toast.
  *

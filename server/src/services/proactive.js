@@ -103,7 +103,7 @@ function composeMessage(memoryItem) {
 let _gemma4AlertSent = false;
 async function checkGemma4Availability() {
   if (_gemma4AlertSent) return null;
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.GOOGLE_API_KEY;
   if (!apiKey) return null;
   try {
     const fetchImpl = typeof globalThis.fetch === 'function' ? globalThis.fetch : (await import('node-fetch')).default;

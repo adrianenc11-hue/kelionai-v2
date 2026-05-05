@@ -14,7 +14,7 @@ import { subscribeNarrationMode, getNarrationMode } from './narrationMode'
 import { logAiEvent } from './aiEventLog'
 
 const SAMPLE_RATE_IN = 16000   // Mic capture rate for SpeechRecognition
-const SAMPLE_RATE_OUT = 24000  // TTS playback rate (ElevenLabs/Gemini REST)
+const SAMPLE_RATE_OUT = 24000  // TTS playback rate (ElevenLabs REST TTS)
 
 function floatTo16BitPCM(float32) {
   const out = new Int16Array(float32.length)
@@ -41,7 +41,7 @@ function bytesFromBase64(b64) {
   return out
 }
 
-export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null, active = true }) {
+export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null, active = true }) {
   // Kept in a ref so the parent can pass a fresh closure (e.g. a useState
   // setter wrapped in useCallback) without tearing down the WS or the
   // credits heartbeat every render.
@@ -105,7 +105,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
   // persona already tells Kelion to continue the conversation rather than
   // re-greet. We must NOT fire the setupComplete kickstart ("Greet me with
   // a short hello…") in that case — an explicit user turn would override
-  // the system instruction and Gemini would re-greet anyway, defeating F4.
+  // the system instruction and the model would re-greet anyway, defeating F4.
   // handleMessage reads this ref to decide whether to skip the kickstart.
   const handoffSessionRef = useRef(false)
   // Anti-double-greeting guard. The model sometimes generates
@@ -114,7 +114,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
   // spoken at least once. Becomes true on first inputTranscription.
   const userHasSpokenRef = useRef(false)
   // Narration-pending guard — set true right before sending a synthetic
-  // narration prompt so the returning inputTranscription (which Gemini
+  // narration prompt so the returning inputTranscription (which the model
   // echoes back as the 'user' turn) is NOT shown in the transcript.
   const narrationPendingRef = useRef(false)
   // translatorModeRef — set in start() before the WS opens so handleMessage
@@ -124,7 +124,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
   const sessionIdRef = useRef(null)
 
   const wsRef = useRef(null)
-  const audioCtxRef = useRef(null)       // 16kHz capture context for Gemini — MUST match SAMPLE_RATE_IN
+  const audioCtxRef = useRef(null)       // 16kHz capture context for voice — MUST match SAMPLE_RATE_IN
   const meterCtxRef = useRef(null)       // Separate default-rate context for the level meter analyser
   const workletNodeRef = useRef(null)
   const micStreamRef = useRef(null)
@@ -161,7 +161,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
   const hiddenVideoCameraRef = useRef(null)
   const hiddenVideoScreenRef = useRef(null)
   const frameCanvasRef = useRef(null)
-  // Tool-call loop guard — detects when Gemini repeatedly calls the same
+  // Tool-call loop guard — detects when the model repeatedly calls the same
   // tool with the same args (infinite loop). After MAX_REPEATS identical
   // calls within WINDOW_MS, we return an error telling the model to stop.
   const toolCallLoopRef = useRef({ key: '', count: 0, firstAt: 0 })
@@ -192,7 +192,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
   // IMPORTANT: uses a SEPARATE AudioContext from the 16kHz capture context.
   // Sharing `audioCtxRef` here lazily created a 48kHz default-rate context
   // before the capture pipeline could create its 16kHz one, which caused the
-  // mic to be captured at 48kHz but tagged as 16kHz on the wire to Gemini.
+  // mic to be captured at 48kHz but tagged as 16kHz on the wire to the model.
   const startMicLevel = useCallback((stream) => {
     if (!meterCtxRef.current) {
       meterCtxRef.current = new (window.AudioContext || window.webkitAudioContext)()
@@ -394,7 +394,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
           // turn must be invisible in the UI.
         } else {
           appendTurn('assistant', sc.outputTranscription.text, false, '🔊 AI Voice')
-          logAiEvent('transcript_out', { text: sc.outputTranscription.text, source: 'gemini-live' })
+          logAiEvent('transcript_out', { text: sc.outputTranscription.text, source: 'voice-live' })
           // Accumulate for TTS flush on turnComplete (cloned and native REST)
           cloneTranscriptBufRef.current += sc.outputTranscription.text
           console.log('[tts] buffered outputTranscription:', sc.outputTranscription.text.slice(0, 80))
@@ -413,7 +413,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
         const inline = part.inlineData || part.inline_data
         if (inline?.data && inline.mimeType?.startsWith('audio/')) {
           logAiEvent('audio_skipped', { reason: 'migrated-to-rest-tts' })
-          console.log('[geminiLive] skipped Gemini PCM chunk (migrated to REST TTS)')
+          console.log('[kelionVoice] skipped native PCM chunk (migrated to REST TTS)')
         }
         // DO NOT append part.text immediately — accumulate silently.
         // outputTranscription is the clean, post-processed version and
@@ -436,8 +436,8 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
           cloneTranscriptBufRef.current += partText
           console.log('[tts] using partText fallback:', partText.slice(0, 80))
         } else if (!hadTranscript && !partText && turnHasAudioRef.current) {
-          // Gemini API sometimes streams audio chunks but never fires outputTranscription or part.text
-          appendTurn('assistant', '[Gemini Audio - Fără transcript text returnat de API]', false, '🔊 Audio Only (No Text)')
+          // API sometimes streams audio chunks but never fires outputTranscription or part.text
+          appendTurn('assistant', '[Audio - Fără transcript text returnat de API]', false, '🔊 Audio Only (No Text)')
         }
         // Reset all per-turn buffers
         turnHasTranscriptRef.current = false
@@ -466,7 +466,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
               if (!r.ok) {
                 const errText = await r.text().catch(() => '')
                 logAiEvent('tts_err', { error: `HTTP ${r.status}: ${errText}` })
-                console.error('[geminiLive] TTS error', r.status, errText)
+                console.error('[kelionVoice] TTS error', r.status, errText)
                 // Show error visibly so user knows why voice failed
                 let reason = errText
                 try { reason = JSON.parse(errText)?.error || errText } catch {}
@@ -496,13 +496,13 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
               const audioEl = audioRef?.current
               if (audioEl) {
                 // Temporarily detach the MediaStream so the <audio> element
-                // plays the blob instead of the (now-silent) Gemini stream.
+                // plays the blob instead of the (now-silent) voice stream.
                 const prevSrcObject = audioEl.srcObject
                 const prevMuted = audioEl.muted
                 audioEl.srcObject = null
                 audioEl.src = blobUrl
                 // CRITICAL: enqueueAudio() sets audioEl.muted = true because
-                // Gemini native audio is routed through AudioContext.destination
+                // Native audio is routed through AudioContext.destination
                 // and the <audio> element only carries the stream for lip-sync.
                 // For cloned voice the blob IS the primary audio source, so we
                 // MUST unmute it or the user hears nothing.
@@ -512,7 +512,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
                 audioEl.onended = () => {
                   URL.revokeObjectURL(blobUrl)
                   audioEl.src = ''
-                  audioEl.srcObject = prevSrcObject // restore Gemini stream
+                  audioEl.srcObject = prevSrcObject // restore voice stream
                   audioEl.muted = prevMuted         // restore muted state
                   setStatus('listening')
                 }
@@ -546,7 +546,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
                 fallback.play().catch(() => setStatus('listening'))
               }
             } catch (err) {
-              console.error('[geminiLive] cloned TTS failed', err)
+              console.error('[kelionVoice] cloned TTS failed', err)
               appendTurn('assistant', `⚠️ Voce clonată: ${err?.message || 'eroare de rețea'}`, true, '⚙️ System')
               setStatus('listening')
             }
@@ -563,7 +563,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
     // Stage 4 — The model asks us to run a function tool.
     // Each functionCall carries { id, name, args }. We route to the right
     // /api/tools/* backend endpoint, then send back a toolResponse with the
-    // matching id so Gemini can continue the turn with the result.
+    // matching id so the model can continue the turn with the result.
     if (msg.toolCall?.functionCalls?.length) {
       const fcs = msg.toolCall.functionCalls
       // Narrate to the transcript so the user SEES what Kelion is doing
@@ -584,7 +584,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
             toolCallLoopRef.current = { key: loopKey, count: 1, firstAt: now }
           }
           if (toolCallLoopRef.current.count > TOOL_LOOP_MAX) {
-            console.warn(`[geminiLive] tool loop detected: ${fc.name} called ${toolCallLoopRef.current.count}x — breaking`)
+            console.warn(`[kelionVoice] tool loop detected: ${fc.name} called ${toolCallLoopRef.current.count}x — breaking`)
             logAiEvent('tool_loop_break', { name: fc.name, count: toolCallLoopRef.current.count })
             return {
               id: fc.id,
@@ -603,7 +603,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
           ws.send(JSON.stringify({ toolResponse: { functionResponses: responses } }))
         }
       } catch (err) {
-        console.error('[geminiLive] tool execution failed', err)
+        console.error('[kelionVoice] tool execution failed', err)
         if (ws && ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({
             toolResponse: {
@@ -648,7 +648,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
     }
 
     if (msg.error || msg.errorMessage) {
-      console.error('[geminiLive] error from server:', msg.error || msg.errorMessage)
+      console.error('[kelionVoice] error from server:', msg.error || msg.errorMessage)
       setError(msg.error?.message || msg.errorMessage || 'Server error')
       setStatus('error')
     }
@@ -659,7 +659,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
   // calls start() without textOnly so the mic opens as before.
   const start = useCallback(async (opts = {}) => {
     // F4 — KelionStage passes the current
-    // session transcript so Gemini continues rather than re-greeting.
+    // session transcript so the model continues rather than re-greeting.
     // Fresh sessions call start() with no args and stay on GET.
     const priorTurns = Array.isArray(opts.priorTurns) ? opts.priorTurns : []
     // Concurrent-call guard — see comment on `startInFlightRef`. Tap and
@@ -735,8 +735,8 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
       const geoQuery = (coords && Number.isFinite(coords.lat) && Number.isFinite(coords.lon))
         ? `&lat=${coords.lat.toFixed(6)}&lon=${coords.lon.toFixed(6)}&acc=${Math.round(coords.accuracy || 0)}`
         : ''
-      // Backend selector. Default is `aistudio` — uses GEMINI_API_KEY with
-      // ephemeral tokens via AI Studio. Matches the server default
+      // Backend selector. Default is `aistudio` — legacy path.
+      // Current production uses OpenRouter. Matches the server default
       // (realtime.js). `?liveBackend=vertex` (or
       // `localStorage.kelion_live_backend = 'vertex'`) forces the Vertex AI
       // proxy path — requires GCP billing to be enabled.
@@ -749,7 +749,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
         if (raw === 'aistudio') liveBackend = 'aistudio'
       } catch (_) { /* window/localStorage missing in SSR — default stays */ }
       const backendQuery = liveBackend === 'aistudio' ? '&backend=aistudio' : '&backend=vertex'
-      const tokenUrl = `/api/realtime/gemini-token?lang=${encodeURIComponent(langHint)}${geoQuery}${backendQuery}`
+      const tokenUrl = `/api/realtime/voice-token?lang=${encodeURIComponent(langHint)}${geoQuery}${backendQuery}`
       const tokenRes = priorTurns.length
         ? await fetch(tokenUrl, {
             method: 'POST',
@@ -785,11 +785,14 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
       const tokenBody = await tokenRes.json()
       const token = tokenBody?.token
       const setupPayload = tokenBody?.setup
-      const resolvedBackend = tokenBody?.backend === 'vertex' ? 'vertex' : 'aistudio'
-      // Vertex path doesn't return a token (auth lives on the server-side
-      // proxy). Only enforce the token presence for AI Studio.
-      if (resolvedBackend !== 'vertex' && !token) throw new Error('No ephemeral token returned')
-      if (!setupPayload) throw new Error('No live-connect setup returned')
+      const resolvedBackend = tokenBody?.backend === 'vertex' ? 'vertex'
+        : tokenBody?.backend === 'openrouter' ? 'openrouter'
+        : 'aistudio'
+      // Vertex and OpenRouter paths don't return a token (Vertex auth
+      // lives on the server-side proxy; OpenRouter uses REST Voice Mode).
+      // Only enforce the token presence for AI Studio.
+      if (resolvedBackend === 'aistudio' && !token) throw new Error('No ephemeral token returned')
+      if (resolvedBackend === 'aistudio' && !setupPayload) throw new Error('No live-connect setup returned')
 
       // Trial countdown. Server returns tokenBody.trial = null for
       // signed-in / admin users and { allowed, remainingMs, windowMs }
@@ -820,7 +823,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
 
       if (tokenBody?.model?.includes('gemma')) {
         // OpenRouter REST Voice Mode
-        console.log('[geminiLive] OpenRouter model detected, switching to REST Voice Mode');
+        console.log('[kelionVoice] OpenRouter model detected, switching to REST Voice Mode');
         // We MUST NOT stop micStreamRef.current here because if the soundbars are flat,
         // the user thinks the app is dead and clicks the button again!
 
@@ -870,7 +873,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
               const ctx = canvas.getContext('2d');
               ctx.drawImage(bitmap, 0, 0);
               base64Image = canvas.toDataURL('image/jpeg');
-            } catch(e) { console.error('[geminiLive] Vision frame error', e); }
+            } catch(e) { console.error('[kelionVoice] Vision frame error', e); }
           }
           
           // Use the enhanced sendText which supports images and audio playback!
@@ -953,11 +956,11 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
           logAiEvent('setup_sent', { model: setupPayload?.model || 'from-server', voice: setupPayload?.generationConfig?.speechConfig?.voiceConfig?.prebuiltVoiceConfig?.voiceName || '?' })
           ws.send(JSON.stringify({ setup: setupPayload }))
         } catch (err) {
-          console.error('[geminiLive] failed to send setup frame', err)
+          console.error('[kelionVoice] failed to send setup frame', err)
         }
 
         // NOTE: the greet-first `clientContent` kickstart used to live here,
-        // sent synchronously right after `setup`. That caused Gemini to
+        // sent synchronously right after `setup`. That caused the API to
         // close the socket with 1007 "setup must be the first message and
         // only the first" because Google treats any non-setup frame
         // arriving before its own `setupComplete` ack as a protocol
@@ -1048,7 +1051,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
             }
           } catch (err) {
             // Network hiccup — keep ticking; we'll try again in 60 s.
-            console.warn('[geminiLive] credits/consume failed', err && err.message)
+            console.warn('[kelionVoice] credits/consume failed', err && err.message)
           }
         }
         // Expose the starter to handleMessage via a ref so the first
@@ -1065,7 +1068,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
 
       ws.onmessage = (event) => handleMessage(event.data, ws)
       ws.onerror = (e) => {
-        console.error('[geminiLive] ws error', e)
+        console.error('[kelionVoice] ws error', e)
         setError('Connection error')
         setStatus('error')
       }
@@ -1075,7 +1078,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
         // silently flipped back to 'idle'. 1000 = normal, 1005/1006 = no
         // status / abnormal, 1008 = policy (wrong endpoint / bad token),
         // 1007 = protocol (double setup), 1011 = server / quota.
-        console.warn('[geminiLive] ws close', { code: e?.code, reason: e?.reason, wasClean: e?.wasClean })
+        console.warn('[kelionVoice] ws close', { code: e?.code, reason: e?.reason, wasClean: e?.wasClean })
         // Always tear down the credits heartbeat on socket close. Without
         // this guard the 60s interval kept ticking after the ws died and
         // fired a stray /api/credits/consume on tab wake hours later —
@@ -1126,7 +1129,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
         try {
           await ctx.audioWorklet.addModule('/audio-capture-worklet.js')
         } catch (e) {
-          console.error('[geminiLive] Worklet load failed:', e)
+          console.error('[kelionVoice] Worklet load failed:', e)
           throw new Error('Failed to load audio worklet')
         }
 
@@ -1149,7 +1152,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
       }
 
     } catch (e) {
-      console.error('[geminiLive] start error', e)
+      console.error('[kelionVoice] start error', e)
       setError(e.message || String(e))
       setStatus('error')
     } finally {
@@ -1163,8 +1166,8 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
   useEffect(() => { statusRef.current = status }, [status])
 
   // ───── Video frame sender (M9 camera + M10 screen share) ─────
-  // Streams a MediaStream to Gemini Live as a continuous sequence of JPEG
-  // frames tagged with `realtimeInput.video` (the field Gemini Live treats
+  // Streams a MediaStream to the Live API as a continuous sequence of JPEG
+  // frames tagged with `realtimeInput.video` (the field the Live API treats
   // as a live video track, not isolated images). Adrian flagged 2026-04-19
   // that the previous 1-fps "snapshot" behavior made the avatar feel blind
   // between captures — now we stream at ~15 fps with a 480px short edge and
@@ -1232,14 +1235,14 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
         ws.send(JSON.stringify({
           realtimeInput: {
             // `video` is the live-video channel (continuous). Previously we
-            // used `mediaChunks` which Gemini Live treats as discrete image
+            // used `mediaChunks` which the Live API treats as discrete image
             // attachments (snapshots), which is exactly what broke the
             // "live" feel Adrian reported.
             video: { data: b64, mimeType: 'image/jpeg' },
           },
         }))
       } catch (e) {
-        console.warn('[geminiLive] frame send failed', e)
+        console.warn('[kelionVoice] frame send failed', e)
       } finally {
         busy = false
       }
@@ -1335,7 +1338,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
         if (e && (e.name === 'NotAllowedError' || e.name === 'SecurityError')) break
       }
     }
-    console.error('[geminiLive] camera start failed', lastError)
+    console.error('[kelionVoice] camera start failed', lastError)
     // Translate Chromium's opaque errors into something the user can
     // act on. The raw DOMException messages ("Could not start video
     // source") aren't helpful; map them to a concrete remedy.
@@ -1388,7 +1391,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
     } catch (e) {
       // User canceling the picker throws AbortError — not a real error.
       if (e.name !== 'AbortError' && e.name !== 'NotAllowedError') {
-        console.error('[geminiLive] screen share failed', e)
+        console.error('[kelionVoice] screen share failed', e)
         setVisionError(e.message || 'Screen share failed')
       }
     }
@@ -1484,7 +1487,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
   // When set_narration_mode is enabled (via the voice tool), periodically
   // inject a short text prompt into the live WebSocket asking the model to
   // describe what it sees from the camera frames it is already receiving.
-  // Gemini Live sees the video track natively — we just need to nudge it
+  // The Live API sees the video track natively — we just need to nudge it
   // with a text turn on a timer so it speaks the description out loud.
   const narrationTimerRef = useRef(null)
   useEffect(() => {
@@ -1558,7 +1561,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
       restart: (opts) => startCamera(opts),
       getFacingMode: () => cameraFacingRef.current || 'user',
       // camera_zoom tool reaches through to the live MediaStreamTrack
-      // and applies a native zoom constraint where supported. Gemini's
+      // and applies a native zoom constraint where supported. The
       // hidden <video> element is tracked on hiddenVideoCameraRef; fall
       // back to cameraStreamRef when the hidden video hasn't attached
       // yet (first frame hasn't fired).
@@ -1628,7 +1631,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
         }))
         setStatus('thinking')
       } catch (err) {
-        console.error('[geminiLive] sendText failed', err)
+        console.error('[kelionVoice] sendText failed', err)
       }
     } else {
       // HTTP fallback — Gemma 4 text/voice chat via /api/chat
@@ -1714,25 +1717,25 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
                 setStatus('idle')
               }
               audioEl.onerror = (e) => {
-                console.error('[geminiLive] Audio playback error:', e)
+                console.error('[kelionVoice] Audio playback error:', e)
                 appendTurn('assistant', `⚠️ Eroare la redarea audio în browser.`, true, '⚙️ System')
                 URL.revokeObjectURL(blobUrl)
                 setStatus('idle')
               }
               
               audioEl.play().catch((e) => {
-                console.error('[geminiLive] Audio play() blocked:', e)
+                console.error('[kelionVoice] Audio play() blocked:', e)
                 appendTurn('assistant', `⚠️ Browserul a blocat redarea audio automată.`, true, '⚙️ System')
                 setStatus('idle')
               })
             } else {
               const errText = await r.text().catch(() => '')
-              console.error('[geminiLive] TTS network error:', r.status, errText)
+              console.error('[kelionVoice] TTS network error:', r.status, errText)
               appendTurn('assistant', `⚠️ Eroare rețea voce (${r.status}): ${errText.slice(0, 100)}`, true, '⚙️ System')
               setStatus('idle')
             }
           } catch(e) {
-            console.error('[geminiLive] TTS catch error:', e)
+            console.error('[kelionVoice] TTS catch error:', e)
             appendTurn('assistant', `⚠️ Eroare internă voce: ${e.message}`, true, '⚙️ System')
             setStatus('idle')
           }
@@ -1740,7 +1743,7 @@ export function useGeminiLive({ audioRef, coords = null, onBalanceUpdate = null,
           setStatus('idle')
         }
       } catch (err) {
-        console.error('[geminiLive] HTTP chat fallback failed', err)
+        console.error('[kelionVoice] HTTP chat fallback failed', err)
         appendTurn('assistant', 'Connection error. Please try again.', true)
         setStatus('idle')
       }

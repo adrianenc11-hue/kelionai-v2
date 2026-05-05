@@ -109,10 +109,10 @@ test.describe('Voice session token endpoint (Gemma 4)', () => {
     // The voice token endpoint now returns Gemma 4 model info for REST
     // Voice Mode (SpeechRecognition → OpenRouter → TTS).
     // No ephemeral token is minted — model name triggers REST mode on client.
-    const res = await request.get(`${BASE}/api/realtime/gemini-token?lang=en-US`);
+    const res = await request.get(`${BASE}/api/realtime/voice-token?lang=en-US`);
     if (res.status() === 503) {
       const body = await res.json();
-      expect(body.error).toMatch(/GEMINI_API_KEY/i);
+      expect(body.error).toMatch(/GOOGLE_API_KEY/i);
       return;
     }
     expect(res.status()).toBe(200);

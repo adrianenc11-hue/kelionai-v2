@@ -75,15 +75,15 @@ module.exports = {
 
   dbPath: optional('DB_PATH', './data/kelion.db'),
 
-  gemini: {
-    apiKey:       optional('GEMINI_API_KEY'),
-    chatModel:    optional('GEMINI_CHAT_MODEL', 'gemma-4-31b-it'),
+  google: {
+    apiKey:       optional('GOOGLE_API_KEY'),
+    chatModel:    optional('GOOGLE_CHAT_MODEL', 'gemma-4-31b-it'),
     // Keep this default in sync with server/src/routes/realtime.js — both
     // read OPENROUTER_MODEL directly, so the fallbacks must match.
     // Override via Railway env OPENROUTER_MODEL.
     liveModel:    optional('OPENROUTER_MODEL', 'google/gemma-4-31b-it'),
-    ttsModel:     optional('GEMINI_TTS_MODEL', 'gemma-4-31b-it'),
-    ttsVoiceKelion: optional('GEMINI_TTS_VOICE_KELION', 'Kore'),
+    ttsModel:     optional('GOOGLE_TTS_MODEL', 'gemma-4-31b-it'),
+    ttsVoiceKelion: optional('GOOGLE_TTS_VOICE_KELION', 'Kore'),
   },
 
   stripe: {

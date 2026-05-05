@@ -109,7 +109,7 @@ router.get('/balance', requireAuth, async (req, res) => {
  *
  * Deduct live-session minutes from a signed-in user's balance. Called
  * by the client as a 60s heartbeat while a voice session
- * is running (useGeminiLive.js). Admins are auto-exempt (`exempt: true`
+ * is running (voice hook). Admins are auto-exempt (`exempt: true`
  * in the response so the client doesn't need to know who's admin).
  *
  * Body: { minutes?: number, silent?: boolean }

@@ -1,7 +1,7 @@
 const {
   KELION_TOOLS,
   buildKelionToolsChatCompletions,
-  buildKelionToolsGemini,
+  buildKelionToolsGoogle,
 } = require('../src/routes/realtime');
 
 // PR #199 — verbal camera controls. Pins the tool surface so future
@@ -103,9 +103,9 @@ describe('PR #199 — verbal camera controls', () => {
     }
   });
 
-  test('Gemini adapter surfaces all four camera tools', () => {
-    const geminiTool = buildKelionToolsGemini();
-    const decls = (Array.isArray(geminiTool) ? geminiTool : [geminiTool])
+  test('Google adapter surfaces all four camera tools', () => {
+    const googleTool = buildKelionToolsGoogle();
+    const decls = (Array.isArray(googleTool) ? googleTool : [googleTool])
       .flatMap((t) => (t && t.functionDeclarations) || []);
     const names = decls.map((d) => d.name);
     for (const n of ['switch_camera', 'camera_on', 'camera_off', 'zoom_camera']) {

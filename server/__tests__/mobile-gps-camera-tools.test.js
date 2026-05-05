@@ -1,4 +1,4 @@
-const { KELION_TOOLS, buildKelionToolsChatCompletions, buildKelionToolsGemini } = require('../src/routes/realtime')
+const { KELION_TOOLS, buildKelionToolsChatCompletions, buildKelionToolsGoogle } = require('../src/routes/realtime')
 
 describe('PR #139 — mobile GPS + camera voice tools', () => {
   test('KELION_TOOLS includes get_my_location with include_address', () => {
@@ -31,16 +31,16 @@ describe('PR #139 — mobile GPS + camera voice tools', () => {
     expect(names).toContain('switch_camera')
   })
 
-  test('Gemini adapter surfaces both new tools under functionDeclarations', () => {
-    const geminiTool = buildKelionToolsGemini()
-    const decls = (Array.isArray(geminiTool) ? geminiTool : [geminiTool])
+  test('Google adapter surfaces both new tools under functionDeclarations', () => {
+    const googleTool = buildKelionToolsGoogle()
+    const decls = (Array.isArray(googleTool) ? googleTool : [googleTool])
       .flatMap((t) => (t && t.functionDeclarations) || [])
     const names = decls.map((d) => d.name)
     expect(names).toContain('get_my_location')
     expect(names).toContain('switch_camera')
   })
 
-  test('persona prompt mentions both tools so Gemini knows to call them', () => {
+  test('persona prompt mentions both tools so the model knows to call them', () => {
     const realtime = require('../src/routes/realtime')
     // buildKelionPersona isn't exported directly but the prompt text
     // lives in this file — grep the module source at require time via

@@ -23,7 +23,7 @@ Edit `server/.env` and add your API keys:
 
 ```env
 # Required for AI features
-GEMINI_API_KEY=your-gemini-api-key
+GOOGLE_API_KEY=your-google-api-key
 OPENROUTER_API_KEY=your-openrouter-api-key
 
 # Required for voice synthesis
@@ -74,7 +74,7 @@ npm run dev
 - ✅ Admin panel for user management
 
 ### AI Features
-- ✅ Gemma 4 integration (via Gemini API + OpenRouter)
+- ✅ Gemma 4 integration (via Google API + OpenRouter)
 - ✅ Real-time voice chat (WebRTC)
 - ✅ ElevenLabs TTS (multilingual)
 - ✅ Vision support (camera frames)
@@ -145,7 +145,7 @@ The app is pre-configured for Railway:
 3. Deploy automatically on push
 
 **Required Variables**:
-- `GEMINI_API_KEY`
+- `GOOGLE_API_KEY`
 - `OPENROUTER_API_KEY`
 - `ELEVENLABS_API_KEY`
 - `GOOGLE_CLIENT_ID`

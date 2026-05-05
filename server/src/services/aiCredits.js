@@ -10,7 +10,7 @@
  * Providers vary a lot:
  *
  *
- *  - Gemini (Google AI Studio): no public balance endpoint. We test the key
+ *  - Gemma 4 (Google AI Studio / OpenRouter): no public balance endpoint. We test the key
  *    with a cheap models.list call and return a "configured" signal + link
  *    to the aistudio console where the admin can rotate/check billing.
  *
@@ -44,11 +44,11 @@ function maskKey(key) {
   return `${key.slice(0, 4)}…${key.slice(-4)}`;
 }
 
-async function probeGemini() {
-  const apiKey = config.gemini && config.gemini.apiKey;
+async function probeGoogleAI() {
+  const apiKey = config.google && config.google.apiKey;
   const card = {
-    id: 'gemini',
-    name: 'Google Gemini',
+    id: 'google',
+    name: 'Gemma 4 (Google)',
     subtitle: 'Live voice + chat',
     configured: Boolean(apiKey),
     keyFingerprint: maskKey(apiKey),
@@ -62,7 +62,7 @@ async function probeGemini() {
   };
   if (!apiKey) {
     card.status = 'error';
-    card.message = 'GEMINI_API_KEY not set';
+    card.message = 'GOOGLE_API_KEY not set';
     return card;
   }
   try {
@@ -227,19 +227,19 @@ async function probeRailway() {
  */
 async function getAllCredits() {
   // Order is display order in the admin grid.
-  const [gemini, elevenlabs, stripe, railway] = await Promise.all([
-    probeGemini(),
+  const [googleAI, elevenlabs, stripe, railway] = await Promise.all([
+    probeGoogleAI(),
     probeElevenLabs(),
     probeStripe(),
     probeRailway(),
   ]);
-  return [gemini, elevenlabs, stripe, railway];
+  return [googleAI, elevenlabs, stripe, railway];
 }
 
 /**
  * Revenue-split contract: for every credit top-up the user pays, a
  * fixed fraction (default 50%) is earmarked for AI provider spend
- * (Google Gemini, ElevenLabs). The remainder is the owner's
+ * (Gemma 4, ElevenLabs). The remainder is the owner's
  * net. We do NOT transfer money automatically — Stripe cannot pay GCP
  * directly. Instead we compute the allocation off the existing credit
  * ledger and surface it next to the raw provider cards so the admin
@@ -253,7 +253,7 @@ async function getAllCredits() {
  *     per 1k chars, which is the effective rate for pay-as-you-go
  *     overage; real tier pricing varies, but this is a conservative
  *     upper bound suitable for budget tracking).
- *   - Gemini: Google does NOT expose per-project spend via any public
+ *   - Gemma 4: Google does NOT expose per-project spend via any public
  *     API that works with AI Studio keys. The only option is the
  *     Google Cloud Billing API with a service-account + billing
  *     account ID (most users don't bother). We report "unknown" and
@@ -346,16 +346,16 @@ async function buildRevenueSplit(revenueSummary, { days = 30, currency = 'gbp' }
   // currencies explicit so the admin can eyeball the buffer.
   const knownSpendCents = Number(elevenlabs.estSpendCents || 0);
 
-  // Gemini cost is unknown from our side. Honest "null" so UI can
+  // Gemma 4 cost is unknown from our side. Honest "null" so UI can
   // render a manual-entry placeholder instead of pretending $0.
-  const gemini = {
+  const googleAI = {
     source: 'manual',
-    note: 'Gemini spend is not exposed via AI Studio keys. Use GCP Billing dashboard to cross-check.',
+    note: 'Gemma 4 spend is not exposed via AI Studio keys. Use GCP Billing dashboard to cross-check.',
     billingUrl: 'https://console.cloud.google.com/billing',
   };
 
   // Delta compares allocated revenue against *known* spend only. When
-  // Gemini cost is added manually we'll subtract it from this delta.
+  // Gemma 4 cost is added manually we'll subtract it from this delta.
   // Status is conservative: if known spend already eats > 80% of
   // allocation, we flag warn; over 100%, over.
   let status = 'ok';
@@ -384,7 +384,7 @@ async function buildRevenueSplit(revenueSummary, { days = 30, currency = 'gbp' }
       ownerDisplay: formatMinorCurrency(ownerCents, currency),
     },
     spend: {
-      gemini,
+      googleAI,
       elevenlabs: {
         configured: elevenlabs.configured,
         status: elevenlabs.status,
@@ -411,7 +411,7 @@ async function buildRevenueSplit(revenueSummary, { days = 30, currency = 'gbp' }
 
 module.exports = {
   getAllCredits,
-  probeGemini,
+  probeGoogleAI,
 
   probeElevenLabs,
   probeStripe,

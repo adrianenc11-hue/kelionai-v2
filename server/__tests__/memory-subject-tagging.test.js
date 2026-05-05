@@ -4,7 +4,7 @@
 //
 // Covers:
 //   1. factExtractor normalises `subject` / `subject_name` / `confidence`
-//      from the raw Gemini JSON (defaulting to 'self' when absent,
+//      from the raw model JSON (defaulting to 'self' when absent,
 //      dropping "other" rows without a usable name, clamping confidence).
 //   2. formatMemoryBlocks partitions a mixed list into a "signed-in user"
 //      section and an "other people" section grouped by name, and produces
@@ -12,7 +12,7 @@
 //      guests / brand-new users with no memory).
 //
 // Both are pure functions that don't hit the network or the DB, so the
-// suite is fast and deterministic. We do NOT call the real Gemini API;
+// suite is fast and deterministic. We do NOT call the real Google API;
 // instead we fake the fetch so we can feed raw JSON strings through the
 // same parse path the production code takes.
 

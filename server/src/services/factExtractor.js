@@ -7,7 +7,7 @@
 // remembering next week", not "Kelion said hi".
 //
 // Returns an array of { kind, fact } objects, bounded to a small size.
-// Fails closed (returns []) if Gemini is unavailable or returns junk.
+// Fails closed (returns []) if Gemma 4 is unavailable or returns junk.
 
 const config = require('../config');
 

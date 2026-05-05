@@ -13,7 +13,7 @@
 //   • `isAdminUser` consulted only the DB row + email allowlist and
 //     ignored the JWT's own `role: 'admin'` claim.
 // Result: HUD rendered "Admin · ∞" (the permissive `/auth/passkey/me`
-// path), but `/gemini-token` fell into the guest
+// path), but `/voice-token` fell into the guest
 // branch and 429'd after the 15-min IP trial window.
 //
 // New contract:
@@ -58,7 +58,7 @@ function peekSignedInUser(req) {
     // Previously in Postgres mode we returned null for any non-numeric
     // `sub` (pre-Postgres Google UUIDs, etc.), which silently demoted
     // a signed-in admin to "guest" on every public endpoint — including
-    // /api/realtime/gemini-token, triggering the 429 "Free trial used
+    // /api/realtime/voice-token, triggering the 429 "Free trial used
     // up" gate on an admin with unlimited credits. Adrian 2026-04-20:
     // "admin nu expira nici o data, ai inca un bag". The public-endpoint
     // surface must honour the JWT's email + role claims regardless of

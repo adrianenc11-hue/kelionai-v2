@@ -86,7 +86,7 @@ initDb().then(async () => {
 
 // Validate required API keys in production
 if (config.isProduction) {
-  const requiredKeys = ['GEMINI_API_KEY', 'ELEVENLABS_API_KEY'];
+  const requiredKeys = ['ELEVENLABS_API_KEY'];
   const missing = requiredKeys.filter(key => !process.env[key]);
   
   if (missing.length > 0) {
@@ -365,7 +365,7 @@ app.get('/health', async (_req, res) => {
       database: 'unknown',
       ai: 'unknown',
       ai_provider: 'none',
-      gemini: 'unknown',
+      google: 'unknown',
       elevenlabs: 'unknown',
     },
   };
@@ -384,11 +384,11 @@ app.get('/health', async (_req, res) => {
     health.services.database = 'error';
   }
 
-  // AI providers — Gemini only
-  const hasGemini = !!process.env.GEMINI_API_KEY;
-  health.services.gemini = hasGemini ? 'configured' : 'not configured';
-  health.services.ai = hasGemini ? 'configured' : 'not configured';
-  health.services.ai_provider = hasGemini ? 'gemini' : 'none';
+  // AI providers — Gemma 4 only
+  const hasGoogleAI = !!process.env.GOOGLE_API_KEY;
+  health.services.google = hasGoogleAI ? 'configured' : 'not configured';
+  health.services.ai = hasGoogleAI ? 'configured' : 'not configured';
+  health.services.ai_provider = hasGoogleAI ? 'google' : 'none';
 
   // ElevenLabs (cloned voice TTS)
   health.services.elevenlabs = process.env.ELEVENLABS_API_KEY ? 'configured' : 'not configured';

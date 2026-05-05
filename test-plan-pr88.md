@@ -11,11 +11,11 @@
 
 2. **`show_on_monitor('image', …)` works again.** Unsplash retired `source.unsplash.com` in 2024; every request returns `HTTP 503`. Replaced with `loremflickr.com/1280/720/{query}` which serves a topic-matched Flickr image directly.
 
-Unchanged: `map`, `weather`, `video` (URL form), `wiki`, `web`, `clear`, the camera frame sender, the Gemini Live setup, the chat layout, the button panel.
+Unchanged: `map`, `weather`, `video` (URL form), `wiki`, `web`, `clear`, the camera frame sender, the Gemma 4 Voice setup, the chat layout, the button panel.
 
 ---
 
-## Flow 1 — Camera auto-start reaches Gemini Live (primary, tests fix #1)
+## Flow 1 — Camera auto-start reaches Gemma 4 Voice (primary, tests fix #1)
 
 Adversarial framing: if the one-shot gesture listener regressed or was never wired in, a first-visit user who never clicked the ⋯ → "Turn camera on" would end up with an unused camera stream and Kelion would answer every visual question with a hedged "I can't actually see you right now". That is the exact failure mode the fix targets.
 

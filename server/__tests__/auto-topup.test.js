@@ -179,7 +179,7 @@ describe('autoTopup service (PR E2)', () => {
     const out = await svc.checkAndTrigger([
       { id: 'stripe', name: 'Stripe', kind: 'revenue', status: 'ok', balance: 100, balanceDisplay: '100 € available' },
       { id: 'groq', name: 'Groq', status: 'unconfigured', balance: null, balanceDisplay: 'Check in Groq console' },
-      { id: 'gemini', name: 'Google Gemini', status: 'ok', balance: null, balanceDisplay: 'Check in AI Studio' },
+      { id: 'gemini', name: 'Gemma 4 (Google)', status: 'ok', balance: null, balanceDisplay: 'Check in AI Studio' },
     ]);
     expect(out.triggered).toHaveLength(0);
     expect(global.fetch).not.toHaveBeenCalled();

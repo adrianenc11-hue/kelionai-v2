@@ -1,5 +1,5 @@
 // Stage 4 — client-side bridge for Kelion voice function tools.
-// When the model emits a toolCall, geminiLive.js calls runTool(name, args)
+// When the model emits a toolCall, the voice loop calls runTool(name, args)
 // which proxies to our backend. The backend owns credentials (BROWSER_USE_API_KEY,
 // MCP tokens, etc.); the client just shuttles.
 //
@@ -28,7 +28,7 @@ import {
 import { requestUINotify, requestUINavigate, listAllowedRoutes } from './uiActionStore'
 import { getCsrfToken } from './api'
 
-// Rate-limit for observe_user_emotion — Gemini floods this tool (~1/sec)
+// Rate-limit for observe_user_emotion — the model floods this tool (~1/sec)
 let _lastEmotionAt = 0
 
 async function postJSON(url, body) {
@@ -498,7 +498,7 @@ export async function runTool(name, args) {
       return summarizeRealTool('search_files', await postJSON('/api/tools/execute', { name: 'search_files', args: args || {} }))
     case 'observe_user_emotion': {
       // Local-only: mutate the emotion store so the avatar reacts.
-      // Cooldown: Gemini calls this in a tight loop (~1/sec) when the camera
+      // Cooldown: the model calls this in a tight loop (~1/sec) when the camera
       // is active, flooding the WS and blocking useful responses. Rate-limit
       // to once per 30 seconds — intermediate calls return a silent ack.
       const now = Date.now()
@@ -607,8 +607,8 @@ function download(){
     }
     case 'set_narration_mode': {
       // Accessibility mode. Flips a module-level flag that
-      // src/lib/geminiLive.js watches — when true it runs a periodic
-      // vision call and injects the description into the Gemini session
+      // The voice transport watches — when true it runs a periodic
+      // vision call and injects the description into the voice session
       // so Kelion speaks a short natural narration. Does NOT itself
       // fetch the first frame; the transport's narration loop handles
       // the cadence.
@@ -643,7 +643,7 @@ function download(){
       return 'narration_off'
     }
     case 'switch_voice': {
-      // Switch between Gemini built-in voice and user's ElevenLabs cloned voice.
+      // Switch between Gemma 4 built-in voice and user's ElevenLabs cloned voice.
       const targetMode = args?.mode || 'default'
       const next = setVoiceMode(targetMode)
       // Also toggle the server-side DB `enabled` flag so the TTS endpoint

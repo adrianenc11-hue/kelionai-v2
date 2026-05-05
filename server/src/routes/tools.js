@@ -5,7 +5,7 @@
 // message, so the tool runs inside our trust boundary (not client-side).
 // Each endpoint returns { ok: true, result: <string> } on success, or
 // { ok: false, error: <string>, unavailable?: true } when a provider isn't
-// configured so Gemini can gracefully tell the user what's missing.
+// configured so the model can gracefully tell the user what's missing.
 
 const { Router } = require('express');
 const jwt = require('jsonwebtoken');

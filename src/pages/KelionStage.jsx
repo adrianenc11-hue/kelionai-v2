@@ -17,7 +17,7 @@ import StudioDecor from '../components/stage/StudioDecor'
 import CameraRig from '../components/stage/CameraRig'
 import MonitorOverlay from '../components/stage/MonitorOverlay'
 import { TopBarIconButton, AdminTabBar, VisitorsAnalyticsPanel, PayoutsPanel, MenuItem, friendlyCreditStatus, uaIsBot, uaBrowser, uaOs, refHost, flagEmoji, RevenueChart, LiveSessionsPanel, ExportButtons } from '../components/stage/AdminPanels'
-import { useGeminiLive } from '../lib/geminiLive'
+import { useKelionVoice } from '../lib/kelionVoice'
 import { useWakeWord } from '../lib/useWakeWord'
 import { useTrial } from '../lib/useTrial'
 import { useClientGeo } from '../lib/useClientGeo'
@@ -923,7 +923,7 @@ export default function KelionStage() {
 
   const micMouthOpen = useLipSync(audioRef)
 
-  // statusRef and muteModeRef: declared before useGeminiLive to avoid TDZ.
+  // statusRef and muteModeRef: declared before useKelionVoice to avoid TDZ.
   const statusRef = useRef('idle')
   const muteModeRef = useRef(false)
 
@@ -963,10 +963,10 @@ export default function KelionStage() {
   // turn from the voice hook.
   const [bubbleVisible, setBubbleVisible] = useState(true)
   const bubbleHideTimerRef = useRef(null)
-  // NOTE: bubbleVisible useEffect moved after useGeminiLive (needs turns + status)
+  // NOTE: bubbleVisible useEffect moved after useKelionVoice (needs turns + status)
 
   // Voice transport — Gemma 4 REST (SpeechRecognition → OpenRouter → TTS).
-  const liveHook = useGeminiLive({
+  const liveHook = useKelionVoice({
     audioRef,
     coords: clientGeo,
     onBalanceUpdate: (minutes) => setBalance(minutes),
@@ -1012,7 +1012,7 @@ export default function KelionStage() {
   }, [micOff, setMicEnabled])
 
   // Chat bubble auto-hide — fade the on-stage bubble out after 8s of
-  // quiet so the avatar isn't cluttered. Placed after useGeminiLive
+  // quiet so the avatar isn't cluttered. Placed after the voice hook
   // destructuring so `turns` and `status` are in scope.
   useEffect(() => {
     if (turns.length === 0) { setBubbleVisible(false); return }
@@ -3327,7 +3327,7 @@ export default function KelionStage() {
           {/* Revenue-split panel — shows how much of the last 30 days of
               top-up revenue is earmarked for AI provider spend vs owner
               net, and compares against the known portion of that spend
-              (ElevenLabs via API; Gemini is manual). Renders above the
+              (ElevenLabs via API; Gemma 4 is manual). Renders above the
               provider cards so the admin sees the budget context first.
               */}
           {revenueSplitLoading && (
@@ -3408,7 +3408,7 @@ export default function KelionStage() {
                     ? (revenueSplit.spend?.elevenlabs?.estSpendDisplay || '—')
                     : 'not configured',
                   { dim: true })}
-                {row('  Gemini',
+                {row('  Gemma 4',
                   'manual — open GCP Billing',
                   { dim: true })}
                 <div style={{
@@ -4526,7 +4526,7 @@ export default function KelionStage() {
               nimic — odata configurat, fiecare top-up al unui user trece
               prin: Stripe Checkout ? Stripe balance ? payout automat (zilnic
               sau saptamânal, dupa setarea ta). Jumatate din fiecare top-up
-              e deja rezervata intern pentru costurile AI (Gemini,
+              e deja rezervata intern pentru costurile AI (Gemma 4,
               ElevenLabs), cealalta jumatate e profitul net.
             </div>
           </div>

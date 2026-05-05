@@ -1,7 +1,7 @@
 const {
   KELION_TOOLS,
   buildKelionToolsChatCompletions,
-  buildKelionToolsGemini,
+  buildKelionToolsGoogle,
 } = require('../src/routes/realtime');
 
 // PR #200 — UI agency primitives. Pins the tool catalog so a future
@@ -68,9 +68,9 @@ describe('PR #200 — UI action tools', () => {
     expect(names).toContain('ui_navigate');
   });
 
-  test('Gemini adapter surfaces both UI tools under functionDeclarations', () => {
-    const geminiTool = buildKelionToolsGemini();
-    const decls = (Array.isArray(geminiTool) ? geminiTool : [geminiTool])
+  test('Google adapter surfaces both UI tools under functionDeclarations', () => {
+    const googleTool = buildKelionToolsGoogle();
+    const decls = (Array.isArray(googleTool) ? googleTool : [googleTool])
       .flatMap((t) => (t && t.functionDeclarations) || []);
     const names = decls.map((d) => d.name);
     expect(names).toContain('ui_notify');
