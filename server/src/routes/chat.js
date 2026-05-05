@@ -200,9 +200,10 @@ Your replies must be direct, conversational, and concise.${locationContext}`
     if (!r.ok) {
       const errText = await r.text();
       console.error('[chat] OpenRouter generation failed:', r.status, errText.slice(0, 500));
-      let userError = 'Eroare generare AI.';
       if (r.status === 402 || r.status === 429 || errText.toLowerCase().includes('insufficient_quota')) {
-        userError = 'Fonduri insuficiente OpenRouter. Vă rugăm să reîncărcați contul AI respectiv: https://openrouter.ai/settings/credits';
+        userError = `Fonduri insuficiente OpenRouter sau Rate Limit. Status: ${r.status}, Detalii: ${errText}`;
+      } else {
+        userError = `Eroare generare AI. Status: ${r.status}, Detalii: ${errText}`;
       }
       return res.status(500).json({ error: userError });
     }
