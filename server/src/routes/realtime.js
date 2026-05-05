@@ -1447,7 +1447,7 @@ const geminiTokenHandler = async (req, res) => {
     //   Browser SpeechRecognition → /api/realtime/pipeline (Gemma 4 via
     //   OpenRouter) → /api/voice/clone/tts (ElevenLabs / Gemini REST).
     // We still build the full persona + tools so /pipeline can use them.
-    const chatModel = process.env.OPENROUTER_MODEL || 'google/gemma-4-31b-it';
+    const chatModel = process.env.OPENROUTER_MODEL || 'google/gemini-2.0-flash-exp:free';
     
     // Restore variables needed for JSON payload
     const user = adminUser;
@@ -1674,7 +1674,7 @@ router.post('/pipeline', async (req, res) => {
     // Build tools in OpenAI format
     const openRouterTools = buildKelionToolsChatCompletions();
 
-    const chatModel = process.env.OPENROUTER_MODEL || 'google/gemma-4-31b-it';
+    const chatModel = process.env.OPENROUTER_MODEL || 'google/gemini-2.0-flash-exp:free';
     const url = 'https://openrouter.ai/api/v1/chat/completions';
 
     const body = {

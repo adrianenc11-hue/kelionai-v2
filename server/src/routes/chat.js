@@ -91,8 +91,8 @@ router.post('/', async (req, res) => {
       session.history = session.history.slice(-MAX_HISTORY * 2);
     }
 
-    // Model: Gemma 4 31B via OpenRouter — supports tool_calls natively.
-    const model = process.env.CHAT_MODEL || process.env.OPENROUTER_MODEL || 'google/gemma-4-31b-it';
+    // Model: gemini-2.0-flash-exp:free via OpenRouter — explicitly supports tool_calls.
+    const model = process.env.CHAT_MODEL || process.env.OPENROUTER_MODEL || 'google/gemini-2.0-flash-exp:free';
     const url = 'https://openrouter.ai/api/v1/chat/completions';
 
     const { buildKelionToolsChatCompletions } = require('./realtime');
