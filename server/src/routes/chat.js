@@ -235,7 +235,7 @@ Your replies must be direct, conversational, and concise.${locationContext}`
     res.json({ reply, model });
   } catch (err) {
     console.error('[chat] error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Internal server error', details: err.message, stack: err.stack });
   }
 });
 
