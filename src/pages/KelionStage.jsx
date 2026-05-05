@@ -1095,7 +1095,7 @@ export default function KelionStage() {
     // Always use liveSendText — it tries WebSocket first, then falls back
     // to /api/chat HTTP endpoint (Gemma 4). Never call start() for text-only
     // messages; start() fetches a voice token which may fail (500).
-    if (liveSendTextRef.current) await liveSendTextRef.current(payloadStr)
+    if (liveSendTextRef.current) await liveSendTextRef.current(payloadStr, null, true)
   }, [chatInput, attachedFile, applyMuteCommand])
   const trialHud = useTrial({ signedIn: !!authState.signedIn })
   const trialRemainingMs = trialHud.remainingMs
