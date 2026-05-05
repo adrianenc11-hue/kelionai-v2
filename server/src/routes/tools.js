@@ -132,7 +132,7 @@ router.post('/browser/browse', async (req, res) => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: process.env.OPENROUTER_MODEL || 'google/gemini-2.0-flash-exp:free',
+        model: process.env.OPENROUTER_MODEL || 'google/gemma-2-27b-it',
         messages: [
           {
             role: 'system',
