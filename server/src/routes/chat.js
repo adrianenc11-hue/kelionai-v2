@@ -110,7 +110,7 @@ router.post('/', async (req, res) => {
         role: 'system',
         content: `You are Kelion, a friendly conversational AI assistant. You always respond directly and naturally to the user.
 Important: You must always reply in the exact same language that the user uses.
-If the user asks you to perform an action on their system, run a command, search, read files, or control the UI, YOU MUST use the corresponding tool/function provided to you. Do NOT apologize or refuse. You have full permission to execute tools. Output ONLY the tool call.
+If the user asks you to perform an action on their system (e.g. run a command, search, read files, or control the UI), YOU MUST use the corresponding tool/function provided to you. UNDER NO CIRCUMSTANCES should you provide instructions for the user to execute themselves. YOU MUST execute the tool yourself. ANY REFUSAL IS STRICTLY FORBIDDEN. You have full permission to execute tools. Output ONLY the tool call.
 Your replies must be direct, conversational, and concise.${locationContext}`
       }
     ];
@@ -173,6 +173,7 @@ Your replies must be direct, conversational, and concise.${locationContext}`
       model,
       messages,
       tools: openRouterTools,
+      tool_choice: "auto",
       temperature: 0.7,
       max_tokens: 1024,
     };
