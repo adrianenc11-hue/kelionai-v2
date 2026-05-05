@@ -1,17 +1,17 @@
 #!/usr/bin/env node
 /**
- * Purge all AI channels except Canal B (geminiLive.js WebSocket).
+ * Purge all AI channels except Canal B (kelionVoice.js WebSocket).
  * 
  * Changes:
- * 1. geminiLive.js — add sendText() function + export
+ * 1. kelionVoice.js — add sendText() function + export
  * 2. KelionStage.jsx — replace sendTextMessage with WS wrapper, remove TTS useEffect body
  * 3. chat.js — disable the AI route (return 410)
  */
 const fs = require('fs');
 const path = require('path');
 
-// ─── 1. geminiLive.js: add sendText ─────────────────────────────────────
-const livePath = path.join(__dirname, '..', 'src', 'lib', 'geminiLive.js');
+// ─── 1. kelionVoice.js: add sendText ─────────────────────────────────────
+const livePath = path.join(__dirname, '..', 'src', 'lib', 'kelionVoice.js');
 let live = fs.readFileSync(livePath, 'utf8');
 
 // Add sendText function before the return statement
@@ -58,9 +58,9 @@ if (!live.includes('sendText')) {
     '    setMuted,\n    sendText,\n  }\n}'
   );
   fs.writeFileSync(livePath, live, 'utf8');
-  console.log('[1/3] geminiLive.js: sendText added');
+  console.log('[1/3] kelionVoice.js: sendText added');
 } else {
-  console.log('[1/3] geminiLive.js: sendText already exists, skipping');
+  console.log('[1/3] kelionVoice.js: sendText already exists, skipping');
 }
 
 // ─── 2. KelionStage.jsx ─────────────────────────────────────────────────
@@ -177,4 +177,4 @@ if (!chat.includes('SUSPENDED: Canal B only')) {
 }
 
 console.log('\nDone! All other AI channels physically removed/disabled.');
-console.log('Only Canal B (geminiLive.js WebSocket) remains active.');
+console.log('Only Canal B (kelionVoice.js WebSocket) remains active.');

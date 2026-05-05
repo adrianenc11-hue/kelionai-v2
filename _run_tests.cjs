@@ -63,7 +63,7 @@ async function run() {
   // ═══ F1: HEALTH ═══
   console.log('\n── F1: HEALTH ──');
   const h = await get('/health');
-  log('F1', '/health', h.ok && h.json?.status === 'ok', `db=${h.json?.services?.database}, gemini=${h.json?.services?.gemini}`);
+  log('F1', '/health', h.ok && h.json?.status === 'ok', `db=${h.json?.services?.database}, google=${h.json?.services?.Gemma 4}`);
   const p = await get('/ping');
   log('F1', '/ping', p.text.includes('PONG'), 'PONG');
   const ts = await get('/api/tools/status');

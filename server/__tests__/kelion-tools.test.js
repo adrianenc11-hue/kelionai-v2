@@ -99,7 +99,7 @@ const EXPECTED_TOOL_NAMES = [
   // PR D — communications + automations + package info.
   'send_email', 'create_calendar_ics', 'zapier_trigger',
   'github_repo_info', 'list_github_repo_files', 'read_github_file', 'npm_package_info', 'pypi_package_info',
-  // F11 — AI image generation (Gemini native). Graceful fallback when
+  // F11 — AI image generation (google native). Graceful fallback when
   // GOOGLE_API_KEY is absent.
   'generate_image',
   // PR #388 — local file tools + GitHub PR creation. Lets the Kelion
