@@ -1,9 +1,9 @@
 'use strict';
 
 /**
- * F11 — Gemini native image generation + short-lived URL serving.
+ * F11 — AI image generation + short-lived URL serving.
  *
- * The voice model / text chat calls `generate_image(prompt, size?)`. Gemini
+ * The voice model / text chat calls `generate_image(prompt, size?)`. The API
  * returns the image as inlineData (base64 PNG). Piping the raw base64
  * payload back through a tool result would:
  *   1) blow past the voice model's context on the read-back pass,
@@ -46,7 +46,7 @@ function cacheGet(id) {
 }
 
 /**
- * Generate an image with Gemini native image generation. Returns `{ ok, id,
+ * Generate an image via AI image generation. Returns `{ ok, id,
  * url, title, prompt, size }` on success, or `{ ok:false, error }` on any
  * failure mode (missing key, moderation block, timeout, upstream error).
  *

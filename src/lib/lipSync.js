@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { TUNING } from './tuning'
 
-// Lip-sync driver. Listens to the audio element's MediaStream (the Gemini
+// Lip-sync driver. Listens to the audio element's MediaStream (the voice
 // Live hook routes decoded PCM through a MediaStreamDestination and sets
 // `audio.srcObject` to that stream), measures the voice-band energy, and
 // returns a smoothed 0..1 mouth-open value.
@@ -21,8 +21,8 @@ import { TUNING } from './tuning'
 // reads as speech, not noise.
 
 // Target formant region for vowels. F1 (open/close) and F2 (front/back) sit
-// inside this range for every Kelion voice (ElevenLabs, Gemini REST TTS,
-// ElevenLabs). Bins outside this range still count but at half weight.
+// inside this range for every Kelion voice (ElevenLabs TTS).
+// Bins outside this range still count but at half weight.
 const SPEECH_LO_HZ = 100
 const SPEECH_HI_HZ = 3500
 const FORMANT_LO_HZ = 200
@@ -123,7 +123,7 @@ export function useLipSync(audioRef) {
 
     // MediaStream attachment is not an event — poll the audio element's
     // srcObject. 80 ms is tight enough that the first audible chunk of a
-    // Gemini turn gets the analyser attached before the vowel onset, so
+    // AI turn gets the analyser attached before the vowel onset, so
     // the mouth starts opening on the first word instead of ~0.5 s late.
     const tryAttach = () => {
       const stream = audio.srcObject

@@ -40,7 +40,7 @@ CODEOWNERS approval (see `CODEOWNERS`).
 
 | Feature | Script | Delivered? |
 |---|---|---|
-| Live voice round-trip (Gemini Live ephemeral-token precondition) | `e2e/acceptance/voice-roundtrip.cjs` | driven by CI status on `master` |
+| Live voice round-trip (Gemma 4 Voice ephemeral-token precondition) | `e2e/acceptance/voice-roundtrip.cjs` | driven by CI status on `master` |
 
 The default state for every capability is "not delivered". Moving a row
 from "not delivered" to "delivered" requires:

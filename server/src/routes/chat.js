@@ -9,7 +9,7 @@ const { Router } = require('express');
 const { trialStatus, stampTrialIfFresh } = require('../services/trialQuota');
 const { peekSignedInUser, isAdminUser } = require('../middleware/optionalAuth');
 const ipGeo = require('../services/ipGeo');
-const { buildKelionToolsGemini } = require('./realtime');
+const { buildKelionToolsGoogle } = require('./realtime');
 
 const router = Router();
 
@@ -91,8 +91,8 @@ router.post('/', async (req, res) => {
       session.history = session.history.slice(-MAX_HISTORY * 2);
     }
 
-    // Model: Gemma 4 31B via OpenRouter — supports tool_calls natively.
-    const model = process.env.CHAT_MODEL || process.env.OPENROUTER_MODEL || 'google/gemma-4-31b-it';
+    // Model: via OpenRouter — explicitly supports tool_calls.
+    const model = process.env.CHAT_MODEL || process.env.OPENROUTER_MODEL || 'google/gemma-4-27b-it:free';
     const url = 'https://openrouter.ai/api/v1/chat/completions';
 
     const { buildKelionToolsChatCompletions } = require('./realtime');
@@ -104,7 +104,7 @@ router.post('/', async (req, res) => {
       ? `\n\n[SYSTEM CONTEXT: The user's current GPS coordinates are: Latitude ${lat}, Longitude ${lon}. If asked about location, weather, or directions, you have access to this.]` 
       : '';
 
-    // Convert Gemini history to OpenAI format
+    // Convert session history to OpenAI format
     const messages = [
       {
         role: 'system',

@@ -1,7 +1,7 @@
 const {
   KELION_TOOLS,
   buildKelionToolsChatCompletions,
-  buildKelionToolsGemini,
+  buildKelionToolsGoogle,
 } = require('../src/routes/realtime');
 const {
   toolGetActionHistory,
@@ -63,9 +63,9 @@ describe('PR #8 — get_action_history (Memory of Actions)', () => {
       expect(names).toContain('get_action_history');
     });
 
-    test('Gemini adapter surfaces get_action_history', () => {
-      const geminiTools = buildKelionToolsGemini();
-      const names = geminiTools[0].functionDeclarations.map((t) => t.name);
+    test('Google adapter surfaces get_action_history', () => {
+      const googleTools = buildKelionToolsGoogle();
+      const names = googleTools[0].functionDeclarations.map((t) => t.name);
       expect(names).toContain('get_action_history');
     });
   });

@@ -1830,8 +1830,8 @@ async function toolReadPdf({ url, base64, file_id, max_chars, max_pages }) {
   const cap = Math.max(500, Math.min(200000, Number.parseInt(max_chars, 10) || 100000)); // Cap marit pt analize profunde
 
   try {
-    // Gemma 4 multimodal analysis via Gemini API (Text + Images)
-    const apiKey = process.env.GEMINI_API_KEY;
+    // Gemma 4 multimodal analysis via Google API (Text + Images)
+    const apiKey = process.env.GOOGLE_API_KEY;
     if (apiKey) {
       const base64Data = loaded.buffer.toString('base64');
       const payload = {
@@ -1844,7 +1844,7 @@ async function toolReadPdf({ url, base64, file_id, max_chars, max_pages }) {
         generationConfig: { temperature: 0.1 }
       };
 
-      const gemmaModel = process.env.GEMINI_CHAT_MODEL || 'gemma-4-31b-it';
+      const gemmaModel = process.env.GOOGLE_CHAT_MODEL || 'gemma-4-31b-it';
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${gemmaModel}:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1858,7 +1858,7 @@ async function toolReadPdf({ url, base64, file_id, max_chars, max_pages }) {
           const truncated = text.length > cap;
           return {
             ok: true,
-            method: 'gemini-multimodal',
+            method: 'gemma4-multimodal',
             text: truncated ? text.slice(0, cap) + '… [truncated]' : text,
             truncated,
             chars: text.length,
@@ -1868,10 +1868,10 @@ async function toolReadPdf({ url, base64, file_id, max_chars, max_pages }) {
       }
     }
   } catch (err) {
-    console.warn('[read_pdf] Gemini vision fallback failed:', err.message);
+    console.warn('[read_pdf] Gemma 4 vision fallback failed:', err.message);
   }
 
-  // Fallback: pdf-parse clasic (doar text) dacă Gemini pică sau nu e setat API KEY
+  // Fallback: pdf-parse clasic (doar text) dacă Gemma 4 pică sau nu e setat API KEY
   const maxPages = Math.max(1, Math.min(200, Number.parseInt(max_pages, 10) || 50));
   try {
     const pdfParse = require('pdf-parse');
@@ -2529,7 +2529,7 @@ async function toolZapierTrigger(args) {
   if (!/^https:\/\/hooks\.zapier\.com\/hooks\/catch\//i.test(url)) {
     return { ok: false, error: 'webhook_url must be a Zapier Catch Hook (https://hooks.zapier.com/hooks/catch/…)' };
   }
-  // Schema advertises `payload` as a JSON string (Gemini's
+  // Schema advertises `payload` as a JSON string (the model's
   // endpoint rejects object-type params without explicit properties). Accept
   // both a pre-parsed object and a JSON string for backward compat.
   let payload = {};
@@ -3486,7 +3486,7 @@ async function toolRememberFact(args, ctx) {
 // directly into memory_items as low-confidence facts, ready to be
 // re-affirmed (or overridden) by the explicit fact-extractor on the
 // next conversation. For guests we no-op gracefully.
-// Per-user cooldown for learn_from_observation — Gemini calls this repeatedly
+// Per-user cooldown for learn_from_observation — the model calls this repeatedly
 // when the camera is active, flooding the DB with near-identical rows.
 const _learnCooldown = new Map(); // userId → lastCallMs
 

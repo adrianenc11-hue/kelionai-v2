@@ -1,13 +1,13 @@
 'use strict';
 
-// Vertex AI Gemini Live API WebSocket proxy.
+// Vertex AI Live API WebSocket proxy.
 //
 // Vertex Live API authenticates with OAuth 2.0 Bearer tokens via the
 // `Authorization` HTTP header — a mechanism browsers cannot use on
 // WebSocket connections (the WebSocket constructor in the web platform
 // does not accept custom headers). The Google-published tutorial for
 // browser-based Live API clients therefore uses a **server proxy**
-// that handles auth against Vertex and forwards the raw Gemini Live
+// that handles auth against Vertex and forwards the raw Live API
 // JSON frames verbatim in both directions:
 //   https://docs.cloud.google.com/vertex-ai/generative-ai/docs/live-api/get-started-websocket
 //
@@ -17,17 +17,17 @@
 // credentials, opens the upstream WebSocket to the regional
 // `*-aiplatform.googleapis.com` endpoint, and pipes frames through.
 //
-// The Gemini Live protocol frames are identical between Google AI
+// The Live API protocol frames are identical between Google AI
 // Studio (`generativelanguage.googleapis.com`) and Vertex AI — the
 // only differences are the URL path and the auth shape. Because of
-// that, the existing browser hook `useGeminiLive` can be pointed at
+// that, the existing browser voice hook can be pointed at
 // this proxy with zero protocol changes; the hook keeps sending and
 // receiving the same JSON (`setup`, `clientContent`, `realtimeInput`,
 // `serverContent`, `toolCall`, etc.).
 //
 // Scope / non-goals for this first cut:
 //   - We do NOT implement trial / credits / auth gating here yet. The
-//     legacy `/gemini-token` route already does that for the AI Studio
+//     legacy `/voice-token` route already does that for the AI Studio
 //     path and stays in place. Gating will be wired into the upgrade
 //     handler in a follow-up PR once the proxy is proven end-to-end.
 //   - We only support a single upstream per browser connection. If
@@ -180,7 +180,7 @@ async function handleClientConnection(clientWs, req) {
   };
 
   upstream.on('open', () => {
-    // No special handshake — the client sends its Gemini Live
+    // No special handshake — the client sends its Live API
     // `setup` frame as the first message, and Vertex responds with
     // `setupComplete`. The protocol is wire-identical to AI Studio
     // once past the auth handshake.

@@ -30,7 +30,7 @@ export function logAiEvent(type, data = {}) {
       case 'ws_close':       return `WebSocket closed (${data.code}) ${data.reason || ''}`
       case 'setup_sent':     return `Setup frame sent → model: ${data.model || '?'}`
       case 'setup_complete': return `Session ready`
-      case 'audio_out':      return `🔊 Gemini native audio chunk (${data.bytes || 0} bytes)`
+      case 'audio_out':      return `🔊 AI native audio chunk (${data.bytes || 0} bytes)`
       case 'audio_skipped':  return `🔇 Audio skipped (cloned voice active)`
       case 'clone_tts_req':  return `🎤 ElevenLabs TTS request: "${(data.text || '').slice(0, 60)}..."`
       case 'clone_tts_ok':   return `✅ ElevenLabs TTS played (${data.durationMs || 0}ms)`

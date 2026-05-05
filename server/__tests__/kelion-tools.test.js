@@ -1,20 +1,20 @@
 'use strict';
 
 // Unit tests for the provider-agnostic Kelion tool catalog and its
-// shape adapters. Guards against drift between the Gemini and
+// shape adapters. Guards against drift between the Google and
 // Chat Completions renderings when a new tool is added to KELION_TOOLS
 // — both shapes must still emit the exact set of tool names and the
 // same required-argument contracts.
 //
-// Only Gemini and the shared Chat Completions adapter remain.
+// Only Google and the shared Chat Completions adapter remain.
 
 // Minimal env so `src/routes/realtime` loads without exploding on
 // config-required vars.
-process.env.GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'test-gemini';
+process.env.GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || 'test-google';
 
 const {
   KELION_TOOLS,
-  buildKelionToolsGemini,
+  buildKelionToolsGoogle,
   buildKelionToolsChatCompletions,
 } = require('../src/routes/realtime');
 
@@ -100,7 +100,7 @@ const EXPECTED_TOOL_NAMES = [
   'send_email', 'create_calendar_ics', 'zapier_trigger',
   'github_repo_info', 'list_github_repo_files', 'read_github_file', 'npm_package_info', 'pypi_package_info',
   // F11 — AI image generation (Gemini native). Graceful fallback when
-  // GEMINI_API_KEY is absent.
+  // GOOGLE_API_KEY is absent.
   'generate_image',
   // PR #388 — local file tools + GitHub PR creation. Lets the Kelion
   // agent inspect the repo, edit files, and open a Pull Request after
@@ -143,7 +143,7 @@ const EXPECTED_TOOL_NAMES = [
   // delivered without an explicit user click.
   'compose_email_draft',
   // ElevenLabs cloned voice toggle — switches Kelion's TTS between
-  // Gemini built-in voice and the user's ElevenLabs cloned voice.
+  // Gemma 4 built-in voice and the user's ElevenLabs cloned voice.
   'switch_voice',
   // Agentic loop — multi-step plan execution
   'execute_plan',
@@ -169,8 +169,8 @@ describe('Kelion tool catalog', () => {
   });
 });
 
-describe('buildKelionToolsGemini', () => {
-  const rendered = buildKelionToolsGemini();
+describe('buildKelionToolsGoogle', () => {
+  const rendered = buildKelionToolsGoogle();
 
   test('returns tools array with functionDeclarations', () => {
     expect(Array.isArray(rendered)).toBe(true);
@@ -181,7 +181,7 @@ describe('buildKelionToolsGemini', () => {
     expect(rendered[0].functionDeclarations).toHaveLength(EXPECTED_TOOL_NAMES.length);
   });
 
-  test('types are UPPERCASE (Gemini v1alpha convention)', () => {
+  test('types are UPPERCASE (Google v1alpha convention)', () => {
     for (const fn of rendered[0].functionDeclarations) {
       expect(fn.parameters.type).toBe('OBJECT');
       for (const [, prop] of Object.entries(fn.parameters.properties)) {
@@ -190,17 +190,17 @@ describe('buildKelionToolsGemini', () => {
     }
   });
 
-  test('observe_user_emotion keeps its enum intact in Gemini shape', () => {
+  test('observe_user_emotion keeps its enum intact in Google shape', () => {
     const fn = rendered[0].functionDeclarations.find((f) => f.name === 'observe_user_emotion');
     expect(fn.parameters.properties.state.enum).toEqual([
       'neutral','happy','sad','surprised','angry','tired','focused','confused','anxious',
     ]);
   });
 
-  // Gemini BidiGenerateContent rejects the whole setup frame with
+  // Google BidiGenerateContent rejects the whole setup frame with
   // "missing field" if any ARRAY property omits `items`, and closes the
   // socket with code 1007 before setupComplete. Guard the adapter so new
-  // array-typed parameters can't regress voice for everyone on Gemini.
+  // array-typed parameters can't regress voice for everyone on Google API.
   test('every ARRAY property carries an items schema', () => {
     const walk = (schema, path) => {
       if (!schema || typeof schema !== 'object') return;
@@ -263,11 +263,11 @@ describe('buildKelionToolsChatCompletions', () => {
     ]);
   });
 
-  test('tool-name set matches the Gemini rendering exactly', () => {
+  test('tool-name set matches the Google rendering exactly', () => {
     const ccNames = buildKelionToolsChatCompletions().map((t) => t.function.name).sort();
-    const geminiDecls = buildKelionToolsGemini().find(t => t.functionDeclarations);
-    const geminiNames = geminiDecls.functionDeclarations
+    const googleDecls = buildKelionToolsGoogle().find(t => t.functionDeclarations);
+    const googleNames = googleDecls.functionDeclarations
       .map((t) => t.name).sort();
-    expect(ccNames).toEqual(geminiNames);
+    expect(ccNames).toEqual(googleNames);
   });
 });
