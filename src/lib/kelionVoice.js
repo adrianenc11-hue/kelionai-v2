@@ -1690,10 +1690,12 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
         }
         appendTurn('assistant', finalReply, true, finalModel ? `🤖 ${finalModel}` : undefined)
         
-        if (playAudio) {
+        console.log('[TTS-DEBUG] playAudio=', playAudio, 'finalReply length=', finalReply.length, 'muteMode=', muteModeRef.current)
+        if (playAudio && !muteModeRef.current) {
           setStatus('speaking')
           const isNative = !isClonedVoiceActive();
           const ttsUrl = isNative ? '/api/voice/clone/tts?native=true' : '/api/voice/clone/tts';
+          console.log('[TTS-DEBUG] calling TTS:', ttsUrl, 'text:', finalReply.slice(0, 60))
           
           try {
             const r = await fetch(ttsUrl, {
@@ -1702,8 +1704,10 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
               credentials: 'include',
               body: JSON.stringify({ text: finalReply, lang: getDetectedLang() }),
             })
+            console.log('[TTS-DEBUG] TTS response status:', r.status)
             if (r.ok) {
               const audioData = await r.arrayBuffer()
+              console.log('[TTS-DEBUG] TTS audio bytes:', audioData.byteLength)
               if (audioData.byteLength < 100) {
                 appendTurn('assistant', `⚠️ Eroare audio: Răspunsul vocal a fost gol. Verificați cota ElevenLabs.`, true, '⚙️ System')
                 setStatus('idle')
@@ -1712,8 +1716,13 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
               const blob = new Blob([audioData], { type: 'audio/mpeg' })
               const blobUrl = URL.createObjectURL(blob)
               
-              const audioEl = (audioRef && audioRef.current) ? audioRef.current : new window.Audio();
+              // Always create a fresh Audio() for HTTP TTS to avoid
+              // the shared audioRef being stuck in muted state from
+              // the WebSocket voice path (which sets muted=true for
+              // lipsync). This ensures text-chat TTS always plays.
+              const audioEl = new window.Audio();
               audioEl.src = blobUrl;
+              audioEl.volume = 1;
               audioEl.onended = () => {
                 URL.revokeObjectURL(blobUrl)
                 setStatus('idle')
@@ -1725,7 +1734,10 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
                 setStatus('idle')
               }
               
-              audioEl.play().catch((e) => {
+              console.log('[TTS-DEBUG] calling audioEl.play()')
+              audioEl.play().then(() => {
+                console.log('[TTS-DEBUG] AUDIO PLAYING OK')
+              }).catch((e) => {
                 console.error('[kelionVoice] Audio play() blocked:', e)
                 appendTurn('assistant', `⚠️ Browserul a blocat redarea audio automată.`, true, '⚙️ System')
                 setStatus('idle')
