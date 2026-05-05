@@ -1371,26 +1371,12 @@ const geminiTokenHandler = async (req, res) => {
       });
     }
   }
-  // Admin key-override path: when `GEMINI_API_KEY_ADMIN` is set AND the
-  // current caller is an admin, mint the ephemeral token against the
-  // admin's own GCP project. Rationale: the voice API (v1alpha, preview)
-  // has strict per-project quotas — when public users exhaust them Google
-  // closes the WS with code 1011 "You exceeded your current quota…". The
-  // owner of the app should not be blocked by users' usage, so we let
-  // them plug a separate billing project via env and route their
-  // sessions through it. Public users keep hitting the shared key.
+  // The Vertex backend and AI Studio legacy paths are no longer relevant 
+  // since we migrated to OpenRouter/Gemma 4 natively. We removed the
+  // GEMINI_API_KEY block requirement here.
+  
   const adminUser = await peekSignedInUser(req);
   const isAdmin = await isAdminUser(adminUser);
-  const apiKey = (isAdmin && process.env.GEMINI_API_KEY_ADMIN)
-    ? process.env.GEMINI_API_KEY_ADMIN
-    : process.env.GEMINI_API_KEY;
-  // The Vertex backend authenticates server-side via a GCP service
-  // account (see `vertexLiveProxy.js`) and does not need a GEMINI_API_KEY.
-  // The legacy AI Studio path still does; we only 503 on its absence.
-  if (backend !== 'vertex' && !apiKey) {
-    return res.status(503).json({ error: 'GEMINI_API_KEY not configured' });
-  }
-
   // Gating matrix:
   //   - guests (no JWT)            → 15-min/day IP trial window
   //   - signed-in non-admin        → credits balance must be > 0 (402 if not)
@@ -1462,6 +1448,18 @@ const geminiTokenHandler = async (req, res) => {
     //   OpenRouter) → /api/voice/clone/tts (ElevenLabs / Gemini REST).
     // We still build the full persona + tools so /pipeline can use them.
     const chatModel = process.env.OPENROUTER_MODEL || 'google/gemma-4-31b-it';
+    
+    // Restore variables needed for JSON payload
+    const user = adminUser;
+    const voice = req.query.voice || process.env.GEMINI_TTS_VOICE_KELION || 'Kore';
+    const styleFromCookie = req.cookies?.['kelion.voice_style'];
+    const voiceStyle = resolveVoiceStyle(styleFromCookie || '');
+    let memoryItems = [];
+    try {
+      memoryItems = await getFactMemory(user?.id);
+    } catch (err) {
+      console.warn('[realtime] failed to fetch user facts', err.message);
+    }
 
     res.json({
       token: null,
