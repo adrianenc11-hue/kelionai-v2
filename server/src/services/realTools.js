@@ -1736,8 +1736,7 @@ function pickForcedTool(lastUserMessage) {
   return null;
 }
 
-// Groq-powered coding tools and plan_task REMOVED — Gemini Live
-// handles coding questions and multi-step planning directly.
+
 
 
 // ──────────────────────────────────────────────────────────────────
@@ -1831,7 +1830,7 @@ async function toolReadPdf({ url, base64, file_id, max_chars, max_pages }) {
   const cap = Math.max(500, Math.min(200000, Number.parseInt(max_chars, 10) || 100000)); // Cap marit pt analize profunde
 
   try {
-    // Încercare de a folosi Gemini 2.5 Flash pentru analiză multimodală nativă (Text + Imagini)
+    // Gemma 4 multimodal analysis via Gemini API (Text + Images)
     const apiKey = process.env.GEMINI_API_KEY;
     if (apiKey) {
       const base64Data = loaded.buffer.toString('base64');
@@ -1845,7 +1844,8 @@ async function toolReadPdf({ url, base64, file_id, max_chars, max_pages }) {
         generationConfig: { temperature: 0.1 }
       };
 
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+      const gemmaModel = process.env.GEMINI_CHAT_MODEL || 'gemma-4-31b-it';
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${gemmaModel}:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -2015,9 +2015,7 @@ async function toolOcrPassport({ url, base64 }) {
   };
 }
 
-// Groq-powered coding tools (toolSolveProblem, toolCodeReview,
-// toolExplainCode) and plan_task (toolPlanTask) REMOVED — Gemini Live
-// handles coding questions and multi-step planning directly.
+
 
 // ──────────────────────────────────────────────────────────────────
 // PR C — sandboxed code runner, regex tester, and user-intern tools.
@@ -2860,9 +2858,9 @@ async function toolAskExpertCoder(args) {
   
   // Fallback chain: try preferred model first, then alternatives
   const MODELS = [
-    args?.model || 'qwen/qwen-2.5-coder-32b-instruct',
-    'deepseek/deepseek-r1',
-    'meta-llama/llama-3.3-70b-instruct:free',
+    args?.model || 'google/gemma-4-31b-it',
+    'google/gemma-4-31b-it',
+    'google/gemma-4-26b-a4b-it',
   ];
   // Deduplicate in case args.model matches one of the fallbacks
   const uniqueModels = [...new Set(MODELS)];
@@ -3293,7 +3291,7 @@ async function executeRealTool(name, args, ctx) {
     case 'dictionary':        return toolDictionary(a);
     // ── translation ──
     case 'translate':         return toolTranslate(a);
-    // ── groq-powered coding + plan_task REMOVED — Gemini Live handles these ──
+
     // ── PR B — documents + OCR ──
     case 'read_pdf':          return toolReadPdf(a);
     case 'read_docx':         return toolReadDocx(a);

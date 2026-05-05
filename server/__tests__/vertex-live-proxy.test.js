@@ -1,6 +1,6 @@
 'use strict';
 
-// Smoke tests for the Vertex AI Gemini Live WebSocket proxy.
+// Smoke tests for the Vertex AI WebSocket proxy.
 //
 // We exercise the pure helpers (URL + project/location resolution)
 // here. The full upgrade-handler path needs a live Vertex endpoint

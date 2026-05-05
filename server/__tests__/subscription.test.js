@@ -47,5 +47,5 @@ describe('New user defaults', () => {
   it('tier=free, status=active, usage=0',    async () => { const {token}=await createUser(); const r=await request(app).get('/api/users/me').set('Authorization',`Bearer ${token}`); expect(r.body.subscription_tier).toBe('free'); expect(r.body.subscription_status).toBe('active'); expect(r.body.usage.today).toBe(0); expect(r.body.usage.daily_limit).toBe(10); });
 });
 
-// NOTE: /api/payments/* mock routes removed (2026-04-25 audit).
-// Real Stripe checkout is tested via /api/credits/* test suite.
+
+

@@ -2,7 +2,7 @@
 
 // POST /api/chat — text chat using Gemma 4 via generateContent API.
 // This is a fallback/primary text chat route that does NOT require
-// the Gemini Live WebSocket. Works with any model that supports
+// This is the primary text chat route using Gemma 4 via OpenRouter.
 // generateContent, including Gemma 4.
 
 const { Router } = require('express');
@@ -90,10 +90,8 @@ router.post('/', async (req, res) => {
       session.history = session.history.slice(-MAX_HISTORY * 2);
     }
 
-    // Model: must support OpenAI-style function calling (tool_calls).
-    // gemma-3-27b-it does NOT support tool_calls — it outputs JSON as text.
-    // google/gemini-2.0-flash supports tool_calls natively via OpenRouter.
-    const model = process.env.CHAT_MODEL || process.env.OPENROUTER_MODEL || 'google/gemini-2.0-flash-001';
+    // Model: Gemma 4 31B via OpenRouter — supports tool_calls natively.
+    const model = process.env.CHAT_MODEL || process.env.OPENROUTER_MODEL || 'google/gemma-4-31b-it';
     const url = 'https://openrouter.ai/api/v1/chat/completions';
     const orKey = process.env.OPENROUTER_API_KEY;
     if (!orKey) {
@@ -181,16 +179,24 @@ Your replies must be direct, conversational, and concise.${locationContext}`
       max_tokens: 1024,
     };
 
-    const r = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${orKey}`,
-        'HTTP-Referer': 'https://kelion.ai',
-        'X-Title': 'Kelion AI'
-      },
-      body: JSON.stringify(body),
-    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 30_000);
+    let r;
+    try {
+      r = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${orKey}`,
+          'HTTP-Referer': 'https://kelion.ai',
+          'X-Title': 'Kelion AI'
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
 
     if (!r.ok) {
       const errText = await r.text();
@@ -232,7 +238,7 @@ Your replies must be direct, conversational, and concise.${locationContext}`
     res.json({ reply, model });
   } catch (err) {
     console.error('[chat] error:', err);
-    res.status(500).json({ error: 'Internal server error', details: err.message, stack: err.stack });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

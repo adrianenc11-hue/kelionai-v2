@@ -110,8 +110,7 @@ export default function StudioDecor() {
         <meshStandardMaterial color={'#0a0b12'} roughness={0.6} metalness={0.35} />
       </mesh>
 
-      {/* Ceiling strip removed — Adrian flagged the warm #ffb27a line as
-          a distracting "brown bar" at the top of the stage. */}
+
 
       {/* Cool floor LED strip */}
       <mesh position={[0, -1.9, -4.5]}>
@@ -119,12 +118,7 @@ export default function StudioDecor() {
         <meshBasicMaterial color={'#60a5fa'} toneMapped={false} />
       </mesh>
 
-      {/* The in-scene 3D presentation monitor was removed so that the stage
-          stays clean when no content is loaded. All monitor payloads now
-          render exclusively in the half-page <MonitorOverlay/> (left 50vw
-          on desktop, bottom 55vh on mobile). An empty dark bezel sitting
-          next to the avatar at all times was confusing — users expected it
-          to be the promised half-page screen. */}
+
 
       {/* Reflective floor */}
       <mesh position={[0, -1.65, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>

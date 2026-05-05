@@ -1,7 +1,7 @@
 'use strict';
 
 // Stage 4 — tool executors for Kelion's function-calling.
-// These endpoints are hit by the CLIENT after Gemini Live emits a toolCall
+// These endpoints are hit by the CLIENT after the model emits a toolCall
 // message, so the tool runs inside our trust boundary (not client-side).
 // Each endpoint returns { ok: true, result: <string> } on success, or
 // { ok: false, error: <string>, unavailable?: true } when a provider isn't
@@ -132,7 +132,7 @@ router.post('/browser/browse', async (req, res) => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.3-70b-instruct:free',
+        model: process.env.OPENROUTER_MODEL || 'google/gemma-4-31b-it',
         messages: [
           {
             role: 'system',
@@ -253,7 +253,7 @@ router.post('/upload_temp', (req, res) => {
 });
 
 // ─── Real-tool proxy (shared server-side executor) ────────────────
-// Voice sessions (Gemini Live) emit tool calls on the
+// Voice sessions emit tool calls on the
 // client; src/lib/kelionTools.js runTool() proxies unknown names here so
 // they run inside our trust boundary with the same executor the text
 // chat route already uses. Rate-limited per IP to stop a runaway session
@@ -315,7 +315,7 @@ router.post('/execute', async (req, res) => {
 // The frontend surfaces this in transcript meta / debug overlay.
 router.get('/status', (_req, res) => {
   res.json({
-    google_search: true, // built into Gemini Live, always on
+    google_search: true, // built into the model, always on
     browse_web: !!process.env.BROWSER_USE_API_KEY,
     mcp: {
       calendar: !!process.env.MCP_ENABLED,

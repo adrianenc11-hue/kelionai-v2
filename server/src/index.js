@@ -27,7 +27,7 @@ const toolsRouter      = require('./routes/tools');
 const pushRouter       = require('./routes/push');
 const creditsRouter    = require('./routes/credits');
 const diagRouter       = require('./routes/diag');
-// YouTube removed (2026-04-28) — was causing constant errors and API quota issues.
+
 const generatedImagesRouter = require('./routes/generatedImages');
 const voiceCloneRouter = require('./routes/voiceClone');
 const demoRouter       = require('./routes/demo');
@@ -219,8 +219,7 @@ app.get('/api/subscription/plans', (req, res) => {
   res.json({ plans: getPlans() });
 });
 
-// NOTE: /api/payments/* mock routes removed (2026-04-25 audit).
-// Real Stripe checkout is handled by /api/credits/* routes.
+
 
 // Referral routes (auth required)
 app.post('/api/referral/generate', requireAuth, async (req, res) => {
@@ -270,20 +269,6 @@ app.post('/api/referral/use', requireAuth, async (req, res) => {
   }
 });
 
-// Audit M2 — the legacy /api/realtime/trial-token endpoint (mounted
-// here directly on `app`, _before_ the realtime router) has been
-// removed. It was:
-//   - bypassing the shared 15-min/day trial window enforced by
-//     /api/trial/status + /api/chat + /api/tts, so a guest could mint
-//     a new Realtime session every 24 h _on top of_ their
-//     text-chat quota — effectively doubling free minutes.
-//   - storing a per-IP last-issued timestamp in a Map that was never
-//     garbage-collected (same leak shape as H2 `consumeStateByUser`).
-//   - duplicating the mint logic of the canonical /api/realtime/token
-//     handler (in ./routes/realtime.js), which already applies
-//     chatLimiter + admin-project routing.
-// Guests reach voice via the regular /api/realtime/token flow, gated
-// by the shared trial window. Removing the shadow closes the bypass.
 
 // API routes (auth required)
 app.use('/api/users', requireAuth, usersRouter);
@@ -328,11 +313,11 @@ app.use('/api/conversations', requireAuth, conversationsRouter);
 app.use('/api/studio', requireAuth, studioRouter);
 
 // Stage 4 — M19 (browser use) + M20 (web search status) + M21 (MCP stubs).
-// Router is PUBLIC by design: Gemini Live tool-call flow has no login gate,
+// Router is PUBLIC by design: voice tool-call flow has no login gate,
 // and MCP endpoints self-check for a signed-in user inside the handler.
 app.use('/api/tools', chatLimiter, toolsRouter);
 
-// YouTube route removed (2026-04-28) — constant API errors.
+
 
 // F11 — short-lived PNG serving for `generate_image` tool. The route
 // lives outside chatLimiter because it's a pure GET by opaque UUID;
@@ -469,7 +454,7 @@ app.use((err, _req, res, _next) => {
 });
 
 // Wrap the Express app in a raw http.Server so we can attach a
-// WebSocket upgrade handler for the Vertex AI Gemini Live proxy on
+// WebSocket upgrade handler for the Vertex AI proxy on
 // the same port (see `routes/vertexLiveProxy.js`). Keeping everything
 // on one port keeps Railway's single-port routing happy and means
 // the browser hits the proxy over the same origin it already talks

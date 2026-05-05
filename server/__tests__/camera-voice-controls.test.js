@@ -95,9 +95,9 @@ describe('PR #199 — verbal camera controls', () => {
     expect(d).toMatch(/rotește|rotate|flip|switch/);
   });
 
-  test('OpenAI adapter surfaces all four camera tools', () => {
-    const openaiTools = buildKelionToolsChatCompletions();
-    const names = openaiTools.map((t) => t.name || t.function?.name).filter(Boolean);
+  test('Chat Completions adapter surfaces all four camera tools', () => {
+    const ccTools = buildKelionToolsChatCompletions();
+    const names = ccTools.map((t) => t.name || t.function?.name).filter(Boolean);
     for (const n of ['switch_camera', 'camera_on', 'camera_off', 'zoom_camera']) {
       expect(names).toContain(n);
     }

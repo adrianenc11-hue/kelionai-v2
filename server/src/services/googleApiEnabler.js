@@ -32,7 +32,6 @@ const REQUIRED_APIS = [
   'gmail.googleapis.com',               // Gmail API (read_email)
   'drive.googleapis.com',               // Google Drive API (search_files)
 
-  // YouTube removed (2026-04-28)
 ];
 
 let _enabledOnce = false;

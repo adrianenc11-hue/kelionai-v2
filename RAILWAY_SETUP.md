@@ -33,7 +33,8 @@ JWT_SECRET=<generate-random-32-char-string>
 
 ### AI Services
 ```
-OPENAI_API_KEY=<your-openai-key>
+GEMINI_API_KEY=<your-gemini-key>
+OPENROUTER_API_KEY=<your-openrouter-key>
 ELEVENLABS_API_KEY=<your-elevenlabs-key>
 ```
 
@@ -95,7 +96,7 @@ Expected:
   "status": "ok",
   "services": {
     "database": "connected",
-    "openai": "configured",
+    "gemini": "configured",
     "elevenlabs": "configured"
   }
 }

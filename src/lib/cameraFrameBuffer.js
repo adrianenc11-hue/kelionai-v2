@@ -3,7 +3,7 @@
 // Keeps the most recent camera frame as a data URL. Used by the
 // narration mode (set_narration_mode) which periodically sends the
 // latest frame to Gemini Vision for continuous scene description.
-// Gemini Live now handles direct vision via realtimeInput.video,
+// The voice transport now handles direct vision via realtimeInput.video,
 // so the old what_do_you_see tool no longer uses this buffer.
 //
 // This module owns the single source of truth for "the latest frame we

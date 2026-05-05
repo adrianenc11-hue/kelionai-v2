@@ -108,7 +108,7 @@ router.get('/balance', requireAuth, async (req, res) => {
  * POST /api/credits/consume
  *
  * Deduct live-session minutes from a signed-in user's balance. Called
- * by the client as a 60s heartbeat while a Gemini Live voice session
+ * by the client as a 60s heartbeat while a voice session
  * is running (useGeminiLive.js). Admins are auto-exempt (`exempt: true`
  * in the response so the client doesn't need to know who's admin).
  *
@@ -477,8 +477,8 @@ router.post('/consume', requireAuth, async (req, res) => {
       deltaMinutes: -take,
       kind: 'consumption',
       note: decision.action === 'charge_forced'
-        ? 'Gemini Live session (forced — silent streak capped)'
-        : 'Gemini Live session',
+        ? 'Voice session (forced — silent streak capped)'
+        : 'Voice session',
     });
     await persistConsumeState(req.user.id, decision.nextState, now);
     return res.json({

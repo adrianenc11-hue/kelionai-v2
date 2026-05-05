@@ -23,7 +23,8 @@ Edit `server/.env` and add your API keys:
 
 ```env
 # Required for AI features
-OPENAI_API_KEY=sk-your-key-here
+GEMINI_API_KEY=your-gemini-api-key
+OPENROUTER_API_KEY=your-openrouter-api-key
 
 # Required for voice synthesis
 ELEVENLABS_API_KEY=your-key-here
@@ -73,7 +74,7 @@ npm run dev
 - ✅ Admin panel for user management
 
 ### AI Features
-- ✅ OpenAI GPT-4o integration
+- ✅ Gemma 4 integration (via Gemini API + OpenRouter)
 - ✅ Real-time voice chat (WebRTC)
 - ✅ ElevenLabs TTS (multilingual)
 - ✅ Vision support (camera frames)
@@ -144,7 +145,8 @@ The app is pre-configured for Railway:
 3. Deploy automatically on push
 
 **Required Variables**:
-- `OPENAI_API_KEY`
+- `GEMINI_API_KEY`
+- `OPENROUTER_API_KEY`
 - `ELEVENLABS_API_KEY`
 - `GOOGLE_CLIENT_ID`
 - `GOOGLE_CLIENT_SECRET`
@@ -222,7 +224,8 @@ kelionai-v2/
 ## Next Steps
 
 1. **Get API Keys**:
-   - [OpenAI](https://platform.openai.com/api-keys)
+   - [Google AI Studio](https://aistudio.google.com/app/apikey)
+   - [OpenRouter](https://openrouter.ai/keys)
    - [ElevenLabs](https://elevenlabs.io/app/settings)
    - [Google OAuth](https://console.cloud.google.com/apis/credentials)
 

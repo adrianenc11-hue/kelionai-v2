@@ -1,5 +1,5 @@
-// Stage 4 — client-side bridge for Gemini Live function tools.
-// When Gemini Live emits a toolCall, geminiLive.js calls runTool(name, args)
+// Stage 4 — client-side bridge for Kelion voice function tools.
+// When the model emits a toolCall, geminiLive.js calls runTool(name, args)
 // which proxies to our backend. The backend owns credentials (BROWSER_USE_API_KEY,
 // MCP tokens, etc.); the client just shuttles.
 //
@@ -642,8 +642,6 @@ function download(){
       }
       return 'narration_off'
     }
-    // what_do_you_see REMOVED — Gemini Live receives camera frames
-    // natively via realtimeInput.video and can describe them directly.
     case 'switch_voice': {
       // Switch between Gemini built-in voice and user's ElevenLabs cloned voice.
       const targetMode = args?.mode || 'default'

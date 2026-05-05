@@ -21,7 +21,7 @@ import { TUNING } from './tuning'
 // reads as speech, not noise.
 
 // Target formant region for vowels. F1 (open/close) and F2 (front/back) sit
-// inside this range for every Kelion voice (Gemini Live "Kore", Charon,
+// inside this range for every Kelion voice (ElevenLabs, Gemini REST TTS,
 // ElevenLabs). Bins outside this range still count but at half weight.
 const SPEECH_LO_HZ = 100
 const SPEECH_HI_HZ = 3500

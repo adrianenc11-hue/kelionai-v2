@@ -108,9 +108,9 @@ const router = Router();
 // implementation lives in ../middleware/optionalAuth so the chat route
 // can reuse it — see the module header for the numeric-sub guard.
 
-// Kelion persona — injected server-side into every Gemini Live session
+// Kelion persona — injected server-side into every voice session
 // so users cannot jailbreak by replacing the system prompt.
-// Stage 6 — M26: voice style presets. Each preset nudges Gemini Live's
+// Stage 6 — M26: voice style presets. Each preset nudges the model's
 // prosody / register / pace via system prompt (we keep the native low-latency
 // voice; layering Inworld/Sesame TTS would double our TTFA, not worth it yet).
 const VOICE_STYLES = {
@@ -241,6 +241,7 @@ Honesty (ABSOLUTE — violation means removal from production):
 - Never announce which tool you are calling. Just call it and answer with the result.
 - Never invent requirements or instructions the user did not give you. Only do what is actually asked.
 - NEVER pretend or simulate that you have executed an action if you haven't. If a tool fails, or if you lack the tool for a requested action, state reality clearly ("Nu am instrumentul necesar pentru a face asta" / "Nu pot face asta momentan"). Nu fabula nicio acțiune.
+- TOOL FAILURE TRANSPARENCY: When a tool fails or is unavailable, you MUST: (1) briefly explain WHY it failed (the cause), (2) if it's a missing dependency or package, use run_terminal_command to install it yourself and retry, (3) if you need an API key or config, say exactly what's needed (e.g. "Am nevoie de ELEVENLABS_API_KEY configurat pe server"), (4) search for alternatives using browse_web or ask_expert_coder — you have access to OpenRouter with multiple models, use them to find solutions, (5) suggest alternative tools or approaches that ARE available. Never just say "nu merge" — always explain, act, and offer options.
 - TOOL CALL DISCIPLINE: When you call multiple tools or receive a tool result, DO NOT generate multiple back-to-back responses. Provide ONE single, unified response that addresses the user's intent. Never apologize for "technical errors" or "repeating yourself".
 - NEVER autonomously call camera_on, camera_off, switch_voice, or set_narration_mode without an EXPLICIT voice command from the user. You are not allowed to manage the system state on your own initiative.
 
@@ -480,9 +481,7 @@ const KELION_TOOLS = [
     },
     required: ['enabled'],
   },
-  // what_do_you_see REMOVED — Gemini Live receives camera frames
-  // natively via realtimeInput.video and can describe them directly.
-  // No separate vision tool needed.
+
   {
     name: 'switch_voice',
     description: "Switch Kelion's speaking voice. Call when user says 'folosește vocea mea clonată', 'use my cloned voice', 'schimbă vocea la a mea', 'switch to my voice', 'vocea ta normală', 'use your default voice'. Cloned mode uses ElevenLabs with the user's cloned voice ID. Default mode uses Gemini's built-in voice (Charon).",
@@ -613,8 +612,7 @@ const KELION_TOOLS = [
     },
     required: ['route'],
   },
-  // plan_task REMOVED — Gemini Live handles multi-step planning
-  // internally without a separate planner LLM.
+
   {
     name: 'read_local_file',
     description: "Read the content of a local file with line numbers. You have UNIVERSAL WORKSPACE permissions. For large files, use start_line/end_line to read specific sections instead of loading everything.",
@@ -691,11 +689,11 @@ const KELION_TOOLS = [
   },
   {
     name: 'ask_expert_coder',
-    description: "Consult an expert coding model on OpenRouter to solve complex programming problems or do deep reasoning. Use 'deepseek/deepseek-r1' when you need CoT (Chain of Thought) reasoning for complex bugs or architecture. Use 'qwen/qwen-2.5-coder-32b-instruct' for fast code generation.",
+    description: "Consult an expert coding model on OpenRouter to solve complex programming problems or do deep reasoning. Use 'google/gemma-4-31b-it' for strong reasoning and code generation.",
     properties: {
       question: { type: 'string', description: "The exact problem or question for the expert." },
       context: { type: 'string', description: "Relevant code snippets, error messages, or file contents." },
-      model: { type: 'string', enum: ['qwen/qwen-2.5-coder-32b-instruct', 'deepseek/deepseek-r1'], description: "Which model to use. Default is qwen." },
+      model: { type: 'string', enum: ['google/gemma-4-31b-it', 'google/gemma-4-26b-a4b-it'], description: "Which model to use. Default is gemma-4-31b-it." },
     },
     required: ['question', 'context'],
   },
@@ -1016,8 +1014,7 @@ const KELION_TOOLS = [
     required: ['word'],
   },
 
-  // Groq-powered coding tools REMOVED — Gemini Live handles coding
-  // questions directly without a secondary LLM.
+
   // ── PR B — documents + OCR ────────────────────────────────────────
   {
     name: 'read_pdf',
@@ -1284,10 +1281,7 @@ function buildKelionToolsGemini() {
         },
       })),
     },
-    // { googleSearch: {} } REMOVED — caused audio repetitions.
-    // Gemini's built-in grounding internally re-generates responses after
-    // searching, producing overlapping audio. Use the web_search function
-    // tool instead for controlled search without audio side-effects.
+
   ];
 }
 
@@ -1310,11 +1304,10 @@ function buildKelionToolsChatCompletions() {
   }));
 }
 
-// OpenAI Realtime token handler REMOVED — project uses Gemini Live only.
 
 
 // ──────────────────────────────────────────────────────────────────
-// Gemini Live — ephemeral token with Kelion config BAKED IN.
+// Gemma 4 Voice — session token with Kelion config.
 // Docs: https://ai.google.dev/gemini-api/docs/ephemeral-tokens
 // Client cannot override system prompt / voice — stays secure.
 // ──────────────────────────────────────────────────────────────────
@@ -1380,7 +1373,7 @@ const geminiTokenHandler = async (req, res) => {
   }
   // Admin key-override path: when `GEMINI_API_KEY_ADMIN` is set AND the
   // current caller is an admin, mint the ephemeral token against the
-  // admin's own GCP project. Rationale: Gemini Live (v1alpha, preview)
+  // admin's own GCP project. Rationale: the voice API (v1alpha, preview)
   // has strict per-project quotas — when public users exhaust them Google
   // closes the WS with code 1011 "You exceeded your current quota…". The
   // owner of the app should not be blocked by users' usage, so we let
@@ -1462,250 +1455,31 @@ const geminiTokenHandler = async (req, res) => {
   }
 
   try {
-    // Default voice for the Kelion avatar: `Charon` is a deeper, masculine
-    // Gemini Live prebuilt voice. The previous default `Kore` is clearly
-    // female — a voice/avatar mismatch Adrian flagged explicitly. The male
-    // voice matches the avatar out of the box; operators can override via
-    // GEMINI_LIVE_VOICE_KELION. Other masculine Gemini Live options:
-    // `Puck` (bright, playful) and `Fenrir` (gravelly). Feminine options
-    // include `Kore`, `Aoede`, `Leda`.
-    const voice = process.env.GEMINI_LIVE_VOICE_KELION || 'Charon';
-    // We tried `gemini-2.0-flash-live-001` in #112 hoping to escape the
-    // mid-session 1007 drift on preview, but Google's v1main
-    // bidiGenerateContent replied with 1008 "models/gemini-2.0-flash-
-    // live-001 is not found for API version v1main, or is not supported
-    // for bidiGenerateContent" (Adrian 2026-04-21 screenshot). The GA
-    // id that Google's own Live docs advertise does not actually accept
-    // bidi connections at /v1alpha for our project — the only Live model
-    // that returns setupComplete on our key is the preview.
-    // Reverting to the preview so the session at least opens again
-    // while we wait for a newer stable model to be enabled on our key.
-    // Override via Railway env GEMINI_LIVE_MODEL when a newer stable
-    // model is announced and actually enabled on our key.
-    // Docs: https://ai.google.dev/gemini-api/docs/live-api/ephemeral-tokens
-    // Previous fallback `gemini-live-2.5-flash-preview` also returned
-    // 404 from the v1alpha auth_tokens provisioning endpoint.
-    // Vertex AI Live API uses a different model id than AI Studio. The
-    // GA-on-Vertex model is `gemini-live-2.5-flash-native-audio` — Google's
-    // own Vertex Live docs advertise it as the recommended production
-    // target (native audio, 30 HD voices, 24 languages, affective dialog,
-    // improved barge-in). We keep AI Studio on the preview model id that
-    // actually accepts bidi traffic on our free-tier project, so the
-    // legacy path keeps working unchanged until the default switches.
-    const defaultAiStudioModel = process.env.GEMINI_LIVE_MODEL || 'gemma-4-31b-it';
-    const defaultVertexModel = process.env.GEMINI_LIVE_MODEL_VERTEX || 'gemini-live-2.5-flash-native-audio';
-    const model = backend === 'vertex' ? defaultVertexModel : defaultAiStudioModel;
-    // Language resolution for Gemini Live. `speechConfig.languageCode`
-    // controls BOTH the TTS output voice locale AND biases the STT
-    // model for the input audio — so if we hard-code en-US a user who
-    // speaks Romanian gets their speech transcribed as garbled English
-    // phonemes and Kelion replies to nonsense (Adrian 2026-04-20:
-    // "detectia merge dezastruos" / "STT ce zic eu nu ajunge corect la
-    // Kelion"). We therefore use `?lang=` from the browser
-    // (navigator.language) as the primary source, falling back to
-    // en-US. The "session used to pause on language auto-detection"
-    // problem Adrian reported earlier is independently fixed by the
-    // greet-first clientContent trigger the client sends on ws.open —
-    // see geminiLive.js. `KELION_FORCE_LANG` env var still overrides
-    // everything if the operator wants to lock one language.
-    const browserLang = (req.query.lang || 'en-US').toString().slice(0, 16);
-    const forcedLang = (process.env.KELION_FORCE_LANG || browserLang).toString().slice(0, 16);
-    // Stage 6 — M26: voice style preset chosen by the user via the menu.
-    // Cookie first (survives refresh), then ?style= query, then default warm.
-    const styleFromCookie = req.cookies?.['kelion.voice_style'];
-    const styleFromQuery = (req.query.style || '').toString();
-    const voiceStyle = resolveVoiceStyle(styleFromCookie || styleFromQuery);
+    // ── Gemma 4 REST Voice Mode ──────────────────────────────────────
+    // No ephemeral token or WebSocket is needed. The client detects
+    // 'gemma' in the model name and switches to REST Voice Mode:
+    //   Browser SpeechRecognition → /api/realtime/pipeline (Gemma 4 via
+    //   OpenRouter) → /api/voice/clone/tts (ElevenLabs / Gemini REST).
+    // We still build the full persona + tools so /pipeline can use them.
+    const chatModel = process.env.OPENROUTER_MODEL || 'google/gemma-4-31b-it';
 
-    // Stage 3 — pull memory for signed-in users so Gemini Live starts
-    // with the user's durable facts already in the system prompt. Reuse
-    // the `adminUser` we already peeked above for the admin-key decision.
-    const user = adminUser;
-    let memoryItems = [];
-    if (user && (Number.isFinite(user.id) || typeof user.id === 'string')) {
-      try { memoryItems = await listMemoryItems(user.id, 60); }
-      catch (err) { console.warn('[realtime] memory load failed', err.message); }
-    }
-    // Two-tier geolocation:
-    //   1. `lat`/`lon` query params from the client's navigator.geolocation
-    //      (real GPS on mobile, WiFi-fused OS location on desktop — typical
-    //      accuracy ~20 m). The client sends these when it has them.
-    //   2. IP-geo via Cloudflare / Railway forward headers → ipapi.co
-    //      (typical accuracy ~25-50 km; used as fallback AND to enrich
-    //      city / timezone / country when we only have raw coords).
-    // We merge the two: when real coords are present they OVERRIDE the
-    // IP-level latitude/longitude but we keep the IP-derived city /
-    // region / country / timezone so the persona prompt still reads
-    // "Cluj-Napoca, Romania" instead of just "46.77, 23.59".
-    const ipGeoData = await ipGeo.lookup(ipGeo.clientIp(req));
-    const clientLat = Number.parseFloat(req.query.lat);
-    const clientLon = Number.parseFloat(req.query.lon);
-    const clientAcc = Number.parseFloat(req.query.acc);
-    const geo = (Number.isFinite(clientLat) && Number.isFinite(clientLon))
-      ? {
-        ...(ipGeoData || {}),
-        latitude: clientLat,
-        longitude: clientLon,
-        accuracy: Number.isFinite(clientAcc) ? clientAcc : null,
-        source: 'client-gps',
-      }
-      : ipGeoData;
-
-    const now = Date.now();
-    const newSessionExpireTime = new Date(now + 60 * 1000).toISOString();
-    const expireTime = new Date(now + 30 * 60 * 1000).toISOString();
-
-    // Build the FULL live-connect setup object. We return it to the client
-    // verbatim and let it send it as the first WS frame instead of locking
-    // it into the ephemeral token. After 3 iterations (PR #65/#66/#67) we
-    // confirmed Google rejects ephemeral-token sessions that reference ANY
-    // rich setup field (systemInstruction, tools, inputAudioTranscription,
-    // outputAudioTranscription, realtimeInputConfig, speechConfig) with
-    // close code 1007 "token-based requests cannot use project-scoped
-    // features such as tuned models". Token constraints only accept a tiny
-    // subset (model + responseModalities + temperature + sessionResumption)
-    // per the official docs:
-    //   https://ai.google.dev/gemini-api/docs/ephemeral-tokens#create-ephemeral-token
-    // Trade-off: the persona text is now visible in the client Network tab.
-    // Acceptable — the persona is a prompt, not a credential, and moving
-    // it to the client is what finally unlocks voice chat end-to-end.
-    // Vertex expects a fully-qualified model path in the setup frame:
-    //   projects/<PROJECT>/locations/<LOCATION>/publishers/google/models/<MODEL>
-    // The `LlmBidiService/BidiGenerateContent` endpoint is regional and
-    // reads the project/location from this string. AI Studio, on the
-    // other hand, accepts just `models/<MODEL>` on the v1alpha bidi
-    // endpoint.
-    let setupModelPath = 'models/' + model;
-    if (backend === 'vertex') {
-      // `vertexResolved.project` is guaranteed non-empty here — the
-      // 503 guard above returns early when no project can be derived,
-      // so we always build the fully-qualified Vertex path and never
-      // fall back to the AI Studio `models/<M>` shape (which Vertex
-      // BidiGenerateContent rejects with close code 1007).
-      setupModelPath = 'projects/' + vertexResolved.project
-        + '/locations/' + vertexResolved.location
-        + '/publishers/google/models/' + model;
-    }
-    const fullSetup = {
-      model: setupModelPath,
-      generationConfig: {
-        responseModalities: ['TEXT'],
-        // Audio playback migrated to ElevenLabs REST TTS; voiceConfig omitted.
-        speechConfig: {
-          // Pass the browser's language through so Gemini can both
-          // transcribe the input correctly and reply in the user's
-          // locale. See the note above `forcedLang` for why we stopped
-          // hard-coding en-US.
-          languageCode: forcedLang,
-        },
-        temperature: 0.6,
-      },
-      systemInstruction: {
-        parts: [{
-          text: buildKelionPersona({
-            user,
-            memoryItems,
-            voiceStyle,
-            geo,
-            priorTurns,
-            lockedLangTag: await resolveLockedLangTag({ req, user, forcedLang }),
-          })
-        }],
-      },
-      realtimeInputConfig: {
-        automaticActivityDetection: { disabled: false },
-        turnCoverage: 'TURN_INCLUDES_ALL_INPUT',
-      },
-      inputAudioTranscription: {},
-      outputAudioTranscription: {},
-      // Stage 4 — tools. functionDeclarations route tool calls back to
-      // OUR backend via the client, which executes them and returns a
-      // tool_response. The declarations themselves live in KELION_TOOLS
-      // above (single source of truth);
-      // we only render them here in the Gemini-specific shape.
-      //
-      // NOTE: `{googleSearch: {}}` was removed earlier — it's a
-      // project-scoped grounding feature that is rejected on ephemeral
-      // token sessions with close code 1007. Web search is instead handled
-      // by the `browse_web` function-declaration tool, which routes through
-      // our own server (via `/api/tools/browse_web`).
-      tools: buildKelionToolsGemini(),
-    };
-
-    // Vertex short-circuit: the browser WebSocket will connect to our
-    // same-origin proxy at `/api/realtime/vertex-live-ws`, which holds
-    // a GCP service-account access token server-side. No ephemeral
-    // token is needed; return the setup + gating info and let the
-    // client open the proxy WS directly.
-    if (backend === 'vertex') {
-      return res.json({
-        token: null,
-        expiresAt: expireTime,
-        model,
-        voice,
-        provider: 'gemini',
-        backend: 'vertex',
-        signedIn: !!user,
-        userName: user?.name || null,
-        memoryCount: memoryItems.length,
-        voiceStyle: voiceStyle.label,
-        setup: fullSetup,
-        trial,
-      });
-    }
-
-    // Ephemeral tokens live under v1alpha only — v1beta/auth_tokens returns 404.
-    // We mint the token with NO bidiGenerateContentSetup constraints so we can
-    // use the plain `BidiGenerateContent` WebSocket endpoint and ship the full
-    // setup (above) from the client. This sidesteps the 1007 "project-scoped
-    // features" rejection entirely.
-    const url = 'https://generativelanguage.googleapis.com/v1alpha/auth_tokens?key=' + encodeURIComponent(apiKey);
-    const r = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        uses: 1,
-        expireTime,
-        newSessionExpireTime,
-      }),
-    });
-
-    if (!r.ok) {
-      const err = await r.text();
-      // Log enough to diagnose without leaking the API key back to the client.
-      // Operators can grep Railway logs for "[realtime] Gemini ephemeral token error".
-      console.error(
-        '[realtime] Gemini ephemeral token error:',
-        'status=' + r.status,
-        'model=' + model,
-        'voice=' + voice,
-        'lang=' + browserLang,
-        'body=' + err.slice(0, 2000),
-      );
-      return res.status(500).json({ error: 'Failed to create Gemini live session' });
-    }
-
-    const data = await r.json();
     res.json({
-      token: data.name,
-      expiresAt: expireTime,
-      model,
+      token: null,
+      expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+      model: chatModel,
       voice,
-      provider: 'gemini',
-      backend: 'aistudio',
+      provider: 'openrouter',
+      backend: 'openrouter',
       signedIn: !!user,
       userName: user?.name || null,
       memoryCount: memoryItems.length,
       voiceStyle: voiceStyle.label,
-      setup: fullSetup,
-      // Trial info: null for signed-in / admin; object with
-      // { allowed, remainingMs, windowMs } for guests. Client uses
-      // remainingMs to render a visible countdown HUD (15:00 → 0:00)
-      // and auto-stops the session when it hits zero.
+      setup: null,
       trial,
     });
 
     // Register active session for admin live-sessions.
-    const sid = data.name || `s-${Date.now()}`;
+    const sid = `rest-${Date.now()}`;
     activeSessions.set(sid, {
       userId: user?.id || null,
       userEmail: user?.email || null,
@@ -1715,15 +1489,15 @@ const geminiTokenHandler = async (req, res) => {
     // Auto-remove after 30 min (max session duration).
     setTimeout(() => activeSessions.delete(sid), 30 * 60 * 1000).unref();
   } catch (err) {
-    console.error('[realtime] Gemini error:', err.message);
-    res.status(500).json({ error: 'Failed to create Gemini live session' });
+    console.error('[realtime] token error:', err.message);
+    res.status(500).json({ error: 'Failed to create voice session' });
   }
 };
 router.get('/gemini-token', geminiTokenHandler);
 router.post('/gemini-token', geminiTokenHandler);
 
 // ──────────────────────────────────────────────────────────────────
-// /vision — Gemini Flash camera frame description.
+// /vision — Gemma 4 camera frame description.
 // The client captures JPEG frames and POSTs them here. Gemini describes
 // the scene in 1-2 sentences, and the client injects that description
 // back into the realtime session as context.
@@ -1780,7 +1554,7 @@ router.post('/vision', visionLimiter, async (req, res) => {
         'X-Title': 'Kelion AI Vision'
       },
       body: JSON.stringify({
-        model: 'anthropic/claude-3.5-sonnet',
+        model: 'google/gemma-4-31b-it',
         messages: [
           {
             role: 'user',
@@ -1847,9 +1621,9 @@ router.post('/vision', visionLimiter, async (req, res) => {
 });
 
 // ──────────────────────────────────────────────────────────────────
-// /pipeline — Gemini Flash text-chat pipeline (tools supported).
+// /pipeline — Gemma 4 text-chat pipeline (tools supported).
 // For typed messages: text → Gemini chat → tool loop → text back.
-// Voice goes directly through Gemini Live WebSocket — not this route.
+// Voice goes directly through Gemma 4 REST Voice Mode — not this route.
 // ──────────────────────────────────────────────────────────────────
 router.post('/pipeline', async (req, res) => {
   const { history, textOverride, visionContext } = req.body || {};
@@ -1903,7 +1677,7 @@ router.post('/pipeline', async (req, res) => {
     const openRouterTools = buildKelionToolsChatCompletions();
 
     const openRouterKey = process.env.OPENROUTER_API_KEY || apiKey; // Fallback to process.env if needed, but we will add OPENROUTER_API_KEY to .env
-    const chatModel = process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.3-70b-instruct:free';
+    const chatModel = process.env.OPENROUTER_MODEL || 'google/gemma-4-31b-it';
     const url = 'https://openrouter.ai/api/v1/chat/completions';
 
     const body = {
@@ -1934,7 +1708,7 @@ router.post('/pipeline', async (req, res) => {
       if (!r.ok && r.status === 402 && !fallbackTriggered) {
         console.warn('[pipeline] OpenRouter 402 Payment Required. Falling back to free model.');
         fallbackTriggered = true;
-        currentModel = 'meta-llama/llama-3.3-70b-instruct:free';
+        currentModel = 'google/gemma-4-31b-it';
         reqBody.model = currentModel;
         
         // Retry with free model
@@ -2013,10 +1787,10 @@ router.post('/pipeline', async (req, res) => {
 
     // Extract final text
     const finalMessage = result.choices?.[0]?.message;
-    // For DeepSeek Reasoner, the thinking process might be in finalMessage.reasoning_content, we only return content
+    // Extract final text — only return .content (ignore any reasoning_content from CoT models)
     let assistantText = (finalMessage?.content || '').trim();
     if (fallbackTriggered) {
-      assistantText = "[SISTEM: Contul OpenRouter a rămas fără credit! Am trecut automat pe modelul gratuit Llama.]\n" + assistantText;
+      assistantText = "[SISTEM: Contul OpenRouter a rămas fără credit! Am trecut automat pe modelul de rezervă Gemma 4.]\n" + assistantText;
     }
     console.log('[pipeline] OpenRouter:', assistantText.slice(0, 100));
 
