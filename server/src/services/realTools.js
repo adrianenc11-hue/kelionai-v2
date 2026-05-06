@@ -45,20 +45,20 @@ mathRestricted.import(
     // Wipe the dangerous constructors + anything that builds arbitrary
     // sized collections. If a user really needs matrices they can use the
     // UI once we add a dedicated tool for it — not free-form math.
-    ones:       () => { throw new Error('matrix constructors disabled'); },
-    zeros:      () => { throw new Error('matrix constructors disabled'); },
-    identity:   () => { throw new Error('matrix constructors disabled'); },
-    diag:       () => { throw new Error('matrix constructors disabled'); },
-    range:      () => { throw new Error('range is disabled'); },
-    concat:     () => { throw new Error('concat is disabled'); },
-    flatten:    () => { throw new Error('flatten is disabled'); },
-    resize:     () => { throw new Error('resize is disabled'); },
-    reshape:    () => { throw new Error('reshape is disabled'); },
-    matrix:     () => { throw new Error('matrix is disabled'); },
+    ones: () => { throw new Error('matrix constructors disabled'); },
+    zeros: () => { throw new Error('matrix constructors disabled'); },
+    identity: () => { throw new Error('matrix constructors disabled'); },
+    diag: () => { throw new Error('matrix constructors disabled'); },
+    range: () => { throw new Error('range is disabled'); },
+    concat: () => { throw new Error('concat is disabled'); },
+    flatten: () => { throw new Error('flatten is disabled'); },
+    resize: () => { throw new Error('resize is disabled'); },
+    reshape: () => { throw new Error('reshape is disabled'); },
+    matrix: () => { throw new Error('matrix is disabled'); },
     // Factorial / gamma — capped to prevent OOM (e.g. `1e9!`), but
     // still functional for university-level math (combinatorics,
     // probability, statistics).
-    factorial:  (n) => {
+    factorial: (n) => {
       const x = Number(n);
       if (!Number.isFinite(x) || x < 0 || x > 170) {
         throw new Error('factorial out of range (0..170)');
@@ -70,7 +70,7 @@ mathRestricted.import(
     // gamma(n) is essential for university-level statistics, probability,
     // and integral calculus. We delegate to mathjs's internal gamma but
     // cap the input to prevent memory abuse.
-    gamma:      (n) => {
+    gamma: (n) => {
       const x = Number(n);
       if (!Number.isFinite(x) || Math.abs(x) > 170) {
         throw new Error('gamma out of range (|n| ≤ 170)');
@@ -117,10 +117,10 @@ async function getFetch() {
 
 async function fetchWithTimeout(url, opts = {}, timeoutMs = 8000, retries = 2) {
   const fetchImpl = await getFetch();
-  
+
   let lastErr;
   let lastStatus;
-  
+
   for (let attempt = 0; attempt <= retries; attempt++) {
     const ctrl = typeof AbortController === 'function' ? new AbortController() : null;
     const timer = ctrl ? setTimeout(() => ctrl.abort(), timeoutMs) : null;
@@ -143,7 +143,7 @@ async function fetchWithTimeout(url, opts = {}, timeoutMs = 8000, retries = 2) {
       if (timer) clearTimeout(timer);
     }
   }
-  
+
   if (lastErr) throw lastErr;
   throw new Error(`Request failed after retries with status ${lastStatus}`);
 }
@@ -275,11 +275,11 @@ async function geocodeCity(city) {
   const hit = data && Array.isArray(data.results) && data.results[0];
   if (!hit) throw new Error(`could not find location "${city}"`);
   return {
-    latitude:  hit.latitude,
+    latitude: hit.latitude,
     longitude: hit.longitude,
-    name:      hit.name,
-    country:   hit.country || null,
-    timezone:  hit.timezone || null,
+    name: hit.name,
+    country: hit.country || null,
+    timezone: hit.timezone || null,
   };
 }
 
@@ -311,9 +311,9 @@ async function toolGetWeather({ city, lat, lon, days, _maxDays }) {
       ok: true,
       location: place ? { name: place.name, country: place.country, latitude, longitude } : { latitude, longitude },
       current: data.current || null,
-      daily:   data.daily  || null,
-      units:   { ...(data.current_units || {}), ...(data.daily_units || {}) },
-      source:  'open-meteo.com',
+      daily: data.daily || null,
+      units: { ...(data.current_units || {}), ...(data.daily_units || {}) },
+      source: 'open-meteo.com',
     };
   } catch (err) {
     return { ok: false, error: err && err.message ? err.message : String(err) };
@@ -386,9 +386,9 @@ async function toolPlayRadio({ query, country, language, tag, limit }) {
       order: 'clickcount',     // popularity-weighted, biases to live
       reverse: 'true',
     });
-    if (country)  params.set('country',  String(country).slice(0, 60));
+    if (country) params.set('country', String(country).slice(0, 60));
     if (language) params.set('language', String(language).slice(0, 60));
-    if (tag)      params.set('tag',      String(tag).slice(0, 40));
+    if (tag) params.set('tag', String(tag).slice(0, 40));
     url = `${host}/json/stations/search?${params.toString()}`;
   } else {
     const params = new URLSearchParams({
@@ -397,9 +397,9 @@ async function toolPlayRadio({ query, country, language, tag, limit }) {
       reverse: 'true',
       limit: String(n * 4),
     });
-    if (country)  params.set('country',  String(country).slice(0, 60));
+    if (country) params.set('country', String(country).slice(0, 60));
     if (language) params.set('language', String(language).slice(0, 60));
-    if (tag)      params.set('tag',      String(tag).slice(0, 40));
+    if (tag) params.set('tag', String(tag).slice(0, 40));
     url = `${host}/json/stations/search?${params.toString()}`;
   }
   try {
@@ -409,20 +409,20 @@ async function toolPlayRadio({ query, country, language, tag, limit }) {
     if (!r.ok) return { ok: false, error: `radio-browser ${r.status}` };
     const arr = await r.json();
     if (!Array.isArray(arr) || arr.length === 0) {
-      return { ok: false, error: `no station found for "${q || (country||language||tag)}"` };
+      return { ok: false, error: `no station found for "${q || (country || language || tag)}"` };
     }
     // Filter to entries that have a working stream URL.
     const playable = arr
       .map((s) => ({
-        name:    (s.name || '').toString().trim(),
-        url:     (s.url_resolved || s.url || '').toString().trim(),
+        name: (s.name || '').toString().trim(),
+        url: (s.url_resolved || s.url || '').toString().trim(),
         country: (s.country || '').toString(),
-        language:(s.language || '').toString(),
-        codec:   (s.codec || '').toString().toLowerCase(),
+        language: (s.language || '').toString(),
+        codec: (s.codec || '').toString().toLowerCase(),
         bitrate: Number(s.bitrate) || null,
-        homepage:(s.homepage || '').toString(),
+        homepage: (s.homepage || '').toString(),
         favicon: (s.favicon || '').toString(),
-        tags:    (s.tags || '').toString(),
+        tags: (s.tags || '').toString(),
       }))
       .filter((s) => /^https?:\/\//i.test(s.url) && s.name)
       // Drop video-only or DRM-locked codecs the browser can't play
@@ -509,9 +509,9 @@ async function toolWebSearch({ query, limit }) {
   if (serperKey) {
     try {
       const r = await fetchWithTimeout('https://google.serper.dev/search', {
-        method:  'POST',
+        method: 'POST',
         headers: { 'X-API-KEY': serperKey, 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ q, num: n }),
+        body: JSON.stringify({ q, num: n }),
       });
       if (r.ok) {
         const data = await r.json();
@@ -1984,15 +1984,15 @@ function parseMrz(lines) {
     const cleanName = (s) => s.replace(/</g, ' ').replace(/\s+/g, ' ').trim();
     return {
       format: 'TD3',
-      documentType:   l1.slice(0, 2).replace(/</g, ''),
+      documentType: l1.slice(0, 2).replace(/</g, ''),
       issuingCountry: l1.slice(2, 5).replace(/</g, ''),
-      surname:        cleanName(surnameRaw),
-      givenNames:     cleanName(givenRaw),
+      surname: cleanName(surnameRaw),
+      givenNames: cleanName(givenRaw),
       passportNumber: l2.slice(0, 9).replace(/</g, ''),
-      nationality:    l2.slice(10, 13).replace(/</g, ''),
-      dateOfBirth:    mrzDate(l2.slice(13, 19)),
-      sex:            l2[20] === '<' ? null : l2[20],
-      dateOfExpiry:   mrzDate(l2.slice(21, 27), true),
+      nationality: l2.slice(10, 13).replace(/</g, ''),
+      dateOfBirth: mrzDate(l2.slice(13, 19)),
+      sex: l2[20] === '<' ? null : l2[20],
+      dateOfExpiry: mrzDate(l2.slice(21, 27), true),
     };
   }
   return { format: 'unknown', lines };
@@ -2186,8 +2186,8 @@ async function toolGetMyLocation(args, ctx) {
       const rg = await toolReverseGeocode({ lat, lon });
       if (rg && rg.ok) {
         result.displayName = rg.displayName || rg.display_name || null;
-        result.city        = rg.city || rg.address?.city || rg.address?.town || rg.address?.village || null;
-        result.country     = rg.country || rg.address?.country || null;
+        result.city = rg.city || rg.address?.city || rg.address?.town || rg.address?.village || null;
+        result.country = rg.country || rg.address?.country || null;
       }
     } catch { /* keep numeric answer */ }
   }
@@ -2237,10 +2237,10 @@ async function toolGetMyUsage(args, ctx) {
     const filtered = kindFilter
       ? rows.filter((r) => kindFilter === 'topup' ? r.kind === 'topup' : Number(r.delta_minutes) < 0)
       : rows;
-    const topups   = filtered.filter((r) => r.kind === 'topup');
+    const topups = filtered.filter((r) => r.kind === 'topup');
     const consumed = filtered.filter((r) => Number(r.delta_minutes) < 0);
     const minutesConsumed = consumed.reduce((s, r) => s + Math.abs(Number(r.delta_minutes) || 0), 0);
-    const minutesTopped   = topups.reduce((s, r) => s + Math.max(0, Number(r.delta_minutes) || 0), 0);
+    const minutesTopped = topups.reduce((s, r) => s + Math.max(0, Number(r.delta_minutes) || 0), 0);
     return {
       ok: true,
       minutesConsumed,
@@ -2361,7 +2361,7 @@ function e164ish(s) {
 }
 
 async function toolSendSms(args) {
-  const sid   = process.env.TWILIO_ACCOUNT_SID;
+  const sid = process.env.TWILIO_ACCOUNT_SID;
   const token = process.env.TWILIO_AUTH_TOKEN;
   const fromRaw = (args?.from || process.env.TWILIO_FROM || '').toString().trim();
   if (!sid || !token) {
@@ -2462,7 +2462,7 @@ function toolCreateCalendarIcs(args) {
   if (!title) return { ok: false, error: 'missing title' };
   if (title.length > 200) return { ok: false, error: 'title too long (max 200 chars)' };
   const startRaw = String(args?.start || '').trim();
-  const endRaw   = String(args?.end   || '').trim();
+  const endRaw = String(args?.end || '').trim();
   const dtStart = icsFmtDate(startRaw);
   if (!dtStart) return { ok: false, error: 'invalid `start` (expected ISO 8601)' };
   let dtEnd = icsFmtDate(endRaw);
@@ -2472,8 +2472,8 @@ function toolCreateCalendarIcs(args) {
   }
   if (!dtEnd) return { ok: false, error: 'invalid `end` (expected ISO 8601)' };
   const description = String(args?.description || '').slice(0, 2000);
-  const location    = String(args?.location    || '').slice(0, 200);
-  const attendees   = Array.isArray(args?.attendees) ? args.attendees.slice(0, 50) : [];
+  const location = String(args?.location || '').slice(0, 200);
+  const attendees = Array.isArray(args?.attendees) ? args.attendees.slice(0, 50) : [];
   const validAttendees = [];
   for (const a of attendees) {
     const email = String(a && a.email != null ? a.email : a).trim();
@@ -2496,7 +2496,7 @@ function toolCreateCalendarIcs(args) {
     `SUMMARY:${icsEscape(title)}`,
   ];
   if (description) lines.push(`DESCRIPTION:${icsEscape(description)}`);
-  if (location)    lines.push(`LOCATION:${icsEscape(location)}`);
+  if (location) lines.push(`LOCATION:${icsEscape(location)}`);
   for (const at of validAttendees) {
     // RFC 5545 §3.2: parameter values containing CONTROL / ":" / ";" / "," must be
     // wrapped in DQUOTEs; DQUOTE itself cannot appear inside a parameter value, so
@@ -2560,8 +2560,8 @@ async function toolZapierTrigger(args) {
       ok: true,
       status: r.status,
       zapierStatus: parsed ? (parsed.status || null) : null,
-      zapierId:     parsed ? (parsed.id || parsed.request_id || null) : null,
-      response:     parsed || (txt ? txt.slice(0, 500) : null),
+      zapierId: parsed ? (parsed.id || parsed.request_id || null) : null,
+      response: parsed || (txt ? txt.slice(0, 500) : null),
     };
   } catch (err) {
     return { ok: false, error: err && err.message ? err.message : String(err) };
@@ -2591,12 +2591,12 @@ async function toolListGithubRepoFiles(args) {
     if (!r.ok) return { ok: false, status: r.status, error: `GitHub HTTP ${r.status}` };
     const j = await r.json();
     if (!j.tree) return { ok: false, error: 'no tree found' };
-    
+
     // Filter out huge node_modules or .git paths, return only files
     const files = j.tree
       .filter(t => t.type === 'blob' && !t.path.includes('node_modules/') && !t.path.includes('.git/'))
       .map(t => t.path);
-      
+
     return { ok: true, repo: slug, branch: j.sha, fileCount: files.length, files: files.slice(0, 1000) }; // cap at 1000 to avoid giant responses
   } catch (err) {
     return { ok: false, error: err && err.message ? err.message : String(err) };
@@ -2611,7 +2611,7 @@ async function toolReadGithubFile(args) {
   const path = String(args?.path || '').trim();
   if (!path) return { ok: false, error: 'missing file path' };
   const branch = args?.branch ? String(args.branch) : 'HEAD';
-  
+
   const headers = { Accept: 'application/vnd.github.v3.raw', 'User-Agent': 'kelion-ai-tools' };
   if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
   try {
@@ -2648,23 +2648,23 @@ async function toolGithubRepoInfo(args) {
     const j = await r.json();
     return {
       ok: true,
-      fullName:   j.full_name,
+      fullName: j.full_name,
       description: j.description || null,
-      homepage:   j.homepage || null,
-      url:        j.html_url,
-      stars:      j.stargazers_count,
-      forks:      j.forks_count,
-      watchers:   j.subscribers_count,
+      homepage: j.homepage || null,
+      url: j.html_url,
+      stars: j.stargazers_count,
+      forks: j.forks_count,
+      watchers: j.subscribers_count,
       openIssues: j.open_issues_count,
-      language:   j.language || null,
-      license:    j.license ? (j.license.spdx_id || j.license.name || null) : null,
-      topics:     Array.isArray(j.topics) ? j.topics.slice(0, 20) : [],
-      archived:   !!j.archived,
-      fork:       !!j.fork,
+      language: j.language || null,
+      license: j.license ? (j.license.spdx_id || j.license.name || null) : null,
+      topics: Array.isArray(j.topics) ? j.topics.slice(0, 20) : [],
+      archived: !!j.archived,
+      fork: !!j.fork,
       defaultBranch: j.default_branch,
-      createdAt:  j.created_at,
-      pushedAt:   j.pushed_at,
-      updatedAt:  j.updated_at,
+      createdAt: j.created_at,
+      pushedAt: j.pushed_at,
+      updatedAt: j.updated_at,
     };
   } catch (err) {
     return { ok: false, error: err && err.message ? err.message : String(err) };
@@ -2677,10 +2677,10 @@ async function toolGetGithubIssues(args) {
   slug = slug.replace(/^https?:\/\/github\.com\//i, '').replace(/\.git$/i, '').replace(/\/$/, '');
   if (!validSlugRepo(slug)) return { ok: false, error: 'invalid repo slug (expected owner/name)' };
   const state = ['open', 'closed', 'all'].includes(args?.state) ? args.state : 'open';
-  
+
   const headers = { Accept: 'application/vnd.github+json', 'User-Agent': 'kelion-ai-tools' };
   if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
-  
+
   try {
     const url = `https://api.github.com/repos/${slug}/issues?state=${state}&sort=updated&direction=desc&per_page=10`;
     const r = await fetchWithTimeout(url, { headers });
@@ -2688,7 +2688,7 @@ async function toolGetGithubIssues(args) {
     if (!r.ok) return { ok: false, status: r.status, error: `GitHub HTTP ${r.status}` };
     const j = await r.json();
     if (!Array.isArray(j)) return { ok: false, error: 'unexpected GitHub response' };
-    
+
     return {
       ok: true,
       repo: slug,
@@ -2748,13 +2748,13 @@ async function toolNpmPackageInfo(args) {
       name: j.name,
       latest,
       description: (pkg && pkg.description) || j.description || null,
-      homepage:    (pkg && pkg.homepage) || null,
-      license:     (pkg && pkg.license) || j.license || null,
-      repository:  pkg && pkg.repository ? (pkg.repository.url || pkg.repository) : null,
-      keywords:    Array.isArray(pkg && pkg.keywords) ? pkg.keywords.slice(0, 20) : [],
+      homepage: (pkg && pkg.homepage) || null,
+      license: (pkg && pkg.license) || j.license || null,
+      repository: pkg && pkg.repository ? (pkg.repository.url || pkg.repository) : null,
+      keywords: Array.isArray(pkg && pkg.keywords) ? pkg.keywords.slice(0, 20) : [],
       weeklyDownloads: weekly,
-      modified:    j.time && j.time.modified ? j.time.modified : null,
-      versions:    Array.isArray(Object.keys(j.versions || {}))
+      modified: j.time && j.time.modified ? j.time.modified : null,
+      versions: Array.isArray(Object.keys(j.versions || {}))
         ? Object.keys(j.versions || {}).slice(-10)
         : [],
     };
@@ -2786,13 +2786,13 @@ async function toolPypiPackageInfo(args) {
       description: typeof info.description === 'string'
         ? (info.description.length > 2000 ? info.description.slice(0, 2000) + '…' : info.description)
         : null,
-      homepage:   info.home_page || (info.project_urls && info.project_urls.Homepage) || null,
-      author:     info.author || null,
+      homepage: info.home_page || (info.project_urls && info.project_urls.Homepage) || null,
+      author: info.author || null,
       authorEmail: info.author_email || null,
-      license:    info.license || null,
+      license: info.license || null,
       requiresPython: info.requires_python || null,
-      yanked:     !!(info.yanked),
-      releases:   Array.isArray(Object.keys(j.releases || {}))
+      yanked: !!(info.yanked),
+      releases: Array.isArray(Object.keys(j.releases || {}))
         ? Object.keys(j.releases || {}).slice(-10)
         : [],
       projectUrls: info.project_urls || null,
@@ -2825,12 +2825,12 @@ async function toolRunTerminalCommand(args) {
   try {
     const cmd = String(args?.command || '').trim();
     if (!cmd) return { ok: false, error: 'No command provided' };
-    
+
     // Safety check: block extremely dangerous commands
     if (cmd.includes('rm -rf /') || cmd.includes('mkfs')) {
       return { ok: false, error: 'Command blocked for security reasons.' };
     }
-    
+
     let targetCwd = REPO_ROOT;
     if (args?.cwd) {
       targetCwd = _path.resolve(REPO_ROOT, args.cwd);
@@ -2850,12 +2850,12 @@ async function toolAskExpertCoder(args) {
   const question = String(args?.question || '');
   const context = String(args?.context || '');
   if (!question) return { ok: false, error: 'Question is required' };
-  
+
   const OR_KEY = process.env.OPENROUTER_API_KEY;
   if (!OR_KEY) return { ok: false, error: 'OPENROUTER_API_KEY is not set' };
 
   const prompt = `You are an expert coder. Answer the question precisely.\n\nContext:\n${context}\n\nQuestion:\n${question}`;
-  
+
   // Fallback chain: try preferred model first, then alternatives
   const MODELS = [
     args?.model || 'google/gemma-4-31b-it',
@@ -2865,7 +2865,7 @@ async function toolAskExpertCoder(args) {
   // Deduplicate in case args.model matches one of the fallbacks
   const uniqueModels = [...new Set(MODELS)];
   const errors = [];
-  
+
   for (const model of uniqueModels) {
     try {
       const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -2879,12 +2879,12 @@ async function toolAskExpertCoder(args) {
           messages: [{ role: 'user', content: prompt }]
         })
       });
-      
+
       if (!res.ok) {
         errors.push(`${model}: HTTP ${res.status}`);
         continue;
       }
-      
+
       const data = await res.json();
       if (data.error) {
         errors.push(`${model}: ${data.error.message}`);
@@ -2902,7 +2902,7 @@ async function toolFetchDocumentation(args) {
   try {
     const url = String(args?.url || '');
     if (!url || !url.startsWith('http')) return { ok: false, error: 'Valid URL is required' };
-    
+
     const res = await fetch(`https://r.jina.ai/${url}`);
     const text = await res.text();
     return { ok: true, content: text.slice(0, 15000) };
@@ -2938,7 +2938,7 @@ async function toolListLocalFiles(args) {
     const resolvedPath = _path.resolve(REPO_ROOT, dir);
     if (!isPathSafe(resolvedPath)) return { ok: false, error: 'access denied: path points to a restricted OS directory' };
     if (!_fs.existsSync(resolvedPath)) return { ok: false, error: 'directory not found' };
-    
+
     const entries = _fs.readdirSync(resolvedPath, { withFileTypes: true });
     const files = entries.map(e => {
       const full = _path.join(resolvedPath, e.name);
@@ -2965,21 +2965,21 @@ async function toolReadLocalFile(args) {
     const resolvedPath = _path.resolve(REPO_ROOT, filePath);
     if (!isPathSafe(resolvedPath)) return { ok: false, error: 'access denied: path points to a restricted OS directory' };
     if (!_fs.existsSync(resolvedPath)) return { ok: false, error: 'file not found' };
-    
+
     const raw = _fs.readFileSync(resolvedPath, 'utf8');
     const allLines = raw.split('\n');
     const totalLines = allLines.length;
-    
+
     // Support line-range reading for large files
     const startLine = Math.max(1, parseInt(args?.start_line, 10) || 1);
     const endLine = Math.min(totalLines, parseInt(args?.end_line, 10) || totalLines);
     const sliced = allLines.slice(startLine - 1, endLine);
-    
+
     // Add line numbers for precision editing
     const numbered = sliced.map((line, i) => `${startLine + i}: ${line}`).join('\n');
     const cap = 50000;
     const content = numbered.length > cap ? numbered.slice(0, cap) + '\n...[truncated]' : numbered;
-    
+
     return { ok: true, path: filePath, totalLines, showing: `${startLine}-${endLine}`, content };
   } catch (err) {
     return { ok: false, error: err.message };
@@ -2993,10 +2993,10 @@ async function toolEditLocalFile(args) {
     if (!filePath) return { ok: false, error: 'missing file path' };
     const resolvedPath = _path.resolve(REPO_ROOT, filePath);
     if (!isPathSafe(resolvedPath)) return { ok: false, error: 'access denied: path points to a restricted OS directory' };
-    
+
     const dir = _path.dirname(resolvedPath);
     if (!_fs.existsSync(dir)) _fs.mkdirSync(dir, { recursive: true });
-    
+
     _fs.writeFileSync(resolvedPath, content, 'utf8');
     return { ok: true, path: filePath };
   } catch (err) {
@@ -3026,21 +3026,21 @@ async function toolReplaceInFile(args) {
     const filePath = String(args?.path || '').trim();
     const targetText = String(args?.target_text || '');
     const replacementText = String(args?.replacement_text || '');
-    
+
     if (!filePath || !targetText) return { ok: false, error: 'path and target_text are required' };
     const resolvedPath = _path.resolve(REPO_ROOT, filePath);
     if (!isPathSafe(resolvedPath)) return { ok: false, error: 'access denied: restricted directory' };
     if (!_fs.existsSync(resolvedPath)) return { ok: false, error: 'File does not exist' };
-    
+
     const content = _fs.readFileSync(resolvedPath, 'utf8');
     if (!content.includes(targetText)) {
       return { ok: false, error: 'Target text not found in the file. It must match exactly.' };
     }
-    
+
     // Strict replacement of the first occurrence (or all, but usually targeted)
     const newContent = content.replace(targetText, replacementText);
     _fs.writeFileSync(resolvedPath, newContent, 'utf8');
-    
+
     return { ok: true, path: filePath, status: 'Replaced successfully' };
   } catch (err) {
     return { ok: false, error: err.message };
@@ -3052,22 +3052,22 @@ async function toolCreateGithubPr(args) {
     const title = String(args?.title || 'Automated Kelion PR');
     const branch = String(args?.branch || 'feat/kelion-auto-' + Date.now());
     const message = String(args?.message || 'feat: automated updates');
-    
+
     let gitStatus = '';
     try {
       const st = await _exec('git status --porcelain', { cwd: REPO_ROOT });
       gitStatus = st.stdout;
-    } catch(e) { }
-    
+    } catch (e) { }
+
     if (!gitStatus.trim()) {
       return { ok: false, error: 'No changes to commit' };
     }
-    
+
     await _exec(`git checkout -b ${branch}`, { cwd: REPO_ROOT });
     await _exec(`git add .`, { cwd: REPO_ROOT });
     await _exec(`git commit -m "${message.replace(/"/g, '\\"')}"`, { cwd: REPO_ROOT });
     await _exec(`git push -u origin ${branch}`, { cwd: REPO_ROOT });
-    
+
     try {
       const { stdout: prUrl } = await _exec(`gh pr create --title "${title.replace(/"/g, '\\"')}" --body "Automated PR from Kelion."`, { cwd: REPO_ROOT });
       return { ok: true, url: prUrl.trim() };
@@ -3083,7 +3083,7 @@ async function toolManageGithubPrs(args) {
   try {
     const action = args?.action;
     const prNumber = args?.pr_number;
-    
+
     if (action === 'list') {
       const { stdout } = await _exec('gh pr list --state open --json number,title,url', { cwd: REPO_ROOT });
       return { ok: true, prs: JSON.parse(stdout || '[]') };
@@ -3256,69 +3256,69 @@ async function executeRealTool(name, args, ctx) {
   }
   switch (name) {
     // ── math / offline ──
-    case 'calculate':         return toolCalculate(a);
-    case 'unit_convert':      return toolUnitConvert(a);
-    case 'get_moon_phase':    return toolGetMoonPhase(a);
+    case 'calculate': return toolCalculate(a);
+    case 'unit_convert': return toolUnitConvert(a);
+    case 'get_moon_phase': return toolGetMoonPhase(a);
     // ── radio / streaming ──
-    case 'play_radio':        return toolPlayRadio(a);
+    case 'play_radio': return toolPlayRadio(a);
     // ── weather / feeds ──
-    case 'get_weather':       return toolGetWeather(a);
-    case 'get_forecast':      return toolGetForecast(a);
-    case 'get_air_quality':   return toolGetAirQuality(a);
-    case 'get_news':          return toolGetNews(a);
-    case 'get_crypto_price':  return toolGetCryptoPrice(a);
-    case 'get_stock_price':   return toolGetStockPrice(a);
-    case 'get_forex':         return toolGetForex(a);
-    case 'currency_convert':  return toolCurrencyConvert(a);
-    case 'get_earthquakes':   return toolGetEarthquakes(a);
-    case 'get_sun_times':     return toolGetSunTimes(a);
+    case 'get_weather': return toolGetWeather(a);
+    case 'get_forecast': return toolGetForecast(a);
+    case 'get_air_quality': return toolGetAirQuality(a);
+    case 'get_news': return toolGetNews(a);
+    case 'get_crypto_price': return toolGetCryptoPrice(a);
+    case 'get_stock_price': return toolGetStockPrice(a);
+    case 'get_forex': return toolGetForex(a);
+    case 'currency_convert': return toolCurrencyConvert(a);
+    case 'get_earthquakes': return toolGetEarthquakes(a);
+    case 'get_sun_times': return toolGetSunTimes(a);
     // ── geo ──
-    case 'geocode':           return toolGeocode(a);
-    case 'reverse_geocode':   return toolReverseGeocode(a);
-    case 'get_route':         return toolGetRoute(a);
-    case 'nearby_places':     return toolNearbyPlaces(a);
-    case 'get_elevation':     return toolGetElevation(a);
-    case 'get_timezone':      return toolGetTimezone(a);
+    case 'geocode': return toolGeocode(a);
+    case 'reverse_geocode': return toolReverseGeocode(a);
+    case 'get_route': return toolGetRoute(a);
+    case 'nearby_places': return toolNearbyPlaces(a);
+    case 'get_elevation': return toolGetElevation(a);
+    case 'get_timezone': return toolGetTimezone(a);
     // ── web / search ──
-    case 'web_search':        return toolWebSearch(a);
-    case 'search_academic':   return toolSearchAcademic(a);
-    case 'search_github':     return toolSearchGithub(a);
+    case 'web_search': return toolWebSearch(a);
+    case 'search_academic': return toolSearchAcademic(a);
+    case 'search_github': return toolSearchGithub(a);
     case 'search_stackoverflow': return toolSearchStackoverflow(a);
-    case 'fetch_url':         return toolFetchUrl(a);
-    case 'rss_read':          return toolRssRead(a);
+    case 'fetch_url': return toolFetchUrl(a);
+    case 'rss_read': return toolRssRead(a);
     // ── knowledge ──
-    case 'wikipedia_search':  return toolWikipediaSearch(a);
-    case 'dictionary':        return toolDictionary(a);
+    case 'wikipedia_search': return toolWikipediaSearch(a);
+    case 'dictionary': return toolDictionary(a);
     // ── translation ──
-    case 'translate':         return toolTranslate(a);
+    case 'translate': return toolTranslate(a);
 
     // ── PR B — documents + OCR ──
-    case 'read_pdf':          return toolReadPdf(a);
-    case 'read_docx':         return toolReadDocx(a);
-    case 'ocr_image':         return toolOcrImage(a);
-    case 'ocr_passport':      return toolOcrPassport(a);
+    case 'read_pdf': return toolReadPdf(a);
+    case 'read_docx': return toolReadDocx(a);
+    case 'ocr_image': return toolOcrImage(a);
+    case 'ocr_passport': return toolOcrPassport(a);
     // ── PR D — communications + automations + package info ──
-    case 'send_email':            return toolSendEmail(a);
-    case 'send_sms':              return toolSendSms(a);
-    case 'create_calendar_ics':   return toolCreateCalendarIcs(a);
-    case 'zapier_trigger':        return toolZapierTrigger(a);
-    case 'github_repo_info':      return toolGithubRepoInfo(a);
+    case 'send_email': return toolSendEmail(a);
+    case 'send_sms': return toolSendSms(a);
+    case 'create_calendar_ics': return toolCreateCalendarIcs(a);
+    case 'zapier_trigger': return toolZapierTrigger(a);
+    case 'github_repo_info': return toolGithubRepoInfo(a);
     case 'list_github_repo_files': return toolListGithubRepoFiles(a);
-    case 'read_github_file':      return toolReadGithubFile(a);
-    case 'npm_package_info':      return toolNpmPackageInfo(a);
-    case 'pypi_package_info':     return toolPypiPackageInfo(a);
+    case 'read_github_file': return toolReadGithubFile(a);
+    case 'npm_package_info': return toolNpmPackageInfo(a);
+    case 'pypi_package_info': return toolPypiPackageInfo(a);
     // ── Local File tools ──
-    case 'read_local_file':   return toolReadLocalFile(a);
-    case 'list_local_files':  return toolListLocalFiles(a);
-    case 'edit_local_file':   return toolEditLocalFile(a);
-    case 'search_codebase':   return toolSearchCodebase(a);
-    case 'replace_in_file':   return toolReplaceInFile(a);
-    case 'create_github_pr':  return toolCreateGithubPr(a);
+    case 'read_local_file': return toolReadLocalFile(a);
+    case 'list_local_files': return toolListLocalFiles(a);
+    case 'edit_local_file': return toolEditLocalFile(a);
+    case 'search_codebase': return toolSearchCodebase(a);
+    case 'replace_in_file': return toolReplaceInFile(a);
+    case 'create_github_pr': return toolCreateGithubPr(a);
     case 'manage_github_prs': return toolManageGithubPrs(a);
     // ── God Mode aliases (declared in KELION_TOOLS, route to existing impls) ──
-    case 'run_command':              return toolRunTerminalCommand(a);
-    case 'write_to_file':            return toolEditLocalFile(a);
-    case 'replace_file_content':     return toolReplaceInFile(a);
+    case 'run_command': return toolRunTerminalCommand(a);
+    case 'write_to_file': return toolEditLocalFile(a);
+    case 'replace_file_content': return toolReplaceInFile(a);
     case 'multi_replace_file_content': {
       // Accepts { path, replacements: '[{target_content,replacement_content},...]' }
       try {
@@ -3344,18 +3344,18 @@ async function executeRealTool(name, args, ctx) {
     }
     // ── Agentic Expert Tools ──
     case 'run_terminal_command': return toolRunTerminalCommand(a);
-    case 'ask_expert_coder':     return toolAskExpertCoder(a);
-    case 'fetch_documentation':  return toolFetchDocumentation(a);
-    case 'browse_web':           return toolBrowseWeb(a);
+    case 'ask_expert_coder': return toolAskExpertCoder(a);
+    case 'fetch_documentation': return toolFetchDocumentation(a);
+    case 'browse_web': return toolBrowseWeb(a);
     // ── PR C — sandbox + regex + user-intern ──
-    case 'run_regex':         return toolRunRegex(a);
-    case 'run_code':          return toolRunCode(a);
-    case 'get_my_location':   return toolGetMyLocation(a, ctx);
-    case 'get_my_credits':    return toolGetMyCredits(a, ctx);
-    case 'get_my_usage':      return toolGetMyUsage(a, ctx);
-    case 'get_my_profile':    return toolGetMyProfile(a, ctx);
+    case 'run_regex': return toolRunRegex(a);
+    case 'run_code': return toolRunCode(a);
+    case 'get_my_location': return toolGetMyLocation(a, ctx);
+    case 'get_my_credits': return toolGetMyCredits(a, ctx);
+    case 'get_my_usage': return toolGetMyUsage(a, ctx);
+    case 'get_my_profile': return toolGetMyProfile(a, ctx);
     // ── F11 — image generation (gpt-image-1) ──
-    case 'generate_image':    return toolGenerateImage(a);
+    case 'generate_image': return toolGenerateImage(a);
     // ── PR 8/N — Memory of Actions (read-only self-reflection) ──
     case 'get_action_history': return toolGetActionHistory(a, ctx);
     // ── Silent vision auto-learn — write durable observations ──
@@ -3363,41 +3363,41 @@ async function executeRealTool(name, args, ctx) {
     // ── Explicit memory from text chat — user says "my name is X" etc. ──
     case 'remember_fact': return toolRememberFact(a, ctx);
     // ── MCP — Google Calendar / Gmail / Drive (per-user OAuth) ──
-    case 'read_calendar':     return toolReadCalendar(a, ctx);
-    case 'read_email':        return toolReadEmail(a, ctx);
-    case 'search_files':      return toolSearchFiles(a, ctx);
+    case 'read_calendar': return toolReadCalendar(a, ctx);
+    case 'read_email': return toolReadEmail(a, ctx);
+    case 'search_files': return toolSearchFiles(a, ctx);
     // ── Agentic Loop ──
-    case 'execute_plan':      return toolExecutePlan(a, ctx);
+    case 'execute_plan': return toolExecutePlan(a, ctx);
     // ── Gemma 4 Deep Reasoning ──
 
     // ── Position 0 — Super LLM capabilities ──
-    case 'query_database':       return toolQueryDatabase(a, ctx);
-    case 'check_updates':        return toolCheckUpdates(a);
+    case 'query_database': return toolQueryDatabase(a, ctx);
+    case 'check_updates': return toolCheckUpdates(a);
     case 'conversation_summary': return toolConversationSummary(a, ctx);
-    case 'thinking_mode':        return toolThinkingMode(a);
-    case 'deep_search':          return toolDeepSearch(a);
-    case 'memory_sources':       return toolMemorySources(a, ctx);
-    case 'self_verify':          return toolSelfVerify(a);
-    case 'data_visualize':       return toolDataVisualize(a);
-    case 'computer_use':         return toolComputerUse(a);
-    case 'auto_test':            return toolAutoTest(a);
-    case 'session_persist':      return toolSessionPersist(a, ctx);
-    case 'parallel_tools':       return toolParallelTools(a, ctx);
-    case 'video_analyze':        return toolVideoAnalyze(a);
-    case 'audio_analyze':        return toolAudioAnalyze(a);
-    case 'image_edit':           return toolImageEdit(a);
-    case 'spreadsheet_analyze':  return toolSpreadsheetAnalyze(a);
-    case 'vision_analyze':       return toolVisionAnalyze(a);
-    case 'screen_capture':       return toolScreenCapture(a);
-    case 'task_planner':         return toolTaskPlanner(a, ctx);
-    case 'clipboard_manager':    return toolClipboardManager(a);
-    case 'context_cache':        return toolContextCache(a, ctx);
-    case 'mcp_protocol':         return toolMcpProtocol(a, ctx);
-    case 'scheduled_task':       return toolScheduledTask(a, ctx);
-    case 'qr_code':              return toolQrCode(a);
-    case 'smart_alert':          return toolSmartAlert(a, ctx);
+    case 'thinking_mode': return toolThinkingMode(a);
+    case 'deep_search': return toolDeepSearch(a);
+    case 'memory_sources': return toolMemorySources(a, ctx);
+    case 'self_verify': return toolSelfVerify(a);
+    case 'data_visualize': return toolDataVisualize(a);
+    case 'computer_use': return toolComputerUse(a);
+    case 'auto_test': return toolAutoTest(a);
+    case 'session_persist': return toolSessionPersist(a, ctx);
+    case 'parallel_tools': return toolParallelTools(a, ctx);
+    case 'video_analyze': return toolVideoAnalyze(a);
+    case 'audio_analyze': return toolAudioAnalyze(a);
+    case 'image_edit': return toolImageEdit(a);
+    case 'spreadsheet_analyze': return toolSpreadsheetAnalyze(a);
+    case 'vision_analyze': return toolVisionAnalyze(a);
+    case 'screen_capture': return toolScreenCapture(a);
+    case 'task_planner': return toolTaskPlanner(a, ctx);
+    case 'clipboard_manager': return toolClipboardManager(a);
+    case 'context_cache': return toolContextCache(a, ctx);
+    case 'mcp_protocol': return toolMcpProtocol(a, ctx);
+    case 'scheduled_task': return toolScheduledTask(a, ctx);
+    case 'qr_code': return toolQrCode(a);
+    case 'smart_alert': return toolSmartAlert(a, ctx);
 
-    default:                  return null; // signal "not handled here"
+    default: return null; // signal "not handled here"
   }
 }
 
@@ -4032,12 +4032,16 @@ async function toolSelfVerify(args) {
       if (target.endsWith('.js') || target.endsWith('.jsx') || target.endsWith('.ts')) {
         const openBraces = (content.match(/{/g) || []).length;
         const closeBraces = (content.match(/}/g) || []).length;
-        checks.push({ check: 'balanced_braces', passed: openBraces === closeBraces,
-          detail: `{ = ${openBraces}, } = ${closeBraces}` });
+        checks.push({
+          check: 'balanced_braces', passed: openBraces === closeBraces,
+          detail: `{ = ${openBraces}, } = ${closeBraces}`
+        });
         const openParens = (content.match(/\(/g) || []).length;
         const closeParens = (content.match(/\)/g) || []).length;
-        checks.push({ check: 'balanced_parens', passed: openParens === closeParens,
-          detail: `( = ${openParens}, ) = ${closeParens}` });
+        checks.push({
+          check: 'balanced_parens', passed: openParens === closeParens,
+          detail: `( = ${openParens}, ) = ${closeParens}`
+        });
       }
 
       const allPassed = checks.every(c => c.passed);
@@ -4170,10 +4174,10 @@ async function toolComputerUse(args) {
   try {
     _fs.writeFileSync(tmpFile, script, 'utf8');
     const { stdout, stderr } = await _exec(`node "${tmpFile}"`, { cwd: REPO_ROOT, timeout: 30000 });
-    try { _fs.unlinkSync(tmpFile); } catch (_) {}
+    try { _fs.unlinkSync(tmpFile); } catch (_) { }
     return { ok: true, output: stdout.trim(), errors: stderr?.trim() || null, script_preview: script.slice(0, 500) };
   } catch (err) {
-    try { _fs.unlinkSync(tmpFile); } catch (_) {}
+    try { _fs.unlinkSync(tmpFile); } catch (_) { }
     return { ok: false, error: err.message, script_preview: script.slice(0, 300) };
   }
 }
@@ -4186,7 +4190,7 @@ async function toolAutoTest(args) {
   try {
     const resolved = _path.resolve(REPO_ROOT, target);
     if (_fs.existsSync(resolved)) fileContent = _fs.readFileSync(resolved, 'utf8').slice(0, 3000);
-  } catch (_) {}
+  } catch (_) { }
   const expert = await toolAskExpertCoder({
     question: `Write a Jest test file for: ${target}. Output ONLY the test code.`,
     context: fileContent || `Testing ${target}`,
@@ -4197,10 +4201,10 @@ async function toolAutoTest(args) {
   _fs.writeFileSync(testFile, testCode, 'utf8');
   try {
     const { stdout } = await _exec(`npx jest "${testFile}" --no-coverage 2>&1`, { cwd: _path.join(REPO_ROOT, 'server'), timeout: 30000 });
-    try { _fs.unlinkSync(testFile); } catch (_) {}
+    try { _fs.unlinkSync(testFile); } catch (_) { }
     return { ok: true, output: stdout.slice(-1500), test_file: testFile };
   } catch (err) {
-    try { _fs.unlinkSync(testFile); } catch (_) {}
+    try { _fs.unlinkSync(testFile); } catch (_) { }
     return { ok: false, error: err.message?.slice(0, 500), test_code_preview: testCode.slice(0, 500) };
   }
 }
@@ -4253,7 +4257,7 @@ async function toolVideoAnalyze(args) {
       const vidId = url.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/)?.[1];
       if (vidId) {
         const oembed = await toolFetchUrl({ url: `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${vidId}&format=json` });
-        if (oembed?.ok) { try { const d = JSON.parse(oembed.content); return { ok: true, source: 'youtube', video_id: vidId, title: d.title, author: d.author_name, thumbnail: d.thumbnail_url }; } catch (_) {} }
+        if (oembed?.ok) { try { const d = JSON.parse(oembed.content); return { ok: true, source: 'youtube', video_id: vidId, title: d.title, author: d.author_name, thumbnail: d.thumbnail_url }; } catch (_) { } }
       }
     }
     const page = await toolFetchUrl({ url });
@@ -4267,7 +4271,7 @@ async function toolAudioAnalyze(args) {
   if (!url) return { ok: false, error: 'url is required' };
   const ext = _path.extname(url).toLowerCase();
   const formats = { '.mp3': 'MPEG Audio', '.wav': 'WAV', '.flac': 'FLAC', '.aac': 'AAC', '.ogg': 'Ogg Vorbis', '.m4a': 'MPEG-4 Audio' };
-  return { ok: true, url, detected_format: formats[ext] || 'unknown', extension: ext || 'none', playable: ['.mp3','.wav','.ogg','.aac','.m4a'].includes(ext), instruction: 'Use show_on_monitor(kind="audio", query=<url>) to play.' };
+  return { ok: true, url, detected_format: formats[ext] || 'unknown', extension: ext || 'none', playable: ['.mp3', '.wav', '.ogg', '.aac', '.m4a'].includes(ext), instruction: 'Use show_on_monitor(kind="audio", query=<url>) to play.' };
 }
 
 // 0.13 — image_edit: Basic image manipulation instructions (delegates to run_code).
@@ -4276,10 +4280,10 @@ async function toolImageEdit(args) {
   const source = String(args?.source || '').trim();
   if (!operation || !source) return { ok: false, error: 'operation and source are required' };
   const script = `from PIL import Image; img = Image.open("${source}"); ` +
-    (operation === 'resize' ? `img = img.resize((${args?.width||800}, ${args?.height||600})); img.save("output.png"); print("resized")` :
-     operation === 'grayscale' ? `img = img.convert("L"); img.save("output.png"); print("grayscale")` :
-     operation === 'rotate' ? `img = img.rotate(${args?.angle||90}); img.save("output.png"); print("rotated")` :
-     `print("unknown operation: ${operation}")`);
+    (operation === 'resize' ? `img = img.resize((${args?.width || 800}, ${args?.height || 600})); img.save("output.png"); print("resized")` :
+      operation === 'grayscale' ? `img = img.convert("L"); img.save("output.png"); print("grayscale")` :
+        operation === 'rotate' ? `img = img.rotate(${args?.angle || 90}); img.save("output.png"); print("rotated")` :
+          `print("unknown operation: ${operation}")`);
   return toolRunCode ? await toolRunCode({ language: 'python', code: script }) : { ok: false, error: 'run_code unavailable' };
 }
 
@@ -4293,7 +4297,7 @@ async function toolSpreadsheetAnalyze(args) {
   const numericCols = {};
   headers.forEach((h, i) => {
     const vals = rows.map(r => parseFloat(r[i])).filter(v => !isNaN(v));
-    if (vals.length > 0) numericCols[h] = { count: vals.length, sum: vals.reduce((a,b) => a+b, 0), min: Math.min(...vals), max: Math.max(...vals), avg: vals.reduce((a,b) => a+b, 0) / vals.length };
+    if (vals.length > 0) numericCols[h] = { count: vals.length, sum: vals.reduce((a, b) => a + b, 0), min: Math.min(...vals), max: Math.max(...vals), avg: vals.reduce((a, b) => a + b, 0) / vals.length };
   });
   return { ok: true, headers, total_rows: rows.length, total_columns: headers.length, numeric_analysis: numericCols, sample_rows: rows.slice(0, 5) };
 }
@@ -4399,7 +4403,7 @@ async function toolScheduledTask(args, ctx) {
   const scheduledFor = new Date(Date.now() + delayMin * 60000).toISOString();
   const timer = setTimeout(() => { const t = _scheduledTasks.get(id); if (t) t.status = 'fired'; }, delayMin * 60000);
   _scheduledTasks.set(id, { id, userId, description, delay_minutes: delayMin, scheduled_for: scheduledFor, status: 'pending', timer });
-  if (_scheduledTasks.size > 100) { const oldest = [..._scheduledTasks.entries()].find(([,v]) => v.status !== 'pending'); if (oldest) _scheduledTasks.delete(oldest[0]); }
+  if (_scheduledTasks.size > 100) { const oldest = [..._scheduledTasks.entries()].find(([, v]) => v.status !== 'pending'); if (oldest) _scheduledTasks.delete(oldest[0]); }
   return { ok: true, id, description, scheduled_for: scheduledFor, delay_minutes: delayMin };
 }
 
