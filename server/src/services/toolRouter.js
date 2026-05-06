@@ -25,6 +25,10 @@ const TOOL_CATEGORIES = {
     'get_action_history',
     'ui_notify',
     'show_on_monitor',
+    'query_database',
+    'conversation_summary',
+    'thinking_mode',
+    'memory_sources',
   ],
 
   // Greetings and simple conversation — no tools needed beyond CORE
@@ -66,6 +70,7 @@ const TOOL_CATEGORIES = {
     'translate',
     'fetch_documentation',
     'browse_web',
+    'deep_search',
   ],
 
   // Finance — crypto, stocks, forex
@@ -81,6 +86,7 @@ const TOOL_CATEGORIES = {
     'calculate',
     'unit_convert',
     'run_regex',
+    'data_visualize',
   ],
 
   // Code, files, terminal — development tools
@@ -98,6 +104,8 @@ const TOOL_CATEGORIES = {
     'run_code',
     'ask_expert_coder',
     'execute_plan',
+    'check_updates',
+    'self_verify',
   ],
 
   // GitHub
@@ -115,6 +123,7 @@ const TOOL_CATEGORIES = {
     'npm_package_info',
     'pypi_package_info',
     'search_stackoverflow',
+    'check_updates',
   ],
 
   // Camera and vision
@@ -149,6 +158,8 @@ const TOOL_CATEGORIES = {
     'get_my_credits',
     'get_my_usage',
     'get_my_profile',
+    'query_database',
+    'conversation_summary',
   ],
 
   // Documents and OCR
@@ -303,9 +314,14 @@ const CATEGORY_TRIGGERS = {
       /credit|minut|minute|balanț|balance/i,
       /profil|profile|cont|account/i,
       /consum|usage|cheltui/i,
+      /baz[aă].*date|database|conversați[ie]|memori[ie]|fact/i,
+      /rezumat|summary|sumariz/i,
+      /câte.*conversați|cât.*am.*vorbit/i,
     ],
     keywords: ['credit', 'minute', 'balanță', 'balance', 'profil',
-      'profile', 'cont', 'account', 'consum', 'usage'],
+      'profile', 'cont', 'account', 'consum', 'usage',
+      'bază de date', 'database', 'conversații', 'rezumat', 'summary',
+      'memorie', 'memory', 'fapte', 'facts'],
   },
   DOCUMENTS: {
     patterns: [

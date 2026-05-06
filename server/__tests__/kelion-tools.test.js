@@ -147,6 +147,16 @@ const EXPECTED_TOOL_NAMES = [
   'switch_voice',
   // Agentic loop — multi-step plan execution
   'execute_plan',
+  // Position 0 — Super LLM capabilities (Claude Opus 4.7 / GPT-5.5 /
+  // Gemini 3.1 / Grok 3 / DeepSeek V4 inspired).
+  'query_database',
+  'check_updates',
+  'conversation_summary',
+  'thinking_mode',
+  'deep_search',
+  'memory_sources',
+  'self_verify',
+  'data_visualize',
 ];
 
 describe('Kelion tool catalog', () => {

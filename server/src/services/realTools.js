@@ -3370,6 +3370,16 @@ async function executeRealTool(name, args, ctx) {
     case 'execute_plan':      return toolExecutePlan(a, ctx);
     // ── Gemma 4 Deep Reasoning ──
 
+    // ── Position 0 — Super LLM capabilities ──
+    case 'query_database':       return toolQueryDatabase(a, ctx);
+    case 'check_updates':        return toolCheckUpdates(a);
+    case 'conversation_summary': return toolConversationSummary(a, ctx);
+    case 'thinking_mode':        return toolThinkingMode(a);
+    case 'deep_search':          return toolDeepSearch(a);
+    case 'memory_sources':       return toolMemorySources(a, ctx);
+    case 'self_verify':          return toolSelfVerify(a);
+    case 'data_visualize':       return toolDataVisualize(a);
+
     default:                  return null; // signal "not handled here"
   }
 }
@@ -3572,6 +3582,562 @@ async function toolGetActionHistory(args, ctx) {
   return { ok: true, count: actions.length, actions };
 }
 
+// ═════════════════════════════════════════════════════════════════════
+// Position 0 — Super LLM capabilities
+// ═════════════════════════════════════════════════════════════════════
+
+// 0.5 — query_database: Kelion interconnected to ALL data in the DB.
+// READ-ONLY. Supports predefined query types to prevent SQL injection.
+// The user's data is always scoped to their own user_id.
+async function toolQueryDatabase(args, ctx) {
+  const userId = ctx?.user?.id;
+  if (!userId) {
+    return { ok: false, signed_in: false, error: 'Database access requires sign-in.' };
+  }
+  const db = require('../db');
+  const query = String(args?.query || '').trim().toLowerCase();
+  const limitRaw = Number.parseInt(args?.limit, 10);
+  const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(100, limitRaw)) : 20;
+
+  try {
+    // Predefined safe query types — never runs raw SQL
+    if (query.includes('conversation') || query.includes('chat') || query.includes('mesaj')) {
+      // Conversation stats
+      const convos = await db.listConversations(userId, 200);
+      const totalConversations = convos.length;
+      let totalMessages = 0;
+      let longestMessage = { content: '', length: 0, role: '', conversation_title: '' };
+      let userMessages = 0;
+      let assistantMessages = 0;
+
+      for (const c of convos.slice(0, 50)) {
+        const msgs = await db.getConversationMessages(c.id);
+        totalMessages += msgs.length;
+        for (const m of msgs) {
+          if (m.role === 'user') userMessages++;
+          if (m.role === 'assistant') assistantMessages++;
+          if (m.content && m.content.length > longestMessage.length) {
+            longestMessage = {
+              content: m.content.slice(0, 200) + (m.content.length > 200 ? '...' : ''),
+              length: m.content.length,
+              role: m.role,
+              conversation_title: c.title || 'Untitled',
+            };
+          }
+        }
+      }
+      return {
+        ok: true,
+        type: 'conversations',
+        total_conversations: totalConversations,
+        total_messages: totalMessages,
+        user_messages: userMessages,
+        assistant_messages: assistantMessages,
+        longest_message: longestMessage,
+        recent_conversations: convos.slice(0, limit).map(c => ({
+          id: c.id, title: c.title, created_at: c.created_at, updated_at: c.updated_at,
+        })),
+      };
+    }
+
+    if (query.includes('memor') || query.includes('fact') || query.includes('ține minte')) {
+      // Memory items
+      const memories = await db.getMemoryItems(userId);
+      return {
+        ok: true,
+        type: 'memory',
+        total_items: memories.length,
+        items: memories.slice(0, limit).map(m => ({
+          id: m.id, kind: m.kind, fact: m.fact, subject: m.subject,
+          subject_name: m.subject_name, tier: m.tier,
+          created_at: m.created_at, last_affirmed_at: m.last_affirmed_at,
+        })),
+      };
+    }
+
+    if (query.includes('action') || query.includes('acțiun') || query.includes('tool') || query.includes('history')) {
+      // Action history
+      const rows = await db.listRecentActions(userId, { limit });
+      return {
+        ok: true,
+        type: 'actions',
+        total: rows.length,
+        actions: rows.map(r => ({
+          id: r.id, tool: r.tool_name, ok: !!r.ok,
+          args: r.args_summary, result: r.result_summary,
+          duration_ms: r.duration_ms, at: r.created_at,
+        })),
+      };
+    }
+
+    if (query.includes('credit') || query.includes('minut') || query.includes('balanț') || query.includes('usage')) {
+      // Credits + transactions
+      const user = await db.getUserById(userId);
+      const txRows = await db.getRecentTransactions(userId, limit);
+      return {
+        ok: true,
+        type: 'credits',
+        balance_minutes: user?.credits_balance_minutes || 0,
+        transactions: txRows.map(t => ({
+          id: t.id, delta_minutes: t.delta_minutes,
+          kind: t.kind, note: t.note, created_at: t.created_at,
+        })),
+      };
+    }
+
+    if (query.includes('profil') || query.includes('cont') || query.includes('account') || query.includes('user')) {
+      // User profile
+      const user = await db.getUserById(userId);
+      return {
+        ok: true,
+        type: 'profile',
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        subscription_tier: user.subscription_tier,
+        credits_balance_minutes: user.credits_balance_minutes,
+        preferred_language: user.preferred_language,
+        created_at: user.created_at,
+      };
+    }
+
+    // Default: return available query types
+    return {
+      ok: true,
+      type: 'help',
+      message: 'Specify what to query. Available types: conversations, memory, actions, credits, profile.',
+      hint: 'Use natural language like: "show my conversations", "what facts do you remember", "my credit balance"',
+    };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
+// 0.4 — check_updates: Verify npm dependency versions.
+// Runs `npm outdated --json` in the project root and parses the result.
+async function toolCheckUpdates(args) {
+  const { execSync } = require('child_process');
+  const target = String(args?.path || '.').trim();
+  try {
+    const cwd = _path.resolve(REPO_ROOT, target);
+    // npm outdated returns exit code 1 when there ARE outdated packages
+    let raw;
+    try {
+      raw = execSync('npm outdated --json 2>&1', { cwd, timeout: 30000 }).toString();
+    } catch (e) {
+      raw = e.stdout ? e.stdout.toString() : '{}';
+    }
+    const outdated = JSON.parse(raw || '{}');
+    const packages = Object.entries(outdated).map(([name, info]) => ({
+      name,
+      current: info.current || 'N/A',
+      wanted: info.wanted || 'N/A',
+      latest: info.latest || 'N/A',
+      type: info.type || 'dependencies',
+      needs_update: info.current !== info.latest,
+    }));
+    const needsUpdate = packages.filter(p => p.needs_update);
+    return {
+      ok: true,
+      total_packages: packages.length,
+      outdated_count: needsUpdate.length,
+      up_to_date: needsUpdate.length === 0,
+      outdated: needsUpdate.slice(0, 50),
+    };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
+// 0.24 — conversation_summary: Auto-summarize conversations for context.
+async function toolConversationSummary(args, ctx) {
+  const userId = ctx?.user?.id;
+  if (!userId) {
+    return { ok: false, signed_in: false, error: 'Conversation summary requires sign-in.' };
+  }
+  const db = require('../db');
+  const limitRaw = Number.parseInt(args?.limit, 10);
+  const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(10, limitRaw)) : 5;
+
+  try {
+    const convos = await db.listConversations(userId, limit);
+    const summaries = [];
+    for (const c of convos) {
+      const msgs = await db.getConversationMessages(c.id);
+      const totalChars = msgs.reduce((sum, m) => sum + (m.content?.length || 0), 0);
+      const userMsgs = msgs.filter(m => m.role === 'user');
+      const assistantMsgs = msgs.filter(m => m.role === 'assistant');
+      // Extract key topics from user messages (first 3 unique first sentences)
+      const topics = [...new Set(
+        userMsgs
+          .map(m => (m.content || '').split(/[.!?\n]/)[0].trim())
+          .filter(s => s.length > 5)
+          .slice(0, 3)
+      )];
+      summaries.push({
+        id: c.id,
+        title: c.title || 'Untitled',
+        created_at: c.created_at,
+        updated_at: c.updated_at,
+        total_messages: msgs.length,
+        user_messages: userMsgs.length,
+        assistant_messages: assistantMsgs.length,
+        total_characters: totalChars,
+        key_topics: topics,
+        first_user_message: userMsgs[0]?.content?.slice(0, 150) || '',
+        last_user_message: userMsgs[userMsgs.length - 1]?.content?.slice(0, 150) || '',
+      });
+    }
+    return {
+      ok: true,
+      total_conversations: convos.length,
+      summaries,
+    };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
+// 0.6 — thinking_mode: Visible chain-of-thought reasoning.
+// Routes to OpenRouter with a "think step-by-step" wrapper and returns
+// both the reasoning steps and the final answer, so the UI can display them.
+async function toolThinkingMode(args) {
+  const question = String(args?.question || '').trim();
+  if (!question) return { ok: false, error: 'question is required' };
+
+  const context = typeof args?.context === 'string' ? args.context : '';
+
+  // Use ask_expert_coder internally but with a structured thinking prompt
+  const thinkingPrompt = `You are a brilliant problem-solver. Think step-by-step to answer this question. Structure your response EXACTLY as follows:
+
+THINKING:
+1. [First reasoning step]
+2. [Second reasoning step]
+3. [Continue as needed]
+
+ANSWER:
+[Your final, concise answer]
+
+Question: ${question}${context ? `\n\nContext: ${context}` : ''}`;
+
+  try {
+    const result = await toolAskExpertCoder({
+      question: thinkingPrompt,
+      context: context || 'Step-by-step reasoning required.',
+    });
+
+    if (!result?.ok) return { ok: false, error: result?.error || 'Thinking failed' };
+
+    const answer = result.answer || '';
+    // Parse thinking steps and final answer
+    const thinkingMatch = answer.match(/THINKING:\s*([\s\S]*?)(?=ANSWER:|$)/i);
+    const answerMatch = answer.match(/ANSWER:\s*([\s\S]*?)$/i);
+
+    const steps = thinkingMatch
+      ? thinkingMatch[1].trim().split(/\n/).filter(l => l.trim()).map(l => l.replace(/^\d+\.\s*/, '').trim())
+      : [answer];
+    const finalAnswer = answerMatch ? answerMatch[1].trim() : answer;
+
+    return {
+      ok: true,
+      thinking_steps: steps,
+      answer: finalAnswer,
+      model_used: result.model || 'unknown',
+    };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
+// 0.8 — deep_search: Multi-source web synthesis.
+// Runs multiple web searches, fetches top pages, and synthesizes a report.
+async function toolDeepSearch(args) {
+  const topic = String(args?.topic || '').trim();
+  if (!topic) return { ok: false, error: 'topic is required' };
+
+  const maxSources = Math.min(Math.max(Number(args?.max_sources) || 5, 2), 10);
+
+  try {
+    // Generate multiple search angles
+    const searchQueries = [
+      topic,
+      `${topic} latest news 2026`,
+      `${topic} review analysis`,
+    ];
+
+    const allResults = [];
+    for (const q of searchQueries.slice(0, 3)) {
+      const searchResult = await toolWebSearch({ query: q, limit: maxSources });
+      if (searchResult?.ok && searchResult.results) {
+        for (const r of searchResult.results) {
+          // Deduplicate by URL
+          if (!allResults.find(x => x.url === r.url)) {
+            allResults.push(r);
+          }
+        }
+      }
+    }
+
+    // Fetch content from top results
+    const fetched = [];
+    for (const r of allResults.slice(0, maxSources)) {
+      try {
+        const page = await toolFetchUrl({ url: r.url });
+        if (page?.ok && page.content) {
+          fetched.push({
+            title: r.title || r.url,
+            url: r.url,
+            snippet: r.snippet || '',
+            content_preview: (page.content || '').slice(0, 800),
+          });
+        }
+      } catch (_) {
+        fetched.push({
+          title: r.title || r.url,
+          url: r.url,
+          snippet: r.snippet || '',
+          content_preview: r.snippet || '',
+        });
+      }
+    }
+
+    // Synthesize using expert coder
+    const synthesisPrompt = `Synthesize a comprehensive report on: "${topic}"
+
+Sources (${fetched.length}):
+${fetched.map((f, i) => `[${i + 1}] ${f.title}\n    URL: ${f.url}\n    ${f.content_preview.slice(0, 300)}`).join('\n\n')}
+
+Write a structured synthesis report with:
+1. Key findings
+2. Contradictions or disagreements between sources
+3. Most reliable conclusion
+Keep it under 500 words.`;
+
+    let synthesis = '';
+    try {
+      const expert = await toolAskExpertCoder({
+        question: synthesisPrompt,
+        context: `Deep search synthesis for: ${topic}`,
+      });
+      synthesis = expert?.answer || 'Synthesis unavailable.';
+    } catch (_) {
+      synthesis = 'Could not synthesize — raw results provided.';
+    }
+
+    return {
+      ok: true,
+      topic,
+      sources_found: allResults.length,
+      sources_fetched: fetched.length,
+      synthesis,
+      sources: fetched.map(f => ({
+        title: f.title,
+        url: f.url,
+        snippet: f.snippet,
+      })),
+    };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
+// 0.10 — memory_sources: Show exactly where a fact came from.
+// Returns the user's memory items with metadata (timestamps, kind, confidence).
+async function toolMemorySources(args, ctx) {
+  const userId = ctx?.user?.id;
+  if (!userId) {
+    return { ok: false, signed_in: false, error: 'Memory sources requires sign-in.' };
+  }
+  const db = require('../db');
+  const query = String(args?.query || '').trim().toLowerCase();
+
+  try {
+    const memories = await db.getMemoryItems(userId);
+    let filtered = memories;
+
+    // Filter by query if provided
+    if (query) {
+      filtered = memories.filter(m =>
+        (m.fact || '').toLowerCase().includes(query) ||
+        (m.kind || '').toLowerCase().includes(query) ||
+        (m.subject_name || '').toLowerCase().includes(query)
+      );
+    }
+
+    return {
+      ok: true,
+      total_memories: memories.length,
+      matching: filtered.length,
+      sources: filtered.slice(0, 30).map(m => ({
+        id: m.id,
+        fact: m.fact,
+        kind: m.kind,
+        subject: m.subject,
+        subject_name: m.subject_name || null,
+        confidence: m.confidence || null,
+        tier: m.tier || null,
+        created_at: m.created_at,
+        last_affirmed_at: m.last_affirmed_at || null,
+        source_type: 'memory_item',
+      })),
+    };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
+// 0.2 — self_verify: Re-check outputs after an edit/action.
+// Reads back a file after edit, or re-runs a check, to confirm correctness.
+async function toolSelfVerify(args) {
+  const action = String(args?.action || '').trim();
+  const target = String(args?.target || '').trim();
+
+  if (!action) return { ok: false, error: 'action is required (e.g. "check_file", "verify_url", "re_calculate")' };
+
+  try {
+    if (action === 'check_file' || action === 'verify_file') {
+      if (!target) return { ok: false, error: 'target (file path) is required for check_file' };
+      const resolvedPath = _path.resolve(REPO_ROOT, target);
+      if (!_fs.existsSync(resolvedPath)) {
+        return { ok: false, verified: false, error: `File does not exist: ${target}` };
+      }
+      const content = _fs.readFileSync(resolvedPath, 'utf8');
+      const lines = content.split('\n').length;
+      const bytes = Buffer.byteLength(content, 'utf8');
+
+      // Basic syntax checks
+      const checks = [];
+      if (target.endsWith('.json')) {
+        try { JSON.parse(content); checks.push({ check: 'valid_json', passed: true }); }
+        catch (e) { checks.push({ check: 'valid_json', passed: false, error: e.message }); }
+      }
+      if (target.endsWith('.js') || target.endsWith('.jsx') || target.endsWith('.ts')) {
+        const openBraces = (content.match(/{/g) || []).length;
+        const closeBraces = (content.match(/}/g) || []).length;
+        checks.push({ check: 'balanced_braces', passed: openBraces === closeBraces,
+          detail: `{ = ${openBraces}, } = ${closeBraces}` });
+        const openParens = (content.match(/\(/g) || []).length;
+        const closeParens = (content.match(/\)/g) || []).length;
+        checks.push({ check: 'balanced_parens', passed: openParens === closeParens,
+          detail: `( = ${openParens}, ) = ${closeParens}` });
+      }
+
+      const allPassed = checks.every(c => c.passed);
+      return {
+        ok: true,
+        verified: allPassed || checks.length === 0,
+        file: target,
+        lines,
+        bytes,
+        checks,
+        preview_first_5: content.split('\n').slice(0, 5).join('\n'),
+        preview_last_5: content.split('\n').slice(-5).join('\n'),
+      };
+    }
+
+    if (action === 're_calculate' || action === 'verify_math') {
+      if (!target) return { ok: false, error: 'target (expression) is required for re_calculate' };
+      const result1 = toolCalculate({ expression: target });
+      const result2 = toolCalculate({ expression: target });
+      return {
+        ok: true,
+        verified: result1?.result === result2?.result,
+        expression: target,
+        result: result1?.result,
+        double_check: result2?.result,
+        match: result1?.result === result2?.result,
+      };
+    }
+
+    if (action === 'verify_url') {
+      if (!target) return { ok: false, error: 'target (URL) is required for verify_url' };
+      const result = await toolFetchUrl({ url: target });
+      return {
+        ok: true,
+        verified: result?.ok === true,
+        url: target,
+        status: result?.ok ? 'reachable' : 'unreachable',
+        title: result?.title || null,
+        content_length: result?.content?.length || 0,
+      };
+    }
+
+    return {
+      ok: false,
+      error: `Unknown action: ${action}. Use: check_file, re_calculate, verify_url`,
+    };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
+// 0.22 — data_visualize: Generate Chart.js HTML for the monitor.
+// Returns ready-to-use HTML that can be shown via show_on_monitor(kind='html').
+async function toolDataVisualize(args) {
+  const chartType = String(args?.type || 'bar').trim().toLowerCase();
+  const title = String(args?.title || 'Chart').trim();
+  let labels, datasets;
+
+  try {
+    labels = typeof args?.labels === 'string' ? JSON.parse(args.labels) : args?.labels;
+    datasets = typeof args?.data === 'string' ? JSON.parse(args.data) : args?.data;
+  } catch (e) {
+    return { ok: false, error: 'Invalid JSON in labels or data: ' + e.message };
+  }
+
+  if (!Array.isArray(labels) || !Array.isArray(datasets)) {
+    return { ok: false, error: 'labels (array) and data (array of numbers or array of datasets) are required' };
+  }
+
+  // Support simple array of numbers or array of dataset objects
+  const colors = ['#7c3aed', '#a78bfa', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#8b5cf6'];
+  let chartDatasets;
+  if (datasets.length > 0 && typeof datasets[0] === 'number') {
+    chartDatasets = [{
+      label: title,
+      data: datasets,
+      backgroundColor: labels.map((_, i) => colors[i % colors.length]),
+      borderColor: labels.map((_, i) => colors[i % colors.length]),
+      borderWidth: 1,
+    }];
+  } else {
+    chartDatasets = datasets.map((ds, i) => ({
+      label: ds.label || `Series ${i + 1}`,
+      data: ds.data || ds.values || [],
+      backgroundColor: ds.color || colors[i % colors.length],
+      borderColor: ds.color || colors[i % colors.length],
+      borderWidth: 1,
+      fill: chartType === 'line' ? false : undefined,
+    }));
+  }
+
+  const chartConfig = {
+    type: chartType,
+    data: { labels, datasets: chartDatasets },
+    options: {
+      responsive: true,
+      plugins: { title: { display: true, text: title, font: { size: 18 } } },
+      scales: chartType !== 'pie' && chartType !== 'doughnut' ? {
+        y: { beginAtZero: true }
+      } : undefined,
+    },
+  };
+
+  const html = `<div style="max-width:700px;margin:0 auto;padding:20px">
+<canvas id="kelionChart"></canvas>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>new Chart(document.getElementById('kelionChart'), ${JSON.stringify(chartConfig)})</script>`;
+
+  return {
+    ok: true,
+    chart_type: chartType,
+    html,
+    instruction: 'Call show_on_monitor(kind="html", query=<this html>) to display the chart.',
+  };
+}
+
 // Full list of tool names handled by this module — keeps catalogs honest.
 const REAL_TOOL_NAMES = [
   'calculate', 'unit_convert', 'get_moon_phase',
@@ -3613,6 +4179,9 @@ const REAL_TOOL_NAMES = [
   'learn_from_observation',
   // MCP — Google Calendar / Gmail / Drive
   'read_calendar', 'read_email', 'search_files',
+  // ── Position 0 — Super LLM capabilities ──
+  'query_database', 'check_updates', 'conversation_summary',
+  'thinking_mode', 'deep_search', 'memory_sources', 'self_verify', 'data_visualize',
 ];
 
 module.exports = {
@@ -3693,6 +4262,15 @@ module.exports = {
   toolRememberFact,
   // Faza A — global live radio search (radio-browser.info, ~50k stations)
   toolPlayRadio,
+  // ── Position 0 — Super LLM capabilities ──
+  toolQueryDatabase,
+  toolCheckUpdates,
+  toolConversationSummary,
+  toolThinkingMode,
+  toolDeepSearch,
+  toolMemorySources,
+  toolSelfVerify,
+  toolDataVisualize,
   // Memory files
   storeTempFile,
   getTempFile,

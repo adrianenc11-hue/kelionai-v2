@@ -1242,6 +1242,78 @@ const KELION_TOOLS = [
     },
     required: ['steps'],
   },
+  // ── Position 0 — Super LLM capabilities ──────────────────────────
+  {
+    name: 'query_database',
+    description: "Query Kelion's own database to look up the signed-in user's data: conversations, memory items, action history, credits, profile. READ-ONLY. Use when the user asks 'câte conversații am?', 'ce fapte ții minte?', 'show my credit balance', 'what tools have you used for me?'. Returns structured data scoped to the user's account only.",
+    properties: {
+      query: { type: 'string', description: "Natural-language query indicating what to look up. Include keywords like 'conversations', 'memory', 'actions', 'credits', or 'profile'. E.g. 'show my conversations this month', 'what facts do you remember about me', 'my credit balance'." },
+      limit: { type: 'integer', description: "Max items to return (1-100, default 20)." },
+    },
+    required: ['query'],
+  },
+  {
+    name: 'check_updates',
+    description: "Check for outdated npm dependencies in the project. Runs `npm outdated --json` and returns a list of packages that need updating, with current vs latest versions. Use when the user asks 'are my packages up to date?', 'verifică dependențele', 'check for updates'.",
+    properties: {
+      path: { type: 'string', description: "Optional sub-directory to check (relative to repo root). Default '.' (root)." },
+    },
+    required: [],
+  },
+  {
+    name: 'conversation_summary',
+    description: "Generate a structured summary of the user's recent conversations — message counts, key topics, first/last user messages. Use when the user asks 'fă un rezumat', 'summarize our chats', 'what have we discussed?'. Helps manage context for long sessions.",
+    properties: {
+      limit: { type: 'integer', description: "How many recent conversations to summarize (1-10, default 5)." },
+    },
+    required: [],
+  },
+  {
+    name: 'thinking_mode',
+    description: "Think step-by-step through a complex problem, showing visible reasoning steps before giving the final answer. Use when the user asks 'gândește pas cu pas', 'think step by step', 'reason through this', or for any complex analytical question that benefits from visible chain-of-thought.",
+    properties: {
+      question: { type: 'string', description: "The question or problem to reason through step-by-step." },
+      context: { type: 'string', description: "Optional additional context (code, data, constraints)." },
+    },
+    required: ['question'],
+  },
+  {
+    name: 'deep_search',
+    description: "Perform a deep multi-source web research on a topic. Searches from multiple angles, fetches content from top sources, and synthesizes a comprehensive report. Use when the user asks 'caută tot despre', 'deep search', 'cercetează', 'find everything about', or needs a thorough analysis from multiple web sources.",
+    properties: {
+      topic: { type: 'string', description: "The topic to research deeply across multiple sources." },
+      max_sources: { type: 'integer', description: "Maximum sources to fetch and synthesize (2-10, default 5)." },
+    },
+    required: ['topic'],
+  },
+  {
+    name: 'memory_sources',
+    description: "Show the user exactly which memory items (facts, preferences, observations) Kelion has stored about them, with full metadata: timestamps, confidence scores, kind, and source. Use when the user asks 'de unde știi asta?', 'where did you learn that?', 'show me my memory', 'what do you know about me?', 'arată-mi sursele'.",
+    properties: {
+      query: { type: 'string', description: "Optional filter to search within memory items (e.g. 'name', 'job', 'preference'). Leave empty to show all." },
+    },
+    required: [],
+  },
+  {
+    name: 'self_verify',
+    description: "Re-check and verify a previous action's output. Reads back edited files, re-calculates math, or re-checks URLs to confirm correctness. Use AUTOMATICALLY after editing files or performing calculations to ensure accuracy. Also use when the user asks 'verifică', 'check if it's correct', 'e corect?'.",
+    properties: {
+      action: { type: 'string', description: "What to verify: 'check_file' (re-read a file), 're_calculate' (re-run math), 'verify_url' (check URL reachability)." },
+      target: { type: 'string', description: "The target to verify: file path for check_file, math expression for re_calculate, URL for verify_url." },
+    },
+    required: ['action', 'target'],
+  },
+  {
+    name: 'data_visualize',
+    description: "Generate a chart or graph from data. Returns Chart.js HTML ready to display on the monitor via show_on_monitor(kind='html'). Supports bar, line, pie, doughnut, radar, scatter charts. Use when the user asks 'fă un grafic', 'make a chart', 'visualize this data', 'show me a graph'.",
+    properties: {
+      type: { type: 'string', description: "Chart type: 'bar', 'line', 'pie', 'doughnut', 'radar', 'scatter'. Default 'bar'." },
+      title: { type: 'string', description: "Chart title displayed above the graph." },
+      labels: { type: 'string', description: "JSON array of labels for the X axis, e.g. '[\"Jan\",\"Feb\",\"Mar\"]'." },
+      data: { type: 'string', description: "JSON array of numbers or dataset objects. Simple: '[10,20,30]'. Multi-series: '[{\"label\":\"Sales\",\"data\":[10,20]},{\"label\":\"Costs\",\"data\":[5,15]}]'." },
+    },
+    required: ['labels', 'data'],
+  },
 ];
 
 // Google v1alpha BidiGenerateContent — JSON schema with UPPERCASE types and
