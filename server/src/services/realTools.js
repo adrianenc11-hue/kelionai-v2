@@ -3379,6 +3379,23 @@ async function executeRealTool(name, args, ctx) {
     case 'memory_sources':       return toolMemorySources(a, ctx);
     case 'self_verify':          return toolSelfVerify(a);
     case 'data_visualize':       return toolDataVisualize(a);
+    case 'computer_use':         return toolComputerUse(a);
+    case 'auto_test':            return toolAutoTest(a);
+    case 'session_persist':      return toolSessionPersist(a, ctx);
+    case 'parallel_tools':       return toolParallelTools(a, ctx);
+    case 'video_analyze':        return toolVideoAnalyze(a);
+    case 'audio_analyze':        return toolAudioAnalyze(a);
+    case 'image_edit':           return toolImageEdit(a);
+    case 'spreadsheet_analyze':  return toolSpreadsheetAnalyze(a);
+    case 'vision_analyze':       return toolVisionAnalyze(a);
+    case 'screen_capture':       return toolScreenCapture(a);
+    case 'task_planner':         return toolTaskPlanner(a, ctx);
+    case 'clipboard_manager':    return toolClipboardManager(a);
+    case 'context_cache':        return toolContextCache(a, ctx);
+    case 'mcp_protocol':         return toolMcpProtocol(a, ctx);
+    case 'scheduled_task':       return toolScheduledTask(a, ctx);
+    case 'qr_code':              return toolQrCode(a);
+    case 'smart_alert':          return toolSmartAlert(a, ctx);
 
     default:                  return null; // signal "not handled here"
   }
@@ -4138,6 +4155,286 @@ async function toolDataVisualize(args) {
   };
 }
 
+// 0.1 — computer_use: Generate and run a Playwright automation script.
+async function toolComputerUse(args) {
+  const task = String(args?.task || '').trim();
+  const url = String(args?.url || '').trim();
+  if (!task) return { ok: false, error: 'task is required' };
+  const expertResult = await toolAskExpertCoder({
+    question: `Write a minimal Node.js Playwright script that does: "${task}"${url ? ` starting at ${url}` : ''}. Use chromium.launch({headless:true}). Output ONLY the script, no explanation. The script should console.log a JSON result at the end.`,
+    context: 'Playwright automation. Keep it under 40 lines.',
+  });
+  if (!expertResult?.ok) return { ok: false, error: 'Could not generate script' };
+  const script = (expertResult.answer || '').replace(/```[\w]*\n?/g, '').trim();
+  const tmpFile = _path.join(REPO_ROOT, '.tmp_playwright_' + Date.now() + '.js');
+  try {
+    _fs.writeFileSync(tmpFile, script, 'utf8');
+    const { stdout, stderr } = await _exec(`node "${tmpFile}"`, { cwd: REPO_ROOT, timeout: 30000 });
+    try { _fs.unlinkSync(tmpFile); } catch (_) {}
+    return { ok: true, output: stdout.trim(), errors: stderr?.trim() || null, script_preview: script.slice(0, 500) };
+  } catch (err) {
+    try { _fs.unlinkSync(tmpFile); } catch (_) {}
+    return { ok: false, error: err.message, script_preview: script.slice(0, 300) };
+  }
+}
+
+// 0.3 — auto_test: Write and run a Jest test for a given file/function.
+async function toolAutoTest(args) {
+  const target = String(args?.target || '').trim();
+  if (!target) return { ok: false, error: 'target file or function is required' };
+  let fileContent = '';
+  try {
+    const resolved = _path.resolve(REPO_ROOT, target);
+    if (_fs.existsSync(resolved)) fileContent = _fs.readFileSync(resolved, 'utf8').slice(0, 3000);
+  } catch (_) {}
+  const expert = await toolAskExpertCoder({
+    question: `Write a Jest test file for: ${target}. Output ONLY the test code.`,
+    context: fileContent || `Testing ${target}`,
+  });
+  if (!expert?.ok) return { ok: false, error: 'Could not generate test' };
+  const testCode = (expert.answer || '').replace(/```[\w]*\n?/g, '').trim();
+  const testFile = _path.join(REPO_ROOT, 'server', '__tests__', `auto_${Date.now()}.test.js`);
+  _fs.writeFileSync(testFile, testCode, 'utf8');
+  try {
+    const { stdout } = await _exec(`npx jest "${testFile}" --no-coverage 2>&1`, { cwd: _path.join(REPO_ROOT, 'server'), timeout: 30000 });
+    try { _fs.unlinkSync(testFile); } catch (_) {}
+    return { ok: true, output: stdout.slice(-1500), test_file: testFile };
+  } catch (err) {
+    try { _fs.unlinkSync(testFile); } catch (_) {}
+    return { ok: false, error: err.message?.slice(0, 500), test_code_preview: testCode.slice(0, 500) };
+  }
+}
+
+// 0.7 — session_persist: Save/restore key-value session data in DB.
+async function toolSessionPersist(args, ctx) {
+  const userId = ctx?.user?.id;
+  if (!userId) return { ok: false, signed_in: false, error: 'Session persistence requires sign-in.' };
+  const action = String(args?.action || 'get').trim();
+  const key = String(args?.key || '').trim();
+  if (!key) return { ok: false, error: 'key is required' };
+  const db = require('../db');
+  try {
+    if (action === 'set' || action === 'save') {
+      const value = String(args?.value || '');
+      await db.addMemoryItems(userId, [{ kind: 'context', fact: `[session:${key}] ${value}`, subject: 'self', confidence: 0.95 }]);
+      return { ok: true, action: 'saved', key };
+    }
+    const memories = await db.getMemoryItems(userId);
+    const match = memories.find(m => (m.fact || '').startsWith(`[session:${key}]`));
+    if (match) {
+      const value = match.fact.replace(`[session:${key}] `, '');
+      return { ok: true, action: 'loaded', key, value, created_at: match.created_at };
+    }
+    return { ok: true, action: 'not_found', key, value: null };
+  } catch (err) { return { ok: false, error: err.message }; }
+}
+
+// 0.9 — parallel_tools: Execute multiple tool calls in parallel.
+async function toolParallelTools(args, ctx) {
+  let calls;
+  try { calls = typeof args?.calls === 'string' ? JSON.parse(args.calls) : args?.calls; }
+  catch (e) { return { ok: false, error: 'Invalid calls JSON: ' + e.message }; }
+  if (!Array.isArray(calls) || !calls.length) return { ok: false, error: 'calls must be a non-empty array of {tool, args}' };
+  if (calls.length > 10) return { ok: false, error: 'Max 10 parallel calls' };
+  const results = await Promise.allSettled(calls.map(c => executeRealTool(String(c.tool), c.args || {}, ctx)));
+  const output = results.map((r, i) => ({
+    tool: calls[i].tool, status: r.status, result: r.status === 'fulfilled' ? r.value : { error: r.reason?.message },
+  }));
+  const ok = output.filter(o => o.result?.ok !== false).length;
+  return { ok: ok > 0, completed: output.length, succeeded: ok, results: output };
+}
+
+// 0.11 — video_analyze: Extract metadata from a video URL/file.
+async function toolVideoAnalyze(args) {
+  const url = String(args?.url || '').trim();
+  if (!url) return { ok: false, error: 'url is required' };
+  try {
+    if (url.includes('youtube.com') || url.includes('youtu.be')) {
+      const vidId = url.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/)?.[1];
+      if (vidId) {
+        const oembed = await toolFetchUrl({ url: `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${vidId}&format=json` });
+        if (oembed?.ok) { try { const d = JSON.parse(oembed.content); return { ok: true, source: 'youtube', video_id: vidId, title: d.title, author: d.author_name, thumbnail: d.thumbnail_url }; } catch (_) {} }
+      }
+    }
+    const page = await toolFetchUrl({ url });
+    return { ok: true, source: 'url', url, content_length: page?.content?.length || 0, fetched: !!page?.ok };
+  } catch (err) { return { ok: false, error: err.message }; }
+}
+
+// 0.12 — audio_analyze: Analyze audio file metadata.
+async function toolAudioAnalyze(args) {
+  const url = String(args?.url || '').trim();
+  if (!url) return { ok: false, error: 'url is required' };
+  const ext = _path.extname(url).toLowerCase();
+  const formats = { '.mp3': 'MPEG Audio', '.wav': 'WAV', '.flac': 'FLAC', '.aac': 'AAC', '.ogg': 'Ogg Vorbis', '.m4a': 'MPEG-4 Audio' };
+  return { ok: true, url, detected_format: formats[ext] || 'unknown', extension: ext || 'none', playable: ['.mp3','.wav','.ogg','.aac','.m4a'].includes(ext), instruction: 'Use show_on_monitor(kind="audio", query=<url>) to play.' };
+}
+
+// 0.13 — image_edit: Basic image manipulation instructions (delegates to run_code).
+async function toolImageEdit(args) {
+  const operation = String(args?.operation || '').trim();
+  const source = String(args?.source || '').trim();
+  if (!operation || !source) return { ok: false, error: 'operation and source are required' };
+  const script = `from PIL import Image; img = Image.open("${source}"); ` +
+    (operation === 'resize' ? `img = img.resize((${args?.width||800}, ${args?.height||600})); img.save("output.png"); print("resized")` :
+     operation === 'grayscale' ? `img = img.convert("L"); img.save("output.png"); print("grayscale")` :
+     operation === 'rotate' ? `img = img.rotate(${args?.angle||90}); img.save("output.png"); print("rotated")` :
+     `print("unknown operation: ${operation}")`);
+  return toolRunCode ? await toolRunCode({ language: 'python', code: script }) : { ok: false, error: 'run_code unavailable' };
+}
+
+// 0.14 — spreadsheet_analyze: Parse and analyze CSV data.
+async function toolSpreadsheetAnalyze(args) {
+  const data = String(args?.data || '').trim();
+  if (!data) return { ok: false, error: 'data (CSV string) is required' };
+  const lines = data.split('\n').map(l => l.split(',').map(c => c.trim()));
+  const headers = lines[0] || [];
+  const rows = lines.slice(1).filter(r => r.length > 0);
+  const numericCols = {};
+  headers.forEach((h, i) => {
+    const vals = rows.map(r => parseFloat(r[i])).filter(v => !isNaN(v));
+    if (vals.length > 0) numericCols[h] = { count: vals.length, sum: vals.reduce((a,b) => a+b, 0), min: Math.min(...vals), max: Math.max(...vals), avg: vals.reduce((a,b) => a+b, 0) / vals.length };
+  });
+  return { ok: true, headers, total_rows: rows.length, total_columns: headers.length, numeric_analysis: numericCols, sample_rows: rows.slice(0, 5) };
+}
+
+// 0.15 — vision_analyze: Detailed image analysis (delegates to ask_expert with image description).
+async function toolVisionAnalyze(args) {
+  const description = String(args?.description || '').trim();
+  const question = String(args?.question || 'Describe this image in detail').trim();
+  if (!description) return { ok: false, error: 'description of the image/scene is required (from camera frame or user upload)' };
+  const expert = await toolAskExpertCoder({ question: `Analyze this visual scene: ${description}\n\nQuestion: ${question}`, context: 'Visual analysis task.' });
+  return { ok: !!expert?.ok, analysis: expert?.answer || 'Analysis unavailable', question };
+}
+
+// 0.16 — screen_capture: Client-side tool marker (actual capture in frontend).
+async function toolScreenCapture(args) {
+  return { ok: true, client_action: 'screen_capture', instruction: 'The client will capture the screen and send it as a frame. Use the camera frames to see the result.' };
+}
+
+// 0.17 — task_planner: Create a structured task list with priorities.
+async function toolTaskPlanner(args, ctx) {
+  const goal = String(args?.goal || '').trim();
+  if (!goal) return { ok: false, error: 'goal is required' };
+  const expert = await toolAskExpertCoder({
+    question: `Create a structured task plan for: "${goal}". Return a JSON array of objects with: {task, priority (1-5), estimated_minutes, dependencies (array of task indices), status: "pending"}. Max 10 tasks.`,
+    context: 'Task planning. Return ONLY valid JSON array.',
+  });
+  let tasks = [];
+  try {
+    const raw = (expert?.answer || '').match(/\[[\s\S]*\]/)?.[0];
+    tasks = raw ? JSON.parse(raw) : [];
+  } catch (_) { tasks = [{ task: goal, priority: 1, estimated_minutes: 30, dependencies: [], status: 'pending' }]; }
+  return { ok: true, goal, tasks, total_tasks: tasks.length, estimated_total_minutes: tasks.reduce((s, t) => s + (t.estimated_minutes || 0), 0) };
+}
+
+// 0.18 — clipboard_manager: Client-side clipboard read/write.
+async function toolClipboardManager(args) {
+  const action = String(args?.action || 'read').trim();
+  if (action === 'write') {
+    const text = String(args?.text || '');
+    return { ok: true, client_action: 'clipboard_write', text, instruction: 'Content will be copied to clipboard on the client.' };
+  }
+  return { ok: true, client_action: 'clipboard_read', instruction: 'The client will read clipboard contents and send them back.' };
+}
+
+// 0.19 — context_cache: In-memory context cache for cross-turn references.
+const _contextCache = new Map();
+async function toolContextCache(args, ctx) {
+  const action = String(args?.action || 'get').trim();
+  const key = String(args?.key || '').trim();
+  const userId = ctx?.user?.id || 'guest';
+  const cacheKey = `${userId}:${key}`;
+  if (action === 'set' || action === 'save') {
+    const value = args?.value;
+    _contextCache.set(cacheKey, { value, stored_at: new Date().toISOString() });
+    if (_contextCache.size > 200) { const oldest = _contextCache.keys().next().value; _contextCache.delete(oldest); }
+    return { ok: true, action: 'cached', key };
+  }
+  if (action === 'delete') { _contextCache.delete(cacheKey); return { ok: true, action: 'deleted', key }; }
+  if (action === 'list') {
+    const keys = [..._contextCache.keys()].filter(k => k.startsWith(userId + ':')).map(k => k.split(':').slice(1).join(':'));
+    return { ok: true, action: 'list', keys, count: keys.length };
+  }
+  const entry = _contextCache.get(cacheKey);
+  return { ok: true, action: 'get', key, found: !!entry, value: entry?.value || null, stored_at: entry?.stored_at || null };
+}
+
+// 0.20 — mcp_protocol: MCP connector status and management.
+async function toolMcpProtocol(args, ctx) {
+  const action = String(args?.action || 'status').trim();
+  const userId = ctx?.user?.id;
+  if (!userId) return { ok: false, signed_in: false, error: 'MCP requires sign-in.' };
+  const googleMcpMod = require('./googleMcp');
+  if (action === 'status') {
+    const connected = await googleMcpMod.hasGoogleConnection(userId).catch(() => false);
+    return { ok: true, mcp_enabled: !!process.env.MCP_ENABLED, google_connected: connected, available_services: ['google_calendar', 'gmail', 'google_drive'] };
+  }
+  if (action === 'connect') {
+    const url = googleMcpMod.getConnectUrl(userId);
+    return { ok: true, connect_url: url, instruction: 'Open this URL to connect your Google account.' };
+  }
+  return { ok: true, action, note: 'Use action: status or connect' };
+}
+
+// 0.21 — scheduled_task: Schedule a reminder or future action.
+const _scheduledTasks = new Map();
+async function toolScheduledTask(args, ctx) {
+  const action = String(args?.action || 'create').trim();
+  const userId = ctx?.user?.id || 'guest';
+  if (action === 'list') {
+    const tasks = [..._scheduledTasks.values()].filter(t => t.userId === userId);
+    return { ok: true, tasks: tasks.map(t => ({ id: t.id, description: t.description, scheduled_for: t.scheduled_for, status: t.status })), count: tasks.length };
+  }
+  if (action === 'cancel') {
+    const id = String(args?.id || '');
+    const task = _scheduledTasks.get(id);
+    if (task && task.userId === userId) { clearTimeout(task.timer); task.status = 'cancelled'; return { ok: true, cancelled: id }; }
+    return { ok: false, error: 'Task not found' };
+  }
+  const description = String(args?.description || '').trim();
+  const delayMin = Math.max(1, Math.min(1440, Number(args?.delay_minutes) || 5));
+  if (!description) return { ok: false, error: 'description is required' };
+  const id = 'sched_' + Date.now();
+  const scheduledFor = new Date(Date.now() + delayMin * 60000).toISOString();
+  const timer = setTimeout(() => { const t = _scheduledTasks.get(id); if (t) t.status = 'fired'; }, delayMin * 60000);
+  _scheduledTasks.set(id, { id, userId, description, delay_minutes: delayMin, scheduled_for: scheduledFor, status: 'pending', timer });
+  if (_scheduledTasks.size > 100) { const oldest = [..._scheduledTasks.entries()].find(([,v]) => v.status !== 'pending'); if (oldest) _scheduledTasks.delete(oldest[0]); }
+  return { ok: true, id, description, scheduled_for: scheduledFor, delay_minutes: delayMin };
+}
+
+// 0.23 — qr_code: Generate a QR code image URL.
+async function toolQrCode(args) {
+  const text = String(args?.text || '').trim();
+  if (!text) return { ok: false, error: 'text is required' };
+  const size = Math.min(Math.max(Number(args?.size) || 300, 100), 1000);
+  const encoded = encodeURIComponent(text);
+  const url = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encoded}`;
+  return { ok: true, qr_url: url, text, size, instruction: 'Call show_on_monitor(kind="image", query=<qr_url>) to display the QR code, or show_on_monitor(kind="html", query="<img src=\\"<qr_url>\\" />").' };
+}
+
+// 0.25 — smart_alert: Set up a condition-based alert.
+const _smartAlerts = new Map();
+async function toolSmartAlert(args, ctx) {
+  const action = String(args?.action || 'create').trim();
+  const userId = ctx?.user?.id || 'guest';
+  if (action === 'list') {
+    const alerts = [..._smartAlerts.values()].filter(a => a.userId === userId);
+    return { ok: true, alerts: alerts.map(a => ({ id: a.id, condition: a.condition, message: a.message, status: a.status })), count: alerts.length };
+  }
+  if (action === 'delete') {
+    const id = String(args?.id || '');
+    if (_smartAlerts.has(id)) { _smartAlerts.delete(id); return { ok: true, deleted: id }; }
+    return { ok: false, error: 'Alert not found' };
+  }
+  const condition = String(args?.condition || '').trim();
+  const message = String(args?.message || '').trim();
+  if (!condition || !message) return { ok: false, error: 'condition and message are required' };
+  const id = 'alert_' + Date.now();
+  _smartAlerts.set(id, { id, userId, condition, message, status: 'active', created_at: new Date().toISOString() });
+  return { ok: true, id, condition, message, status: 'active' };
+}
+
 // Full list of tool names handled by this module — keeps catalogs honest.
 const REAL_TOOL_NAMES = [
   'calculate', 'unit_convert', 'get_moon_phase',
@@ -4182,6 +4479,10 @@ const REAL_TOOL_NAMES = [
   // ── Position 0 — Super LLM capabilities ──
   'query_database', 'check_updates', 'conversation_summary',
   'thinking_mode', 'deep_search', 'memory_sources', 'self_verify', 'data_visualize',
+  'computer_use', 'auto_test', 'session_persist', 'parallel_tools',
+  'video_analyze', 'audio_analyze', 'image_edit', 'spreadsheet_analyze',
+  'vision_analyze', 'screen_capture', 'task_planner', 'clipboard_manager',
+  'context_cache', 'mcp_protocol', 'scheduled_task', 'qr_code', 'smart_alert',
 ];
 
 module.exports = {
@@ -4271,6 +4572,23 @@ module.exports = {
   toolMemorySources,
   toolSelfVerify,
   toolDataVisualize,
+  toolComputerUse,
+  toolAutoTest,
+  toolSessionPersist,
+  toolParallelTools,
+  toolVideoAnalyze,
+  toolAudioAnalyze,
+  toolImageEdit,
+  toolSpreadsheetAnalyze,
+  toolVisionAnalyze,
+  toolScreenCapture,
+  toolTaskPlanner,
+  toolClipboardManager,
+  toolContextCache,
+  toolMcpProtocol,
+  toolScheduledTask,
+  toolQrCode,
+  toolSmartAlert,
   // Memory files
   storeTempFile,
   getTempFile,
