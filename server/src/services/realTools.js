@@ -3370,6 +3370,11 @@ async function executeRealTool(name, args, ctx) {
     case 'execute_plan':      return toolExecutePlan(a, ctx);
     // ── Gemma 4 Deep Reasoning ──
 
+    // ── Position 0 — Super LLM capabilities ──
+    case 'query_database':       return toolQueryDatabase(a, ctx);
+    case 'check_updates':        return toolCheckUpdates(a);
+    case 'conversation_summary': return toolConversationSummary(a, ctx);
+
     default:                  return null; // signal "not handled here"
   }
 }
@@ -3572,6 +3577,223 @@ async function toolGetActionHistory(args, ctx) {
   return { ok: true, count: actions.length, actions };
 }
 
+// ═════════════════════════════════════════════════════════════════════
+// Position 0 — Super LLM capabilities
+// ═════════════════════════════════════════════════════════════════════
+
+// 0.5 — query_database: Kelion interconnected to ALL data in the DB.
+// READ-ONLY. Supports predefined query types to prevent SQL injection.
+// The user's data is always scoped to their own user_id.
+async function toolQueryDatabase(args, ctx) {
+  const userId = ctx?.user?.id;
+  if (!userId) {
+    return { ok: false, signed_in: false, error: 'Database access requires sign-in.' };
+  }
+  const db = require('../db');
+  const query = String(args?.query || '').trim().toLowerCase();
+  const limitRaw = Number.parseInt(args?.limit, 10);
+  const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(100, limitRaw)) : 20;
+
+  try {
+    // Predefined safe query types — never runs raw SQL
+    if (query.includes('conversation') || query.includes('chat') || query.includes('mesaj')) {
+      // Conversation stats
+      const convos = await db.listConversations(userId, 200);
+      const totalConversations = convos.length;
+      let totalMessages = 0;
+      let longestMessage = { content: '', length: 0, role: '', conversation_title: '' };
+      let userMessages = 0;
+      let assistantMessages = 0;
+
+      for (const c of convos.slice(0, 50)) {
+        const msgs = await db.getConversationMessages(c.id);
+        totalMessages += msgs.length;
+        for (const m of msgs) {
+          if (m.role === 'user') userMessages++;
+          if (m.role === 'assistant') assistantMessages++;
+          if (m.content && m.content.length > longestMessage.length) {
+            longestMessage = {
+              content: m.content.slice(0, 200) + (m.content.length > 200 ? '...' : ''),
+              length: m.content.length,
+              role: m.role,
+              conversation_title: c.title || 'Untitled',
+            };
+          }
+        }
+      }
+      return {
+        ok: true,
+        type: 'conversations',
+        total_conversations: totalConversations,
+        total_messages: totalMessages,
+        user_messages: userMessages,
+        assistant_messages: assistantMessages,
+        longest_message: longestMessage,
+        recent_conversations: convos.slice(0, limit).map(c => ({
+          id: c.id, title: c.title, created_at: c.created_at, updated_at: c.updated_at,
+        })),
+      };
+    }
+
+    if (query.includes('memor') || query.includes('fact') || query.includes('ține minte')) {
+      // Memory items
+      const memories = await db.getMemoryItems(userId);
+      return {
+        ok: true,
+        type: 'memory',
+        total_items: memories.length,
+        items: memories.slice(0, limit).map(m => ({
+          id: m.id, kind: m.kind, fact: m.fact, subject: m.subject,
+          subject_name: m.subject_name, tier: m.tier,
+          created_at: m.created_at, last_affirmed_at: m.last_affirmed_at,
+        })),
+      };
+    }
+
+    if (query.includes('action') || query.includes('acțiun') || query.includes('tool') || query.includes('history')) {
+      // Action history
+      const rows = await db.listRecentActions(userId, { limit });
+      return {
+        ok: true,
+        type: 'actions',
+        total: rows.length,
+        actions: rows.map(r => ({
+          id: r.id, tool: r.tool_name, ok: !!r.ok,
+          args: r.args_summary, result: r.result_summary,
+          duration_ms: r.duration_ms, at: r.created_at,
+        })),
+      };
+    }
+
+    if (query.includes('credit') || query.includes('minut') || query.includes('balanț') || query.includes('usage')) {
+      // Credits + transactions
+      const user = await db.getUserById(userId);
+      const txRows = await db.getRecentTransactions(userId, limit);
+      return {
+        ok: true,
+        type: 'credits',
+        balance_minutes: user?.credits_balance_minutes || 0,
+        transactions: txRows.map(t => ({
+          id: t.id, delta_minutes: t.delta_minutes,
+          kind: t.kind, note: t.note, created_at: t.created_at,
+        })),
+      };
+    }
+
+    if (query.includes('profil') || query.includes('cont') || query.includes('account') || query.includes('user')) {
+      // User profile
+      const user = await db.getUserById(userId);
+      return {
+        ok: true,
+        type: 'profile',
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        subscription_tier: user.subscription_tier,
+        credits_balance_minutes: user.credits_balance_minutes,
+        preferred_language: user.preferred_language,
+        created_at: user.created_at,
+      };
+    }
+
+    // Default: return available query types
+    return {
+      ok: true,
+      type: 'help',
+      message: 'Specify what to query. Available types: conversations, memory, actions, credits, profile.',
+      hint: 'Use natural language like: "show my conversations", "what facts do you remember", "my credit balance"',
+    };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
+// 0.4 — check_updates: Verify npm dependency versions.
+// Runs `npm outdated --json` in the project root and parses the result.
+async function toolCheckUpdates(args) {
+  const { execSync } = require('child_process');
+  const target = String(args?.path || '.').trim();
+  try {
+    const cwd = _path.resolve(REPO_ROOT, target);
+    // npm outdated returns exit code 1 when there ARE outdated packages
+    let raw;
+    try {
+      raw = execSync('npm outdated --json 2>&1', { cwd, timeout: 30000 }).toString();
+    } catch (e) {
+      raw = e.stdout ? e.stdout.toString() : '{}';
+    }
+    const outdated = JSON.parse(raw || '{}');
+    const packages = Object.entries(outdated).map(([name, info]) => ({
+      name,
+      current: info.current || 'N/A',
+      wanted: info.wanted || 'N/A',
+      latest: info.latest || 'N/A',
+      type: info.type || 'dependencies',
+      needs_update: info.current !== info.latest,
+    }));
+    const needsUpdate = packages.filter(p => p.needs_update);
+    return {
+      ok: true,
+      total_packages: packages.length,
+      outdated_count: needsUpdate.length,
+      up_to_date: needsUpdate.length === 0,
+      outdated: needsUpdate.slice(0, 50),
+    };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
+// 0.24 — conversation_summary: Auto-summarize conversations for context.
+async function toolConversationSummary(args, ctx) {
+  const userId = ctx?.user?.id;
+  if (!userId) {
+    return { ok: false, signed_in: false, error: 'Conversation summary requires sign-in.' };
+  }
+  const db = require('../db');
+  const limitRaw = Number.parseInt(args?.limit, 10);
+  const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(10, limitRaw)) : 5;
+
+  try {
+    const convos = await db.listConversations(userId, limit);
+    const summaries = [];
+    for (const c of convos) {
+      const msgs = await db.getConversationMessages(c.id);
+      const totalChars = msgs.reduce((sum, m) => sum + (m.content?.length || 0), 0);
+      const userMsgs = msgs.filter(m => m.role === 'user');
+      const assistantMsgs = msgs.filter(m => m.role === 'assistant');
+      // Extract key topics from user messages (first 3 unique first sentences)
+      const topics = [...new Set(
+        userMsgs
+          .map(m => (m.content || '').split(/[.!?\n]/)[0].trim())
+          .filter(s => s.length > 5)
+          .slice(0, 3)
+      )];
+      summaries.push({
+        id: c.id,
+        title: c.title || 'Untitled',
+        created_at: c.created_at,
+        updated_at: c.updated_at,
+        total_messages: msgs.length,
+        user_messages: userMsgs.length,
+        assistant_messages: assistantMsgs.length,
+        total_characters: totalChars,
+        key_topics: topics,
+        first_user_message: userMsgs[0]?.content?.slice(0, 150) || '',
+        last_user_message: userMsgs[userMsgs.length - 1]?.content?.slice(0, 150) || '',
+      });
+    }
+    return {
+      ok: true,
+      total_conversations: convos.length,
+      summaries,
+    };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
 // Full list of tool names handled by this module — keeps catalogs honest.
 const REAL_TOOL_NAMES = [
   'calculate', 'unit_convert', 'get_moon_phase',
@@ -3613,6 +3835,8 @@ const REAL_TOOL_NAMES = [
   'learn_from_observation',
   // MCP — Google Calendar / Gmail / Drive
   'read_calendar', 'read_email', 'search_files',
+  // ── Position 0 — Super LLM capabilities ──
+  'query_database', 'check_updates', 'conversation_summary',
 ];
 
 module.exports = {
@@ -3693,6 +3917,10 @@ module.exports = {
   toolRememberFact,
   // Faza A — global live radio search (radio-browser.info, ~50k stations)
   toolPlayRadio,
+  // ── Position 0 — Super LLM capabilities ──
+  toolQueryDatabase,
+  toolCheckUpdates,
+  toolConversationSummary,
   // Memory files
   storeTempFile,
   getTempFile,

@@ -1242,6 +1242,32 @@ const KELION_TOOLS = [
     },
     required: ['steps'],
   },
+  // ── Position 0 — Super LLM capabilities ──────────────────────────
+  {
+    name: 'query_database',
+    description: "Query Kelion's own database to look up the signed-in user's data: conversations, memory items, action history, credits, profile. READ-ONLY. Use when the user asks 'câte conversații am?', 'ce fapte ții minte?', 'show my credit balance', 'what tools have you used for me?'. Returns structured data scoped to the user's account only.",
+    properties: {
+      query: { type: 'string', description: "Natural-language query indicating what to look up. Include keywords like 'conversations', 'memory', 'actions', 'credits', or 'profile'. E.g. 'show my conversations this month', 'what facts do you remember about me', 'my credit balance'." },
+      limit: { type: 'integer', description: "Max items to return (1-100, default 20)." },
+    },
+    required: ['query'],
+  },
+  {
+    name: 'check_updates',
+    description: "Check for outdated npm dependencies in the project. Runs `npm outdated --json` and returns a list of packages that need updating, with current vs latest versions. Use when the user asks 'are my packages up to date?', 'verifică dependențele', 'check for updates'.",
+    properties: {
+      path: { type: 'string', description: "Optional sub-directory to check (relative to repo root). Default '.' (root)." },
+    },
+    required: [],
+  },
+  {
+    name: 'conversation_summary',
+    description: "Generate a structured summary of the user's recent conversations — message counts, key topics, first/last user messages. Use when the user asks 'fă un rezumat', 'summarize our chats', 'what have we discussed?'. Helps manage context for long sessions.",
+    properties: {
+      limit: { type: 'integer', description: "How many recent conversations to summarize (1-10, default 5)." },
+    },
+    required: [],
+  },
 ];
 
 // Google v1alpha BidiGenerateContent — JSON schema with UPPERCASE types and
