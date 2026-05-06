@@ -71,7 +71,7 @@ const REAL_TOOL_NAMES = new Set([
   'read_pdf', 'read_docx', 'ocr_image', 'ocr_passport',
   'send_email', 'create_calendar_ics', 'zapier_trigger',
   'github_repo_info', 'get_github_issues', 'list_github_repo_files', 'read_github_file', 'npm_package_info', 'pypi_package_info',
-  'read_local_file', 'list_local_files', 'edit_local_file', 'search_codebase', 'replace_in_file', 'create_github_pr',
+  'read_local_file', 'list_local_files', 'edit_local_file', 'search_codebase', 'replace_in_file', 'create_github_pr', 'manage_github_prs',
   'run_command', 'write_to_file', 'replace_file_content', 'multi_replace_file_content',
   'run_terminal_command', 'ask_expert_coder', 'fetch_documentation', 'browse_web',
   'run_regex', 'get_my_credits', 'get_my_usage', 'get_my_profile',
@@ -85,6 +85,13 @@ const REAL_TOOL_NAMES = new Set([
   'play_radio',
   // Google Account tools (Calendar, Gmail, Drive)
   'read_calendar', 'read_email', 'search_files',
+  // ── Position 0 — Super LLM capabilities ──
+  'query_database', 'check_updates', 'conversation_summary',
+  'thinking_mode', 'deep_search', 'memory_sources', 'self_verify', 'data_visualize',
+  'computer_use', 'auto_test', 'session_persist', 'parallel_tools',
+  'video_analyze', 'audio_analyze', 'image_edit', 'spreadsheet_analyze',
+  'vision_analyze', 'screen_capture', 'task_planner', 'clipboard_manager',
+  'context_cache', 'mcp_protocol', 'scheduled_task', 'qr_code', 'smart_alert',
 ])
 
 // Compress a tool-result JSON into a short, speakable string for the voice
