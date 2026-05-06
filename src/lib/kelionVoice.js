@@ -1690,8 +1690,8 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
         }
         appendTurn('assistant', finalReply, true, finalModel ? `🤖 ${finalModel}` : undefined)
         
-        console.log('[TTS-DEBUG] playAudio=', playAudio, 'finalReply length=', finalReply.length, 'muteMode=', muteModeRef.current)
-        if (playAudio && !muteModeRef.current) {
+        console.log('[TTS-DEBUG] playAudio=', playAudio, 'finalReply length=', finalReply.length)
+        if (playAudio) {
           setStatus('speaking')
           const isNative = !isClonedVoiceActive();
           const ttsUrl = isNative ? '/api/voice/clone/tts?native=true' : '/api/voice/clone/tts';

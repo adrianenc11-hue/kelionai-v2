@@ -3593,17 +3593,26 @@ const REAL_TOOL_NAMES = [
   'github_repo_info', 'list_github_repo_files', 'read_github_file', 'npm_package_info', 'pypi_package_info',
   // F11 — image generation
   'generate_image',
-  // PR 8/N — Memory of Actions. Read-only self-reflection: returns the
-  // caller's own recent tool invocations (from action_history) so
-  // Kelion can check "did I already email that?" before re-running.
-  // Returns `{ ok:false, signed_in:false }` for guests.
+  // PR 8/N — Memory of Actions
   'get_action_history',
-  // Explicit memory save — user tells Kelion something worth remembering.
+  // Explicit memory save
   'remember_fact',
-  // Live radio streaming via radio-browser.info
+  // Live radio streaming
   'play_radio',
-  // Deep reasoning with Gemma 4
+  // Deep reasoning
   'deep_think',
+  // ── God Mode tools (local file ops + terminal) ──
+  'run_command', 'run_terminal_command',
+  'write_to_file', 'replace_file_content', 'multi_replace_file_content',
+  'read_local_file', 'list_local_files', 'edit_local_file',
+  'search_codebase', 'replace_in_file',
+  'create_github_pr', 'manage_github_prs',
+  'ask_expert_coder', 'fetch_documentation', 'browse_web',
+  'execute_plan',
+  // Silent vision auto-learn
+  'learn_from_observation',
+  // MCP — Google Calendar / Gmail / Drive
+  'read_calendar', 'read_email', 'search_files',
 ];
 
 module.exports = {
