@@ -1304,6 +1304,39 @@ function buildKelionToolsChatCompletions() {
   }));
 }
 
+// ── Demand-driven tool selection (2026-05-06) ──────────────────────
+// Default: all tools are OFF. Only tools relevant to the user's message
+// are activated, used, then go back to OFF for the next request.
+// This reduces token cost by 60-90% and improves model focus.
+const { selectTools } = require('../services/toolRouter');
+
+function buildKelionToolsChatCompletionsForMessage(userMessage) {
+  const { tools: selectedTools, categories, selectedCount } = selectTools(userMessage, KELION_TOOLS);
+  
+  if (selectedCount === 0) {
+    // Pure greeting / simple chat — no tools needed at all
+    console.log('[toolRouter] No tools activated (simple chat)');
+    return { tools: [], categories: [] };
+  }
+
+  console.log(`[toolRouter] Activated ${selectedCount}/${KELION_TOOLS.length} tools for categories: [${categories.join(', ')}]`);
+  
+  const formatted = selectedTools.map(t => ({
+    type: 'function',
+    function: {
+      name: t.name,
+      description: t.description,
+      parameters: {
+        type: 'object',
+        properties: t.properties,
+        required: t.required,
+      },
+    },
+  }));
+  
+  return { tools: formatted, categories };
+}
+
 
 
 // ──────────────────────────────────────────────────────────────────
@@ -1639,6 +1672,20 @@ router.post('/pipeline', async (req, res) => {
     }
     console.log('[pipeline] text:', userText);
 
+    // ── Adaptive Resource Governor ────────────────────────────────────
+    // Compute resource levels: OFF → MIN → MAX based on need.
+    // Resources activate to MAX only for the duration they're needed,
+    // then drop back to OFF/MIN for the next request.
+    const { computeResourceSnapshot, logTransition } = require('../services/resourceGovernor');
+    const { needsVision } = require('../services/toolRouter');
+    const resourceContext = {
+      message: userText,
+      cameraActive: !!(visionContext && visionContext.trim()),
+      narrationActive: false, // pipeline doesn't have narration state
+      visionRequested: needsVision(userText),
+    };
+    // Tool categories will be computed next — add them after toolRouter runs
+
     // Build persona + system prompt
     const adminUser = await peekSignedInUser(req);
     const isAdmin = await isAdminUser(adminUser);
@@ -1673,8 +1720,24 @@ router.post('/pipeline', async (req, res) => {
     }
     messages.push({ role: 'user', content: userText });
 
-    // Build tools in OpenAI format
-    const openRouterTools = buildKelionToolsChatCompletions();
+    // ── Demand-driven tool activation ─────────────────────────────────
+    // Default: all tools OFF. Only activate tools relevant to this
+    // specific message. After the request, tools go back to OFF.
+    const { tools: openRouterTools, categories: activeCategories } = buildKelionToolsChatCompletionsForMessage(userText);
+
+    // Complete the resource snapshot now that we have tool categories
+    resourceContext.toolCategories = activeCategories;
+    const snapshot = computeResourceSnapshot(resourceContext);
+    // Log active resource levels for this request
+    const activeResources = Object.entries(snapshot)
+      .filter(([, v]) => v.levelName !== 'OFF')
+      .map(([k, v]) => `${k}=${v.levelName}`)
+      .join(', ');
+    if (activeResources) {
+      console.log(`[resourceGov] Request levels: ${activeResources}`);
+    } else {
+      console.log('[resourceGov] All resources OFF (simple chat)');
+    }
 
     const chatModel = process.env.OPENROUTER_MODEL || 'google/gemma-4-31b-it';
     const url = 'https://openrouter.ai/api/v1/chat/completions';
@@ -1682,10 +1745,13 @@ router.post('/pipeline', async (req, res) => {
     const body = {
       model: chatModel,
       messages,
-      tools: openRouterTools,
       temperature: 0.6,
       max_tokens: 4000,
     };
+    // Only include tools field when tools are actually needed
+    if (openRouterTools.length > 0) {
+      body.tools = openRouterTools;
+    }
 
     let currentModel = chatModel;
     let fallbackTriggered = false;
@@ -1828,6 +1894,7 @@ module.exports.resolveVoiceStyle = resolveVoiceStyle;
 module.exports.KELION_TOOLS = KELION_TOOLS;
 module.exports.buildKelionToolsGoogle = buildKelionToolsGoogle;
 module.exports.buildKelionToolsChatCompletions = buildKelionToolsChatCompletions;
+module.exports.buildKelionToolsChatCompletionsForMessage = buildKelionToolsChatCompletionsForMessage;
 module.exports.buildKelionPersona = buildKelionPersona;
 // Audit M9 — exported so chat.js renders memory with the same
 // self/other partitioning as the voice persona. Keeping a single

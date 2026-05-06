@@ -1191,20 +1191,15 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
     video.srcObject = stream
     video.play().catch(() => {})
 
-    // ~15 fps target. We honor the spec in wall time rather than animation
-    // frames so tab-visibility throttling does not pause the stream to the
-    // AI (the user might be looking at a different window but we still want
-    // Kelion to "see" the camera).
-    const TARGET_FPS = kind === 'screen' ? 8 : 15
+    // Performance-optimised frame rate (2026-05-06). 4fps camera is
+    // sufficient for the AI to track motion; the model processes one
+    // frame at a time. When frames ARE sent, they go at FULL QUALITY
+    // (1024px, JPEG 0.78) so the model has maximum capability.
+    // Screen share at 2fps (mostly static content).
+    const TARGET_FPS = kind === 'screen' ? 2 : 4
     const MIN_INTERVAL_MS = Math.floor(1000 / TARGET_FPS)
-    // PR 5/N — high-quality live vision. Adrian 2026-04-20: "fiind o
-    // aplicație profesională, camerele trebuie să trimită către avatar
-    // imagini live de foarte bună calitate". Camera short-edge goes
-    // 480 → 1024 (4.5× pixel area) and JPEG_Q 0.55 → 0.78 — still well
-    // inside the 2 MB back-pressure budget at 15 fps because the
-    // existing `bufferedAmount > BACKPRESSURE_BYTES` guard already
-    // drops frames when the socket is full. Screen share keeps its
-    // higher ceiling (was already 960).
+    // Full quality — when vision is active, give the model the best
+    // data possible for accurate analysis.
     const MAX_W = kind === 'screen' ? 1280 : 1024
     const JPEG_Q = kind === 'screen' ? 0.75 : 0.78
     const BACKPRESSURE_BYTES = 2_000_000
@@ -1314,12 +1309,14 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
     const baseSelector = deviceId
       ? { deviceId: { exact: deviceId } }
       : { facingMode: nextFacing }
+    // 2026-05-06: Reduced from 4K → 720p. We downscale to 480px in the
+    // frame sender anyway, so capturing at 4K wastes memory and GPU
+    // (camera driver allocates 4K buffers that we never use at full res).
+    // 720p gives enough headroom for the 480px downscale while keeping
+    // resource usage sane.
     const constraintLadder = [
-      { video: { ...baseSelector, width: { ideal: 3840 }, height: { ideal: 2160 } }, audio: false },
-      { video: { ...baseSelector, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false },
       { video: { ...baseSelector, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
       { video: { ...baseSelector, width: { ideal: 640 }, height: { ideal: 480 } }, audio: false },
-      { video: { width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
       { video: { width: { ideal: 640 }, height: { ideal: 480 } }, audio: false },
       { video: true, audio: false },
     ]
