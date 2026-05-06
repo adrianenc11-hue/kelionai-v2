@@ -157,6 +157,23 @@ const EXPECTED_TOOL_NAMES = [
   'memory_sources',
   'self_verify',
   'data_visualize',
+  'computer_use',
+  'auto_test',
+  'session_persist',
+  'parallel_tools',
+  'video_analyze',
+  'audio_analyze',
+  'image_edit',
+  'spreadsheet_analyze',
+  'vision_analyze',
+  'screen_capture',
+  'task_planner',
+  'clipboard_manager',
+  'context_cache',
+  'mcp_protocol',
+  'scheduled_task',
+  'qr_code',
+  'smart_alert',
 ];
 
 describe('Kelion tool catalog', () => {
