@@ -95,10 +95,25 @@ router.post('/', async (req, res) => {
     const model = process.env.CHAT_MODEL || process.env.OPENROUTER_MODEL || 'google/gemma-4-31b-it';
     const url = 'https://openrouter.ai/api/v1/chat/completions';
 
-    const { buildKelionToolsChatCompletions } = require('./realtime');
-    // Inject the coordinates into the tools builder if the backend supports it,
-    // though OpenRouter tools might not implicitly use it. The system prompt is safer.
-    const openRouterTools = buildKelionToolsChatCompletions();
+    // ── Demand-driven tool activation ─────────────────────────────────
+    // Default: all tools OFF. Activate only tools relevant to this
+    // specific message. After the request completes, tools go back to OFF.
+    const { selectTools } = require('../services/toolRouter');
+    const { KELION_TOOLS } = require('./realtime');
+    const { tools: relevantTools, categories } = selectTools(message, KELION_TOOLS);
+    const openRouterTools = relevantTools.map(t => ({
+      type: 'function',
+      function: {
+        name: t.name,
+        description: t.description,
+        parameters: { type: 'object', properties: t.properties, required: t.required },
+      },
+    }));
+    if (categories.length) {
+      console.log(`[chat] toolRouter activated ${openRouterTools.length} tools for [${categories.join(', ')}]`);
+    } else {
+      console.log('[chat] toolRouter: no tools needed (simple chat)');
+    }
 
     const locationContext = (lat && lon) 
       ? `\n\n[SYSTEM CONTEXT: The user's current GPS coordinates are: Latitude ${lat}, Longitude ${lon}. If asked about location, weather, or directions, you have access to this.]` 
@@ -172,11 +187,14 @@ Your replies must be direct, conversational, and concise.${locationContext}`
     const body = {
       model,
       messages,
-      tools: openRouterTools,
-      tool_choice: "auto",
       temperature: 0.7,
       max_tokens: 1024,
     };
+    // Only include tools when the router activated some — saves ~3000 tokens on greetings
+    if (openRouterTools.length > 0) {
+      body.tools = openRouterTools;
+      body.tool_choice = "auto";
+    }
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 30_000);
