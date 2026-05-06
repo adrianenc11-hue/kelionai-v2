@@ -27,6 +27,8 @@ const TOOL_CATEGORIES = {
     'show_on_monitor',
     'query_database',
     'conversation_summary',
+    'thinking_mode',
+    'memory_sources',
   ],
 
   // Greetings and simple conversation — no tools needed beyond CORE
@@ -68,6 +70,7 @@ const TOOL_CATEGORIES = {
     'translate',
     'fetch_documentation',
     'browse_web',
+    'deep_search',
   ],
 
   // Finance — crypto, stocks, forex
@@ -83,6 +86,7 @@ const TOOL_CATEGORIES = {
     'calculate',
     'unit_convert',
     'run_regex',
+    'data_visualize',
   ],
 
   // Code, files, terminal — development tools
@@ -101,6 +105,7 @@ const TOOL_CATEGORIES = {
     'ask_expert_coder',
     'execute_plan',
     'check_updates',
+    'self_verify',
   ],
 
   // GitHub

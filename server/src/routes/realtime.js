@@ -1268,6 +1268,52 @@ const KELION_TOOLS = [
     },
     required: [],
   },
+  {
+    name: 'thinking_mode',
+    description: "Think step-by-step through a complex problem, showing visible reasoning steps before giving the final answer. Use when the user asks 'gândește pas cu pas', 'think step by step', 'reason through this', or for any complex analytical question that benefits from visible chain-of-thought.",
+    properties: {
+      question: { type: 'string', description: "The question or problem to reason through step-by-step." },
+      context: { type: 'string', description: "Optional additional context (code, data, constraints)." },
+    },
+    required: ['question'],
+  },
+  {
+    name: 'deep_search',
+    description: "Perform a deep multi-source web research on a topic. Searches from multiple angles, fetches content from top sources, and synthesizes a comprehensive report. Use when the user asks 'caută tot despre', 'deep search', 'cercetează', 'find everything about', or needs a thorough analysis from multiple web sources.",
+    properties: {
+      topic: { type: 'string', description: "The topic to research deeply across multiple sources." },
+      max_sources: { type: 'integer', description: "Maximum sources to fetch and synthesize (2-10, default 5)." },
+    },
+    required: ['topic'],
+  },
+  {
+    name: 'memory_sources',
+    description: "Show the user exactly which memory items (facts, preferences, observations) Kelion has stored about them, with full metadata: timestamps, confidence scores, kind, and source. Use when the user asks 'de unde știi asta?', 'where did you learn that?', 'show me my memory', 'what do you know about me?', 'arată-mi sursele'.",
+    properties: {
+      query: { type: 'string', description: "Optional filter to search within memory items (e.g. 'name', 'job', 'preference'). Leave empty to show all." },
+    },
+    required: [],
+  },
+  {
+    name: 'self_verify',
+    description: "Re-check and verify a previous action's output. Reads back edited files, re-calculates math, or re-checks URLs to confirm correctness. Use AUTOMATICALLY after editing files or performing calculations to ensure accuracy. Also use when the user asks 'verifică', 'check if it's correct', 'e corect?'.",
+    properties: {
+      action: { type: 'string', description: "What to verify: 'check_file' (re-read a file), 're_calculate' (re-run math), 'verify_url' (check URL reachability)." },
+      target: { type: 'string', description: "The target to verify: file path for check_file, math expression for re_calculate, URL for verify_url." },
+    },
+    required: ['action', 'target'],
+  },
+  {
+    name: 'data_visualize',
+    description: "Generate a chart or graph from data. Returns Chart.js HTML ready to display on the monitor via show_on_monitor(kind='html'). Supports bar, line, pie, doughnut, radar, scatter charts. Use when the user asks 'fă un grafic', 'make a chart', 'visualize this data', 'show me a graph'.",
+    properties: {
+      type: { type: 'string', description: "Chart type: 'bar', 'line', 'pie', 'doughnut', 'radar', 'scatter'. Default 'bar'." },
+      title: { type: 'string', description: "Chart title displayed above the graph." },
+      labels: { type: 'string', description: "JSON array of labels for the X axis, e.g. '[\"Jan\",\"Feb\",\"Mar\"]'." },
+      data: { type: 'string', description: "JSON array of numbers or dataset objects. Simple: '[10,20,30]'. Multi-series: '[{\"label\":\"Sales\",\"data\":[10,20]},{\"label\":\"Costs\",\"data\":[5,15]}]'." },
+    },
+    required: ['labels', 'data'],
+  },
 ];
 
 // Google v1alpha BidiGenerateContent — JSON schema with UPPERCASE types and
