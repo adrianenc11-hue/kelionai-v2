@@ -951,6 +951,69 @@ async function appendConversationMessage(userId, conversationId, role, content) 
   };
 }
 
+// Advanced transcript search — full-text search across all conversation
+// messages for a given user. Supports keyword match (LIKE), date range
+// (ISO-8601), role filter ('user' / 'assistant'), and pagination.
+// Returns matching messages with their parent conversation title so the
+// Transcript search panel can render results in context.
+async function searchConversationMessages(userId, {
+  query = '',
+  dateFrom = null,
+  dateTo = null,
+  role = null,
+  limit = 50,
+  offset = 0,
+} = {}) {
+  const safeLimit = Math.max(1, Math.min(200, Number(limit) || 50));
+  const safeOffset = Math.max(0, Number(offset) || 0);
+  const params = [userId];
+  const conditions = ['c.user_id = ?'];
+
+  if (query && typeof query === 'string' && query.trim()) {
+    conditions.push('m.content LIKE ?');
+    params.push(`%${query.trim()}%`);
+  }
+  if (dateFrom && typeof dateFrom === 'string') {
+    conditions.push('m.created_at >= ?');
+    params.push(dateFrom);
+  }
+  if (dateTo && typeof dateTo === 'string') {
+    conditions.push('m.created_at <= ?');
+    params.push(dateTo);
+  }
+  if (role === 'user' || role === 'assistant') {
+    conditions.push('m.role = ?');
+    params.push(role);
+  }
+
+  const where = conditions.join(' AND ');
+  params.push(safeLimit, safeOffset);
+
+  const rows = await db.all(
+    `SELECT m.id, m.role, m.content, m.created_at,
+            m.conversation_id,
+            c.title AS conversation_title
+     FROM conversation_messages m
+     JOIN conversations c ON c.id = m.conversation_id
+     WHERE ${where}
+     ORDER BY m.created_at DESC
+     LIMIT ? OFFSET ?`,
+    params
+  );
+
+  // Count total matches for pagination.
+  const countParams = params.slice(0, -2); // remove limit+offset
+  const countRow = await db.get(
+    `SELECT COUNT(*) AS total
+     FROM conversation_messages m
+     JOIN conversations c ON c.id = m.conversation_id
+     WHERE ${where}`,
+    countParams
+  );
+
+  return { rows, total: countRow ? countRow.total : 0 };
+}
+
 async function listConversations(userId, limit = 50) {
   const safeLimit = Math.max(1, Math.min(MAX_CONV_PER_USR, Number(limit) || 50));
   return db.all(
@@ -2096,6 +2159,7 @@ module.exports = {
   createConversation,
   appendConversationMessage,
   listConversations,
+  searchConversationMessages,
   getConversationWithMessages,
   updateConversationTitle,
   deleteConversation,

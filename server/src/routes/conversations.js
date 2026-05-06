@@ -16,12 +16,62 @@ const {
   createConversation,
   appendConversationMessage,
   listConversations,
+  searchConversationMessages,
   getConversationWithMessages,
   updateConversationTitle,
   deleteConversation,
 } = require('../db');
 
 const router = Router();
+
+// GET /api/conversations/search — advanced full-text search across all
+// conversation messages for the signed-in user.
+//
+// Query params:
+//   q         — keyword / phrase to search for (case-insensitive LIKE match)
+//   dateFrom  — ISO-8601 lower bound (e.g. '2026-05-01')
+//   dateTo    — ISO-8601 upper bound (e.g. '2026-05-06T23:59:59')
+//   role      — 'user' | 'assistant' — filter by speaker
+//   limit     — max results (1..200, default 50)
+//   offset    — pagination offset (default 0)
+//
+// Response: { results: [...], total, filters: { ... }, ts }
+router.get('/search', async (req, res) => {
+  try {
+    const q        = typeof req.query.q === 'string' ? req.query.q : '';
+    const dateFrom = typeof req.query.dateFrom === 'string' ? req.query.dateFrom : null;
+    const dateTo   = typeof req.query.dateTo === 'string' ? req.query.dateTo : null;
+    const role     = typeof req.query.role === 'string' ? req.query.role : null;
+    const limit    = Math.max(1, Math.min(200, parseInt(req.query.limit || '50', 10)));
+    const offset   = Math.max(0, parseInt(req.query.offset || '0', 10));
+
+    const { rows, total } = await searchConversationMessages(req.user.id, {
+      query: q,
+      dateFrom,
+      dateTo,
+      role,
+      limit,
+      offset,
+    });
+
+    res.json({
+      results: rows.map(r => ({
+        id:                r.id,
+        role:              r.role,
+        content:           r.content,
+        created_at:        r.created_at,
+        conversation_id:   r.conversation_id,
+        conversation_title: r.conversation_title,
+      })),
+      total,
+      filters: { q: q || null, dateFrom, dateTo, role, limit, offset },
+      ts: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error('[conversations/search]', err);
+    res.status(500).json({ error: 'Search failed' });
+  }
+});
 
 // GET /api/conversations — list the user's threads, newest first.
 router.get('/', async (req, res) => {
