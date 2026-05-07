@@ -3656,9 +3656,23 @@ async function toolQueryDatabase(args, ctx) {
       // Sort days newest first
       const days = Object.values(byDay).sort((a, b) => b.date.localeCompare(a.date));
 
+      // Build human-readable summary so the AI presents clean text
+      const dayLines = days.slice(0, limit).map(d => {
+        const titlesStr = d.titles.length > 0 ? ` (${d.titles.join(', ')})` : '';
+        return `  • ${d.date}: ${d.conversations} conversații, ${d.messages} mesaje${titlesStr}`;
+      });
+      const summary = [
+        `Ai ${totalConversations} conversații în baza de date cu un total de ${totalMessages} mesaje.`,
+        `Din ultimele 30 de conversații: ${userMessages} mesaje ale tale, ${assistantMessages} mesaje Kelion.`,
+        ``,
+        `Detalii pe zile:`,
+        ...dayLines,
+      ].join('\n');
+
       return {
         ok: true,
         type: 'conversations',
+        summary,
         total_conversations: totalConversations,
         total_messages: totalMessages,
         user_messages: userMessages,
