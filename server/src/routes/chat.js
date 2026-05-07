@@ -175,9 +175,10 @@ Your replies must be direct, conversational, and concise.${locationContext}`
           if (p.functionResponse) {
             // Prefer human-readable summary when available, fall back to full JSON
             const rawResult = p.functionResponse.response;
-            const resultContent = (rawResult && rawResult.result && rawResult.result.summary)
-              ? rawResult.result.summary
-              : JSON.stringify(rawResult);
+            const summary = rawResult && rawResult.result ? rawResult.result.summary : null;
+            const resultContent = summary != null
+              ? String(summary)
+              : String(JSON.stringify(rawResult));
             messages.push({
               role: 'tool',
               tool_call_id: p.functionResponse.id || `call_${p.functionResponse.name}`,
