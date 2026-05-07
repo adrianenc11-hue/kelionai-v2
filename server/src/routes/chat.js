@@ -115,8 +115,8 @@ router.post('/', async (req, res) => {
       console.log('[chat] toolRouter: no tools needed (simple chat)');
     }
 
-    const locationContext = (lat && lon) 
-      ? `\n\n[SYSTEM CONTEXT: The user's current GPS coordinates are: Latitude ${lat}, Longitude ${lon}. If asked about location, weather, or directions, you have access to this.]` 
+    const locationContext = (lat && lon)
+      ? `\n\n[SYSTEM CONTEXT: The user's current GPS coordinates are: Latitude ${lat}, Longitude ${lon}. If asked about location, weather, or directions, you have access to this.]`
       : '';
 
     // Convert session history to OpenAI format
@@ -136,8 +136,8 @@ Your replies must be direct, conversational, and concise.${locationContext}`
         for (const p of h.parts) {
           if (p.text) content.push({ type: 'text', text: p.text });
           if (p.inlineData) {
-            content.push({ 
-              type: 'image_url', 
+            content.push({
+              type: 'image_url',
               image_url: { url: `data:${p.inlineData.mimeType};base64,${p.inlineData.data}` }
             });
           }
@@ -160,7 +160,7 @@ Your replies must be direct, conversational, and concise.${locationContext}`
             textContent += p.text;
           }
         }
-        
+
         if (tool_calls.length > 0) {
           messages.push({
             role: 'assistant',
@@ -173,11 +173,16 @@ Your replies must be direct, conversational, and concise.${locationContext}`
       } else if (h.role === 'function') {
         for (const p of h.parts) {
           if (p.functionResponse) {
+            // Prefer human-readable summary when available, fall back to full JSON
+            const rawResult = p.functionResponse.response;
+            const resultContent = (rawResult && rawResult.result && rawResult.result.summary)
+              ? rawResult.result.summary
+              : JSON.stringify(rawResult);
             messages.push({
               role: 'tool',
               tool_call_id: p.functionResponse.id || `call_${p.functionResponse.name}`,
               name: p.functionResponse.name,
-              content: JSON.stringify(p.functionResponse.response)
+              content: resultContent,
             });
           }
         }
@@ -237,20 +242,20 @@ Your replies must be direct, conversational, and concise.${locationContext}`
     if (choice.tool_calls && choice.tool_calls.length > 0) {
       const toolCalls = choice.tool_calls.map(tc => {
         let args = {};
-        try { args = JSON.parse(tc.function.arguments); } catch(e){}
+        try { args = JSON.parse(tc.function.arguments); } catch (e) { }
         return { name: tc.function.name, args, id: tc.id };
       });
-      
+
       // Save the model's turn so history is valid
-      session.history.push({ 
-        role: 'model', 
-        parts: toolCalls.map(tc => ({ functionCall: tc })) 
+      session.history.push({
+        role: 'model',
+        parts: toolCalls.map(tc => ({ functionCall: tc }))
       });
       return res.json({ toolCalls, model });
     }
 
     const reply = choice.content || 'Sorry, I could not generate a response.';
-    
+
     // Add assistant response to history
     session.history.push({ role: 'model', parts: [{ text: reply }] });
 
