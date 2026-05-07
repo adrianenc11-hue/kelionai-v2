@@ -242,12 +242,13 @@ const CATEGORY_TRIGGERS = {
       /calculea|comput|math/i, /radical|sqrt|logaritm/i,
       /câ[tț].*fac|how.*much.*is/i, /procent|percent/i,
       /convertește|convert.*unit/i, /kilom|mile|pound|kilo/i,
-      /regex|regular.*express/i,
+      /regex|regular.*express/i, /grafic|chart|plot|vizualiz/i,
       /\d+\s*[\+\-\*\/\^]\s*\d+/,  // Simple arithmetic detection
     ],
     keywords: ['calcul', 'calculate', 'math', 'radical', 'sqrt', 'logaritm',
       'procent', 'percent', 'convertește', 'convert', 'kilometri', 'mile',
-      'kilograme', 'pounds', 'fahrenheit', 'celsius', 'regex'],
+      'kilograme', 'pounds', 'fahrenheit', 'celsius', 'regex',
+      'grafic', 'chart', 'plot', 'vizualizare'],
   },
   CODE_DEV: {
     patterns: [
