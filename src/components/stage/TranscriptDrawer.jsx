@@ -159,7 +159,7 @@ export default function TranscriptDrawer({ turns, authSignedIn, authToken, isAdm
         backdropFilter: 'blur(22px)',
         borderLeft: '1px solid rgba(167, 139, 250, 0.2)',
         padding: '70px 20px 20px 20px',
-        overflowY: 'auto',
+        overflow: 'hidden',
         fontFamily: 'system-ui, -apple-system, sans-serif',
         zIndex: 24,
         userSelect: 'text',
@@ -228,7 +228,7 @@ export default function TranscriptDrawer({ turns, authSignedIn, authToken, isAdm
 
       {/* LIVE TAB — current session turns */}
       {tsTab === 'live' && (
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: 1, overflowY: 'auto', paddingRight: 4 }}>
           {turns.length === 0 && (
             <div style={{ opacity: 0.5, fontSize: 14 }}>Conversația va apărea aici.</div>
           )}
