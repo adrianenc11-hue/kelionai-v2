@@ -274,9 +274,10 @@ const CATEGORY_TRIGGERS = {
     patterns: [
       /npm.*pachet|npm.*package|versiune.*express|version.*of/i,
       /pypi|pip.*install/i, /stackoverflow|stack.*overflow/i,
+      /dependen[tț]e.*neactualizate|check.*updates/i,
     ],
     keywords: ['npm', 'package', 'pachet', 'pypi', 'pip', 'stackoverflow',
-      'versiune', 'version'],
+      'versiune', 'version', 'dependențe', 'neactualizate'],
   },
   CAMERA: {
     patterns: [
