@@ -11,6 +11,33 @@ import React, { useState, useRef, useCallback, useEffect } from 'react'
  *   isAdmin      – boolean
  *   onClose      – () => void
  */
+
+/**
+ * Strip internal tool-calling markup that the model sometimes leaks into its
+ * visible text.  Patterns removed:
+ *   ⚙ **Apelează Tool:** `tool_name` ```json ... ```
+ *   ✅ **Rezultat Tool:** ``` ... ```
+ *   Any remaining raw JSON objects ({ "key": ... })
+ */
+function cleanToolMarkup(text) {
+  if (!text || typeof text !== 'string') return text
+  let cleaned = text
+  // Remove "⚙ **Apelează Tool:** ..." blocks (including JSON code fences)
+  cleaned = cleaned.replace(/⚙\s*\*{0,2}Apeleaz[aăâ]\s*Tool:?\*{0,2}[^✅]*/gi, '')
+  // Remove "✅ **Rezultat Tool:** ..." blocks
+  cleaned = cleaned.replace(/✅\s*\*{0,2}Rezultat\s*Tool:?\*{0,2}\s*```[\s\S]*?```/gi, '')
+  // Remove any remaining fenced code blocks with JSON
+  cleaned = cleaned.replace(/```json[\s\S]*?```/gi, '')
+  cleaned = cleaned.replace(/```[\s\S]*?```/gi, '')
+  // Remove standalone JSON objects like {"ok":true,"type":"conversations",...}
+  cleaned = cleaned.replace(/\{["\s]*ok["\s]*:\s*true[\s\S]*?\}\s*/g, '')
+  // Remove leftover ✅ markers
+  cleaned = cleaned.replace(/[⚙✅]\s*/g, '')
+  // Collapse multiple newlines
+  cleaned = cleaned.replace(/\n{3,}/g, '\n\n')
+  return cleaned.trim()
+}
+
 export default function TranscriptDrawer({ turns, authSignedIn, authToken, isAdmin, onClose }) {
   const [tsTab, setTsTab] = useState('live')
   const [tsQuery, setTsQuery] = useState('')
@@ -217,7 +244,10 @@ export default function TranscriptDrawer({ turns, authSignedIn, authToken, isAdm
                 <span>{t.role === 'user' ? 'TU' : 'KELION'}</span>
                 {isAdmin && t.source && <span style={{ opacity: 0.8, color: t.role === 'user' ? '#d8b4fe' : '#93c5fd', fontWeight: 500 }}>{t.source}</span>}
               </div>
-              {t.text || t.transcript || <i style={{ opacity: 0.4 }}>…</i>}
+              {t.role === 'user'
+                ? (t.text || t.transcript || <i style={{ opacity: 0.4 }}>…</i>)
+                : (cleanToolMarkup(t.text || t.transcript || '') || <i style={{ opacity: 0.4 }}>…</i>)
+              }
             </div>
           ))}
         </div>
