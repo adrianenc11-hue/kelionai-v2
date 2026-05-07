@@ -29,6 +29,7 @@ const TOOL_CATEGORIES = {
     'conversation_summary',
     'thinking_mode',
     'memory_sources',
+    'run_command',
   ],
 
   // Greetings and simple conversation — no tools needed beyond CORE
