@@ -38,6 +38,7 @@ confidence guidance:
 
 Rules:
 - Durable only. Skip one-off mood notes ("I'm tired today"), small talk, retracted statements.
+- NEVER extract or store the user's current GPS location, city, or country as a fact (e.g. do not store "lives in X" or "is currently in Y"). Location must always be read in real-time.
 - Be specific. "Adrian is learning Spanish" > "likes languages".
 - Fact text is SHORT (≤ 140 chars), third-person when a name is known, otherwise neutral ("lives in Cluj").
 - subject_name is REQUIRED for "other" and MUST be the actual name the user used (not "the sister", not "a friend") — skip the item if you don't know the name.
