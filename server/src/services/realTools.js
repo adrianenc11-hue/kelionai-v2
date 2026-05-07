@@ -3629,7 +3629,8 @@ async function toolQueryDatabase(args, ctx) {
       // Group conversations by day
       const byDay = {};
       for (const c of convos) {
-        const dayKey = (c.created_at || '').slice(0, 10) || 'unknown';
+        const rawDate = c.created_at ? String(c.created_at) : '';
+        const dayKey = rawDate.slice(0, 10) || 'unknown';
         if (!byDay[dayKey]) byDay[dayKey] = { date: dayKey, conversations: 0, messages: 0, titles: [] };
         byDay[dayKey].conversations++;
         const msgCount = c.message_count || 0;
