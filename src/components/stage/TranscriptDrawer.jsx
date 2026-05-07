@@ -38,14 +38,14 @@ export default function TranscriptDrawer({ turns, authSignedIn, authToken, isAdm
     try {
       const params = new URLSearchParams()
       if (tsQuery.trim()) params.set('q', tsQuery.trim())
-      // Combine date + time into ISO strings
+      // Combine date + time into SQLite-compatible datetime strings
       if (tsDateFrom) {
         const timePart = tsTimeFrom || '00:00'
-        params.set('dateFrom', `${tsDateFrom}T${timePart}:00`)
+        params.set('dateFrom', `${tsDateFrom} ${timePart}:00`)
       }
       if (tsDateTo) {
         const timePart = tsTimeTo || '23:59'
-        params.set('dateTo', `${tsDateTo}T${timePart}:59`)
+        params.set('dateTo', `${tsDateTo} ${timePart}:59`)
       }
       if (tsRole) params.set('role', tsRole)
       params.set('limit', String(tsLimit))
