@@ -3011,7 +3011,7 @@ async function toolSearchCodebase(args) {
     // Support file-type filtering via include glob (e.g. '*.js', '*.jsx')
     const includeGlob = args?.include ? ` -- '${String(args.include).replace(/'/g, '')}'` : '';
     const caseSensitive = args?.case_sensitive === false ? '-i ' : '';
-    const { stdout } = await _exec(`git grep -nI ${caseSensitive}"${safeQuery}"${includeGlob}`, { cwd: REPO_ROOT });
+    const { stdout } = await _exec(`git grep -nI ${caseSensitive}"${safeQuery}"${includeGlob}`, { cwd: _path.join(REPO_ROOT, 'server') });
     const lines = stdout.trim().split('\n');
     const matches = lines.slice(0, 100).join('\n');
     return { ok: true, matches: matches || 'No matches found.', total: lines.length, truncated: lines.length > 100 };
@@ -4196,7 +4196,7 @@ async function toolComputerUse(args) {
   });
   if (!expertResult?.ok) return { ok: false, error: 'Could not generate script' };
   const script = (expertResult.answer || '').replace(/```[\w]*\n?/g, '').trim();
-  const tmpFile = _path.join(REPO_ROOT, '.tmp_playwright_' + Date.now() + '.js');
+  const tmpFile = _path.join(REPO_ROOT, 'server', '.tmp_playwright_' + Date.now() + '.js');
   try {
     _fs.writeFileSync(tmpFile, script, 'utf8');
     const { stdout, stderr } = await _exec(`node "${tmpFile}"`, { cwd: REPO_ROOT, timeout: 30000 });

@@ -4,7 +4,8 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node src/index.js",
-    "test": "jest --coverage"
+    "test": "jest --coverage",
+    "postinstall": "npx playwright install chromium --with-deps"
   },
   "dependencies": {
     "@google-cloud/text-to-speech": "^5.0.0",
@@ -23,6 +24,7 @@
     "node-fetch": "^3.0.0",
     "pdf-parse": "^1.1.4",
     "pg": "^8.20.0",
+    "playwright": "^1.43.0",
     "sqlite": "^5.1.1",
     "sqlite3": "^5.1.6",
     "tesseract.js": "^5.1.1",
