@@ -1,8 +1,12 @@
 FROM node:20-slim AS base
 
-# Native build tools for better-sqlite3
+# Native build tools for better-sqlite3 + Chromium system dependencies for Playwright
 RUN apt-get update && apt-get install -y \
     python3 make g++ \
+    libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
+    libxkbcommon0 libxcomposite1 libxdamage1 libxrandr2 libgbm1 \
+    libpango-1.0-0 libcairo2 libasound2 libxshmfence1 libx11-xcb1 \
+    fonts-liberation wget ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -14,6 +18,9 @@ RUN npm install
 # Install server dependencies
 COPY server/package.json server/package-lock.json ./server/
 RUN cd server && npm install --omit=dev
+
+# Download Chromium browser for Playwright
+RUN cd server && npx playwright install chromium
 
 # Copy source and build frontend
 COPY . .

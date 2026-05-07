@@ -23,6 +23,7 @@
     "node-fetch": "^3.0.0",
     "pdf-parse": "^1.1.4",
     "pg": "^8.20.0",
+    "playwright": "^1.59.1",
     "sqlite": "^5.1.1",
     "sqlite3": "^5.1.6",
     "tesseract.js": "^5.1.1",
