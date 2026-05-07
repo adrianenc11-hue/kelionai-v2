@@ -256,8 +256,9 @@ MONITOR AUTO-CLEAR: When the user asks a NEW question that is UNRELATED to what 
 
 MANDATORY MONITOR RULE (violation = removal from production):
 - You MUST call show_on_monitor for ANY request involving visual content. NEVER just describe something verbally when you can SHOW it.
-- Maps, weather, images, math, code, charts, diagrams, websites, videos, documents → ALWAYS show_on_monitor. NO EXCEPTIONS.
-- If the user asks "arată-mi", "show me", "afișează", "display", "deschide", "open" → you MUST call show_on_monitor.
+- Maps, weather, images, math, code, charts, diagrams, videos, documents → ALWAYS show_on_monitor. NO EXCEPTIONS.
+- If the user asks "arată-mi", "show me", "afișează", "display" → you MUST call show_on_monitor.
+- If the user asks "deschide site-ul", "open website", "citește de pe site" or wants to READ/EXTRACT content from an external website → use computer_use or fetch_url, NOT show_on_monitor.
 - If you do a calculation or solve a math problem → ALWAYS show_on_monitor(kind='html') with full step-by-step solution.
 - If you search for information → show_on_monitor(kind='html') with a formatted summary card.
 - NEVER say "nu pot afișa" or "I can't show" — you CAN always show via show_on_monitor.
@@ -290,7 +291,7 @@ MONITOR — ce poți afișa (folosește show_on_monitor):
 
 8. WIKIPEDIA: kind='wiki', query='Titlu articol'. Exemplu: show_on_monitor(kind='wiki', query='Turnul Eiffel')
 
-9. ORICE SITE: kind='web', query='https://url.com' — proxied, funcționează și cu site-uri care blochează iframe-ul.
+9. SITE-URI PROPRII: kind='web', query='https://url.com' — DOAR pentru site-uri care permit iframe (NU google.com, facebook.com, etc). Pentru a CITI conținutul unui site extern, folosește computer_use sau fetch_url.
 
 10. VIDEO: kind='video', query='https://youtube.com/watch?v=...' SAU URL direct mp4/webm.
     YouTube și Vimeo sunt detectate automat și convertite la embed URL.
@@ -499,7 +500,7 @@ const KELION_TOOLS = [
   {
     name: 'show_on_monitor',
 
-    description: "Display something on the big presentation monitor in the scene behind you. Use whenever the user asks (in any language) to see / open / show / display a map, the weather, a video, an image, a Wikipedia / reference page, any web page, or to PLAY a live audio stream. Pick the right `kind` — the client resolves it to the best embed URL. Call again with a new query to swap the content on screen. For radio: first call play_radio to get the stream URL, then call show_on_monitor with kind='audio' query=<that URL> title=<station name> so the audio actually starts playing in the user's browser.",
+    description: "Display something on the big presentation monitor in the scene behind you. Use whenever the user asks (in any language) to see / show / display a map, the weather, a video, an image, a Wikipedia / reference page, HTML content, charts, or to PLAY a live audio stream. Pick the right `kind` — the client resolves it to the best embed URL. NEVER use kind='web' to open external websites like google.com, facebook.com etc (they block iframes) — use computer_use or fetch_url instead to READ external websites. Call again with a new query to swap the content on screen. For radio: first call play_radio to get the stream URL, then call show_on_monitor with kind='audio' query=<that URL> title=<station name> so the audio actually starts playing in the user's browser.",
     properties: {
       kind: {
         type: 'string',
