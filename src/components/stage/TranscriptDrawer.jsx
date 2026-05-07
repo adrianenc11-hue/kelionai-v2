@@ -228,7 +228,7 @@ export default function TranscriptDrawer({ turns, authSignedIn, authToken, isAdm
 
       {/* LIVE TAB — current session turns */}
       {tsTab === 'live' && (
-        <div style={{ flex: 1, overflowY: 'auto', paddingRight: 4 }}>
+        <div style={{ flex: 1, overflowY: 'auto', paddingRight: 4, minHeight: 0 }}>
           {turns.length === 0 && (
             <div style={{ opacity: 0.5, fontSize: 14 }}>Conversația va apărea aici.</div>
           )}
@@ -255,7 +255,7 @@ export default function TranscriptDrawer({ turns, authSignedIn, authToken, isAdm
 
       {/* SEARCH TAB — full-text search with filters */}
       {tsTab === 'search' && (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
           {/* Search input */}
           <div style={{ position: 'relative', marginBottom: 10, flexShrink: 0 }}>
             <input
@@ -431,7 +431,7 @@ export default function TranscriptDrawer({ turns, authSignedIn, authToken, isAdm
           )}
 
           {/* Search results */}
-          <div style={{ flex: 1, overflow: 'auto' }}>
+          <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
             {tsResults.map((r) => {
               const ts = r.created_at ? new Date(r.created_at) : null
               const timeStr = ts && !Number.isNaN(ts.getTime())
