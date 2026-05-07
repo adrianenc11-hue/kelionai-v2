@@ -3619,30 +3619,42 @@ async function toolQueryDatabase(args, ctx) {
   try {
     // Predefined safe query types — never runs raw SQL
     if (query.includes('conversation') || query.includes('chat') || query.includes('mesaj')) {
-      // Conversation stats
+      // Conversation stats — indexed by day, clean output
       const convos = await db.listConversations(userId, 200);
       const totalConversations = convos.length;
       let totalMessages = 0;
-      let longestMessage = { content: '', length: 0, role: '', conversation_title: '' };
       let userMessages = 0;
       let assistantMessages = 0;
 
-      for (const c of convos.slice(0, 50)) {
-        const msgs = await db.getConversationMessages(c.id);
-        totalMessages += msgs.length;
-        for (const m of msgs) {
-          if (m.role === 'user') userMessages++;
-          if (m.role === 'assistant') assistantMessages++;
-          if (m.content && m.content.length > longestMessage.length) {
-            longestMessage = {
-              content: m.content.slice(0, 200) + (m.content.length > 200 ? '...' : ''),
-              length: m.content.length,
-              role: m.role,
-              conversation_title: c.title || 'Untitled',
-            };
-          }
+      // Group conversations by day
+      const byDay = {};
+      for (const c of convos) {
+        const dayKey = (c.created_at || '').slice(0, 10) || 'unknown';
+        if (!byDay[dayKey]) byDay[dayKey] = { date: dayKey, conversations: 0, messages: 0, titles: [] };
+        byDay[dayKey].conversations++;
+        const msgCount = c.message_count || 0;
+        byDay[dayKey].messages += msgCount;
+        totalMessages += msgCount;
+        if (byDay[dayKey].titles.length < 5) {
+          byDay[dayKey].titles.push(c.title || 'Fara titlu');
         }
       }
+
+      // Count user vs assistant messages from a sample of recent conversations
+      for (const c of convos.slice(0, 30)) {
+        try {
+          const convoData = await db.getConversationWithMessages(userId, c.id);
+          const msgs = (convoData && convoData.messages) || [];
+          for (const m of msgs) {
+            if (m.role === 'user') userMessages++;
+            if (m.role === 'assistant') assistantMessages++;
+          }
+        } catch (_) { /* skip if conversation not accessible */ }
+      }
+
+      // Sort days newest first
+      const days = Object.values(byDay).sort((a, b) => b.date.localeCompare(a.date));
+
       return {
         ok: true,
         type: 'conversations',
@@ -3650,10 +3662,7 @@ async function toolQueryDatabase(args, ctx) {
         total_messages: totalMessages,
         user_messages: userMessages,
         assistant_messages: assistantMessages,
-        longest_message: longestMessage,
-        recent_conversations: convos.slice(0, limit).map(c => ({
-          id: c.id, title: c.title, created_at: c.created_at, updated_at: c.updated_at,
-        })),
+        by_day: days.slice(0, limit),
       };
     }
 
@@ -3781,30 +3790,33 @@ async function toolConversationSummary(args, ctx) {
     const convos = await db.listConversations(userId, limit);
     const summaries = [];
     for (const c of convos) {
-      const msgs = await db.getConversationMessages(c.id);
-      const totalChars = msgs.reduce((sum, m) => sum + (m.content?.length || 0), 0);
-      const userMsgs = msgs.filter(m => m.role === 'user');
-      const assistantMsgs = msgs.filter(m => m.role === 'assistant');
-      // Extract key topics from user messages (first 3 unique first sentences)
-      const topics = [...new Set(
-        userMsgs
-          .map(m => (m.content || '').split(/[.!?\n]/)[0].trim())
-          .filter(s => s.length > 5)
-          .slice(0, 3)
-      )];
-      summaries.push({
-        id: c.id,
-        title: c.title || 'Untitled',
-        created_at: c.created_at,
-        updated_at: c.updated_at,
-        total_messages: msgs.length,
-        user_messages: userMsgs.length,
-        assistant_messages: assistantMsgs.length,
-        total_characters: totalChars,
-        key_topics: topics,
-        first_user_message: userMsgs[0]?.content?.slice(0, 150) || '',
-        last_user_message: userMsgs[userMsgs.length - 1]?.content?.slice(0, 150) || '',
-      });
+      try {
+        const convoData = await db.getConversationWithMessages(userId, c.id);
+        const msgs = (convoData && convoData.messages) || [];
+        const totalChars = msgs.reduce((sum, m) => sum + (m.content?.length || 0), 0);
+        const userMsgs = msgs.filter(m => m.role === 'user');
+        const assistantMsgs = msgs.filter(m => m.role === 'assistant');
+        // Extract key topics from user messages (first 3 unique first sentences)
+        const topics = [...new Set(
+          userMsgs
+            .map(m => (m.content || '').split(/[.!?\n]/)[0].trim())
+            .filter(s => s.length > 5)
+            .slice(0, 3)
+        )];
+        summaries.push({
+          id: c.id,
+          title: c.title || 'Fara titlu',
+          created_at: c.created_at,
+          updated_at: c.updated_at,
+          total_messages: msgs.length,
+          user_messages: userMsgs.length,
+          assistant_messages: assistantMsgs.length,
+          total_characters: totalChars,
+          key_topics: topics,
+          first_user_message: userMsgs[0]?.content?.slice(0, 150) || '',
+          last_user_message: userMsgs[userMsgs.length - 1]?.content?.slice(0, 150) || '',
+        });
+      } catch (_) { /* skip inaccessible conversations */ }
     }
     return {
       ok: true,
