@@ -4185,27 +4185,55 @@ async function toolDataVisualize(args) {
   };
 }
 
-// 0.1 — computer_use: Generate and run a Playwright automation script.
+// 0.1 — computer_use: Browse a URL and extract content using Jina Reader API.
+// Falls back to native fetch for simple page reads. No Playwright/Chromium needed.
 async function toolComputerUse(args) {
   const task = String(args?.task || '').trim();
   const url = String(args?.url || '').trim();
-  if (!task) return { ok: false, error: 'task is required' };
-  const expertResult = await toolAskExpertCoder({
-    question: `Write a minimal Node.js Playwright script that does: "${task}"${url ? ` starting at ${url}` : ''}. Use chromium.launch({headless:true}). Output ONLY the script, no explanation. The script should console.log a JSON result at the end.`,
-    context: 'Playwright automation. Keep it under 40 lines.',
-  });
-  if (!expertResult?.ok) return { ok: false, error: 'Could not generate script' };
-  const script = (expertResult.answer || '').replace(/```[\w]*\n?/g, '').trim();
-  const tmpFile = _path.join(REPO_ROOT, '.tmp_playwright_' + Date.now() + '.js');
-  try {
-    _fs.writeFileSync(tmpFile, script, 'utf8');
-    const { stdout, stderr } = await _exec(`node "${tmpFile}"`, { cwd: REPO_ROOT, timeout: 30000 });
-    try { _fs.unlinkSync(tmpFile); } catch (_) { }
-    return { ok: true, output: stdout.trim(), errors: stderr?.trim() || null, script_preview: script.slice(0, 500) };
-  } catch (err) {
-    try { _fs.unlinkSync(tmpFile); } catch (_) { }
-    return { ok: false, error: err.message, script_preview: script.slice(0, 300) };
+  if (!task && !url) return { ok: false, error: 'task or url is required' };
+
+  // If we have a URL, use Jina Reader to fetch & extract content
+  const targetUrl = url || extractUrlFromTask(task);
+  if (targetUrl) {
+    try {
+      const jinaUrl = `https://r.jina.ai/${encodeURIComponent(targetUrl)}`;
+      const resp = await fetchWithTimeout(jinaUrl, {
+        headers: { 'Accept': 'text/markdown', 'User-Agent': 'Kelion/1.0' },
+        timeout: 15000,
+      });
+      const markdown = await resp.text();
+      // Extract title from markdown (Jina returns it as first H1)
+      const titleMatch = markdown.match(/^#\s+(.+)/m);
+      const title = titleMatch ? titleMatch[1].trim() : null;
+      return {
+        ok: true,
+        url: targetUrl,
+        title: title || '(no title found)',
+        content: markdown.slice(0, 4000),
+        summary: title
+          ? `Pagina "${title}" a fost accesată cu succes.`
+          : `Conținutul de la ${targetUrl} a fost extras.`,
+      };
+    } catch (err) {
+      return { ok: false, error: `Could not fetch ${targetUrl}: ${err.message}` };
+    }
   }
+
+  // No URL detected — describe what we'd need to do
+  return {
+    ok: false,
+    error: 'No URL detected in the task. Please provide a URL or use browse_web for search-based browsing.',
+  };
+}
+
+// Helper: extract a URL from a natural-language task string
+function extractUrlFromTask(task) {
+  const urlMatch = task.match(/https?:\/\/[^\s"'<>]+/i);
+  if (urlMatch) return urlMatch[0];
+  // Check for bare domains like "google.com"
+  const domainMatch = task.match(/\b([a-z0-9-]+\.[a-z]{2,}(?:\.[a-z]{2,})?)\b/i);
+  if (domainMatch) return `https://${domainMatch[1]}`;
+  return null;
 }
 
 // 0.3 — auto_test: Write and run a Jest test for a given file/function.
