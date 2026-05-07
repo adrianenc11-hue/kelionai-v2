@@ -194,7 +194,7 @@ function start(webpush) {
     runOnce({ webpush }).catch((err) => console.error('[proactive] tick error', err.message));
   }, TICK_MS);
   if (intervalHandle.unref) intervalHandle.unref();
-  console.log(`[proactive] scheduler started — tick every ${Math.round(TICK_MS / 60000)}m, gap ${Math.round(MIN_GAP_MS / 3600000)}h, quiet ${QUIET_START_HOUR}-${QUIET_END_HOUR} UTC`);
+  console.log(`[proactive] scheduler started — tick every ${Math.round(TICK_MS / 60000)}m, gap ${Math.round(MIN_GAP_MS / 3600000)}h, quiet ${QUIET_START_LOCAL}-${QUIET_END_LOCAL} LOCAL`);
 }
 function stop() {
   if (intervalHandle) { clearInterval(intervalHandle); intervalHandle = null; }

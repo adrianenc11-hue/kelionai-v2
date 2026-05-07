@@ -72,7 +72,7 @@ async function extractFacts(turns, options = {}) {
 
   let raw;
   try {
-    const r = await fetch(url, {
+    let r = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -82,6 +82,23 @@ async function extractFacts(turns, options = {}) {
       },
       body: JSON.stringify(body),
     });
+    
+    // Fallback if Gemma is rate-limited
+    if (!r.ok && r.status === 429) {
+      console.warn('[factExtractor] OpenRouter HTTP 429 for Gemma. Falling back to Gemini 2.5 Pro...');
+      body.model = 'google/gemini-2.5-pro';
+      r = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${openRouterKey}`,
+          'HTTP-Referer': 'https://kelion.ai',
+          'X-Title': 'Kelion AI Memory'
+        },
+        body: JSON.stringify(body),
+      });
+    }
+
     if (!r.ok) {
       console.warn('[factExtractor] OpenRouter HTTP', r.status, await r.text());
       return [];
