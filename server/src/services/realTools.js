@@ -3682,7 +3682,7 @@ async function toolQueryDatabase(args, ctx) {
 
     if (query.includes('memor') || query.includes('fact') || query.includes('ține minte')) {
       // Memory items
-      const memories = await db.getMemoryItems(userId);
+      const memories = await db.listMemoryItems(userId);
       return {
         ok: true,
         type: 'memory',
@@ -3996,7 +3996,7 @@ async function toolMemorySources(args, ctx) {
   const query = String(args?.query || '').trim().toLowerCase();
 
   try {
-    const memories = await db.getMemoryItems(userId);
+    const memories = await db.listMemoryItems(userId);
     let filtered = memories;
 
     // Filter by query if provided
@@ -4249,7 +4249,7 @@ async function toolSessionPersist(args, ctx) {
       await db.addMemoryItems(userId, [{ kind: 'context', fact: `[session:${key}] ${value}`, subject: 'self', confidence: 0.95 }]);
       return { ok: true, action: 'saved', key };
     }
-    const memories = await db.getMemoryItems(userId);
+    const memories = await db.listMemoryItems(userId);
     const match = memories.find(m => (m.fact || '').startsWith(`[session:${key}]`));
     if (match) {
       const value = match.fact.replace(`[session:${key}] `, '');
