@@ -116,8 +116,8 @@ async function getJson(path) {
   }
 
   const body = token.body || {};
-  if (body.provider !== 'google') {
-    return fail('voice-token "provider" is not "google"', 'got=' + body.provider);
+  if (body.provider !== 'google' && body.provider !== 'openrouter') {
+    return fail('voice-token "provider" is not "google" or "openrouter"', 'got=' + body.provider);
   }
   if (!body.expiresAt) {
     return fail('voice-token response missing "expiresAt"', JSON.stringify(body));
@@ -137,11 +137,16 @@ async function getJson(path) {
   }
 
   const backend = body.backend;
-  if (backend !== 'vertex' && backend !== 'aistudio') {
-    return fail('voice-token "backend" is not "vertex" or "aistudio"', 'got=' + backend);
+  if (backend !== 'vertex' && backend !== 'aistudio' && backend !== 'openrouter') {
+    return fail('voice-token "backend" is not "vertex", "aistudio", or "openrouter"', 'got=' + backend);
   }
 
-  if (backend === 'vertex') {
+  if (backend === 'openrouter') {
+    // OpenRouter path — token is null (REST-based voice), no setup object needed.
+    // Just verify the essential fields are present (model, voice, voiceStyle
+    // already validated above).
+    // Pass through to success output.
+  } else if (backend === 'vertex') {
     // Vertex auth is server-side via the WS proxy; no ephemeral token
     // is minted, so `token` must be explicitly `null` (not undefined —
     // that would mean the field is missing entirely, which would be a
