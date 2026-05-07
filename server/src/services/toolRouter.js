@@ -257,11 +257,13 @@ const CATEGORY_TRIGGERS = {
       /terminal|command|comand[aă]/i, /build|deploy|install/i,
       /bug|eroare|error|fix|repar/i, /funcți[ei]|function/i,
       /plan.*execut|execute.*plan/i, /expert.*cod/i,
+      /verific[aă]?|verify|check|test/i,
     ],
     keywords: ['rulează', 'run', 'execută', 'execute', 'script', 'cod', 'code',
       'python', 'javascript', 'node', 'npm', 'terminal', 'command',
       'build', 'deploy', 'install', 'bug', 'eroare', 'error', 'fix',
-      'repară', 'fișier', 'file', 'funcție', 'function', 'plan', 'expert'],
+      'repară', 'fișier', 'file', 'funcție', 'function', 'plan', 'expert',
+      'verifică', 'verify', 'check', 'test'],
   },
   GITHUB: {
     patterns: [
