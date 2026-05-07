@@ -95,8 +95,8 @@ async function getJson(path) {
   if (health.status !== 200) {
     return fail('/health not 200', 'status=' + health.status + ' body=' + health.text.slice(0, 400));
   }
-  const Gemma 4 = health.body?.services?.Gemma 4;
-  if (Gemma 4 !== 'configured') {
+  const google = health.body?.services?.google;
+  if (google !== 'configured') {
     return fail(
       '/health reports services.google != "configured"',
       'services=' + JSON.stringify(health.body?.services || null),
@@ -117,7 +117,7 @@ async function getJson(path) {
 
   const body = token.body || {};
   if (body.provider !== 'google') {
-    return fail('voice-token "provider" is not "Gemma 4"', 'got=' + body.provider);
+    return fail('voice-token "provider" is not "google"', 'got=' + body.provider);
   }
   if (!body.expiresAt) {
     return fail('voice-token response missing "expiresAt"', JSON.stringify(body));
