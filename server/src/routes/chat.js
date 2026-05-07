@@ -223,15 +223,46 @@ Your replies must be direct, conversational, and concise.${locationContext}`
     }
 
     if (!r.ok) {
-      const errText = await r.text();
+      let errText = await r.text();
       console.error('[chat] OpenRouter generation failed:', r.status, errText.slice(0, 500));
-      let userError;
-      if (r.status === 402 || r.status === 429 || errText.toLowerCase().includes('insufficient_quota')) {
-        userError = `Fonduri insuficiente OpenRouter sau Rate Limit. Status: ${r.status}, Detalii: ${errText}`;
-      } else {
-        userError = `Eroare generare AI. Status: ${r.status}, Detalii: ${errText}`;
+      
+      // Fallback model if rate limited or insufficient quota
+      if (r.status === 429 || errText.toLowerCase().includes('insufficient_quota') || errText.toLowerCase().includes('rate-limited')) {
+        console.log('[chat] Attempting fallback to google/gemini-2.5-pro due to rate limit...');
+        const fallbackBody = { ...body, model: 'google/gemini-2.5-pro' };
+        try {
+          const r2 = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${orKey}`,
+              'HTTP-Referer': 'https://kelion.ai',
+              'X-Title': 'Kelion AI'
+            },
+            body: JSON.stringify(fallbackBody),
+            signal: controller.signal,
+          });
+          if (r2.ok) {
+            console.log('[chat] Fallback successful.');
+            r = r2;
+          } else {
+            errText = await r2.text();
+            console.error('[chat] Fallback also failed:', r2.status, errText.slice(0, 500));
+          }
+        } catch (fbErr) {
+          console.error('[chat] Fallback error:', fbErr);
+        }
       }
-      return res.status(500).json({ error: userError });
+
+      if (!r.ok) {
+        let userError;
+        if (r.status === 402 || r.status === 429 || errText.toLowerCase().includes('insufficient_quota') || errText.toLowerCase().includes('rate-limited')) {
+          userError = `Fonduri insuficiente OpenRouter sau Rate Limit. Status: ${r.status}, Detalii: ${errText}`;
+        } else {
+          userError = `Eroare generare AI. Status: ${r.status}, Detalii: ${errText}`;
+        }
+        return res.status(500).json({ error: userError });
+      }
     }
 
     const data = await r.json();
