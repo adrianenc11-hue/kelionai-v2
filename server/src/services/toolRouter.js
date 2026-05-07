@@ -71,6 +71,7 @@ const TOOL_CATEGORIES = {
     'translate',
     'fetch_documentation',
     'browse_web',
+    'computer_use',
     'deep_search',
   ],
 
@@ -217,7 +218,7 @@ const CATEGORY_TRIGGERS = {
       /cine.*e|who.*is|ce.*e|what.*is/i, /traduc|translate/i,
       /defini[tț]i|definit|definition|ce.*înseamn/i,
       /rss|feed|blog/i, /documentati|docs/i,
-      /intră.*pe|deschide.*site|open.*page|browse/i,
+      /intră.*pe|deschide.*|open.*|browse|acceseaz[aă]?/i,
       /arată.*site|site.*ul/i, /articol|paper/i,
     ],
     keywords: ['caută', 'search', 'știri', 'news', 'wikipedia', 'wiki',
