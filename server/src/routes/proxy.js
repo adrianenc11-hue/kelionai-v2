@@ -94,8 +94,13 @@ router.get('/', async (req, res) => {
       try { res.setHeader(k, v); } catch { /* ignore invalid headers */ }
     }
 
-    // Add permissive headers so the iframe works
+    // Add permissive headers so the iframe works.
+    // CRITICAL: We must explicitly set Content-Security-Policy here because
+    // Helmet's global middleware adds `frame-ancestors 'self'` to ALL routes,
+    // which would block the proxied content from rendering inside the monitor
+    // iframe. This override runs after Helmet and takes final precedence.
     res.setHeader('X-Frame-Options', 'ALLOWALL');
+    res.setHeader('Content-Security-Policy', "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; frame-ancestors *;");
     res.setHeader('Access-Control-Allow-Origin', '*');
 
     const contentType = (upstream.headers.get('content-type') || '').toLowerCase();
