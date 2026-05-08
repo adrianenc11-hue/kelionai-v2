@@ -118,11 +118,11 @@ describe('run_code — PR C', () => {
     delete process.env.E2B_API_KEY;
   });
 
-  test('returns unavailable when E2B_API_KEY is missing', async () => {
-    const r = await toolRunCode({ language: 'python', code: 'print(1)' });
-    expect(r.ok).toBe(false);
-    expect(r.unavailable).toBe(true);
-    expect(String(r.error)).toMatch(/not configured/i);
+  test('falls back to local execution when E2B_API_KEY is missing', async () => {
+    const r = await toolRunCode({ language: 'javascript', code: 'console.log("local-ok")' });
+    // With local fallback, run_code executes via child_process instead of returning unavailable
+    expect(r.ok).toBe(true);
+    expect(r.stdout).toContain('local-ok');
   });
 
   test('rejects empty code when key is set', async () => {
