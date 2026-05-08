@@ -3454,6 +3454,9 @@ async function executeRealTool(name, args, ctx) {
     case 'parallel_tools': return toolParallelTools(a, ctx);
     case 'document_parser': return toolDocumentParser(a);
     case 'ocr_engine': return toolOcrEngine(a);
+    case 'image_generator_editor': return toolImageGeneratorEditor(a);
+    case 'hardware_manager': return toolHardwareManager(a);
+    case 'cloud_manager': return toolCloudManager(a);
     case 'video_analyze': return toolVideoAnalyze(a);
     case 'audio_analyze': return toolAudioAnalyze(a);
     case 'multimedia_analyzer': return toolMultimediaAnalyzer(a);
@@ -4401,6 +4404,15 @@ async function toolImageEdit(args) {
   return toolRunCode ? await toolRunCode({ language: 'python', code: script }) : { ok: false, error: 'run_code unavailable' };
 }
 
+// 0.22A — image_generator_editor: Super-module for Image Gen, Edit, and QR codes.
+async function toolImageGeneratorEditor(args) {
+  const action = String(args?.action || '').trim().toLowerCase();
+  if (action === 'generate') return toolGenerateImage({ prompt: args?.prompt, size: args?.width ? `${args.width}x${args.height}` : 'auto' });
+  if (action === 'edit') return toolImageEdit(args);
+  if (action === 'qr_code') return toolQrCode({ text: args?.text, size: args?.width || 300 });
+  return { ok: false, error: 'Unknown action. Expected generate, edit, or qr_code.' };
+}
+
 // 0.14 — spreadsheet_analyze: Parse and analyze CSV data.
 async function toolSpreadsheetAnalyze(args) {
   const data = String(args?.data || '').trim();
@@ -4474,6 +4486,16 @@ async function toolSystemBridge(args) {
     return toolClipboardManager({ action: action.replace('clipboard_', ''), text: args?.text });
   }
   return { ok: false, error: 'Unknown system_bridge action. Expected screen_capture, clipboard_read, or clipboard_write.' };
+}
+
+// 0.23A — hardware_manager: Super-module for hardware control.
+async function toolHardwareManager(args) {
+  return { ok: true, client_action: 'hardware_manager', instruction: 'The client will handle the hardware configuration for ' + (args?.device || 'unknown') };
+}
+
+// 0.24A — cloud_manager: Super-module for cloud storage.
+async function toolCloudManager(args) {
+  return { ok: true, client_action: 'cloud_manager', instruction: 'Cloud interaction requires MCP OAuth context on the client for ' + (args?.provider || 'unknown') };
 }
 
 // 0.19 — context_cache: In-memory context cache for cross-turn references.
@@ -4622,6 +4644,7 @@ const REAL_TOOL_NAMES = [
   'vision_analyze', 'screen_capture', 'task_planner', 'clipboard_manager',
   'context_cache', 'mcp_protocol', 'scheduled_task', 'qr_code', 'smart_alert',
   'multimedia_analyzer', 'system_bridge', 'document_parser', 'ocr_engine',
+  'image_generator_editor', 'hardware_manager', 'cloud_manager',
 ];
 
 module.exports = {
@@ -4732,6 +4755,9 @@ module.exports = {
   toolSystemBridge,
   toolDocumentParser,
   toolOcrEngine,
+  toolImageGeneratorEditor,
+  toolHardwareManager,
+  toolCloudManager,
   // Memory files
   storeTempFile,
   getTempFile,

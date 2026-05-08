@@ -178,6 +178,9 @@ const EXPECTED_TOOL_NAMES = [
   'system_bridge',
   'document_parser',
   'ocr_engine',
+  'image_generator_editor',
+  'hardware_manager',
+  'cloud_manager',
 ];
 
 describe('Kelion tool catalog', () => {
