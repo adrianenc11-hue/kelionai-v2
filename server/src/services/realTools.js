@@ -2883,9 +2883,9 @@ async function toolAskExpertCoder(args) {
   const prompt = `You are an expert coder. Answer the question precisely.\n\nContext:\n${context}\n\nQuestion:\n${question}`;
 
   const MODELS = [
-    args?.model || 'anthropic/claude-3-opus',
-    'anthropic/claude-3.5-sonnet',
-    'google/gemini-1.5-pro',
+    args?.model || 'anthropic/claude-4.7-opus',
+    'anthropic/claude-4.6-sonnet',
+    'google/gemini-3.1-pro',
   ];
   // Deduplicate in case args.model matches one of the fallbacks
   const uniqueModels = [...new Set(MODELS)];
