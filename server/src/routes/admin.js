@@ -990,16 +990,16 @@ async function checkProviderBalances() {
     const { sendAdminAlert } = require('./push');
     for (const card of cards) {
       if (!card.configured) continue;
-      if (card.balance == null || card.balance === 'unknown') continue;
+      if (card.balance == null || card.balance === 'unknown' || typeof card.balance !== 'number') continue;
       const bal = parseFloat(card.balance);
       if (isNaN(bal)) continue;
       // Only alert once per provider per hour.
-      const lastAlert = _lastAlertMap[card.provider] || 0;
+      const lastAlert = _lastAlertMap[card.id] || 0;
       if (bal < LOW_BALANCE_THRESHOLD_USD && Date.now() - lastAlert > 60 * 60 * 1000) {
-        _lastAlertMap[card.provider] = Date.now();
-        console.warn(`[watchdog] Low balance: ${card.provider} = $${bal.toFixed(2)}`);
+        _lastAlertMap[card.id] = Date.now();
+        console.warn(`[watchdog] Low balance: ${card.name || card.id} = $${bal.toFixed(2)}`);
         await sendAdminAlert({
-          title: `⚠️ Low credit: ${card.provider}`,
+          title: `⚠️ Low credit: ${card.name || card.id}`,
           body: `Balance: $${bal.toFixed(2)} (threshold: $${LOW_BALANCE_THRESHOLD_USD}). Top up now.`,
           url: card.topUpUrl || '/',
         });
