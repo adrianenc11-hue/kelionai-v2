@@ -198,7 +198,9 @@ function summarizeRealTool(name, j) {
     return j.ok ? `Expert Answer:\n${j.answer}` : `Expert failed: ${j.error}`
   }
   if (name === 'browse_web') {
-    return j.ok ? `Web Content (${j.url}):\n${j.content}` : `Browse failed: ${j.error}`
+    const browseUrl = j.live_url || j.url || ''
+    const browseContent = j.content ? j.content.slice(0, 8000) : ''
+    return j.ok ? `Web Content (${browseUrl}):\n${browseContent}` : `Browse failed: ${j.error}`
   }
   if (name === 'fetch_documentation') {
     return j.ok ? `Documentation Content:\n${j.content}` : `Fetch failed: ${j.error}`
@@ -461,6 +463,15 @@ function autoDisplayOnMonitor(name, j, args) {
     // PyPI package → open on pypi.org
     if (name === 'pypi_package_info' && j.name) {
       handleShowOnMonitor({ kind: 'web', query: `https://pypi.org/project/${j.name}/`, title: `${j.name} — PyPI` })
+      return
+    }
+
+    // browse_web → show the actual page on the monitor via proxy
+    if (name === 'browse_web' && (j.live_url || j.url)) {
+      const pageUrl = j.live_url || j.url
+      if (pageUrl && pageUrl !== 'Search Results' && /^https?:\/\//i.test(pageUrl)) {
+        handleShowOnMonitor({ kind: 'web', query: pageUrl, title: j.title || pageUrl.replace(/^https?:\/\//, '').slice(0, 60) })
+      }
       return
     }
 

@@ -316,7 +316,7 @@ router.post('/execute', async (req, res) => {
 router.get('/status', (_req, res) => {
   res.json({
     google_search: true, // built into the model, always on
-    browse_web: !!process.env.BROWSER_USE_API_KEY,
+    browse_web: true, // Uses Jina AI (free, no key required)
     mcp: {
       calendar: !!process.env.MCP_ENABLED,
       email: !!process.env.MCP_ENABLED,
