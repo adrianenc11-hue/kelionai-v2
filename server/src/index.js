@@ -114,7 +114,7 @@ app.use(
         fontSrc:    ["'self'", "data:", "https:", "http:"],
         imgSrc:     ["'self'", "data:", "blob:", "https:", "http:"],
         connectSrc: ["'self'", "https://generativelanguage.googleapis.com", "wss://generativelanguage.googleapis.com", "https://raw.githack.com", "https://*.githubusercontent.com", "blob:", "https:", "wss:"],
-        mediaSrc:   ["'self'", "blob:"],
+        mediaSrc:   ["'self'", "blob:", "https:", "http:"],
         workerSrc:  ["'self'", "blob:"],
         // Allow cross-origin iframes for the <MonitorOverlay/>: Google Maps
         // embed, wttr.in, Wikipedia, LoremFlickr and friends. Without
