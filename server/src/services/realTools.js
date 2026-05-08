@@ -2884,7 +2884,6 @@ async function toolAskExpertCoder(args) {
 
   const MODELS = [
     args?.model || 'anthropic/claude-3-opus',
-    'openai/gpt-4o',
     'anthropic/claude-3.5-sonnet',
     'google/gemini-1.5-pro',
   ];
