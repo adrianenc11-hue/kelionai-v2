@@ -3116,6 +3116,26 @@ async function toolReplaceInFile(args) {
   }
 }
 
+// GitHub REST API helper — uses GH_TOKEN env var, no gh CLI needed.
+const GITHUB_REPO = 'adrianenc11-hue/kelionai-v2';
+async function _ghApi(path, method = 'GET', body = null) {
+  const token = process.env.GH_TOKEN;
+  if (!token) throw new Error('GH_TOKEN env var not set');
+  const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}${path}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+      ...(body ? { 'Content-Type': 'application/json' } : {}),
+    },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.message || `GitHub API ${res.status}`);
+  return data;
+}
+
 async function toolCreateGithubPr(args) {
   try {
     const title = String(args?.title || 'Automated Kelion PR');
@@ -3137,12 +3157,15 @@ async function toolCreateGithubPr(args) {
     await _exec(`git commit -m "${message.replace(/"/g, '\\"')}"`, { cwd: REPO_ROOT });
     await _exec(`git push -u origin ${branch}`, { cwd: REPO_ROOT });
 
-    try {
-      const { stdout: prUrl } = await _exec(`gh pr create --title "${title.replace(/"/g, '\\"')}" --body "Automated PR from Kelion."`, { cwd: REPO_ROOT });
-      return { ok: true, url: prUrl.trim() };
-    } catch (e) {
-      return { ok: true, url: `https://github.com/adrianenc11-hue/kelionai-v2/pull/new/${branch}` };
-    }
+    // Create PR via GitHub REST API — merge is always manual by the admin
+    const pr = await _ghApi('/pulls', 'POST', {
+      title,
+      head: branch,
+      base: 'master',
+      body: 'Automated PR from Kelion.',
+    });
+
+    return { ok: true, url: pr.html_url, pr_number: pr.number };
   } catch (err) {
     return { ok: false, error: err.message };
   }
@@ -3154,23 +3177,20 @@ async function toolManageGithubPrs(args) {
     const prNumber = args?.pr_number;
 
     if (action === 'list') {
-      const { stdout } = await _exec('gh pr list --state open --json number,title,url', { cwd: REPO_ROOT });
-      return { ok: true, prs: JSON.parse(stdout || '[]') };
-    } else if (action === 'merge') {
-      if (!prNumber) return { ok: false, error: 'pr_number is required to merge' };
-      const { stdout } = await _exec(`gh pr merge ${prNumber} --merge --admin`, { cwd: REPO_ROOT });
-      return { ok: true, result: stdout };
+      const prs = await _ghApi('/pulls?state=open');
+      return { ok: true, prs: prs.map(p => ({ number: p.number, title: p.title, url: p.html_url })) };
     } else if (action === 'close') {
       if (!prNumber) return { ok: false, error: 'pr_number is required to close' };
-      const { stdout } = await _exec(`gh pr close ${prNumber}`, { cwd: REPO_ROOT });
-      return { ok: true, result: stdout };
+      await _ghApi(`/pulls/${prNumber}`, 'PATCH', { state: 'closed' });
+      return { ok: true, result: 'PR closed' };
     } else {
-      return { ok: false, error: 'Unknown action. Use list, merge, or close.' };
+      return { ok: false, error: 'Unknown action. Use list or close.' };
     }
   } catch (err) {
-    return { ok: false, error: 'GitHub CLI (gh) execution failed. You might need to authenticate using "gh auth login" in terminal. Details: ' + err.message };
+    return { ok: false, error: 'GitHub API call failed: ' + err.message };
   }
 }
+
 // ──────────────────────────────────────────────────────────────────
 // Dispatch
 
