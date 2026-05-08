@@ -3157,7 +3157,7 @@ async function toolCreateGithubPr(args) {
     await _exec(`git commit -m "${message.replace(/"/g, '\\"')}"`, { cwd: REPO_ROOT });
     await _exec(`git push -u origin ${branch}`, { cwd: REPO_ROOT });
 
-    // Create PR via GitHub REST API
+    // Create PR via GitHub REST API — merge is always manual by the admin
     const pr = await _ghApi('/pulls', 'POST', {
       title,
       head: branch,
@@ -3165,38 +3165,10 @@ async function toolCreateGithubPr(args) {
       body: 'Automated PR from Kelion.',
     });
 
-    // Enable auto-merge (squash) — PR merges automatically after status checks pass
-    let autoMergeOk = false;
-    try {
-      await _enableAutoMerge(pr.node_id, 'SQUASH');
-      autoMergeOk = true;
-    } catch (e) {
-      // auto-merge may not be enabled on repo — fall back to manual
-    }
-
-    return { ok: true, url: pr.html_url, pr_number: pr.number, auto_merge: autoMergeOk };
+    return { ok: true, url: pr.html_url, pr_number: pr.number };
   } catch (err) {
     return { ok: false, error: err.message };
   }
-}
-
-// Enable auto-merge on a PR via GitHub GraphQL API
-async function _enableAutoMerge(prNodeId, method = 'SQUASH') {
-  const token = process.env.GH_TOKEN;
-  if (!token) throw new Error('GH_TOKEN not set');
-  const res = await fetch('https://api.github.com/graphql', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      query: `mutation { enablePullRequestAutoMerge(input: { pullRequestId: "${prNodeId}", mergeMethod: ${method} }) { pullRequest { autoMergeRequest { enabledAt } } } }`,
-    }),
-  });
-  const data = await res.json();
-  if (data.errors) throw new Error(data.errors[0].message);
-  return data;
 }
 
 async function toolManageGithubPrs(args) {
@@ -3206,40 +3178,19 @@ async function toolManageGithubPrs(args) {
 
     if (action === 'list') {
       const prs = await _ghApi('/pulls?state=open');
-      return { ok: true, prs: prs.map(p => ({ number: p.number, title: p.title, url: p.html_url, auto_merge: !!p.auto_merge })) };
-    } else if (action === 'merge') {
-      if (!prNumber) return { ok: false, error: 'pr_number is required to merge' };
-      // Try direct merge first; if blocked by checks, enable auto-merge
-      try {
-        const result = await _ghApi(`/pulls/${prNumber}/merge`, 'PUT', { merge_method: 'squash' });
-        try { await _exec('git checkout master && git pull origin master', { cwd: REPO_ROOT }); } catch (_) {}
-        return { ok: true, result: result.message || 'Merged successfully' };
-      } catch (mergeErr) {
-        // Direct merge blocked by branch protection — enable auto-merge instead
-        try {
-          const pr = await _ghApi(`/pulls/${prNumber}`);
-          await _enableAutoMerge(pr.node_id, 'SQUASH');
-          return { ok: true, result: 'Auto-merge enabled. PR will merge automatically after status checks pass.' };
-        } catch (autoErr) {
-          return { ok: false, error: 'Merge blocked by status checks and auto-merge failed: ' + autoErr.message };
-        }
-      }
-    } else if (action === 'auto_merge') {
-      if (!prNumber) return { ok: false, error: 'pr_number is required' };
-      const pr = await _ghApi(`/pulls/${prNumber}`);
-      await _enableAutoMerge(pr.node_id, 'SQUASH');
-      return { ok: true, result: 'Auto-merge enabled for PR #' + prNumber };
+      return { ok: true, prs: prs.map(p => ({ number: p.number, title: p.title, url: p.html_url })) };
     } else if (action === 'close') {
       if (!prNumber) return { ok: false, error: 'pr_number is required to close' };
       await _ghApi(`/pulls/${prNumber}`, 'PATCH', { state: 'closed' });
       return { ok: true, result: 'PR closed' };
     } else {
-      return { ok: false, error: 'Unknown action. Use list, merge, auto_merge, or close.' };
+      return { ok: false, error: 'Unknown action. Use list or close.' };
     }
   } catch (err) {
     return { ok: false, error: 'GitHub API call failed: ' + err.message };
   }
 }
+
 // ──────────────────────────────────────────────────────────────────
 // Dispatch
 
