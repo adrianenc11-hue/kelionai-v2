@@ -2914,18 +2914,62 @@ async function toolBrowseWeb(args) {
   try {
     const { task, start_url } = args || {};
     let markdownContext = '';
-    let usedUrl = start_url;
+    let usedUrl = start_url || null;
+    let liveUrl = start_url || null;
+
     if (start_url) {
-      const fetchReq = await fetch(`https://r.jina.ai/${encodeURIComponent(start_url)}`);
+      // User wants a specific page — fetch readable content via Jina Reader
+      const fetchReq = await fetchWithTimeout(`https://r.jina.ai/${start_url}`, {
+        headers: { 'Accept': 'text/markdown' },
+      }, 12000);
       markdownContext = await fetchReq.text();
     } else if (task) {
-      const fetchReq = await fetch(`https://s.jina.ai/${encodeURIComponent(task)}`);
-      markdownContext = await fetchReq.text();
-      usedUrl = 'Search Results';
+      // Extract URL from natural-language task if present
+      const urlMatch = task.match(/https?:\/\/[^\s"'<>]+/i);
+      if (urlMatch) {
+        // Task contains a URL — treat it as start_url
+        liveUrl = urlMatch[0];
+        usedUrl = urlMatch[0];
+        const fetchReq = await fetchWithTimeout(`https://r.jina.ai/${liveUrl}`, {
+          headers: { 'Accept': 'text/markdown' },
+        }, 12000);
+        markdownContext = await fetchReq.text();
+      } else {
+        // Pure text task — use KelionAI's web search to find relevant URLs,
+        // then fetch the top result via Jina Reader for full content.
+        // (Jina Search s.jina.ai requires an API key; toolWebSearch is free.)
+        const searchResult = await toolWebSearch({ query: task, limit: 3 });
+        if (searchResult.ok && Array.isArray(searchResult.results) && searchResult.results.length > 0) {
+          const topResult = searchResult.results[0];
+          liveUrl = topResult.url;
+          usedUrl = topResult.url;
+          // Fetch full readable content of the top result
+          try {
+            const fetchReq = await fetchWithTimeout(`https://r.jina.ai/${liveUrl}`, {
+              headers: { 'Accept': 'text/markdown' },
+            }, 12000);
+            markdownContext = await fetchReq.text();
+          } catch {
+            // If Jina Reader fails, use the search snippet as content
+            markdownContext = searchResult.results
+              .map((r, i) => `${i + 1}. **${r.title}**\n${r.url}\n${r.snippet || ''}`)
+              .join('\n\n');
+          }
+        } else {
+          usedUrl = 'Search Results';
+          markdownContext = searchResult.error || 'No results found.';
+        }
+      }
     } else {
       return { ok: false, error: 'Either task or start_url is required' };
     }
-    return { ok: true, url: usedUrl, content: markdownContext.slice(0, 15000) };
+
+    return {
+      ok: true,
+      url: usedUrl,
+      live_url: liveUrl,
+      content: markdownContext.slice(0, 15000),
+    };
   } catch (err) {
     return { ok: false, error: err.message };
   }
