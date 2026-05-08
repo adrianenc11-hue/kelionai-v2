@@ -181,6 +181,9 @@ const EXPECTED_TOOL_NAMES = [
   'image_generator_editor',
   'hardware_manager',
   'cloud_manager',
+  'communication_hub',
+  'automation_engine',
+  'devops_toolkit',
 ];
 
 describe('Kelion tool catalog', () => {

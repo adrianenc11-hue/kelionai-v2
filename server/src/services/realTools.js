@@ -3457,6 +3457,9 @@ async function executeRealTool(name, args, ctx) {
     case 'image_generator_editor': return toolImageGeneratorEditor(a);
     case 'hardware_manager': return toolHardwareManager(a);
     case 'cloud_manager': return toolCloudManager(a);
+    case 'communication_hub': return toolCommunicationHub(a);
+    case 'automation_engine': return toolAutomationEngine(a);
+    case 'devops_toolkit': return toolDevopsToolkit(a);
     case 'video_analyze': return toolVideoAnalyze(a);
     case 'audio_analyze': return toolAudioAnalyze(a);
     case 'multimedia_analyzer': return toolMultimediaAnalyzer(a);
@@ -4498,6 +4501,33 @@ async function toolCloudManager(args) {
   return { ok: true, client_action: 'cloud_manager', instruction: 'Cloud interaction requires MCP OAuth context on the client for ' + (args?.provider || 'unknown') };
 }
 
+// 0.25A — communication_hub: Super-module for Email/SMS.
+async function toolCommunicationHub(args) {
+  const action = String(args?.action || '').trim().toLowerCase();
+  if (action === 'send_email') return toolSendEmail({ to: args?.to, subject: args?.subject, text: args?.body });
+  if (action === 'compose_draft') return { ok: true, client_action: 'compose_email_draft', to: args?.to, subject: args?.subject, body: args?.body };
+  if (action === 'send_sms') return toolSendSms({ to: args?.to, body: args?.body });
+  return { ok: false, error: 'Unknown action. Expected send_email, compose_draft, or send_sms.' };
+}
+
+// 0.26A — automation_engine: Super-module for Zapier and webhooks.
+async function toolAutomationEngine(args) {
+  const action = String(args?.action || '').trim().toLowerCase();
+  if (action === 'zapier_trigger' || action === 'webhook_trigger') return toolZapierTrigger({ webhook_url: args?.webhook_url, payload: args?.payload });
+  return { ok: false, error: 'Unknown action. Expected zapier_trigger or webhook_trigger.' };
+}
+
+// 0.27A — devops_toolkit: Super-module for Git/GitHub.
+async function toolDevopsToolkit(args) {
+  const action = String(args?.action || '').trim().toLowerCase();
+  if (action === 'repo_info') return toolGithubRepoInfo({ repo: args?.repo });
+  if (action === 'list_files') return toolListGithubRepoFiles({ repo: args?.repo, branch: args?.branch });
+  if (action === 'read_file') return toolReadGithubFile({ repo: args?.repo, path: args?.path, branch: args?.branch });
+  if (action === 'create_pr') return toolCreateGithubPr({ repo: args?.repo, title: args?.title, body: args?.body });
+  if (action === 'manage_prs') return toolManageGithubPrs({ repo: args?.repo, action: args?.pr_action, issue_number: args?.issue_number });
+  return { ok: false, error: 'Unknown action for devops_toolkit.' };
+}
+
 // 0.19 — context_cache: In-memory context cache for cross-turn references.
 const _contextCache = new Map();
 async function toolContextCache(args, ctx) {
@@ -4645,6 +4675,7 @@ const REAL_TOOL_NAMES = [
   'context_cache', 'mcp_protocol', 'scheduled_task', 'qr_code', 'smart_alert',
   'multimedia_analyzer', 'system_bridge', 'document_parser', 'ocr_engine',
   'image_generator_editor', 'hardware_manager', 'cloud_manager',
+  'communication_hub', 'automation_engine', 'devops_toolkit',
 ];
 
 module.exports = {
@@ -4758,6 +4789,9 @@ module.exports = {
   toolImageGeneratorEditor,
   toolHardwareManager,
   toolCloudManager,
+  toolCommunicationHub,
+  toolAutomationEngine,
+  toolDevopsToolkit,
   // Memory files
   storeTempFile,
   getTempFile,
