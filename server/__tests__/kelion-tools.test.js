@@ -174,6 +174,8 @@ const EXPECTED_TOOL_NAMES = [
   'scheduled_task',
   'qr_code',
   'smart_alert',
+  'multimedia_analyzer',
+  'system_bridge',
 ];
 
 describe('Kelion tool catalog', () => {

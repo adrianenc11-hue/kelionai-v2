@@ -92,6 +92,7 @@ const REAL_TOOL_NAMES = new Set([
   'video_analyze', 'audio_analyze', 'image_edit', 'spreadsheet_analyze',
   'vision_analyze', 'screen_capture', 'task_planner', 'clipboard_manager',
   'context_cache', 'mcp_protocol', 'scheduled_task', 'qr_code', 'smart_alert',
+  'multimedia_analyzer', 'system_bridge',
 ])
 
 // Compress a tool-result JSON into a short, speakable string for the voice

@@ -3446,12 +3446,14 @@ async function executeRealTool(name, args, ctx) {
     case 'parallel_tools': return toolParallelTools(a, ctx);
     case 'video_analyze': return toolVideoAnalyze(a);
     case 'audio_analyze': return toolAudioAnalyze(a);
+    case 'multimedia_analyzer': return toolMultimediaAnalyzer(a);
     case 'image_edit': return toolImageEdit(a);
     case 'spreadsheet_analyze': return toolSpreadsheetAnalyze(a);
     case 'vision_analyze': return toolVisionAnalyze(a);
     case 'screen_capture': return toolScreenCapture(a);
-    case 'task_planner': return toolTaskPlanner(a, ctx);
     case 'clipboard_manager': return toolClipboardManager(a);
+    case 'system_bridge': return toolSystemBridge(a);
+    case 'task_planner': return toolTaskPlanner(a, ctx);
     case 'context_cache': return toolContextCache(a, ctx);
     case 'mcp_protocol': return toolMcpProtocol(a, ctx);
     case 'scheduled_task': return toolScheduledTask(a, ctx);
@@ -4337,6 +4339,20 @@ async function toolParallelTools(args, ctx) {
 }
 
 // 0.11 — video_analyze: Extract metadata from a video URL/file.
+// 0.11A — multimedia_analyzer: Super-module for multimedia analysis.
+async function toolMultimediaAnalyzer(args) {
+  const url = String(args?.url || '').trim();
+  const type = String(args?.type || 'video');
+  if (!url) return { ok: false, error: 'url is required for multimedia analysis' };
+  
+  if (type === 'audio') {
+    return toolAudioAnalyze({ url });
+  } else {
+    return toolVideoAnalyze({ url });
+  }
+}
+
+// 0.11 — video_analyze: Analyze video URL metadata.
 async function toolVideoAnalyze(args) {
   const url = String(args?.url || '').trim();
   if (!url) return { ok: false, error: 'url is required' };
@@ -4428,6 +4444,17 @@ async function toolClipboardManager(args) {
     return { ok: true, client_action: 'clipboard_write', text, instruction: 'Content will be copied to clipboard on the client.' };
   }
   return { ok: true, client_action: 'clipboard_read', instruction: 'The client will read clipboard contents and send them back.' };
+}
+
+// 0.18A — system_bridge: Super-module for system control.
+async function toolSystemBridge(args) {
+  const action = String(args?.action || '').trim();
+  if (action === 'screen_capture') {
+    return toolScreenCapture(args);
+  } else if (action === 'clipboard_read' || action === 'clipboard_write') {
+    return toolClipboardManager({ action: action.replace('clipboard_', ''), text: args?.text });
+  }
+  return { ok: false, error: 'Unknown system_bridge action. Expected screen_capture, clipboard_read, or clipboard_write.' };
 }
 
 // 0.19 — context_cache: In-memory context cache for cross-turn references.
@@ -4575,6 +4602,7 @@ const REAL_TOOL_NAMES = [
   'video_analyze', 'audio_analyze', 'image_edit', 'spreadsheet_analyze',
   'vision_analyze', 'screen_capture', 'task_planner', 'clipboard_manager',
   'context_cache', 'mcp_protocol', 'scheduled_task', 'qr_code', 'smart_alert',
+  'multimedia_analyzer', 'system_bridge',
 ];
 
 module.exports = {
@@ -4681,6 +4709,8 @@ module.exports = {
   toolScheduledTask,
   toolQrCode,
   toolSmartAlert,
+  toolMultimediaAnalyzer,
+  toolSystemBridge,
   // Memory files
   storeTempFile,
   getTempFile,
