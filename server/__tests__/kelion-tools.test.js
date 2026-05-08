@@ -184,6 +184,11 @@ const EXPECTED_TOOL_NAMES = [
   'communication_hub',
   'automation_engine',
   'devops_toolkit',
+  'scheduler_pro',
+  'smart_monitor',
+  'deep_memory_architect',
+  'task_orchestrator',
+  'universal_executor',
 ];
 
 describe('Kelion tool catalog', () => {

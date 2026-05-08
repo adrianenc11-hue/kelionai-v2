@@ -3460,6 +3460,11 @@ async function executeRealTool(name, args, ctx) {
     case 'communication_hub': return toolCommunicationHub(a);
     case 'automation_engine': return toolAutomationEngine(a);
     case 'devops_toolkit': return toolDevopsToolkit(a);
+    case 'scheduler_pro': return toolSchedulerPro(a, ctx);
+    case 'smart_monitor': return toolSmartMonitor(a, ctx);
+    case 'deep_memory_architect': return toolDeepMemoryArchitect(a, ctx);
+    case 'task_orchestrator': return toolTaskOrchestrator(a, ctx);
+    case 'universal_executor': return toolUniversalExecutor(a);
     case 'video_analyze': return toolVideoAnalyze(a);
     case 'audio_analyze': return toolAudioAnalyze(a);
     case 'multimedia_analyzer': return toolMultimediaAnalyzer(a);
@@ -4528,6 +4533,49 @@ async function toolDevopsToolkit(args) {
   return { ok: false, error: 'Unknown action for devops_toolkit.' };
 }
 
+// 0.28A — scheduler_pro: Super-module for time management.
+async function toolSchedulerPro(args, ctx) {
+  const action = String(args?.action || '').trim().toLowerCase();
+  if (action === 'read_calendar') return toolReadCalendar(args, ctx);
+  if (action === 'create_ics') return toolCreateCalendarIcs(args);
+  if (action === 'schedule_task') return toolScheduledTask(args, ctx);
+  if (action === 'plan_tasks') return toolTaskPlanner(args, ctx);
+  return { ok: false, error: 'Unknown scheduler_pro action.' };
+}
+
+// 0.29A — smart_monitor: Super-module for alerts and monitoring.
+async function toolSmartMonitor(args, ctx) {
+  return toolSmartAlert(args, ctx);
+}
+
+// 0.30A — deep_memory_architect: Super-module for memory and context.
+async function toolDeepMemoryArchitect(args, ctx) {
+  const action = String(args?.action || '').trim().toLowerCase();
+  if (action === 'context_cache') return toolContextCache(args, ctx);
+  if (action === 'session_persist') return toolSessionPersist(args, ctx);
+  if (action === 'remember_fact') return toolRememberFact(args, ctx);
+  if (action === 'learn_from_observation') return toolLearnFromObservation(args, ctx);
+  if (action === 'get_history') return toolGetActionHistory(args, ctx);
+  return { ok: false, error: 'Unknown deep_memory_architect action.' };
+}
+
+// 0.31A — task_orchestrator: Super-module for execution plans and parallelization.
+async function toolTaskOrchestrator(args, ctx) {
+  const action = String(args?.action || '').trim().toLowerCase();
+  if (action === 'parallel') return toolParallelTools(args, ctx);
+  if (action === 'execute_plan') return toolExecutePlan(args, ctx);
+  return { ok: false, error: 'Unknown task_orchestrator action.' };
+}
+
+// 0.32A — universal_executor: Super-module for code and terminal execution.
+async function toolUniversalExecutor(args) {
+  const action = String(args?.action || '').trim().toLowerCase();
+  if (action === 'run_code') return toolRunCode(args);
+  if (action === 'run_terminal') return toolRunTerminalCommand(args);
+  if (action === 'run_regex') return toolRunRegex(args);
+  return { ok: false, error: 'Unknown universal_executor action.' };
+}
+
 // 0.19 — context_cache: In-memory context cache for cross-turn references.
 const _contextCache = new Map();
 async function toolContextCache(args, ctx) {
@@ -4676,6 +4724,7 @@ const REAL_TOOL_NAMES = [
   'multimedia_analyzer', 'system_bridge', 'document_parser', 'ocr_engine',
   'image_generator_editor', 'hardware_manager', 'cloud_manager',
   'communication_hub', 'automation_engine', 'devops_toolkit',
+  'scheduler_pro', 'smart_monitor', 'deep_memory_architect', 'task_orchestrator', 'universal_executor',
 ];
 
 module.exports = {
@@ -4792,6 +4841,11 @@ module.exports = {
   toolCommunicationHub,
   toolAutomationEngine,
   toolDevopsToolkit,
+  toolSchedulerPro,
+  toolSmartMonitor,
+  toolDeepMemoryArchitect,
+  toolTaskOrchestrator,
+  toolUniversalExecutor,
   // Memory files
   storeTempFile,
   getTempFile,
