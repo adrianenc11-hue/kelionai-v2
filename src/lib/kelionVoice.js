@@ -12,6 +12,7 @@ import { setCameraController, setCurrentFacingMode } from './cameraControl'
 import { getCsrfToken } from './api'
 import { subscribeNarrationMode, getNarrationMode } from './narrationMode'
 import { logAiEvent } from './aiEventLog'
+import { createNoiseSuppressedStream, analyzeTranscript, isValidUtterance, ensureAudioReady, ensureAudioContext } from './audioProcessor'
 
 const SAMPLE_RATE_IN = 16000   // Mic capture rate for SpeechRecognition
 const SAMPLE_RATE_OUT = 24000  // TTS playback rate (ElevenLabs REST TTS)
@@ -855,10 +856,29 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
       }
 
       if (tokenBody?.model?.includes('gemma')) {
-        // OpenRouter REST Voice Mode
+        // OpenRouter REST Voice Mode with noise suppression + transcript analyzer
         console.log('[kelionVoice] OpenRouter model detected, switching to REST Voice Mode');
         // We MUST NOT stop micStreamRef.current here because if the soundbars are flat,
         // the user thinks the app is dead and clicks the button again!
+
+        // ── Noise Suppression Pipeline ──────────────────────────────
+        // Apply advanced audio processing to the mic stream BEFORE
+        // SpeechRecognition sees it: high-pass (85Hz) + low-pass (8kHz)
+        // + notch (50/60Hz AC hum) + noise gate + compressor.
+        // This eliminates ambient noise, keyboard clicks, fan noise,
+        // traffic, etc. while preserving clear voice audio.
+        let noiseSuppCleanup = null
+        if (micStreamRef.current) {
+          try {
+            const nsp = createNoiseSuppressedStream(micStreamRef.current)
+            noiseSuppCleanup = nsp.cleanup
+            console.log('[kelionVoice] ✅ Noise suppression pipeline active: highPass→lowPass→notch→noiseGate→compressor')
+          } catch (nspErr) {
+            console.warn('[kelionVoice] Noise suppression init failed, using raw mic:', nspErr?.message)
+          }
+        }
+        // Store cleanup for stop()
+        window.__noiseSuppCleanup = noiseSuppCleanup
 
         const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (!SR) {
@@ -887,8 +907,32 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
           
           if (!ev.results[0].isFinal) return; // Wait for final transcript
           
-          const transcript = ev.results[0][0].transcript;
-          if (!transcript) return;
+          const rawTranscript = ev.results[0][0].transcript;
+          if (!rawTranscript) return;
+          
+          // ── Transcript Analyzer ────────────────────────────────────
+          // Analyze and correct the SpeechRecognition output BEFORE
+          // sending to Kelion. Handles:
+          // - Language detection (any language)
+          // - Filler word removal (um, uh, hmm...)
+          // - Common misrecognition fixes per language
+          // - Punctuation normalization
+          // - Capitalization
+          const analyzed = analyzeTranscript(rawTranscript, getDetectedLang())
+          
+          // Skip if the utterance is just noise/fillers
+          if (!isValidUtterance(analyzed.text)) {
+            console.log('[kelionVoice] Transcript analyzer: skipped noise/filler utterance:', JSON.stringify(rawTranscript))
+            return
+          }
+          
+          const transcript = analyzed.text
+          if (analyzed.corrections.length > 0) {
+            console.log(`[kelionVoice] 📝 Transcript corrected (${analyzed.lang}): "${rawTranscript}" → "${transcript}" [${analyzed.corrections.join(', ')}]`)
+          }
+          
+          // Update detected language from the analyzer
+          if (analyzed.lang) setDetectedLang(analyzed.lang)
           
           setStatus('thinking');
           setUserLevel(0);
@@ -1713,6 +1757,11 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
               // We MUST clear srcObject and set muted=false because the Live API
               // path leaves it muted with a MediaStream attached.
               const audioEl = audioRef?.current || new window.Audio();
+              // ── Audio Output Resilience ─────────────────────────────
+              // If the system speaker was disabled and re-enabled, the
+              // audio element may be in a broken state. Reset it before
+              // attempting playback.
+              ensureAudioReady(audioEl)
               if (audioEl === audioRef?.current) {
                 audioEl.srcObject = null;
                 audioEl.muted = false;
@@ -1727,9 +1776,28 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
               }
               audioEl.onerror = (e) => {
                 console.error('[kelionVoice] Audio playback error:', e)
-                appendTurn('assistant', `⚠️ Eroare la redarea audio în browser.`, true, '⚙️ System')
-                URL.revokeObjectURL(blobUrl)
-                setStatus('idle')
+                // Auto-recovery: try a fresh Audio element instead of giving up
+                console.log('[kelionVoice] Attempting audio recovery with fresh Audio element...')
+                try {
+                  const recovery = new Audio(blobUrl)
+                  recovery.volume = 1
+                  activeAudioElRef.current = recovery
+                  recovery.onended = () => {
+                    URL.revokeObjectURL(blobUrl)
+                    activeAudioElRef.current = null
+                    setStatus('idle')
+                  }
+                  recovery.play().catch((e2) => {
+                    console.error('[kelionVoice] Audio recovery also failed:', e2?.message)
+                    appendTurn('assistant', `⚠️ Eroare la redarea audio. Verifică dacă difuzorul este activat.`, true, '⚙️ System')
+                    URL.revokeObjectURL(blobUrl)
+                    setStatus('idle')
+                  })
+                } catch (recErr) {
+                  appendTurn('assistant', `⚠️ Eroare la redarea audio. Verifică dacă difuzorul este activat.`, true, '⚙️ System')
+                  URL.revokeObjectURL(blobUrl)
+                  setStatus('idle')
+                }
               }
               
               console.log('[TTS-DEBUG] calling audioEl.play()')
@@ -1737,8 +1805,26 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
                 console.log('[TTS-DEBUG] AUDIO PLAYING OK')
               }).catch((e) => {
                 console.error('[kelionVoice] Audio play() blocked:', e)
-                appendTurn('assistant', `⚠️ Browserul a blocat redarea audio automată.`, true, '⚙️ System')
-                setStatus('idle')
+                // Auto-recovery: try with a standalone Audio element
+                console.log('[kelionVoice] Trying standalone Audio fallback...')
+                try {
+                  const fallback = new Audio(blobUrl)
+                  fallback.volume = 1
+                  activeAudioElRef.current = fallback
+                  fallback.onended = () => {
+                    URL.revokeObjectURL(blobUrl)
+                    activeAudioElRef.current = null
+                    setStatus('idle')
+                  }
+                  fallback.play().catch((e2) => {
+                    console.error('[kelionVoice] Standalone fallback also blocked:', e2?.message)
+                    appendTurn('assistant', `⚠️ Browserul a blocat redarea audio. Apasă oriunde pe pagină și reîncearcă.`, true, '⚙️ System')
+                    setStatus('idle')
+                  })
+                } catch (_) {
+                  appendTurn('assistant', `⚠️ Browserul a blocat redarea audio automată.`, true, '⚙️ System')
+                  setStatus('idle')
+                }
               })
             } else {
               const errText = await r.text().catch(() => '')

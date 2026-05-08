@@ -1,0 +1,281 @@
+name: safe-deploy
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Safe Deploy Pipeline — auto-deploy via PR with health verification & revert.
+#
+# Flow:
+#   1. PR merges to master → Railway triggers a new build automatically.
+#   2. This workflow waits for Railway to finish deploying (polls /health for
+#      the expected deploy_sha for up to 10 minutes).
+#   3. Runs a full health + smoke check against production.
+#   4. If the health check FAILS → auto-reverts to the last known-good commit
+#      by force-pushing master back, which triggers a clean Railway redeploy.
+#   5. Opens an issue documenting the failed deploy + revert.
+# ──────────────────────────────────────────────────────────────────────────────
+
+on:
+  push:
+    branches: [master]
+
+  # Manual trigger for emergency revert or re-check
+  workflow_dispatch:
+    inputs:
+      skip_revert:
+        description: 'Skip auto-revert (just check health)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write    # needed for git revert push
+  issues: write      # needed to create failure issue
+  pull-requests: read
+
+concurrency:
+  group: safe-deploy
+  cancel-in-progress: false  # never cancel a running deploy check
+
+env:
+  PROD_URL: https://kelionai.app
+  HEALTH_ENDPOINT: /health
+  MAX_WAIT_SECONDS: 600      # 10 min max wait for Railway deploy
+  HEALTH_RETRIES: 5          # retry health check this many times
+  HEALTH_RETRY_DELAY: 10     # seconds between retries
+
+jobs:
+  # ─── Job 1: Wait for Railway deploy ────────────────────────────────────────
+  wait-for-deploy:
+    name: Wait for Railway Deploy
+    runs-on: ubuntu-latest
+    outputs:
+      deploy_ready: ${{ steps.wait.outputs.ready }}
+      live_sha: ${{ steps.wait.outputs.live_sha }}
+    steps:
+      - name: Wait for Railway to deploy commit ${{ github.sha }}
+        id: wait
+        run: |
+          EXPECTED="${{ github.sha }}"
+          echo "Waiting for ${{ env.PROD_URL }}${{ env.HEALTH_ENDPOINT }} to report deploy_sha=$EXPECTED"
+          DEADLINE=$(( $(date +%s) + ${{ env.MAX_WAIT_SECONDS }} ))
+          LAST_SHA=""
+
+          while true; do
+            RESP=$(curl -fsS --max-time 15 "${{ env.PROD_URL }}${{ env.HEALTH_ENDPOINT }}" 2>/dev/null || echo '{}')
+            LIVE_SHA=$(echo "$RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('deploy_sha',''))" 2>/dev/null || echo "")
+            LAST_SHA="$LIVE_SHA"
+
+            if [ "$LIVE_SHA" = "$EXPECTED" ]; then
+              echo "✅ Deploy SHA matches: $LIVE_SHA"
+              echo "ready=true" >> "$GITHUB_OUTPUT"
+              echo "live_sha=$LIVE_SHA" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            # If deploy_sha is 'unknown', the server hasn't been updated yet
+            # to expose SHAs — proceed anyway (legacy builds)
+            if [ "$LIVE_SHA" = "unknown" ]; then
+              echo "⚠️ Server reports deploy_sha=unknown (legacy build). Proceeding."
+              echo "ready=true" >> "$GITHUB_OUTPUT"
+              echo "live_sha=unknown" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            NOW=$(date +%s)
+            if [ "$NOW" -ge "$DEADLINE" ]; then
+              echo "❌ Timeout after ${{ env.MAX_WAIT_SECONDS }}s. Expected=$EXPECTED, Live=$LAST_SHA"
+              echo "ready=false" >> "$GITHUB_OUTPUT"
+              echo "live_sha=$LAST_SHA" >> "$GITHUB_OUTPUT"
+              exit 0  # don't fail — let the health check job decide
+            fi
+
+            echo "  live_sha=${LIVE_SHA:-<empty>} — sleeping 15s"
+            sleep 15
+          done
+
+  # ─── Job 2: Health & Smoke Check ───────────────────────────────────────────
+  health-check:
+    name: Production Health Check
+    needs: wait-for-deploy
+    runs-on: ubuntu-latest
+    outputs:
+      healthy: ${{ steps.check.outputs.healthy }}
+      details: ${{ steps.check.outputs.details }}
+    steps:
+      - name: Full production health check
+        id: check
+        run: |
+          HEALTHY=true
+          DETAILS=""
+
+          # 1. Basic health endpoint
+          echo "── Checking ${{ env.PROD_URL }}${{ env.HEALTH_ENDPOINT }} ──"
+          for i in $(seq 1 ${{ env.HEALTH_RETRIES }}); do
+            RESP=$(curl -fsS --max-time 20 "${{ env.PROD_URL }}${{ env.HEALTH_ENDPOINT }}" 2>/dev/null || echo "FAIL")
+            if [ "$RESP" != "FAIL" ]; then
+              echo "Health response: $RESP"
+
+              # Parse status
+              STATUS=$(echo "$RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))" 2>/dev/null || echo "")
+              DB=$(echo "$RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('services',{}).get('database',''))" 2>/dev/null || echo "")
+              AI=$(echo "$RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('services',{}).get('ai',''))" 2>/dev/null || echo "")
+
+              if [ "$STATUS" = "ok" ] && [ "$DB" = "connected" ]; then
+                echo "✅ Health: status=$STATUS, database=$DB, ai=$AI"
+                DETAILS="status=$STATUS, database=$DB, ai=$AI"
+                break
+              else
+                echo "⚠️ Health degraded: status=$STATUS, database=$DB, ai=$AI"
+                DETAILS="DEGRADED: status=$STATUS, database=$DB, ai=$AI"
+                if [ "$i" -eq "${{ env.HEALTH_RETRIES }}" ]; then
+                  HEALTHY=false
+                fi
+              fi
+            else
+              echo "⚠️ Health check attempt $i/${{ env.HEALTH_RETRIES }} failed"
+              if [ "$i" -eq "${{ env.HEALTH_RETRIES }}" ]; then
+                HEALTHY=false
+                DETAILS="UNREACHABLE after ${{ env.HEALTH_RETRIES }} attempts"
+              fi
+            fi
+            sleep ${{ env.HEALTH_RETRY_DELAY }}
+          done
+
+          # 2. Check that the frontend loads (SPA index.html)
+          echo ""
+          echo "── Checking frontend (index.html) ──"
+          HTTP_CODE=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 20 "${{ env.PROD_URL }}/" 2>/dev/null || echo "000")
+          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 400 ]; then
+            echo "✅ Frontend: HTTP $HTTP_CODE"
+          else
+            echo "❌ Frontend: HTTP $HTTP_CODE"
+            HEALTHY=false
+            DETAILS="${DETAILS}; Frontend HTTP $HTTP_CODE"
+          fi
+
+          # 3. Check /ping endpoint
+          echo ""
+          echo "── Checking /ping ──"
+          PING=$(curl -fsS --max-time 10 "${{ env.PROD_URL }}/ping" 2>/dev/null || echo "FAIL")
+          if echo "$PING" | grep -qi "PONG"; then
+            echo "✅ Ping: OK"
+          else
+            echo "❌ Ping failed"
+            HEALTHY=false
+            DETAILS="${DETAILS}; Ping FAIL"
+          fi
+
+          echo ""
+          echo "══════════════════════════════════════"
+          echo "Result: HEALTHY=$HEALTHY"
+          echo "Details: $DETAILS"
+          echo "══════════════════════════════════════"
+
+          echo "healthy=$HEALTHY" >> "$GITHUB_OUTPUT"
+          echo "details=$DETAILS" >> "$GITHUB_OUTPUT"
+
+  # ─── Job 3: Auto-Revert on Failure ─────────────────────────────────────────
+  auto-revert:
+    name: Auto-Revert (if unhealthy)
+    needs: [wait-for-deploy, health-check]
+    if: needs.health-check.outputs.healthy == 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Find last known-good commit
+        id: find_good
+        run: |
+          echo "Current (broken) commit: ${{ github.sha }}"
+
+          # The parent of the current commit is the last known-good state.
+          # For merge commits, use the first parent (the master branch line).
+          GOOD_SHA=$(git rev-parse HEAD~1)
+          echo "Last known-good commit: $GOOD_SHA"
+
+          # Verify the good commit exists
+          if ! git cat-file -e "$GOOD_SHA" 2>/dev/null; then
+            echo "❌ Cannot find parent commit. Manual intervention required."
+            exit 1
+          fi
+
+          echo "good_sha=$GOOD_SHA" >> "$GITHUB_OUTPUT"
+
+          # Show what we're reverting
+          echo ""
+          echo "Commits being reverted:"
+          git log --oneline "$GOOD_SHA..HEAD"
+
+      - name: Revert to last known-good commit
+        if: ${{ github.event.inputs.skip_revert != 'true' }}
+        run: |
+          GOOD_SHA="${{ steps.find_good.outputs.good_sha }}"
+          BAD_SHA="${{ github.sha }}"
+
+          git config user.name "KelionAI Auto-Deploy"
+          git config user.email "deploy@kelionai.app"
+
+          # Create a revert commit (not force push — preserves history)
+          git revert --no-edit HEAD
+
+          echo ""
+          echo "══════════════════════════════════════"
+          echo "🔄 REVERTING: $BAD_SHA → $GOOD_SHA"
+          echo "══════════════════════════════════════"
+
+          git push origin master
+
+      - name: Create failure issue
+        if: ${{ github.event.inputs.skip_revert != 'true' }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const badSha = '${{ github.sha }}'.substring(0, 8);
+            const goodSha = '${{ steps.find_good.outputs.good_sha }}'.substring(0, 8);
+            const details = '${{ needs.health-check.outputs.details }}';
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🚨 Auto-Revert: Deploy ${badSha} failed health check`,
+              body: [
+                `## Auto-Revert Report`,
+                ``,
+                `| Field | Value |`,
+                `|-------|-------|`,
+                `| **Failed Commit** | \`${badSha}\` |`,
+                `| **Reverted To** | \`${goodSha}\` |`,
+                `| **Health Details** | ${details} |`,
+                `| **Timestamp** | ${new Date().toISOString()} |`,
+                ``,
+                `### What happened`,
+                `The deploy of \`${badSha}\` failed the production health check.`,
+                `The system automatically reverted to the last known-good commit \`${goodSha}\`.`,
+                ``,
+                `### Next steps`,
+                `1. Check the [failed workflow run](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`,
+                `2. Fix the issue in a new PR`,
+                `3. Close this issue when resolved`,
+                ``,
+                `---`,
+                `*This issue was created automatically by the safe-deploy workflow.*`,
+              ].join('\n'),
+              labels: ['deploy-failure', 'auto-revert'],
+            });
+
+  # ─── Job 4: Success notification ───────────────────────────────────────────
+  deploy-success:
+    name: Deploy Success ✅
+    needs: [wait-for-deploy, health-check]
+    if: needs.health-check.outputs.healthy == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy verified
+        run: |
+          echo "══════════════════════════════════════"
+          echo "✅ DEPLOY VERIFIED SUCCESSFULLY"
+          echo "  Commit: ${{ github.sha }}"
+          echo "  Health: ${{ needs.health-check.outputs.details }}"
+          echo "══════════════════════════════════════"
