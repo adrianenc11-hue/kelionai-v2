@@ -345,7 +345,6 @@ function MonitorOverlay() {
               controls
               autoPlay
               preload="auto"
-              crossOrigin="anonymous"
               style={{
                 width: '100%',
                 maxWidth: 420,

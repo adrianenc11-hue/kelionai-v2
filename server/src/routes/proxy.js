@@ -173,4 +173,81 @@ try {
   }
 });
 
+// ── Streaming media proxy ─────────────────────────────────────────
+// GET /api/proxy/stream?url=http://... — pipes audio/video data directly
+// without buffering the entire response in memory. The main proxy above
+// uses arrayBuffer() which would consume unlimited RAM on infinite live
+// streams (radio, IPTV). This endpoint streams chunk-by-chunk.
+const { Readable } = require('stream');
+
+router.get('/stream', async (req, res) => {
+  const ip = (req.headers['x-forwarded-for'] || req.ip || '').toString().split(',')[0].trim();
+  if (!rateLimit(ip)) {
+    return res.status(429).send('Rate limit exceeded.');
+  }
+
+  const rawUrl = (req.query.url || '').toString().trim();
+  if (!rawUrl) return res.status(400).send('Missing ?url= parameter');
+
+  let targetUrl;
+  try {
+    targetUrl = new URL(rawUrl);
+    if (targetUrl.protocol !== 'http:' && targetUrl.protocol !== 'https:') {
+      return res.status(400).send('Only http/https URLs are supported');
+    }
+  } catch {
+    return res.status(400).send('Invalid URL');
+  }
+
+  try {
+    const upstream = await fetch(targetUrl.toString(), {
+      redirect: 'follow',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; KelionMonitor/1.0)',
+        'Accept': 'audio/*, video/*, */*',
+        'Icy-MetaData': '0',
+      },
+    });
+
+    if (!upstream.ok) {
+      return res.status(upstream.status).send('Upstream error');
+    }
+
+    // Forward content-type and set CORS/CSP headers
+    const ct = upstream.headers.get('content-type');
+    if (ct) res.setHeader('Content-Type', ct);
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cache-Control', 'no-cache');
+
+    // Pipe the stream — never buffer the entire body
+    if (upstream.body && typeof upstream.body.pipe === 'function') {
+      // Node.js native fetch returns a web ReadableStream; convert to Node stream
+      upstream.body.pipe(res);
+    } else if (upstream.body) {
+      // Web ReadableStream (Node 18+ fetch)
+      const reader = upstream.body.getReader();
+      const push = async () => {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) { res.end(); break; }
+          if (!res.write(value)) {
+            await new Promise(resolve => res.once('drain', resolve));
+          }
+        }
+      };
+      push().catch(() => res.end());
+    } else {
+      res.status(502).send('No response body');
+    }
+
+    // Clean up if client disconnects
+    req.on('close', () => {
+      try { if (upstream.body && upstream.body.cancel) upstream.body.cancel(); } catch {}
+    });
+  } catch (err) {
+    console.warn('[proxy/stream] error:', err && err.message);
+    if (!res.headersSent) res.status(502).send('Stream proxy error');
+  }
+});
+
 module.exports = router;

@@ -630,7 +630,10 @@ L.marker([${lat},${lon}]).addTo(map).bindPopup(${JSON.stringify(name)}).openPopu
       // otherwise derive from the host so we never show a blank label.
       let label;
       try { label = new URL(src).hostname.replace(/^www\./, ''); } catch { label = 'Live audio'; }
-      return { kind: 'audio', src, title: label, embedType: 'audio' };
+      // HTTP streams on HTTPS pages: route through /api/proxy/stream
+      // which pipes the audio data (no buffering). HTTPS streams pass directly.
+      const audioSrc = src.startsWith('http://') ? `/api/proxy/stream?url=${encodeURIComponent(src)}` : src;
+      return { kind: 'audio', src: audioSrc, title: label, embedType: 'audio' };
     }
 
     case 'document': {
