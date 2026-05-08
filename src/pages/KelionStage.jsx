@@ -2484,6 +2484,10 @@ export default function KelionStage() {
                   {t('installApp')}
                 </MenuItem>
               )}
+              
+              <MenuItem onClick={() => { window.location.href = '/api/tools/mcp/connect'; }}>
+                🔗 Conectează Google (MCP)
+              </MenuItem>
 
               {/* Sign out moved to the top-right action bar. */}
             </>

@@ -170,6 +170,13 @@ router.post('/browser/browse', async (req, res) => {
 // Google yet, we return a connect URL they can visit.
 const googleMcp = require('../services/googleMcp');
 
+router.get('/mcp/connect', async (req, res) => {
+  const user = await peekUser(req);
+  if (!user) return res.status(401).send('Not signed in');
+  const url = googleMcp.getConnectUrl(user.id);
+  res.redirect(url);
+});
+
 router.post('/mcp/calendar', async (req, res) => {
   const user = await peekUser(req);
   if (!user) {
