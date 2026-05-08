@@ -152,6 +152,7 @@ const EXPECTED_TOOL_NAMES = [
   'query_database',
   'check_updates',
   'conversation_summary',
+  'read_past_conversation',
   'thinking_mode',
   'deep_search',
   'memory_sources',
