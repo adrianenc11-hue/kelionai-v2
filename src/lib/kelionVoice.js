@@ -117,6 +117,13 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
   // narration prompt so the returning inputTranscription (which the model
   // echoes back as the 'user' turn) is NOT shown in the transcript.
   const narrationPendingRef = useRef(false)
+  // Narration cooldown — epoch ms of the last real user interaction
+  // (voice, text, tool call). The narration loop won't fire within 5s
+  // of this timestamp so Kelion's voice response has time to complete
+  // before the narrator speaks. Without this, status briefly returns
+  // to 'listening' between tool calls and the narrator fires in the gap,
+  // producing overlapping voices ("naratorul intra peste kelion").
+  const narrationCooldownRef = useRef(0)
   // translatorModeRef — set in start() before the WS opens so handleMessage
   // can read it inside setupComplete without a closure/scope issue.
   const translatorModeRef = useRef(false)
@@ -151,6 +158,11 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
   // we've already called `.stop()` on the active sources.
   const playbackGenerationRef = useRef(0)
   const mediaStreamDestRef = useRef(null)
+  // VOICE UNIQUENESS: central ref for ANY audio element currently
+  // playing TTS (audioRef blob, standalone new Audio(), etc.).
+  // clearAudioQueue stops it so only ONE voice speaks at a time.
+  // Adrian 2026-05-08: "sa fie doar el, unicitate e nevoie".
+  const activeAudioElRef = useRef(null)
   const turnActiveRef = useRef({ user: null, assistant: null })
   const analyserRef = useRef(null)
   const micLevelRafRef = useRef(null)
@@ -307,6 +319,17 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
       playbackEndTimeRef.current = playbackCtxRef.current.currentTime
     }
     playbackPlayingRef.current = false
+    // VOICE UNIQUENESS: also stop any TTS audio element (blob-based)
+    // that may be playing from a previous turn. This covers both the
+    // audioRef TTS path and standalone new Audio() fallbacks.
+    const prevAudio = activeAudioElRef.current
+    if (prevAudio) {
+      try { prevAudio.pause() } catch (_) {}
+      try { prevAudio.onended = null } catch (_) {}
+      try { if (prevAudio.src && prevAudio.src.startsWith('blob:')) URL.revokeObjectURL(prevAudio.src) } catch (_) {}
+      try { prevAudio.src = '' } catch (_) {}
+      activeAudioElRef.current = null
+    }
   }, [])
 
   // ───── WebSocket handlers ─────
@@ -379,6 +402,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
           appendTurn('user', sc.inputTranscription.text, false, '🎤 Voice (Mic)')
           logAiEvent('transcript_in', { text: sc.inputTranscription.text })
           lastActivityAtRef.current = Date.now()
+          narrationCooldownRef.current = Date.now()
           // Detect language from what the user says (first word heuristic)
           // so ElevenLabs TTS speaks in the right language.
           const langHint = sc.inputTranscription.lang || sc.inputTranscription.languageCode
@@ -449,6 +473,8 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
           cloneTranscriptBufRef.current = ''
           ;(async () => {
             try {
+              // VOICE UNIQUENESS: stop any previous audio before starting new TTS
+              clearAudioQueue()
               setStatus('speaking')
               logAiEvent('tts_req', { text: textToSpeak })
               const ttsStart = Date.now()
@@ -508,12 +534,14 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
                 // MUST unmute it or the user hears nothing.
                 audioEl.muted = false
                 audioEl.volume = 1.0
+                activeAudioElRef.current = audioEl
                 console.log(`[clonedTTS] playing via main audioEl, muted=${audioEl.muted}, volume=${audioEl.volume}`)
                 audioEl.onended = () => {
                   URL.revokeObjectURL(blobUrl)
                   audioEl.src = ''
                   audioEl.srcObject = prevSrcObject // restore voice stream
                   audioEl.muted = prevMuted         // restore muted state
+                  activeAudioElRef.current = null
                   setStatus('listening')
                 }
                 audioEl.onerror = (e) => {
@@ -532,7 +560,8 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
                   audioEl.muted = prevMuted
                   const fallback = new Audio(blobUrl)
                   fallback.volume = 1.0
-                  fallback.onended = () => { URL.revokeObjectURL(blobUrl); setStatus('listening') }
+                  activeAudioElRef.current = fallback
+                  fallback.onended = () => { URL.revokeObjectURL(blobUrl); activeAudioElRef.current = null; setStatus('listening') }
                   fallback.play().catch((e2) => {
                     console.error('[clonedTTS] fallback play also failed:', e2?.message)
                     appendTurn('assistant', `⚠️ Voce clonată: browser blochează redarea (${e2?.message})`, true, '⚙️ System')
@@ -542,7 +571,8 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
               } else {
                 // No audioRef — fallback to standalone Audio element
                 const fallback = new Audio(blobUrl)
-                fallback.onended = () => { URL.revokeObjectURL(blobUrl); setStatus('listening') }
+                activeAudioElRef.current = fallback
+                fallback.onended = () => { URL.revokeObjectURL(blobUrl); activeAudioElRef.current = null; setStatus('listening') }
                 fallback.play().catch(() => setStatus('listening'))
               }
             } catch (err) {
@@ -566,6 +596,9 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
     // matching id so the model can continue the turn with the result.
     if (msg.toolCall?.functionCalls?.length) {
       const fcs = msg.toolCall.functionCalls
+      // Suppress narration during tool execution — the cooldown prevents
+      // the narrator from jumping in between chained tool calls.
+      narrationCooldownRef.current = Date.now()
       // Narrate to the transcript so the user SEES what Kelion is doing
       // (audio narration is handled by the model itself per the persona).
       for (const fc of fcs) {
@@ -1480,66 +1513,21 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
 
   useEffect(() => () => { stop() }, [stop])
 
-  // ───── Narration loop (accessibility — visually-impaired users) ─────
-  // When set_narration_mode is enabled (via the voice tool), periodically
-  // inject a short text prompt into the live WebSocket asking the model to
-  // describe what it sees from the camera frames it is already receiving.
-  // The Live API sees the video track natively — we just need to nudge it
-  // with a text turn on a timer so it speaks the description out loud.
-  const narrationTimerRef = useRef(null)
-  useEffect(() => {
-    if (!active) return undefined
-    const clearNarrationTimer = () => {
-      if (narrationTimerRef.current) {
-        clearInterval(narrationTimerRef.current)
-        narrationTimerRef.current = null
-      }
-    }
-    const startNarrationLoop = (snap) => {
-      clearNarrationTimer()
-      if (!snap.enabled) return
-      const intervalMs = snap.intervalMs || 8000
-      let lastSentAt = 0
-      narrationTimerRef.current = setInterval(() => {
-        const ws = wsRef.current
-        if (!ws || ws.readyState !== WebSocket.OPEN) return
-        // Don't narrate while Kelion is speaking/thinking — wait for silence
-        if (statusRef.current !== 'listening') return
-        // Debounce: skip if we sent a narration prompt less than (intervalMs - 2s) ago.
-        // This prevents the loop from firing immediately after Kelion finishes
-        // speaking the previous description (status flips to 'listening' and the
-        // next interval tick fires within milliseconds).
-        const now = Date.now()
-        if (now - lastSentAt < intervalMs - 2000) return
-        lastSentAt = now
-        const focus = snap.focus
-          ? `Focus on: ${snap.focus}. `
-          : ''
-        const prompt = `${focus}Describe briefly what you see right now from the camera. Be natural, concise (2-3 sentences). Mention any changes since your last description.`
-        try {
-          // Mark as synthetic so the echoed inputTranscription is suppressed
-          narrationPendingRef.current = true
-          ws.send(JSON.stringify({
-            clientContent: {
-              turns: [{ role: 'user', parts: [{ text: prompt }] }],
-              turnComplete: true,
-            },
-          }))
-        } catch (_) { /* best-effort */ }
-      }, intervalMs)
-    }
-    // Subscribe to narration mode changes
-    const unsub = subscribeNarrationMode((snap) => {
-      startNarrationLoop(snap)
-    })
-    // Check initial state
-    const initial = getNarrationMode()
-    if (initial.enabled) startNarrationLoop(initial)
-    return () => {
-      clearNarrationTimer()
-      unsub()
-    }
-  }, [active])
+  // ───── Narration loop — DISABLED ─────
+  // Adrian (2026-05-08): "ideal ar fi sa fie doar kelion in toate ipostazele,
+  // fara narator, el sa caute el sa dea raspunsul, unicitate e nevoie."
+  //
+  // The autonomous narration timer has been removed. Kelion is the SOLE voice
+  // — when the user asks him to describe what he sees, he does it as himself
+  // (through the normal voice turn flow), not via a separate "narrator" that
+  // fires synthetic prompts on a timer. The timer approach caused overlapping
+  // voices because it injected prompts in the brief 'listening' gaps between
+  // tool calls and user interactions.
+  //
+  // The narrationMode store + set_narration_mode tool declaration still exist
+  // for forward compatibility. If re-enabled in the future, the loop MUST
+  // coordinate with Kelion's turn-taking — never fire while a tool chain is
+  // in progress, and cancel immediately when the user speaks.
 
   // Register the camera controller so the `switch_camera` / camera_on /
   // camera_off / zoom_camera voice tools can drive this hook. Only the
@@ -1613,6 +1601,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
     const clean = (text || '').trim()
     if (!clean && !image) return
     userHasSpokenRef.current = true
+    narrationCooldownRef.current = Date.now()
     if (clean) appendTurn('user', clean, true, playAudio ? '🎤 Voice' : '⌨️ Keyboard')
     if (clean) logAiEvent('text_sent', { text: clean })
 
@@ -1689,6 +1678,8 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
         
         console.log('[TTS-DEBUG] playAudio=', playAudio, 'finalReply length=', finalReply.length)
         if (playAudio) {
+          // VOICE UNIQUENESS: stop any previous audio before starting new TTS
+          clearAudioQueue()
           setStatus('speaking')
           const isNative = !isClonedVoiceActive();
           const ttsUrl = isNative ? '/api/voice/clone/tts?native=true' : '/api/voice/clone/tts';
@@ -1720,8 +1711,10 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
               const audioEl = new window.Audio();
               audioEl.src = blobUrl;
               audioEl.volume = 1;
+              activeAudioElRef.current = audioEl
               audioEl.onended = () => {
                 URL.revokeObjectURL(blobUrl)
+                activeAudioElRef.current = null
                 setStatus('idle')
               }
               audioEl.onerror = (e) => {
