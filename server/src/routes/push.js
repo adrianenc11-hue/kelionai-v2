@@ -133,9 +133,9 @@ router.post('/test', async (req, res) => {
 // balance watchdog and other server-side checks.
 async function sendAdminAlert({ title, body, url }) {
   const { isAdminEmail } = require('../middleware/optionalAuth');
-  const { listAllPushSubscriptions } = require('../db');
+  const { listActivePushSubscriptions } = require('../db');
   try {
-    const allSubs = await listAllPushSubscriptions();
+    const allSubs = await listActivePushSubscriptions();
     // Filter to admin subscriptions only (by user_id → email lookup).
     // For simplicity, send to all enabled subs and let the caller
     // gate on admin status if needed. In practice the admin is the
