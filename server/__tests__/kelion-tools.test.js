@@ -174,6 +174,21 @@ const EXPECTED_TOOL_NAMES = [
   'scheduled_task',
   'qr_code',
   'smart_alert',
+  'multimedia_analyzer',
+  'system_bridge',
+  'document_parser',
+  'ocr_engine',
+  'image_generator_editor',
+  'hardware_manager',
+  'cloud_manager',
+  'communication_hub',
+  'automation_engine',
+  'devops_toolkit',
+  'scheduler_pro',
+  'smart_monitor',
+  'deep_memory_architect',
+  'task_orchestrator',
+  'universal_executor',
 ];
 
 describe('Kelion tool catalog', () => {

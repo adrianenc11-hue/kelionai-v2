@@ -1752,6 +1752,14 @@ function pickForcedTool(lastUserMessage) {
 //   ocr_image     → tesseract.js
 //   ocr_passport  → tesseract.js + MRZ parser (TD3, ICAO 9303)
 
+// 0.21A — ocr_engine: Super-module for Optical Character Recognition (OCR).
+async function toolOcrEngine(args) {
+  const mode = String(args?.mode || 'image').trim().toLowerCase();
+  if (mode === 'passport') return toolOcrPassport(args);
+  return toolOcrImage(args);
+}
+
+
 function decodeBase64Source(base64) {
   const raw = String(base64 || '').replace(/^data:[^,]+,/, '');
   if (!raw) return { ok: false, error: 'missing base64' };
@@ -3444,14 +3452,29 @@ async function executeRealTool(name, args, ctx) {
     case 'auto_test': return toolAutoTest(a);
     case 'session_persist': return toolSessionPersist(a, ctx);
     case 'parallel_tools': return toolParallelTools(a, ctx);
+    case 'document_parser': return toolDocumentParser(a);
+    case 'ocr_engine': return toolOcrEngine(a);
+    case 'image_generator_editor': return toolImageGeneratorEditor(a);
+    case 'hardware_manager': return toolHardwareManager(a);
+    case 'cloud_manager': return toolCloudManager(a);
+    case 'communication_hub': return toolCommunicationHub(a);
+    case 'automation_engine': return toolAutomationEngine(a);
+    case 'devops_toolkit': return toolDevopsToolkit(a);
+    case 'scheduler_pro': return toolSchedulerPro(a, ctx);
+    case 'smart_monitor': return toolSmartMonitor(a, ctx);
+    case 'deep_memory_architect': return toolDeepMemoryArchitect(a, ctx);
+    case 'task_orchestrator': return toolTaskOrchestrator(a, ctx);
+    case 'universal_executor': return toolUniversalExecutor(a);
     case 'video_analyze': return toolVideoAnalyze(a);
     case 'audio_analyze': return toolAudioAnalyze(a);
+    case 'multimedia_analyzer': return toolMultimediaAnalyzer(a);
     case 'image_edit': return toolImageEdit(a);
     case 'spreadsheet_analyze': return toolSpreadsheetAnalyze(a);
     case 'vision_analyze': return toolVisionAnalyze(a);
     case 'screen_capture': return toolScreenCapture(a);
-    case 'task_planner': return toolTaskPlanner(a, ctx);
     case 'clipboard_manager': return toolClipboardManager(a);
+    case 'system_bridge': return toolSystemBridge(a);
+    case 'task_planner': return toolTaskPlanner(a, ctx);
     case 'context_cache': return toolContextCache(a, ctx);
     case 'mcp_protocol': return toolMcpProtocol(a, ctx);
     case 'scheduled_task': return toolScheduledTask(a, ctx);
@@ -4337,6 +4360,20 @@ async function toolParallelTools(args, ctx) {
 }
 
 // 0.11 — video_analyze: Extract metadata from a video URL/file.
+// 0.11A — multimedia_analyzer: Super-module for multimedia analysis.
+async function toolMultimediaAnalyzer(args) {
+  const url = String(args?.url || '').trim();
+  const type = String(args?.type || 'video');
+  if (!url) return { ok: false, error: 'url is required for multimedia analysis' };
+  
+  if (type === 'audio') {
+    return toolAudioAnalyze({ url });
+  } else {
+    return toolVideoAnalyze({ url });
+  }
+}
+
+// 0.11 — video_analyze: Analyze video URL metadata.
 async function toolVideoAnalyze(args) {
   const url = String(args?.url || '').trim();
   if (!url) return { ok: false, error: 'url is required' };
@@ -4373,6 +4410,15 @@ async function toolImageEdit(args) {
         operation === 'rotate' ? `img = img.rotate(${args?.angle || 90}); img.save("output.png"); print("rotated")` :
           `print("unknown operation: ${operation}")`);
   return toolRunCode ? await toolRunCode({ language: 'python', code: script }) : { ok: false, error: 'run_code unavailable' };
+}
+
+// 0.22A — image_generator_editor: Super-module for Image Gen, Edit, and QR codes.
+async function toolImageGeneratorEditor(args) {
+  const action = String(args?.action || '').trim().toLowerCase();
+  if (action === 'generate') return toolGenerateImage({ prompt: args?.prompt, size: args?.width ? `${args.width}x${args.height}` : 'auto' });
+  if (action === 'edit') return toolImageEdit(args);
+  if (action === 'qr_code') return toolQrCode({ text: args?.text, size: args?.width || 300 });
+  return { ok: false, error: 'Unknown action. Expected generate, edit, or qr_code.' };
 }
 
 // 0.14 — spreadsheet_analyze: Parse and analyze CSV data.
@@ -4428,6 +4474,106 @@ async function toolClipboardManager(args) {
     return { ok: true, client_action: 'clipboard_write', text, instruction: 'Content will be copied to clipboard on the client.' };
   }
   return { ok: true, client_action: 'clipboard_read', instruction: 'The client will read clipboard contents and send them back.' };
+}
+
+// 0.20A — document_parser: Super-module for document parsing (PDF, DOCX, CSV).
+async function toolDocumentParser(args) {
+  const type = String(args?.type || '').trim().toLowerCase();
+  if (type === 'pdf') return toolReadPdf(args);
+  if (type === 'docx') return toolReadDocx(args);
+  if (type === 'spreadsheet' || type === 'csv' || type === 'xlsx') return toolSpreadsheetAnalyze(args);
+  return { ok: false, error: 'Unknown document_parser type. Expected pdf, docx, or spreadsheet.' };
+}
+
+// 0.18A — system_bridge: Super-module for system control.
+async function toolSystemBridge(args) {
+  const action = String(args?.action || '').trim();
+  if (action === 'screen_capture') {
+    return toolScreenCapture(args);
+  } else if (action === 'clipboard_read' || action === 'clipboard_write') {
+    return toolClipboardManager({ action: action.replace('clipboard_', ''), text: args?.text });
+  }
+  return { ok: false, error: 'Unknown system_bridge action. Expected screen_capture, clipboard_read, or clipboard_write.' };
+}
+
+// 0.23A — hardware_manager: Super-module for hardware control.
+async function toolHardwareManager(args) {
+  return { ok: true, client_action: 'hardware_manager', instruction: 'The client will handle the hardware configuration for ' + (args?.device || 'unknown') };
+}
+
+// 0.24A — cloud_manager: Super-module for cloud storage.
+async function toolCloudManager(args) {
+  return { ok: true, client_action: 'cloud_manager', instruction: 'Cloud interaction requires MCP OAuth context on the client for ' + (args?.provider || 'unknown') };
+}
+
+// 0.25A — communication_hub: Super-module for Email/SMS.
+async function toolCommunicationHub(args) {
+  const action = String(args?.action || '').trim().toLowerCase();
+  if (action === 'send_email') return toolSendEmail({ to: args?.to, subject: args?.subject, text: args?.body });
+  if (action === 'compose_draft') return { ok: true, client_action: 'compose_email_draft', to: args?.to, subject: args?.subject, body: args?.body };
+  if (action === 'send_sms') return toolSendSms({ to: args?.to, body: args?.body });
+  return { ok: false, error: 'Unknown action. Expected send_email, compose_draft, or send_sms.' };
+}
+
+// 0.26A — automation_engine: Super-module for Zapier and webhooks.
+async function toolAutomationEngine(args) {
+  const action = String(args?.action || '').trim().toLowerCase();
+  if (action === 'zapier_trigger' || action === 'webhook_trigger') return toolZapierTrigger({ webhook_url: args?.webhook_url, payload: args?.payload });
+  return { ok: false, error: 'Unknown action. Expected zapier_trigger or webhook_trigger.' };
+}
+
+// 0.27A — devops_toolkit: Super-module for Git/GitHub.
+async function toolDevopsToolkit(args) {
+  const action = String(args?.action || '').trim().toLowerCase();
+  if (action === 'repo_info') return toolGithubRepoInfo({ repo: args?.repo });
+  if (action === 'list_files') return toolListGithubRepoFiles({ repo: args?.repo, branch: args?.branch });
+  if (action === 'read_file') return toolReadGithubFile({ repo: args?.repo, path: args?.path, branch: args?.branch });
+  if (action === 'create_pr') return toolCreateGithubPr({ repo: args?.repo, title: args?.title, body: args?.body });
+  if (action === 'manage_prs') return toolManageGithubPrs({ repo: args?.repo, action: args?.pr_action, issue_number: args?.issue_number });
+  return { ok: false, error: 'Unknown action for devops_toolkit.' };
+}
+
+// 0.28A — scheduler_pro: Super-module for time management.
+async function toolSchedulerPro(args, ctx) {
+  const action = String(args?.action || '').trim().toLowerCase();
+  if (action === 'read_calendar') return toolReadCalendar(args, ctx);
+  if (action === 'create_ics') return toolCreateCalendarIcs(args);
+  if (action === 'schedule_task') return toolScheduledTask(args, ctx);
+  if (action === 'plan_tasks') return toolTaskPlanner(args, ctx);
+  return { ok: false, error: 'Unknown scheduler_pro action.' };
+}
+
+// 0.29A — smart_monitor: Super-module for alerts and monitoring.
+async function toolSmartMonitor(args, ctx) {
+  return toolSmartAlert(args, ctx);
+}
+
+// 0.30A — deep_memory_architect: Super-module for memory and context.
+async function toolDeepMemoryArchitect(args, ctx) {
+  const action = String(args?.action || '').trim().toLowerCase();
+  if (action === 'context_cache') return toolContextCache(args, ctx);
+  if (action === 'session_persist') return toolSessionPersist(args, ctx);
+  if (action === 'remember_fact') return toolRememberFact(args, ctx);
+  if (action === 'learn_from_observation') return toolLearnFromObservation(args, ctx);
+  if (action === 'get_history') return toolGetActionHistory(args, ctx);
+  return { ok: false, error: 'Unknown deep_memory_architect action.' };
+}
+
+// 0.31A — task_orchestrator: Super-module for execution plans and parallelization.
+async function toolTaskOrchestrator(args, ctx) {
+  const action = String(args?.action || '').trim().toLowerCase();
+  if (action === 'parallel') return toolParallelTools(args, ctx);
+  if (action === 'execute_plan') return toolExecutePlan(args, ctx);
+  return { ok: false, error: 'Unknown task_orchestrator action.' };
+}
+
+// 0.32A — universal_executor: Super-module for code and terminal execution.
+async function toolUniversalExecutor(args) {
+  const action = String(args?.action || '').trim().toLowerCase();
+  if (action === 'run_code') return toolRunCode(args);
+  if (action === 'run_terminal') return toolRunTerminalCommand(args);
+  if (action === 'run_regex') return toolRunRegex(args);
+  return { ok: false, error: 'Unknown universal_executor action.' };
 }
 
 // 0.19 — context_cache: In-memory context cache for cross-turn references.
@@ -4575,6 +4721,10 @@ const REAL_TOOL_NAMES = [
   'video_analyze', 'audio_analyze', 'image_edit', 'spreadsheet_analyze',
   'vision_analyze', 'screen_capture', 'task_planner', 'clipboard_manager',
   'context_cache', 'mcp_protocol', 'scheduled_task', 'qr_code', 'smart_alert',
+  'multimedia_analyzer', 'system_bridge', 'document_parser', 'ocr_engine',
+  'image_generator_editor', 'hardware_manager', 'cloud_manager',
+  'communication_hub', 'automation_engine', 'devops_toolkit',
+  'scheduler_pro', 'smart_monitor', 'deep_memory_architect', 'task_orchestrator', 'universal_executor',
 ];
 
 module.exports = {
@@ -4681,6 +4831,21 @@ module.exports = {
   toolScheduledTask,
   toolQrCode,
   toolSmartAlert,
+  toolMultimediaAnalyzer,
+  toolSystemBridge,
+  toolDocumentParser,
+  toolOcrEngine,
+  toolImageGeneratorEditor,
+  toolHardwareManager,
+  toolCloudManager,
+  toolCommunicationHub,
+  toolAutomationEngine,
+  toolDevopsToolkit,
+  toolSchedulerPro,
+  toolSmartMonitor,
+  toolDeepMemoryArchitect,
+  toolTaskOrchestrator,
+  toolUniversalExecutor,
   // Memory files
   storeTempFile,
   getTempFile,
