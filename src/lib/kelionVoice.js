@@ -1670,14 +1670,19 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
             continue; // Loop back to send toolResponses
           }
           
-          finalReply = data.reply || 'No response.';
+          finalReply = data.reply || '';
           finalModel = data.model;
           break;
         }
-        appendTurn('assistant', finalReply, true, finalModel ? `🤖 ${finalModel}` : undefined)
+        
+        // Prevent empty bubbles
+        if (finalReply) {
+          appendTurn('assistant', finalReply, true, finalModel ? `🤖 ${finalModel}` : undefined)
+        }
         
         console.log('[TTS-DEBUG] playAudio=', playAudio, 'finalReply length=', finalReply.length)
-        if (playAudio) {
+        // Skip TTS if there is actually nothing to say (fixes Point 9: ElevenLabs text required error & playback crash)
+        if (playAudio && finalReply.trim() !== '') {
           // VOICE UNIQUENESS: stop any previous audio before starting new TTS
           clearAudioQueue()
           setStatus('speaking')
@@ -1704,11 +1709,14 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
               const blob = new Blob([audioData], { type: 'audio/mpeg' })
               const blobUrl = URL.createObjectURL(blob)
               
-              // Always create a fresh Audio() for HTTP TTS to avoid
-              // the shared audioRef being stuck in muted state from
-              // the WebSocket voice path (which sets muted=true for
-              // lipsync). This ensures text-chat TTS always plays.
-              const audioEl = new window.Audio();
+              // Use the shared audioRef so the avatar's lip-sync analyser picks it up.
+              // We MUST clear srcObject and set muted=false because the Live API
+              // path leaves it muted with a MediaStream attached.
+              const audioEl = audioRef?.current || new window.Audio();
+              if (audioEl === audioRef?.current) {
+                audioEl.srcObject = null;
+                audioEl.muted = false;
+              }
               audioEl.src = blobUrl;
               audioEl.volume = 1;
               activeAudioElRef.current = audioEl
