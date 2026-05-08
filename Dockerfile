@@ -1,8 +1,10 @@
 FROM node:20-slim AS base
 
 # Native build tools for better-sqlite3 + Chromium system dependencies for Playwright
+# git, curl, bash — required for full admin autonomy (run_command tool)
 RUN apt-get update && apt-get install -y \
     python3 make g++ \
+    git curl bash \
     libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
     libxkbcommon0 libxcomposite1 libxdamage1 libxrandr2 libgbm1 \
     libpango-1.0-0 libcairo2 libasound2 libxshmfence1 libx11-xcb1 \
