@@ -1255,6 +1255,14 @@ const KELION_TOOLS = [
     required: ['query'],
   },
   {
+    name: 'read_past_conversation',
+    description: "Read the exact messages from one of the signed-in user's past conversations. Use when the user asks 'ce am discutat data trecută?', 'adumi aminte ce vorbeam ieri', 'read our last chat'.",
+    properties: {
+      offset: { type: 'integer', description: "Which conversation to read. 0 = the most recent past conversation, 1 = the one before that, etc. Default 0." },
+    },
+    required: [],
+  },
+  {
     name: 'check_updates',
     description: "Check for outdated npm dependencies in the project. Runs `npm outdated --json` and returns a list of packages that need updating, with current vs latest versions. Use when the user asks 'are my packages up to date?', 'verifică dependențele', 'check for updates'.",
     properties: {

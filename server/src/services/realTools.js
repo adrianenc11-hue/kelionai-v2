@@ -3443,6 +3443,7 @@ async function executeRealTool(name, args, ctx) {
     case 'query_database': return toolQueryDatabase(a, ctx);
     case 'check_updates': return toolCheckUpdates(a);
     case 'conversation_summary': return toolConversationSummary(a, ctx);
+    case 'read_past_conversation': return toolReadPastConversation(a, ctx);
     case 'thinking_mode': return toolThinkingMode(a);
     case 'deep_search': return toolDeepSearch(a);
     case 'memory_sources': return toolMemorySources(a, ctx);
@@ -3876,6 +3877,40 @@ async function toolCheckUpdates(args) {
 }
 
 // 0.24 — conversation_summary: Auto-summarize conversations for context.
+async function toolReadPastConversation(args, ctx) {
+  const userId = ctx?.user?.id;
+  if (!userId) {
+    return { ok: false, signed_in: false, error: 'Reading past conversations requires sign-in.' };
+  }
+  const db = require('../db');
+  const offsetRaw = Number.parseInt(args?.offset, 10);
+  const offset = Number.isFinite(offsetRaw) ? Math.max(0, offsetRaw) : 0;
+
+  try {
+    const convos = await db.listConversations(userId, offset + 1);
+    if (!convos || convos.length <= offset) {
+      return { ok: false, error: 'Conversation not found at this offset.' };
+    }
+    const targetConvo = convos[offset];
+    const convoData = await db.getConversationWithMessages(userId, targetConvo.id);
+    if (!convoData) {
+      return { ok: false, error: 'Could not fetch messages for this conversation.' };
+    }
+    const msgs = (convoData.messages || []).map(m => ({
+      role: m.role,
+      content: m.content
+    }));
+    return {
+      ok: true,
+      title: targetConvo.title || 'Fara titlu',
+      date: targetConvo.created_at,
+      messages: msgs
+    };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
 async function toolConversationSummary(args, ctx) {
   const userId = ctx?.user?.id;
   if (!userId) {

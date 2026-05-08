@@ -27,6 +27,7 @@ const TOOL_CATEGORIES = {
     'show_on_monitor',
     'query_database',
     'conversation_summary',
+    'read_past_conversation',
     'thinking_mode',
     'memory_sources',
     'run_command',

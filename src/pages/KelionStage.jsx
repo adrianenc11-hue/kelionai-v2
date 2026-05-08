@@ -1847,23 +1847,46 @@ export default function KelionStage() {
           propagation so typing doesn't toggle the voice session.
           Submit with Enter or the send button.
           ISOLATED: text chat disabled — live voice only. */}
-      {chatPanelOpen && <form
-        onClick={(e) => e.stopPropagation()}
-        onSubmit={(e) => { e.preventDefault(); sendTextMessage() }}
+      {chatPanelOpen && <div
         style={{
           position: 'absolute',
           bottom: 'calc(max(32px, env(safe-area-inset-bottom)) + 54px)',
           left: bottomLeft, transform: 'translateX(-50%)',
           width: overlayShiftsBottom ? 'min(420px, 44vw)' : 'min(420px, 92vw)',
-          display: 'flex', alignItems: 'center', gap: 8,
-          padding: '6px 8px 6px 14px',
-          borderRadius: 999,
-          background: 'rgba(10, 8, 20, 0.72)',
-          backdropFilter: 'blur(14px)',
-          border: '1px solid rgba(167, 139, 250, 0.25)',
           zIndex: bottomZIndex || 50,
         }}
       >
+        <div style={{
+           position: 'absolute',
+           top: -22,
+           right: 20,
+           background: '#ed8936',
+           color: 'white',
+           fontSize: 11,
+           fontWeight: 'bold',
+           padding: '4px 12px',
+           borderTopLeftRadius: 8,
+           borderTopRightRadius: 8,
+           textTransform: 'uppercase',
+           letterSpacing: 0.5,
+           zIndex: 1,
+        }}>
+          DEVELOPER MODE
+        </div>
+        <form
+          onClick={(e) => e.stopPropagation()}
+          onSubmit={(e) => { e.preventDefault(); sendTextMessage() }}
+          style={{
+            position: 'relative',
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: '6px 8px 6px 14px',
+            borderRadius: 999,
+            background: 'rgba(10, 8, 20, 0.72)',
+            backdropFilter: 'blur(14px)',
+            border: '2px solid #ed8936',
+            zIndex: 2,
+          }}
+        >
         {/* F2 — hidden native file picker driving the "+" button below.
             Accepts images, PDFs and text files. The selected file shows
             as a dismissible pill and its filename + size land in the
@@ -2024,7 +2047,8 @@ export default function KelionStage() {
           }}
           aria-label="Send message"
         >↑</button>
-      </form>}
+      </form>
+      </div>}
 
       {/* Microphone ON/OFF Toggle — bottom center */}
       <button

@@ -1659,9 +1659,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
           if (data.toolCalls && data.toolCalls.length > 0) {
             const results = [];
             for (const call of data.toolCalls) {
-              appendTurn('assistant', `⚙️ **Apelează Tool:** \`${call.name}\`\n\`\`\`json\n${JSON.stringify(call.args, null, 2)}\n\`\`\``, false, '⚙️ System');
               const res = await runTool(call.name, call.args);
-              appendTurn('assistant', `✅ **Rezultat Tool:**\n\`\`\`\n${res}\n\`\`\``, false, '⚙️ System');
               results.push({ name: call.name, response: res, id: call.id });
             }
             toolResponses = results;
