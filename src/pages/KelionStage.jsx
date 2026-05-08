@@ -3,7 +3,7 @@ import { useGLTF, Environment, ContactShadows, Float } from '@react-three/drei'
 import * as THREE from 'three'
 import React, { Suspense, useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useLipSync } from '../lib/lipSync'
+import { useLipSync, useAudioElementLipSync } from '../lib/lipSync'
 import { handleShowOnMonitor, setMonitorGeoProvider, subscribeMonitor } from '../lib/monitorStore'
 import { STATUS_COLORS } from '../lib/kelionStatus'
 import { subscribeComposer, getComposer, openEmailComposer, closeComposer } from '../lib/composerStore'
@@ -923,6 +923,8 @@ export default function KelionStage() {
 
 
   const micMouthOpen = useLipSync(audioRef)
+  const { mouthOpen: ttsMouthOpen, attach: attachTts, reset: resetTts } = useAudioElementLipSync()
+  const finalMouthOpen = Math.max(micMouthOpen, ttsMouthOpen)
 
   // statusRef and muteModeRef: declared before useKelionVoice to avoid TDZ.
   const statusRef = useRef('idle')
@@ -1770,413 +1772,210 @@ export default function KelionStage() {
           stays as decor. */}
       <MonitorOverlay />
 
-      <audio ref={audioRef} autoPlay playsInline />
+      <audio ref={audioRef} autoPlay playsInline onPlay={(e) => attachTts(e.target)} onPause={resetTts} onEnded={resetTts} onError={resetTts} />
 
-      {/* Last assistant text reply (when chatting by typing) — fades
-          {/* Chat bubble — unified, reads from turns[] (single source of truth).
-          Shows the last user utterance + the streaming assistant reply.
-          Auto-hides 8s after the last turn.
-          ISOLATED: text chat disabled — live voice only. */}
-      {turns.length > 0 && bubbleVisible && (() => {
-        const lastAssistant = [...turns].reverse().find((t) => t.role === 'assistant')
-        const lastUser = [...turns].reverse().find((t) => t.role === 'user')
-        return (
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              position: 'absolute',
-              bottom: 'calc(max(32px, env(safe-area-inset-bottom)) + 110px)',
-              left: bottomLeft, transform: 'translateX(-50%)',
-              width: overlayShiftsBottom ? 'min(420px, 44vw)' : 'min(680px, 92vw)',
-              maxHeight: '42vh', overflowY: 'auto',
-              display: 'flex', flexDirection: 'column', gap: 8,
-              padding: 14,
-              borderRadius: 16,
-              background: 'rgba(10, 8, 20, 0.72)',
-              backdropFilter: 'blur(14px)',
-              border: '1px solid rgba(167, 139, 250, 0.22)',
-              color: '#ede9fe',
-              fontSize: 14, lineHeight: 1.45,
-              fontFamily: 'system-ui, -apple-system, sans-serif',
-              boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
-              zIndex: bottomZIndex || 4,
-            }}
-          >
-            {lastUser && (lastUser.text || lastUser.transcript) && (
+            {/* ChatGPT-Style Chat Interface */}
+      {chatPanelOpen && (
+        <div style={{
+          position: 'absolute',
+          top: 70, bottom: 0, left: 0, right: 0,
+          display: 'flex', flexDirection: 'column',
+          alignItems: 'center',
+          pointerEvents: 'none',
+          zIndex: bottomZIndex || 4,
+          background: 'linear-gradient(to bottom, rgba(10,8,20,0) 0%, rgba(10,8,20,0.6) 60%, rgba(10,8,20,0.95) 100%)',
+        }}>
+          
+          {/* Scrollable Chat History */}
+          <div style={{
+            flex: 1, width: '100%', maxWidth: 800,
+            overflowY: 'auto', pointerEvents: 'auto',
+            padding: '20px 20px 120px 20px',
+            display: 'flex', flexDirection: 'column', gap: 24,
+            maskImage: 'linear-gradient(to bottom, transparent, black 5%, black)',
+            WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 5%, black)',
+          }}>
+            <div style={{ flex: 1 }} /> {/* Spacer to push messages to bottom if few */}
+            {turns.map((turn, i) => (
+              <div key={i} style={{
+                alignSelf: turn.role === 'user' ? 'flex-end' : 'flex-start',
+                maxWidth: '85%',
+                display: 'flex', flexDirection: 'column', gap: 4,
+              }}>
+                <div style={{
+                  padding: '12px 16px',
+                  borderRadius: 18,
+                  background: turn.role === 'user' ? 'rgba(59, 59, 59, 0.8)' : 'transparent',
+                  color: '#ececec',
+                  fontSize: 15, lineHeight: 1.5,
+                  whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                  fontFamily: 'system-ui, -apple-system, sans-serif',
+                }}>
+                  {turn.text || turn.transcript}
+                </div>
+              </div>
+            ))}
+            {status === 'thinking' && (
               <div style={{
-                alignSelf: 'flex-end', maxWidth: '88%',
-                padding: '8px 12px', borderRadius: 12,
-                background: 'rgba(124, 58, 237, 0.25)',
-                border: '1px solid rgba(167, 139, 250, 0.3)',
-                fontSize: 13,
-                wordBreak: 'break-word',
-                overflowWrap: 'anywhere',
-              }}>{lastUser.text || lastUser.transcript}</div>
-            )}
-            {lastAssistant && (lastAssistant.text || lastAssistant.transcript) && (
-              <div style={{
-                alignSelf: 'flex-start', maxWidth: '92%',
-                padding: '8px 12px', borderRadius: 12,
-                background: 'rgba(167, 139, 250, 0.08)',
-                border: '1px solid rgba(167, 139, 250, 0.18)',
-                whiteSpace: 'pre-wrap',
-                wordBreak: 'break-word',
-                overflowWrap: 'anywhere',
-              }}>{lastAssistant.text || lastAssistant.transcript}</div>
-            )}
-            {!lastAssistant && status === 'thinking' && (
-              <div style={{
-                alignSelf: 'flex-start', fontSize: 13, opacity: 0.7,
-                padding: '8px 12px',
-              }}>Kelion is thinking…</div>
+                alignSelf: 'flex-start', padding: '12px 16px',
+                color: '#ececec', opacity: 0.6, fontSize: 15,
+                fontFamily: 'system-ui, -apple-system, sans-serif',
+              }}>
+                <div className="typing-indicator">Kelion is thinking...</div>
+              </div>
             )}
             {chatError && (
               <div style={{
-                fontSize: 12, color: '#fecaca',
-                background: 'rgba(80, 14, 14, 0.6)',
-                padding: '6px 10px', borderRadius: 10,
-              }}>{chatError}</div>
+                alignSelf: 'center', padding: '8px 16px', borderRadius: 8,
+                background: 'rgba(220, 38, 38, 0.2)', color: '#fca5a5', fontSize: 14,
+                fontFamily: 'system-ui, -apple-system, sans-serif',
+              }}>
+                {chatError}
+              </div>
             )}
           </div>
-        )
-      })()}
 
-      {/* Text chat composer — bottom center, above the status pill.
-          Narrower (420px) than the old 680px because the wider pill was
-          overlapping the stage monitor on the left. Stops click
-          propagation so typing doesn't toggle the voice session.
-          Submit with Enter or the send button.
-          ISOLATED: text chat disabled — live voice only. */}
-      {chatPanelOpen && <div
-        style={{
-          position: 'absolute',
-          bottom: 'calc(max(32px, env(safe-area-inset-bottom)) + 54px)',
-          left: bottomLeft, transform: 'translateX(-50%)',
-          width: overlayShiftsBottom ? 'min(420px, 44vw)' : 'min(420px, 92vw)',
-          zIndex: bottomZIndex || 50,
-        }}
-      >
-        <div style={{
-           position: 'absolute',
-           top: -22,
-           right: 20,
-           background: '#ed8936',
-           color: 'white',
-           fontSize: 11,
-           fontWeight: 'bold',
-           padding: '4px 12px',
-           borderTopLeftRadius: 8,
-           borderTopRightRadius: 8,
-           textTransform: 'uppercase',
-           letterSpacing: 0.5,
-           zIndex: 1,
-        }}>
-          DEVELOPER MODE
-        </div>
-        <form
-          onClick={(e) => e.stopPropagation()}
-          onSubmit={(e) => { e.preventDefault(); sendTextMessage() }}
-          style={{
-            position: 'relative',
-            display: 'flex', alignItems: 'center', gap: 8,
-            padding: '6px 8px 6px 14px',
-            borderRadius: 999,
-            background: 'rgba(10, 8, 20, 0.72)',
-            backdropFilter: 'blur(14px)',
-            border: '2px solid #ed8936',
-            zIndex: 2,
-          }}
-        >
-        {/* F2 — hidden native file picker driving the "+" button below.
-            Accepts images, PDFs and text files. The selected file shows
-            as a dismissible pill and its filename + size land in the
-            outgoing message as a bracketed note. */}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="*/*"
-          style={{ display: 'none' }}
-          onChange={(e) => {
-            const f = e.target.files && e.target.files[0]
-            if (f) setAttachedFile(f)
-          }}
-        />
-        <button
-          type="button"
-          onClick={() => fileInputRef.current && fileInputRef.current.click()}
-          disabled={status === 'thinking' || status === 'idle' || status === 'error'}
-          style={{
-            width: 30, height: 30, borderRadius: '50%',
-            background: 'rgba(167, 139, 250, 0.18)',
-            border: '1px solid rgba(167, 139, 250, 0.3)',
-            color: '#ede9fe',
-            cursor: status === 'thinking' ? 'default' : 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 18, lineHeight: 1, flexShrink: 0, padding: 0,
-          }}
-          title="Attach file"
-          aria-label="Attach file"
-        >+</button>
-        {attachedFile && (
+          {/* ChatGPT-Style Input Bar */}
           <div style={{
-            display: 'flex', alignItems: 'center', gap: 4,
-            padding: '3px 8px',
-            borderRadius: 999,
-            background: 'rgba(124, 58, 237, 0.22)',
-            border: '1px solid rgba(167, 139, 250, 0.35)',
-            color: '#ede9fe', fontSize: 11,
-            maxWidth: 130, overflow: 'hidden',
-            whiteSpace: 'nowrap', textOverflow: 'ellipsis',
-            flexShrink: 0,
-          }} title={attachedFile.name}>
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              📎 {attachedFile.name}
-            </span>
-            <button
-              type="button"
-              onClick={() => {
-                setAttachedFile(null)
-                if (fileInputRef.current) fileInputRef.current.value = ''
-              }}
+            position: 'absolute', bottom: 'calc(max(20px, env(safe-area-inset-bottom)))',
+            width: '100%', maxWidth: 800, padding: '0 20px',
+            pointerEvents: 'auto',
+          }}>
+            <form
+              onSubmit={(e) => { e.preventDefault(); sendTextMessage() }}
               style={{
-                background: 'transparent', border: 'none',
-                color: '#ede9fe', cursor: 'pointer', padding: '0 2px',
-                fontSize: 13, lineHeight: 1,
+                position: 'relative',
+                display: 'flex', alignItems: 'flex-end', gap: 8,
+                padding: '10px 12px',
+                borderRadius: 24,
+                background: 'rgba(47, 47, 47, 0.95)',
+                backdropFilter: 'blur(10px)',
+                boxShadow: '0 0 15px rgba(0,0,0,0.5)',
               }}
-              aria-label="Remove attachment"
-              title="Remove attachment"
-            >×</button>
+            >
+              <input
+                ref={fileInputRef} type="file" accept="*/*" style={{ display: 'none' }}
+                onChange={(e) => {
+                  const f = e.target.files && e.target.files[0]
+                  if (f) setAttachedFile(f)
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current && fileInputRef.current.click()}
+                disabled={status === 'thinking' || status === 'error'}
+                style={{
+                  width: 32, height: 32, borderRadius: '50%',
+                  background: 'transparent', border: 'none', color: '#ececec',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 20, flexShrink: 0, paddingBottom: 2,
+                  opacity: 0.7,
+                }}
+                title="Attach file"
+              >+</button>
+              
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                {attachedFile && (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 4,
+                    padding: '4px 10px', marginBottom: 8,
+                    borderRadius: 12, background: 'rgba(66, 66, 66, 0.8)',
+                    color: '#ececec', fontSize: 12, width: 'fit-content',
+                  }}>
+                    <span style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      📎 {attachedFile.name}
+                    </span>
+                    <button type="button" onClick={() => setAttachedFile(null)} style={{ background: 'transparent', border: 'none', color: '#ececec', cursor: 'pointer', padding: 0 }}>×</button>
+                  </div>
+                )}
+                <textarea
+                  value={chatInput}
+                  onChange={(e) => {
+                    setChatInput(e.target.value);
+                    e.target.style.height = 'auto';
+                    e.target.style.height = Math.min(e.target.scrollHeight, 150) + 'px';
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      sendTextMessage();
+                    }
+                  }}
+                  onPaste={(e) => {
+                    try {
+                      const cd = e.clipboardData || window.clipboardData;
+                      if (!cd) return;
+                      const items = cd.items ? Array.from(cd.items) : [];
+                      const imgItem = items.find((it) => it && it.kind === 'file' && typeof it.type === 'string' && it.type.startsWith('image/'));
+                      if (imgItem) {
+                        const blob = imgItem.getAsFile();
+                        if (blob) {
+                          e.preventDefault();
+                          const ext = (blob.type.split('/')[1] || 'png').split(';')[0];
+                          const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+                          const named = (typeof File !== 'undefined') ? new File([blob], `pasted-${stamp}.${ext}`, { type: blob.type }) : blob;
+                          setAttachedFile(named);
+                          return;
+                        }
+                      }
+                    } catch (_) {}
+                  }}
+                  placeholder="Message Kelion..."
+                  disabled={status === 'thinking'}
+                  style={{
+                    width: '100%', background: 'transparent', border: 'none', outline: 'none',
+                    color: '#ececec', fontSize: 16, fontFamily: 'system-ui, -apple-system, sans-serif',
+                    resize: 'none', maxHeight: 150, overflowY: 'auto',
+                    minHeight: 24, padding: 0, lineHeight: 1.5,
+                  }}
+                />
+              </div>
+
+              {chatInput.trim().length > 0 || attachedFile ? (
+                <button
+                  type="submit"
+                  disabled={status === 'thinking'}
+                  style={{
+                    width: 32, height: 32, borderRadius: '50%',
+                    background: '#ececec', border: 'none', color: '#2f2f2f',
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 16, flexShrink: 0,
+                  }}
+                >↑</button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (status === 'idle' || status === 'error') {
+                      startVoiceWithPriorTurns()
+                      setMicOff(false)
+                      setIntendedVoiceActive(true)
+                    } else if (status === 'listening' || status === 'speaking' || status === 'thinking') {
+                      if (typeof stop === 'function') stop()
+                      setIntendedVoiceActive(false)
+                    }
+                  }}
+                  style={{
+                    width: 32, height: 32, borderRadius: '50%',
+                    background: (status === 'listening' || status === 'speaking') ? '#ef4444' : 'transparent',
+                    border: 'none', color: (status === 'listening' || status === 'speaking') ? '#ececec' : '#ececec',
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 16, flexShrink: 0, opacity: 0.8,
+                  }}
+                  title="Voice Mode"
+                >
+                  {(status === 'listening' || status === 'speaking') ? '■' : '🎤'}
+                </button>
+              )}
+            </form>
+            <div style={{ textAlign: 'center', fontSize: 11, color: '#a0a0a0', marginTop: 8 }}>
+              Kelion can make mistakes. Consider verifying important information.
+            </div>
           </div>
-        )}
-        <input
-          type="text"
-          value={chatInput}
-          onChange={(e) => setChatInput(e.target.value)}
-          // Explicit paste handler — Adrian 2026-04-20: "trebuie sa
-          // pot face paste la orice in tab de scris". On some
-          // Capacitor / WebView builds (and occasionally on Chrome
-          // when a focused 3D canvas sibling intercepts the keyboard
-          // shortcut), the native `input` event from Ctrl+V never
-          // fires and the input stays empty. We read the clipboard
-          // directly from the event, splice it into the current
-          // value at the caret position, and call setState so React
-          // renders the new text. `preventDefault` blocks any
-          // duplicate insertion from the browser's default handler.
-          // Right-click ? Paste from the browser menu also fires
-          // this event, so both paths work.
-          onPaste={(e) => {
-            try {
-              const cd = e.clipboardData || window.clipboardData
-              if (!cd) return
-
-              // Image paste: if the clipboard carries a binary image
-              // (screenshot, copied-from-browser image, drag-and-drop
-              // preview), convert the first one into a File and wire it
-              // through the same attachment pipeline as the paperclip.
-              // This fires before the text branch so a screenshot never
-              // gets silently dropped.
-              const items = cd.items ? Array.from(cd.items) : []
-              const imgItem = items.find((it) => it && it.kind === 'file' && typeof it.type === 'string' && it.type.startsWith('image/'))
-              if (imgItem) {
-                const blob = imgItem.getAsFile()
-                if (blob) {
-                  e.preventDefault()
-                  const ext = (blob.type.split('/')[1] || 'png').split(';')[0]
-                  const stamp = new Date().toISOString().replace(/[:.]/g, '-')
-                  const named = (typeof File !== 'undefined')
-                    ? new File([blob], `pasted-${stamp}.${ext}`, { type: blob.type })
-                    : blob
-                  setAttachedFile(named)
-                  if (fileInputRef.current) { try { fileInputRef.current.value = '' } catch (_) {} }
-                  return
-                }
-              }
-
-              const text = cd.getData ? cd.getData('text') : ''
-              if (text == null || text === '') return
-              e.preventDefault()
-              const el = e.currentTarget
-              const start = typeof el.selectionStart === 'number' ? el.selectionStart : chatInput.length
-              const end = typeof el.selectionEnd === 'number' ? el.selectionEnd : chatInput.length
-              const next = chatInput.slice(0, start) + text + chatInput.slice(end)
-              setChatInput(next)
-              // Restore caret right after the pasted text so the user
-              // can keep typing without clicking again.
-              requestAnimationFrame(() => {
-                try { el.setSelectionRange(start + text.length, start + text.length) } catch (_) { /* ignore */ }
-              })
-            } catch (_) {
-              // If anything goes wrong, fall back to the browser's
-              // default paste handler so we never make things worse
-              // than before.
-            }
-          }}
-          placeholder="Type to Kelion…"
-          disabled={status === 'thinking'}
-          autoComplete="off"
-          autoCorrect="on"
-          spellCheck={true}
-          style={{
-            flex: 1,
-            background: 'transparent', border: 'none', outline: 'none',
-            color: '#ede9fe',
-            fontSize: 15, fontFamily: 'system-ui, -apple-system, sans-serif',
-            padding: '8px 2px',
-            // Allow text selection / right-click menu on the input
-            // itself even though the surrounding stage uses
-            // `user-select: none`. Without this, some Chromium
-            // builds disable the clipboard context menu on nested
-            // inputs.
-            userSelect: 'text',
-            WebkitUserSelect: 'text',
-          }}
-        />
-        <button
-          type="submit"
-          disabled={status === 'thinking' || (chatInput.trim().length === 0 && !attachedFile)}
-          style={{
-            width: 40, height: 40, borderRadius: '50%',
-            background: (chatInput.trim().length === 0 && !attachedFile)
-              ? 'rgba(167, 139, 250, 0.18)'
-              : 'linear-gradient(135deg, #7c3aed, #a78bfa)',
-            border: 'none', color: '#fff',
-            cursor: status === 'thinking' || (chatInput.trim().length === 0 && !attachedFile) ? 'default' : 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            opacity: status === 'thinking' ? 0.6 : 1,
-            fontSize: 16,
-          }}
-          aria-label="Send message"
-        >↑</button>
-      </form>
-      </div>}
-
-      {/* Microphone ON/OFF Toggle — bottom center */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation()
-          if (!intendedVoiceActive) {
-            setIntendedVoiceActive(true)
-            if (status === 'idle' || status === 'error') {
-              startVoiceWithPriorTurns()
-              setMicOff(false)
-            }
-          } else {
-            setIntendedVoiceActive(false)
-            if (typeof stop === 'function') stop()
-          }
-        }}
-        style={{
-          position: 'absolute', bottom: 'max(32px, env(safe-area-inset-bottom))',
-          left: bottomLeft, transform: 'translateX(-50%)',
-          display: 'flex', alignItems: 'center', gap: '10px',
-          padding: '10px 24px',
-          borderRadius: 999,
-          background: (!intendedVoiceActive)
-            ? 'rgba(30, 30, 40, 0.65)'
-            : 'linear-gradient(135deg, #7c3aed, #a78bfa)',
-          backdropFilter: 'blur(12px)',
-          border: (!intendedVoiceActive)
-            ? '1px solid rgba(255, 255, 255, 0.1)'
-            : '1px solid #c4b5fd',
-          color: (!intendedVoiceActive) ? '#9ca3af' : '#ffffff',
-          fontSize: 15, fontFamily: 'system-ui, -apple-system, sans-serif',
-          fontWeight: 600,
-          letterSpacing: '0.04em',
-          cursor: 'pointer',
-          pointerEvents: 'auto',
-          zIndex: bottomZIndex || 50,
-          boxShadow: (status === 'idle' || status === 'error')
-            ? 'none'
-            : micOff
-              ? '0 0 20px rgba(239, 68, 68, 0.3)'
-              : '0 0 20px rgba(139, 92, 246, 0.5)',
-        }}
-        aria-label={(status === 'idle' || status === 'error') ? t('micOff') : micOff ? 'Mic OFF — text chat active' : t('micOn')}
-      >
-        <span style={{
-          width: 10, height: 10, borderRadius: '50%',
-          background: (status === 'idle' || status === 'error') ? '#6b7280' : micOff ? '#ef4444' : '#ffffff',
-          boxShadow: (status === 'idle' || status === 'error') ? 'none' : micOff ? '0 0 8px #ef4444' : '0 0 8px #ffffff',
-        }} />
-        {/* Audio level bargraph — hidden when mic is off */}
-        {!(status === 'idle' || status === 'error') && !micOff && (
-          <span style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 16 }}>
-            {[0.3, 0.6, 1.0, 0.7, 0.4].map((scale, i) => {
-              const level = Math.min(1, (userLevel || 0) * scale)
-              return <span key={i} style={{
-                width: 3, borderRadius: 2,
-                height: Math.max(3, level * 16),
-                background: level > 0.6 ? '#4ade80' : level > 0.3 ? '#a78bfa' : 'rgba(255,255,255,0.4)',
-                transition: 'height 0.1s ease',
-              }} />
-            })}
-          </span>
-        )}
-        {(status === 'idle' || status === 'error')
-          ? t('micOff')
-          : micOff
-            ? '🔇 MIC OFF'
-            : t('micOn')}
-      </button>
-      {/* Voice mode label under the main button */}
-      {!(status === 'idle' || status === 'error') && (
-        <div style={{
-          position: 'absolute',
-          bottom: `calc(max(32px, env(safe-area-inset-bottom)) - 22px)`,
-          left: bottomLeft,
-          transform: 'translateX(-50%)',
-          fontSize: 10,
-          fontWeight: 500,
-          letterSpacing: '0.05em',
-          color: getVoiceMode() === 'cloned' ? '#c4b5fd' : 'rgba(255,255,255,0.45)',
-          fontFamily: 'system-ui, -apple-system, sans-serif',
-          pointerEvents: 'none',
-          zIndex: bottomZIndex || 50,
-          textShadow: '0 1px 4px rgba(0,0,0,0.6)',
-        }}>
-          {getVoiceMode() === 'cloned' ? '🎙 Voce clonată' : '🔊 Voce default'}
         </div>
       )}
 
-      {/* Chat toggle button — right of mic pill */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation()
-          setChatPanelOpen((v) => !v)
-        }}
-        style={{
-          position: 'absolute',
-          bottom: 'max(32px, env(safe-area-inset-bottom))',
-          left: `calc(${bottomLeft} + 100px)`,
-          transform: 'translateX(-50%)',
-          width: 44,
-          height: 44,
-          borderRadius: '50%',
-          background: chatPanelOpen
-            ? 'linear-gradient(135deg, #7c3aed, #a78bfa)'
-            : 'rgba(30, 30, 40, 0.65)',
-          backdropFilter: 'blur(12px)',
-          border: chatPanelOpen
-            ? '1px solid #c4b5fd'
-            : '1px solid rgba(255, 255, 255, 0.1)',
-          color: chatPanelOpen ? '#fff' : '#9ca3af',
-          fontSize: 20,
-          cursor: 'pointer',
-          pointerEvents: 'auto',
-          zIndex: bottomZIndex || 50,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          boxShadow: chatPanelOpen ? '0 0 16px rgba(139, 92, 246, 0.5)' : 'none',
-          transition: 'all 0.2s ease',
-        }}
-        aria-label={chatPanelOpen ? 'Close chat' : 'Open chat'}
-        title={chatPanelOpen ? 'Close chat' : 'Open text chat'}
-      >
-        ⌨
-      </button>
-
-      {/* Guest trial countdown — Adrian: "timer se afiseaza dreapta sus
+{/* Guest trial countdown — Adrian: "timer se afiseaza dreapta sus
           vizibil". Renders top-right, above the action bar, only while
           the server reports `applicable: true` (guests only — signed-in
           and admin users never see it). Shows MM:SS once the 15-min
