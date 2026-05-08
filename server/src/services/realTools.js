@@ -1752,6 +1752,14 @@ function pickForcedTool(lastUserMessage) {
 //   ocr_image     → tesseract.js
 //   ocr_passport  → tesseract.js + MRZ parser (TD3, ICAO 9303)
 
+// 0.21A — ocr_engine: Super-module for Optical Character Recognition (OCR).
+async function toolOcrEngine(args) {
+  const mode = String(args?.mode || 'image').trim().toLowerCase();
+  if (mode === 'passport') return toolOcrPassport(args);
+  return toolOcrImage(args);
+}
+
+
 function decodeBase64Source(base64) {
   const raw = String(base64 || '').replace(/^data:[^,]+,/, '');
   if (!raw) return { ok: false, error: 'missing base64' };
@@ -3444,6 +3452,8 @@ async function executeRealTool(name, args, ctx) {
     case 'auto_test': return toolAutoTest(a);
     case 'session_persist': return toolSessionPersist(a, ctx);
     case 'parallel_tools': return toolParallelTools(a, ctx);
+    case 'document_parser': return toolDocumentParser(a);
+    case 'ocr_engine': return toolOcrEngine(a);
     case 'video_analyze': return toolVideoAnalyze(a);
     case 'audio_analyze': return toolAudioAnalyze(a);
     case 'multimedia_analyzer': return toolMultimediaAnalyzer(a);
@@ -4446,6 +4456,15 @@ async function toolClipboardManager(args) {
   return { ok: true, client_action: 'clipboard_read', instruction: 'The client will read clipboard contents and send them back.' };
 }
 
+// 0.20A — document_parser: Super-module for document parsing (PDF, DOCX, CSV).
+async function toolDocumentParser(args) {
+  const type = String(args?.type || '').trim().toLowerCase();
+  if (type === 'pdf') return toolReadPdf(args);
+  if (type === 'docx') return toolReadDocx(args);
+  if (type === 'spreadsheet' || type === 'csv' || type === 'xlsx') return toolSpreadsheetAnalyze(args);
+  return { ok: false, error: 'Unknown document_parser type. Expected pdf, docx, or spreadsheet.' };
+}
+
 // 0.18A — system_bridge: Super-module for system control.
 async function toolSystemBridge(args) {
   const action = String(args?.action || '').trim();
@@ -4602,7 +4621,7 @@ const REAL_TOOL_NAMES = [
   'video_analyze', 'audio_analyze', 'image_edit', 'spreadsheet_analyze',
   'vision_analyze', 'screen_capture', 'task_planner', 'clipboard_manager',
   'context_cache', 'mcp_protocol', 'scheduled_task', 'qr_code', 'smart_alert',
-  'multimedia_analyzer', 'system_bridge',
+  'multimedia_analyzer', 'system_bridge', 'document_parser', 'ocr_engine',
 ];
 
 module.exports = {
@@ -4711,6 +4730,8 @@ module.exports = {
   toolSmartAlert,
   toolMultimediaAnalyzer,
   toolSystemBridge,
+  toolDocumentParser,
+  toolOcrEngine,
   // Memory files
   storeTempFile,
   getTempFile,

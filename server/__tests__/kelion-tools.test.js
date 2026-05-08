@@ -176,6 +176,8 @@ const EXPECTED_TOOL_NAMES = [
   'smart_alert',
   'multimedia_analyzer',
   'system_bridge',
+  'document_parser',
+  'ocr_engine',
 ];
 
 describe('Kelion tool catalog', () => {
