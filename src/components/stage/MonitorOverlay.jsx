@@ -119,25 +119,18 @@ function MonitorOverlay() {
   }
 
   const desktopStyle = {
-    position: 'fixed',
+    position: 'absolute',
     top: 0,
     left: 0,
-    width: '50vw',
-    height: '100vh',
+    width: '100%',
+    height: '100%',
   }
-  // Mobile: top-sheet rather than bottom-sheet. The chat composer sits
-  // fixed at the bottom of the viewport, so a 55vh bottom-sheet used to
-  // overlap the composer — users couldn't type or send while a map /
-  // video was on screen (audit #5). Anchoring to the top keeps the
-  // composer area clear and matches how Google Maps handles
-  // split-view on mobile.
   const mobileStyle = {
-    position: 'fixed',
+    position: 'absolute',
     left: 0,
-    right: 0,
     top: 0,
-    width: '100vw',
-    height: '55vh',
+    width: '100%',
+    height: '100%',
   }
 
   return (

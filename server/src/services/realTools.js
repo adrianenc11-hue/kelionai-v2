@@ -2592,6 +2592,51 @@ async function toolZapierTrigger(args) {
   }
 }
 
+// ── GitHub Autonomous Push ──────────────────────────────────────────
+async function toolCommitAndPushToGithub(args) {
+  if (!process.env.GITHUB_TOKEN) {
+    return { ok: false, error: 'GITHUB_TOKEN environment variable is missing. Tell the user to set it in Railway or locally before you can push.' };
+  }
+  
+  const msg = args.commit_message || 'Update from Kelion';
+  const branch = args.branch || 'HEAD';
+  const token = process.env.GITHUB_TOKEN;
+  
+  try {
+    const { execSync } = require('child_process');
+    const rootDir = process.cwd();
+    
+    // Config git user if missing
+    try { execSync('git config user.name', { cwd: rootDir }); } catch {
+      execSync('git config user.name "Kelion Autonomous"', { cwd: rootDir });
+      execSync('git config user.email "kelion@kelionai.app"', { cwd: rootDir });
+    }
+    
+    // Set remote URL with token securely
+    const originUrl = `https://x-access-token:${token}@github.com/adrianenc11-hue/kelionai-v2.git`;
+    try {
+      execSync(`git remote set-url origin ${originUrl}`, { cwd: rootDir });
+    } catch {
+      execSync(`git remote add origin ${originUrl}`, { cwd: rootDir });
+    }
+    
+    execSync('git add .', { cwd: rootDir });
+    
+    // Check if there are changes to commit
+    const status = execSync('git status --porcelain', { cwd: rootDir }).toString().trim();
+    if (!status) {
+      return { ok: true, skipped: true, result: "No changes to commit." };
+    }
+    
+    execSync(`git commit -m "${msg.replace(/"/g, '\\"')}"`, { cwd: rootDir });
+    execSync(`git push origin ${branch}`, { cwd: rootDir });
+    
+    return { ok: true, result: `Successfully committed with message '${msg}' and pushed to ${branch}.` };
+  } catch (err) {
+    return { ok: false, error: err.message, stderr: err.stderr ? err.stderr.toString() : null };
+  }
+}
+
 // ── github_repo_info / npm_package_info / pypi_package_info ───────
 // All three hit public APIs (no key required). GITHUB_TOKEN, if set,
 // simply raises the unauth rate limit from 60→5 000 req/h.
@@ -3433,6 +3478,7 @@ async function executeRealTool(name, args, ctx) {
     }
     // ── Agentic Expert Tools ──
     case 'run_terminal_command': return toolRunTerminalCommand(a);
+    case 'commit_and_push_to_github': return toolCommitAndPushToGithub(a);
     case 'ask_expert_coder': return toolAskExpertCoder(a);
     case 'fetch_documentation': return toolFetchDocumentation(a);
     case 'browse_web': return toolBrowseWeb(a);

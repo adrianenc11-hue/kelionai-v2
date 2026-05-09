@@ -700,6 +700,15 @@ const KELION_TOOLS = [
     required: ['command'],
   },
   {
+    name: 'commit_and_push_to_github',
+    description: "Securely commit all local changes and push them to the GitHub repository using the GITHUB_TOKEN environment variable. Call this when you have successfully completed a coding task and the user asks you to save, deploy, or push the changes. You DO NOT need to run git commands manually; this tool does it automatically and securely.",
+    properties: {
+      commit_message: { type: 'string', description: "A concise, conventional commit message (e.g. 'fix: resolve layout bug in KelionStage')." },
+      branch: { type: 'string', description: "Optional branch name. Defaults to HEAD." },
+    },
+    required: ['commit_message'],
+  },
+  {
     name: 'ask_expert_coder',
     description: "Consult an expert coding model on OpenRouter to solve complex programming problems or do deep reasoning. Use 'google/gemma-4-31b-it' for strong reasoning and code generation.",
     properties: {
@@ -1829,7 +1838,7 @@ router.post('/pipeline', async (req, res) => {
       lockedLangTag: await resolveLockedLangTag({ req, user, forcedLang }),
     });
 
-    const systemText = systemPrompt + '\n\nCRITICAL RULES:\n0. ALWAYS RESPOND IN THE EXACT SAME LANGUAGE AS THE USER\'S LATEST MESSAGE. If the user speaks Romanian, answer in Romanian. If they speak German, answer in German. Ignore any random background noise text that makes no sense.\n1. Maximum seriousness and professionalism at all times.\n2. NEVER fabricate, guess, or make up information. NEVER invent tools like "observe_user_emotion" or "learn_from_observation". ONLY use the provided tools.\n3. When asked about facts, news, people, places, events — ALWAYS use web_search or wikipedia_search to get real, current information. Do NOT answer from memory alone.\n4. Answer questions precisely and directly. No filler, no padding.\n5. Zero tolerance for hallucination or lies. If a tool search returns no results, say honestly that you couldn\'t find the information.\n6. You have tools: web_search, wikipedia_search, browse_web, calculate, get_weather, and many more. USE THEM proactively.';
+    const systemText = systemPrompt + '\n\nCRITICAL RULES:\n0. ALWAYS RESPOND IN THE EXACT SAME LANGUAGE AS THE USER\'S LATEST MESSAGE. If the user speaks Romanian, answer in Romanian. If they speak German, answer in German.\n1. MAXIMUM CONCISENESS. Answer precisely and directly. Do not use filler words. Do not explain your thought process. Keep answers extremely short unless a detailed explanation is specifically requested. This is crucial to save tokens and avoid verbosity.\n2. ACADEMIC & PROFESSIONAL TONE. Use highly professional, grammatically perfect language. In Romanian, use natural vocabulary, flawless grammar, and diacritics. Avoid weird translations or robotic phrasing.\n3. ZERO HALLUCINATIONS. NEVER fabricate, guess, or make up information. If you don\'t know, simply say "Nu am această informație." (I don\'t have this information). \n4. When asked about facts, news, people, places, events — ALWAYS use web_search or wikipedia_search. NEVER answer from memory alone.\n5. You have tools: web_search, wikipedia_search, browse_web, calculate, get_weather, etc. USE THEM proactively.';
 
     // Build messages in OpenAI/OpenRouter format
     const messages = [{ role: 'system', content: systemText }];

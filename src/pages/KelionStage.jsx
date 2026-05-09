@@ -1795,29 +1795,9 @@ export default function KelionStage() {
                 )}
               </div>
             ))}
-            {status === 'thinking' && (<div style={{ display: 'inline-flex', gap: 4, padding: '12px 18px', alignSelf: 'flex-start' }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#bbb', animation: 'pulse 1.4s ease-in-out infinite' }} /><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#bbb', animation: 'pulse 1.4s ease-in-out 0.2s infinite' }} /><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#bbb', animation: 'pulse 1.4s ease-in-out 0.4s infinite' }} /></div>)}
             {chatError && (<div style={{ padding: '8px 16px', borderRadius: 10, background: '#fef2f2', color: '#dc2626', fontSize: 14, alignSelf: 'center' }}>{chatError}</div>)}
           </div>
-          <div style={{ padding: '12px 24px 16px', borderTop: '1px solid #f0f0f0' }}>
-            <form onSubmit={(e) => { e.preventDefault(); sendTextMessage() }} style={{ display: 'flex', alignItems: 'flex-end', gap: 10, padding: '10px 14px', borderRadius: 26, background: '#f7f7f8', border: '1px solid #e5e5e5' }}>
-              <input ref={fileInputRef} type="file" accept="*/*" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files && e.target.files[0]; if (f) setAttachedFile(f) }} />
-              <button type="button" onClick={() => fileInputRef.current && fileInputRef.current.click()} disabled={status === 'thinking'} title="Attach file" style={{ width: 34, height: 34, borderRadius: '50%', background: 'transparent', border: '1.5px solid #ccc', color: '#555', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>+</button>
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                {attachedFile && (<div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', marginBottom: 6, borderRadius: 10, background: '#e8e8e8', color: '#555', fontSize: 12, width: 'fit-content' }}><span style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>📎 {attachedFile.name}</span><button type="button" onClick={() => setAttachedFile(null)} style={{ background: 'transparent', border: 'none', color: '#999', cursor: 'pointer', padding: 0, fontSize: 14 }}>×</button></div>)}
-                <textarea value={chatInput} onChange={(e) => { setChatInput(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 150) + 'px'; }} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendTextMessage(); } }} onPaste={(e) => { try { const cd = e.clipboardData || window.clipboardData; if (!cd) return; const items = cd.items ? Array.from(cd.items) : []; const imgItem = items.find((it) => it && it.kind === 'file' && typeof it.type === 'string' && it.type.startsWith('image/')); if (imgItem) { const blob = imgItem.getAsFile(); if (blob) { e.preventDefault(); const ext = (blob.type.split('/')[1] || 'png').split(';')[0]; const stamp = new Date().toISOString().replace(/[:.]/g, '-'); setAttachedFile((typeof File !== 'undefined') ? new File([blob], `pasted-${stamp}.${ext}`, { type: blob.type }) : blob); return; } } } catch (_) {} }} placeholder="Ask anything" disabled={status === 'thinking'} rows={1} style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', color: '#1a1a1a', fontSize: 16, fontFamily: 'system-ui, -apple-system, sans-serif', resize: 'none', maxHeight: 150, overflowY: 'auto', minHeight: 24, padding: '4px 0', lineHeight: 1.5 }} />
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                <button type="button" onClick={() => { if (status === 'idle' || status === 'error') { startVoiceWithPriorTurns(); setMicOff(false); setIntendedVoiceActive(true) } else if (status === 'listening' || status === 'speaking' || status === 'thinking') { if (typeof stop === 'function') stop(); setIntendedVoiceActive(false) } }} style={{ width: 34, height: 34, borderRadius: '50%', background: 'transparent', border: 'none', color: status === 'listening' ? '#ef4444' : '#888', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }} title="Voice">🎤</button>
-                {chatInput.trim().length > 0 || attachedFile ? (
-                  <button type="submit" disabled={status === 'thinking'} title="Send" style={{ width: 36, height: 36, borderRadius: '50%', background: '#1a1a1a', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 700 }}>↑</button>
-                ) : (
-                  <button type="button" onClick={() => { if (status === 'idle' || status === 'error') { startVoiceWithPriorTurns(); setMicOff(false); setIntendedVoiceActive(true) } }} title="Voice mode" style={{ width: 36, height: 36, borderRadius: '50%', background: (status === 'listening' || status === 'speaking') ? '#ef4444' : '#f0f0f0', border: 'none', color: (status === 'listening' || status === 'speaking') ? '#fff' : '#888', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>{(status === 'listening' || status === 'speaking') ? '■' : (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="4" y="6" width="3" height="12" rx="1.5" /><rect x="10.5" y="3" width="3" height="18" rx="1.5" /><rect x="17" y="8" width="3" height="8" rx="1.5" /></svg>)}</button>
-                )}
-              </div>
-            </form>
-            <div style={{ textAlign: 'center', fontSize: 11, color: '#bbb', marginTop: 6 }}>Kelion can make mistakes. Consider verifying important information.</div>
-            </div>
-            </div>
+          </div>
             {/* Back Face (Monitor) */}
             <div style={{
               position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
@@ -1828,21 +1808,52 @@ export default function KelionStage() {
             </div>
           </div>
         </div>
-        {/* RIGHT PANEL — Avatar 3D */}
-        <div style={{ flex: '0 0 30%', maxWidth: '30%', height: '100%', position: 'relative', overflow: 'hidden' }}>
-          <Canvas shadows={{ type: THREE.VSMShadowMap }} camera={{ position: [0, 0.2, 3.0], fov: 42 }} dpr={[1, 2]} gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.8, outputColorSpace: THREE.SRGBColorSpace, powerPreference: 'low-power' }} onCreated={({ gl }) => { const canvas = gl.domElement; if (canvas) { canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); console.warn('[kelion] WebGL context lost') }); canvas.addEventListener('webglcontextrestored', () => { console.log('[kelion] WebGL context restored') }) } }}>
-            <color attach="background" args={['#0a0d1a']} />
-            <fog attach="fog" args={['#0e0b20', 6, 14]} />
-            <Suspense fallback={null}>
-              <ambientLight intensity={0.5} />
-              <directionalLight position={[10, 10, 5]} intensity={1} />
-              <StudioDecor />
-              <group position={[0, -0.4, 0]}>
-                <AvatarModel mouthOpen={mouthOpen} status={status} emotion={emotion} presenting={false} />
-              </group>
-              <ContactShadows position={[0, -1.25, 0]} opacity={0.55} scale={5} blur={2.6} far={2.5} />
-            </Suspense>
-          </Canvas>
+        {/* RIGHT PANEL — Avatar 3D & Chat Input */}
+        <div style={{ flex: '0 0 30%', maxWidth: '30%', height: '100%', position: 'relative', display: 'flex', flexDirection: 'column', background: '#0a0d1a' }}>
+          <div style={{ flex: 1, position: 'relative', overflow: 'hidden', minHeight: 0 }}>
+            <Canvas shadows={{ type: THREE.VSMShadowMap }} camera={{ position: [0, 0.2, 3.0], fov: 42 }} dpr={[1, 2]} gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.8, outputColorSpace: THREE.SRGBColorSpace, powerPreference: 'low-power' }} onCreated={({ gl }) => { const canvas = gl.domElement; if (canvas) { canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); console.warn('[kelion] WebGL context lost') }); canvas.addEventListener('webglcontextrestored', () => { console.log('[kelion] WebGL context restored') }) } }}>
+              <color attach="background" args={['#0a0d1a']} />
+              <fog attach="fog" args={['#0e0b20', 6, 14]} />
+              <Suspense fallback={null}>
+                <ambientLight intensity={0.5} />
+                <directionalLight position={[10, 10, 5]} intensity={1} />
+                <StudioDecor />
+                <group position={[0, -0.4, 0]}>
+                  <AvatarModel mouthOpen={mouthOpen} status={status} emotion={emotion} presenting={false} />
+                </group>
+                <ContactShadows position={[0, -1.25, 0]} opacity={0.55} scale={5} blur={2.6} far={2.5} />
+              </Suspense>
+            </Canvas>
+          </div>
+          {/* Chat Input Container */}
+          <div style={{ padding: '12px 24px 16px', background: '#ffffff', borderTop: '1px solid #e0e0e0', zIndex: 10, flexShrink: 0 }}>
+            <form onSubmit={(e) => { e.preventDefault(); sendTextMessage() }} style={{ display: 'flex', alignItems: 'flex-end', gap: 10, padding: '10px 14px', borderRadius: 26, background: '#f7f7f8', border: '1px solid #e5e5e5' }}>
+              <input ref={fileInputRef} type="file" accept="*/*" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files && e.target.files[0]; if (f) setAttachedFile(f) }} />
+              <button type="button" onClick={() => fileInputRef.current && fileInputRef.current.click()} disabled={status === 'thinking'} title="Attach file" style={{ width: 34, height: 34, borderRadius: '50%', background: 'transparent', border: '1.5px solid #ccc', color: '#555', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>+</button>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                {attachedFile && (<div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', marginBottom: 6, borderRadius: 10, background: '#e8e8e8', color: '#555', fontSize: 12, width: 'fit-content' }}><span style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>📎 {attachedFile.name}</span><button type="button" onClick={() => setAttachedFile(null)} style={{ background: 'transparent', border: 'none', color: '#999', cursor: 'pointer', padding: 0, fontSize: 14 }}>×</button></div>)}
+                <textarea value={chatInput} onChange={(e) => { setChatInput(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 150) + 'px'; }} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendTextMessage(); } }} onPaste={(e) => { try { const cd = e.clipboardData || window.clipboardData; if (!cd) return; const items = cd.items ? Array.from(cd.items) : []; const imgItem = items.find((it) => it && it.kind === 'file' && typeof it.type === 'string' && it.type.startsWith('image/')); if (imgItem) { const blob = imgItem.getAsFile(); if (blob) { e.preventDefault(); const ext = (blob.type.split('/')[1] || 'png').split(';')[0]; const stamp = new Date().toISOString().replace(/[:.]/g, '-'); setAttachedFile((typeof File !== 'undefined') ? new File([blob], `pasted-${stamp}.${ext}`, { type: blob.type }) : blob); return; } } } catch (_) {} }} placeholder="Ask anything" disabled={status === 'thinking'} rows={1} style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', color: '#1a1a1a', fontSize: 16, fontFamily: 'system-ui, -apple-system, sans-serif', resize: 'none', maxHeight: 150, overflowY: 'auto', minHeight: 24, padding: '4px 0', lineHeight: 1.5 }} />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                <button type="button" onClick={() => { if (status === 'idle' || status === 'error') { startVoiceWithPriorTurns(); setMicOff(false); setIntendedVoiceActive(true) } else if (status === 'listening' || status === 'speaking' || status === 'thinking') { if (typeof stop === 'function') stop(); setIntendedVoiceActive(false) } }} style={{ width: 34, height: 34, borderRadius: '50%', background: 'transparent', border: 'none', color: status === 'listening' ? '#ef4444' : '#888', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }} title="Voice">
+                  {(status === 'listening' || status === 'speaking') ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 2, height: 16 }}>
+                      <div style={{ width: 3, borderRadius: 2, background: '#ef4444', height: `${20 + userLevel * 80}%`, transition: 'height 0.1s' }} />
+                      <div style={{ width: 3, borderRadius: 2, background: '#ef4444', height: `${20 + userLevel * 50}%`, transition: 'height 0.1s' }} />
+                      <div style={{ width: 3, borderRadius: 2, background: '#ef4444', height: `${20 + userLevel * 100}%`, transition: 'height 0.1s' }} />
+                      <div style={{ width: 3, borderRadius: 2, background: '#ef4444', height: `${20 + userLevel * 60}%`, transition: 'height 0.1s' }} />
+                    </div>
+                  ) : '🎤'}
+                </button>
+                {chatInput.trim().length > 0 || attachedFile ? (
+                  <button type="submit" disabled={status === 'thinking'} title="Send" style={{ width: 36, height: 36, borderRadius: '50%', background: '#1a1a1a', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 700 }}>↑</button>
+                ) : (
+                  <button type="button" onClick={() => { if (status === 'idle' || status === 'error') { startVoiceWithPriorTurns(); setMicOff(false); setIntendedVoiceActive(true) } }} title="Voice mode" style={{ width: 36, height: 36, borderRadius: '50%', background: (status === 'listening' || status === 'speaking') ? '#ef4444' : '#f0f0f0', border: 'none', color: (status === 'listening' || status === 'speaking') ? '#fff' : '#888', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>{(status === 'listening' || status === 'speaking') ? '■' : (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="4" y="6" width="3" height="12" rx="1.5" /><rect x="10.5" y="3" width="3" height="18" rx="1.5" /><rect x="17" y="8" width="3" height="8" rx="1.5" /></svg>)}</button>
+                )}
+              </div>
+            </form>
+            <div style={{ textAlign: 'center', fontSize: 11, color: '#bbb', marginTop: 6 }}>Kelion can make mistakes. Consider verifying important information.</div>
+          </div>
         </div>
       </div>
 {/* Guest trial countdown — Adrian: "timer se afiseaza dreapta sus
