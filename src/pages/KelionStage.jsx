@@ -1831,7 +1831,6 @@ export default function KelionStage() {
             <form onSubmit={(e) => { e.preventDefault(); sendTextMessage() }} style={{ display: 'flex', alignItems: 'flex-end', gap: 10, padding: '10px 14px', borderRadius: 26, background: '#f7f7f8', border: '1px solid #e5e5e5' }}>
               <input ref={fileInputRef} type="file" accept="*/*" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files && e.target.files[0]; if (f) setAttachedFile(f) }} />
               <button type="button" onClick={() => fileInputRef.current && fileInputRef.current.click()} disabled={status === 'thinking'} title="Attach file" style={{ width: 34, height: 34, borderRadius: '50%', background: 'transparent', border: '1.5px solid #ccc', color: '#555', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>+</button>
-              <VoicePicker />
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
                 {attachedFile && (<div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', marginBottom: 6, borderRadius: 10, background: '#e8e8e8', color: '#555', fontSize: 12, width: 'fit-content' }}><span style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>📎 {attachedFile.name}</span><button type="button" onClick={() => setAttachedFile(null)} style={{ background: 'transparent', border: 'none', color: '#999', cursor: 'pointer', padding: 0, fontSize: 14 }}>×</button></div>)}
                 <textarea value={chatInput} onChange={(e) => { setChatInput(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 150) + 'px'; }} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendTextMessage(); } }} onPaste={(e) => { try { const cd = e.clipboardData || window.clipboardData; if (!cd) return; const items = cd.items ? Array.from(cd.items) : []; const imgItem = items.find((it) => it && it.kind === 'file' && typeof it.type === 'string' && it.type.startsWith('image/')); if (imgItem) { const blob = imgItem.getAsFile(); if (blob) { e.preventDefault(); const ext = (blob.type.split('/')[1] || 'png').split(';')[0]; const stamp = new Date().toISOString().replace(/[:.]/g, '-'); setAttachedFile((typeof File !== 'undefined') ? new File([blob], `pasted-${stamp}.${ext}`, { type: blob.type }) : blob); return; } } } catch (_) {} }} placeholder="Ask anything" disabled={status === 'thinking'} rows={1} style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', color: '#1a1a1a', fontSize: 16, fontFamily: 'system-ui, -apple-system, sans-serif', resize: 'none', maxHeight: 150, overflowY: 'auto', minHeight: 24, padding: '4px 0', lineHeight: 1.5 }} />
@@ -1910,6 +1909,16 @@ export default function KelionStage() {
           )}
         </div>
       )}
+
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          position: 'absolute', top: 18, left: 18, zIndex: 20,
+          display: 'flex', alignItems: 'center', gap: 8,
+        }}
+      >
+        <VoicePicker />
+      </div>
 
       {/* Top-right action bar — Adrian: "panoul cu butoane e gândit
           greșit". Simplified to: Credits/Admin pill + Sign in/out + ⋯.
