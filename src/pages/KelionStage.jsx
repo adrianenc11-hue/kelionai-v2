@@ -867,7 +867,7 @@ export default function KelionStage() {
 
   // Text input for typed messages (goes through Gemma 4 REST pipeline).
   const [chatInput, setChatInput] = useState('')
-  const [chatPanelOpen, setChatPanelOpen] = useState(false)
+  const [chatPanelOpen, setChatPanelOpen] = useState(true)
   const [chatError, setChatError] = useState(null)
   // Conversation history — user-requested ("sa aiba optiune de save").
   // Signed-in users get server persistence via /api/conversations; guests
@@ -1920,7 +1920,7 @@ export default function KelionStage() {
                       }
                     } catch (_) {}
                   }}
-                  placeholder="Message Kelion..."
+                  placeholder="Ask anything"
                   disabled={status === 'thinking'}
                   style={{
                     width: '100%', background: 'transparent', border: 'none', outline: 'none',
