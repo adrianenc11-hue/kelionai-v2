@@ -114,6 +114,11 @@ const EXPECTED_TOOL_NAMES = [
   'manage_github_prs',
   // Agentic
   'run_terminal_command',
+  // PR #504 — autonomous git commit + push using GITHUB_TOKEN. Server-side
+  // shell-out (git add/commit/push) so Kelion can persist code changes it
+  // just made via edit_local_file / replace_in_file without the user
+  // running git manually. Gracefully fails when GITHUB_TOKEN is absent.
+  'commit_and_push_to_github',
   'ask_expert_coder',
   'fetch_documentation',
   // PR #8/N — Memory of Actions. Read-only self-reflection tool: the
