@@ -1033,6 +1033,13 @@ export default function KelionStage() {
     bubbleHideTimerRef.current = setTimeout(() => setBubbleVisible(false), 8000)
     return () => { if (bubbleHideTimerRef.current) clearTimeout(bubbleHideTimerRef.current) }
   }, [turns, status])
+
+  // Auto-scroll the chat panel whenever turns or status change
+  useEffect(() => {
+    if (chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+    }
+  }, [turns, status])
   // -- Mute mode ----------------------------------------------------------
   // Activated when the user explicitly says "nu mai vorbi", "mute",
   // "fii silentios", etc. Suppresses both ElevenLabs text-TTS and the
@@ -1777,17 +1784,17 @@ export default function KelionStage() {
         </div>
         {/* RIGHT PANEL — Avatar 3D */}
         <div style={{ flex: '0 0 30%', maxWidth: '30%', height: '100%', position: 'relative', overflow: 'hidden' }}>
-          <Canvas shadows={{ type: THREE.VSMShadowMap }} camera={{ position: [0, 0.4, 3.2], fov: 45 }} dpr={[1, 2]} gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.8, outputColorSpace: THREE.SRGBColorSpace, powerPreference: 'low-power' }} onCreated={({ gl }) => { const canvas = gl.domElement; if (canvas) { canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); console.warn('[kelion] WebGL context lost') }); canvas.addEventListener('webglcontextrestored', () => { console.log('[kelion] WebGL context restored') }) } }}>
+          <Canvas shadows={{ type: THREE.VSMShadowMap }} camera={{ position: [0, 0.2, 3.0], fov: 42 }} dpr={[1, 2]} gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.8, outputColorSpace: THREE.SRGBColorSpace, powerPreference: 'low-power' }} onCreated={({ gl }) => { const canvas = gl.domElement; if (canvas) { canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); console.warn('[kelion] WebGL context lost') }); canvas.addEventListener('webglcontextrestored', () => { console.log('[kelion] WebGL context restored') }) } }}>
             <color attach="background" args={['#0a0d1a']} />
             <fog attach="fog" args={['#0e0b20', 6, 14]} />
             <Suspense fallback={null}>
               <ambientLight intensity={0.5} />
               <directionalLight position={[10, 10, 5]} intensity={1} />
               <StudioDecor />
-              <group position={[0, -0.8, 0]}>
+              <group position={[0, -0.4, 0]}>
                 <AvatarModel mouthOpen={mouthOpen} status={status} emotion={emotion} presenting={false} />
               </group>
-              <ContactShadows position={[0, -1.65, 0]} opacity={0.55} scale={5} blur={2.6} far={2.5} />
+              <ContactShadows position={[0, -1.25, 0]} opacity={0.55} scale={5} blur={2.6} far={2.5} />
             </Suspense>
           </Canvas>
         </div>
