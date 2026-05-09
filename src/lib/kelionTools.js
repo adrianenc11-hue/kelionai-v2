@@ -81,6 +81,8 @@ const REAL_TOOL_NAMES = new Set([
   'get_action_history',
   // Silent vision auto-learn (PR #210).
   'learn_from_observation',
+  // Explicit memory fact saving
+  'remember_fact',
   // Faza A — global live-radio search via radio-browser.info.
   'play_radio',
   // Google Account tools (Calendar, Gmail, Drive)
