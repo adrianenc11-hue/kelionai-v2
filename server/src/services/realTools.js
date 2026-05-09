@@ -4208,6 +4208,13 @@ async function toolSelfVerify(args) {
           check: 'balanced_parens', passed: openParens === closeParens,
           detail: `( = ${openParens}, ) = ${closeParens}`
         });
+        // Run deep syntax check via Node.js
+        try {
+          const { stdout, stderr } = require('child_process').execSync(`node -c "${resolvedPath}"`, { encoding: 'utf8', stdio: 'pipe' });
+          checks.push({ check: 'node_syntax', passed: true, detail: 'Syntax OK' });
+        } catch (err) {
+          checks.push({ check: 'node_syntax', passed: false, detail: err.stderr || err.message });
+        }
       }
 
       const allPassed = checks.every(c => c.passed);
