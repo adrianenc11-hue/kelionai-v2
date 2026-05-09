@@ -18,7 +18,7 @@ import { test, expect } from '@playwright/test';
  *   2. The homepage HTML actually renders the Kelion shell (root div + JS).
  *   3. Old product routes do not leave the user on an admin/chat/plans page.
  *   4. The voice token endpoint responds with a structured JSON response
- *      containing the Claude model info for REST Voice Mode.
+ *      containing the Gemma 4 model info for REST Voice Mode.
  */
 
 const BASE = process.env.BASE_URL || 'http://127.0.0.1:5173';
@@ -104,9 +104,9 @@ test.describe('Kelion Studio API (DS-1 / DS-3) wiring', () => {
   });
 });
 
-test.describe('Voice session token endpoint (Claude)', () => {
-  test('Returns Claude model with openrouter backend', async ({ request }) => {
-    // The voice token endpoint now returns Claude model info for REST
+test.describe('Voice session token endpoint (Gemma 4)', () => {
+  test('Returns Gemma 4 model with openrouter backend', async ({ request }) => {
+    // The voice token endpoint now returns Gemma 4 model info for REST
     // Voice Mode (SpeechRecognition → OpenRouter → TTS).
     // No ephemeral token is minted — model name triggers REST mode on client.
     const res = await request.get(`${BASE}/api/realtime/voice-token?lang=en-US`);
@@ -118,7 +118,7 @@ test.describe('Voice session token endpoint (Claude)', () => {
     expect(res.status()).toBe(200);
     const body = await res.json();
     expect(body.backend).toBe('openrouter');
-    expect(body.model).toContain('claude');
+    expect(body.model).toContain('gemma');
     expect(body.token).toBeNull();
   });
 });
