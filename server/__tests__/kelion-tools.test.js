@@ -150,6 +150,8 @@ const EXPECTED_TOOL_NAMES = [
   // ElevenLabs cloned voice toggle — switches Kelion's TTS between
   // Claude Opus built-in voice and the user's ElevenLabs cloned voice.
   'switch_voice',
+  // Song identification.
+  'identify_song',
   // Agentic loop — multi-step plan execution
   'execute_plan',
   // Position 0 — Super LLM capabilities (Claude Opus 4.7 / GPT-5.5 /
