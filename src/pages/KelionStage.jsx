@@ -1736,37 +1736,7 @@ export default function KelionStage() {
                     <button title="Email" onClick={() => { window.open('mailto:?subject=Kelion AI&body=' + encodeURIComponent(turn.text||turn.transcript),'_blank') }} style={{ width: 28, height: 28, borderRadius: 6, background: 'transparent', border: 'none', color: '#999', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>📧</button>
                     <button title="Share" onClick={() => { const t2=turn.text||turn.transcript; if(navigator.share) navigator.share({title:'Kelion',text:t2}).catch(()=>{}); else navigator.clipboard.writeText(t2).catch(()=>{}); }} style={{ width: 28, height: 28, borderRadius: 6, background: 'transparent', border: 'none', color: '#999', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>🔗</button>
                   </div>
-                  {/* Action buttons for AI messages */}
-                  {lastTurn.role !== 'user' && (
-                    <div style={{ display: 'flex', gap: 2, marginTop: 2 }}>
-                      <button title="Copy" onClick={() => {
-                        navigator.clipboard.writeText(lastTurn.text || lastTurn.transcript)
-                          .then(() => { setCopiedIdx(lastIdx); setTimeout(() => setCopiedIdx(null), 2000) }).catch(() => {})
-                      }} style={{ width: 28, height: 28, borderRadius: 6, background: 'transparent', border: 'none', color: copiedIdx === lastIdx ? '#4ade80' : '#b0b0b0', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}
-                      >{copiedIdx === lastIdx ? '✓' : '📋'}</button>
-                      <button title="Save as file" onClick={() => {
-                        const txt = lastTurn.text || lastTurn.transcript;
-                        const blob = new Blob([txt], { type: 'text/plain;charset=utf-8' });
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a'); a.href = url;
-                        a.download = `kelion-${new Date().toISOString().slice(0,10)}.txt`;
-                        document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
-                      }} style={{ width: 28, height: 28, borderRadius: 6, background: 'transparent', border: 'none', color: '#b0b0b0', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}
-                      >💾</button>
-                      <button title="Send to email" onClick={() => {
-                        const txt = encodeURIComponent(lastTurn.text || lastTurn.transcript);
-                        window.open(`mailto:?subject=Kelion AI&body=${txt}`, '_blank');
-                      }} style={{ width: 28, height: 28, borderRadius: 6, background: 'transparent', border: 'none', color: '#b0b0b0', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}
-                      >📧</button>
-                      <button title="Share" onClick={() => {
-                        const txt = lastTurn.text || lastTurn.transcript;
-                        if (navigator.share) navigator.share({ title: 'Kelion', text: txt }).catch(() => {});
-                        else navigator.clipboard.writeText(txt).catch(() => {});
-                      }} style={{ width: 28, height: 28, borderRadius: 6, background: 'transparent', border: 'none', color: '#b0b0b0', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}
-                      >🔗</button>
-                    </div>
-                  )}
-                </div>
+                )}
               </div>
             ))}
             {status === 'thinking' && (<div style={{ display: 'inline-flex', gap: 4, padding: '12px 18px', alignSelf: 'flex-start' }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#bbb', animation: 'pulse 1.4s ease-in-out infinite' }} /><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#bbb', animation: 'pulse 1.4s ease-in-out 0.2s infinite' }} /><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#bbb', animation: 'pulse 1.4s ease-in-out 0.4s infinite' }} /></div>)}
