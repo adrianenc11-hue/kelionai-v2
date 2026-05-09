@@ -113,6 +113,7 @@ const TOOL_CATEGORIES = {
 
   // GitHub
   GITHUB: [
+    'commit_and_push_to_github',
     'create_github_pr',
     'manage_github_prs',
     'github_repo_info',

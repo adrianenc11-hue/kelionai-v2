@@ -8,6 +8,7 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     build: {
+      minify: false,
       // Monaco workers are inherently large (~7 MB for TS alone) but only
       // load on the /studio route (React.lazy). We silence the warning
       // since they're already code-split and not on the critical path.

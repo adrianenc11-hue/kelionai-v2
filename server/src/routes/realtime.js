@@ -700,6 +700,15 @@ const KELION_TOOLS = [
     required: ['command'],
   },
   {
+    name: 'commit_and_push_to_github',
+    description: "Securely commit all local changes and push them to the GitHub repository using the GITHUB_TOKEN environment variable. Call this when you have successfully completed a coding task and the user asks you to save, deploy, or push the changes. You DO NOT need to run git commands manually; this tool does it automatically and securely.",
+    properties: {
+      commit_message: { type: 'string', description: "A concise, conventional commit message (e.g. 'fix: resolve layout bug in KelionStage')." },
+      branch: { type: 'string', description: "Optional branch name. Defaults to HEAD." },
+    },
+    required: ['commit_message'],
+  },
+  {
     name: 'ask_expert_coder',
     description: "Consult an expert coding model on OpenRouter to solve complex programming problems or do deep reasoning. Use 'google/gemma-4-31b-it' for strong reasoning and code generation.",
     properties: {
