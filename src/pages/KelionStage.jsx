@@ -1709,219 +1709,77 @@ export default function KelionStage() {
       {/* Debug-only Leva tuning drawer. Renders null unless the URL
           carries ?debug=1 or ?tune=1; zero cost for real users. */}
       {isTuningEnabled() && <TuningPanel />}
-      {/* PR #200 — toast overlay driven by uiActionStore. Fires when
-          Kelion calls ui_notify. Renders null when the queue is empty
-          so idle cost is zero. */}
       <UIActionToast />
-      <Canvas
-        /* THREE 0.183 deprecated PCFSoftShadowMap (the r3f default when
-           `shadows` is passed bare). Switch to VSMShadowMap — softer
-           results and no console warning. */
-        shadows={{ type: THREE.VSMShadowMap }}
-        camera={{ position: [0, 0.2, 4.2], fov: 36 }}
-        dpr={[1, 2]}
-        gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.8, outputColorSpace: THREE.SRGBColorSpace, powerPreference: 'low-power' }}
-        onCreated={({ gl }) => {
-          // Handle WebGL context loss gracefully — prevent the crash
-          // that takes down the entire React tree via ErrorBoundary.
-          const canvas = gl.domElement
-          if (canvas) {
-            canvas.addEventListener('webglcontextlost', (e) => {
-              e.preventDefault()
-              console.warn('[kelion] WebGL context lost — will restore when browser recovers')
-            })
-            canvas.addEventListener('webglcontextrestored', () => {
-              console.log('[kelion] WebGL context restored')
-            })
-          }
-        }}
-      >
-        <color attach="background" args={['#0a0d1a']} />
-        <fog attach="fog" args={['#0e0b20', 6, 14]} />
-        <CameraRig />
-        <Suspense fallback={null}>
-          <ambientLight intensity={0.5} />
-          <directionalLight position={[10, 10, 5]} intensity={1} />
-          <StudioDecor />
-
-          <group position={[1.6, 0, 0]}>
-            {/* `presenting` flips true whenever Kelion is speaking an answer
-                — that's when we have (or will have) content on the monitor
-                and want the body to rotate ~8° toward it. When we wire the
-                tool-use pipeline, this will be driven by an explicit
-                "content on monitor" signal instead. */}
-            <AvatarModel
-              mouthOpen={mouthOpen}
-              status={status}
-              emotion={emotion}
-              // Adrian: "avatarul nu priveste catre user" — previously the
-              // body yawed ~8° toward the on-stage monitor whenever Kelion
-              // spoke, which left the avatar glancing away from the webcam.
-              // We always face the user now; hand gestures still fire while
-              // speaking (see AvatarModel below where we key them off
-              // status === 'speaking').
-              presenting={false}
-            />
-          </group>
-          <ContactShadows position={[1.6, -1.65, 0]} opacity={0.55} scale={5} blur={2.6} far={2.5} />
-        </Suspense>
-      </Canvas>
-
-      {/* Half-page monitor overlay — when Kelion calls show_on_monitor (map /
-          video / image / wiki / web), the content is rendered here as a 2D
-          panel covering the LEFT half of the viewport on desktop (bottom
-          sheet on mobile). Adrian: "inlocuirea monitorului cu jumate de
-          pagina … avatarul pe dreapta". The small 3D monitor in the scene
-          stays as decor. */}
-      <MonitorOverlay />
-
-      <audio ref={audioRef} autoPlay playsInline onPlay={(e) => attachTts(e.target)} onPause={resetTts} onEnded={resetTts} onError={resetTts} />
-
-            {/* Minimal Chat — last message + input bar only, avatar stays visible */}
-      {chatPanelOpen && (() => {
-        const lastTurn = turns.length > 0 ? turns[turns.length - 1] : null;
-        const lastIdx = turns.length - 1;
-        return (
-          <div style={{
-            position: 'absolute', bottom: 0, left: 0, right: 0,
-            display: 'flex', flexDirection: 'column', alignItems: 'center',
-            pointerEvents: 'none', zIndex: bottomZIndex || 4,
-          }}>
-
-            {/* Last message bubble — floating above input */}
-            {lastTurn && (lastTurn.text || lastTurn.transcript) && (
-              <div style={{
-                width: '100%', maxWidth: 768, padding: '0 20px',
-                pointerEvents: 'auto', marginBottom: 8,
-              }}>
-                <div style={{
-                  display: 'flex', flexDirection: 'column', gap: 2,
-                  alignSelf: lastTurn.role === 'user' ? 'flex-end' : 'flex-start',
-                  maxWidth: '85%',
-                  marginLeft: lastTurn.role === 'user' ? 'auto' : 0,
-                }}>
-                  <div style={{
-                    padding: '10px 16px', borderRadius: 18,
-                    background: lastTurn.role === 'user'
-                      ? 'rgba(59,59,59,0.85)'
-                      : 'rgba(20,18,30,0.8)',
-                    backdropFilter: 'blur(12px)',
-                    color: '#ececec', fontSize: 15, lineHeight: 1.5,
-                    whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-                    fontFamily: 'system-ui, -apple-system, sans-serif',
-                    maxHeight: 200, overflowY: 'auto',
-                  }}>
-                    {lastTurn.text || lastTurn.transcript}
-                  </div>
-                  {/* Action buttons for AI messages */}
-                  {lastTurn.role !== 'user' && (
-                    <div style={{ display: 'flex', gap: 2, marginTop: 2 }}>
-                      <button title="Copy" onClick={() => {
-                        navigator.clipboard.writeText(lastTurn.text || lastTurn.transcript)
-                          .then(() => { setCopiedIdx(lastIdx); setTimeout(() => setCopiedIdx(null), 2000) }).catch(() => {})
-                      }} style={{ width: 28, height: 28, borderRadius: 6, background: 'transparent', border: 'none', color: copiedIdx === lastIdx ? '#4ade80' : '#b0b0b0', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}
-                      >{copiedIdx === lastIdx ? '✓' : '📋'}</button>
-                      <button title="Save as file" onClick={() => {
-                        const txt = lastTurn.text || lastTurn.transcript;
-                        const blob = new Blob([txt], { type: 'text/plain;charset=utf-8' });
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a'); a.href = url;
-                        a.download = `kelion-${new Date().toISOString().slice(0,10)}.txt`;
-                        document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
-                      }} style={{ width: 28, height: 28, borderRadius: 6, background: 'transparent', border: 'none', color: '#b0b0b0', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}
-                      >💾</button>
-                      <button title="Send to email" onClick={() => {
-                        const txt = encodeURIComponent(lastTurn.text || lastTurn.transcript);
-                        window.open(`mailto:?subject=Kelion AI&body=${txt}`, '_blank');
-                      }} style={{ width: 28, height: 28, borderRadius: 6, background: 'transparent', border: 'none', color: '#b0b0b0', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}
-                      >📧</button>
-                      <button title="Share" onClick={() => {
-                        const txt = lastTurn.text || lastTurn.transcript;
-                        if (navigator.share) navigator.share({ title: 'Kelion', text: txt }).catch(() => {});
-                        else navigator.clipboard.writeText(txt).catch(() => {});
-                      }} style={{ width: 28, height: 28, borderRadius: 6, background: 'transparent', border: 'none', color: '#b0b0b0', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}
-                      >🔗</button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Thinking indicator */}
-            {status === 'thinking' && (
-              <div style={{ width: '100%', maxWidth: 768, padding: '0 20px 8px', pointerEvents: 'none' }}>
-                <div style={{ color: '#b0b0b0', fontSize: 14, display: 'inline-flex', gap: 4, padding: '8px 16px', borderRadius: 18, background: 'rgba(20,18,30,0.7)', backdropFilter: 'blur(8px)' }}>
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#b0b0b0', animation: 'pulse 1.4s ease-in-out infinite' }} />
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#b0b0b0', animation: 'pulse 1.4s ease-in-out 0.2s infinite' }} />
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#b0b0b0', animation: 'pulse 1.4s ease-in-out 0.4s infinite' }} />
-                </div>
-              </div>
-            )}
-
-            {chatError && (
-              <div style={{ width: '100%', maxWidth: 768, padding: '0 20px 8px', pointerEvents: 'auto' }}>
-                <div style={{ padding: '8px 16px', borderRadius: 8, background: 'rgba(220,38,38,0.2)', color: '#fca5a5', fontSize: 14 }}>{chatError}</div>
-              </div>
-            )}
-
-            {/* Input Bar */}
-            <div style={{
-              width: '100%', maxWidth: 768, padding: '0 16px 16px',
-              pointerEvents: 'auto',
-            }}>
-              <form onSubmit={(e) => { e.preventDefault(); sendTextMessage() }} style={{
-                display: 'flex', alignItems: 'flex-end', gap: 8,
-                padding: '10px 12px', borderRadius: 26,
-                background: 'rgba(47,47,47,0.92)', backdropFilter: 'blur(12px)',
-                border: '1px solid rgba(255,255,255,0.08)',
-                boxShadow: '0 2px 20px rgba(0,0,0,0.4)',
-              }}>
-                <input ref={fileInputRef} type="file" accept="*/*" style={{ display: 'none' }}
-                  onChange={(e) => { const f = e.target.files && e.target.files[0]; if (f) setAttachedFile(f) }} />
-                <button type="button" onClick={() => fileInputRef.current && fileInputRef.current.click()}
-                  disabled={status === 'thinking'} title="Attach file"
-                  style={{ width: 34, height: 34, borderRadius: '50%', background: 'transparent', border: '1.5px solid rgba(255,255,255,0.25)', color: '#e0e0e0', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}
-                >+</button>
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                  {attachedFile && (
-                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', marginBottom: 6, borderRadius: 10, background: 'rgba(255,255,255,0.08)', color: '#d0d0d0', fontSize: 12, width: 'fit-content' }}>
-                      <span style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>📎 {attachedFile.name}</span>
-                      <button type="button" onClick={() => setAttachedFile(null)} style={{ background: 'transparent', border: 'none', color: '#999', cursor: 'pointer', padding: 0, fontSize: 14 }}>×</button>
-                    </div>
-                  )}
-                  <textarea value={chatInput}
-                    onChange={(e) => { setChatInput(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 150) + 'px'; }}
-                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendTextMessage(); } }}
-                    onPaste={(e) => { try { const cd = e.clipboardData || window.clipboardData; if (!cd) return; const items = cd.items ? Array.from(cd.items) : []; const imgItem = items.find((it) => it && it.kind === 'file' && typeof it.type === 'string' && it.type.startsWith('image/')); if (imgItem) { const blob = imgItem.getAsFile(); if (blob) { e.preventDefault(); const ext = (blob.type.split('/')[1] || 'png').split(';')[0]; const stamp = new Date().toISOString().replace(/[:.]/g, '-'); setAttachedFile((typeof File !== 'undefined') ? new File([blob], `pasted-${stamp}.${ext}`, { type: blob.type }) : blob); return; } } } catch (_) {} }}
-                    placeholder="Ask anything" disabled={status === 'thinking'} rows={1}
-                    style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', color: '#e8e8e8', fontSize: 16, fontFamily: 'system-ui, -apple-system, sans-serif', resize: 'none', maxHeight: 150, overflowY: 'auto', minHeight: 24, padding: '6px 0', lineHeight: 1.5 }}
-                  />
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, marginLeft: 4 }}>
-                  <button type="button" onClick={() => { if (status === 'idle' || status === 'error') { startVoiceWithPriorTurns(); setMicOff(false); setIntendedVoiceActive(true) } else if (status === 'listening' || status === 'speaking' || status === 'thinking') { if (typeof stop === 'function') stop(); setIntendedVoiceActive(false) } }}
-                    style={{ width: 34, height: 34, borderRadius: '50%', background: 'transparent', border: 'none', color: status === 'listening' ? '#ef4444' : '#b0b0b0', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }} title="Voice input"
-                  >🎤</button>
-                  {chatInput.trim().length > 0 || attachedFile ? (
-                    <button type="submit" disabled={status === 'thinking'} title="Send"
-                      style={{ width: 36, height: 36, borderRadius: '50%', background: '#e0e0e0', border: 'none', color: '#212121', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 700 }}
-                    >↑</button>
-                  ) : (
-                    <button type="button" onClick={() => { if (status === 'idle' || status === 'error') { startVoiceWithPriorTurns(); setMicOff(false); setIntendedVoiceActive(true) } }} title="Voice mode"
-                      style={{ width: 36, height: 36, borderRadius: '50%', background: (status === 'listening' || status === 'speaking') ? '#ef4444' : 'rgba(255,255,255,0.08)', border: 'none', color: (status === 'listening' || status === 'speaking') ? '#fff' : '#b0b0b0', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}
-                    >{(status === 'listening' || status === 'speaking') ? '■' : (
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="4" y="6" width="3" height="12" rx="1.5" /><rect x="10.5" y="3" width="3" height="18" rx="1.5" /><rect x="17" y="8" width="3" height="8" rx="1.5" /></svg>
-                    )}</button>
-                  )}
-                </div>
-              </form>
-              <div style={{ textAlign: 'center', fontSize: 11, color: '#7a7a7a', marginTop: 6 }}>
-                Kelion can make mistakes. Consider verifying important information.
-              </div>
+      {/* ═══ SPLIT LAYOUT: Chat Left 70% + Avatar Right 30% ═══ */}
+      <div style={{ display: 'flex', width: '100%', height: '100%' }}>
+        {/* LEFT PANEL — Chat / Monitor */}
+        <div style={{ flex: '0 0 70%', maxWidth: '70%', height: '100%', background: '#ffffff', display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
+          <MonitorOverlay />
+          <audio ref={audioRef} autoPlay playsInline onPlay={(e) => attachTts(e.target)} onPause={resetTts} onEnded={resetTts} onError={resetTts} />
+          <div style={{ padding: '16px 24px', borderBottom: '1px solid #e5e5e5', display: 'flex', alignItems: 'center' }}>
+            <div style={{ fontSize: 18, fontWeight: 700, color: '#1a1a1a' }}>KelionAI</div>
+            <div style={{ fontSize: 12, color: '#999', marginLeft: 'auto' }}>
+              {status === 'listening' && '🎤 Listening...'}
+              {status === 'speaking' && '🔊 Speaking...'}
+              {status === 'thinking' && '💭 Thinking...'}
             </div>
           </div>
-        );
-      })()}
-
+          <div ref={chatScrollRef} style={{ flex: 1, overflowY: 'auto', padding: '24px 32px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {turns.length === 0 && (<div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#bbb', fontSize: 16, gap: 8 }}><div style={{ fontSize: 40 }}>💬</div><div>Ask anything or use voice</div></div>)}
+            {turns.map((turn, i) => (
+              <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 4, alignSelf: turn.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '80%' }}>
+                <div style={{ padding: '12px 18px', borderRadius: 20, background: turn.role === 'user' ? '#f0f0f0' : 'transparent', color: '#1a1a1a', fontSize: 15, lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'system-ui, -apple-system, sans-serif' }}>{turn.text || turn.transcript}</div>
+                {turn.role !== 'user' && (turn.text || turn.transcript) && (
+                  <div style={{ display: 'flex', gap: 4, marginTop: 2 }}>
+                    <button title="Copy" onClick={() => { navigator.clipboard.writeText(turn.text || turn.transcript).then(() => { setCopiedIdx(i); setTimeout(() => setCopiedIdx(null), 2000) }).catch(() => {}) }} style={{ width: 28, height: 28, borderRadius: 6, background: 'transparent', border: 'none', color: copiedIdx === i ? '#22c55e' : '#999', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>{copiedIdx === i ? '✓' : '📋'}</button>
+                    <button title="Save" onClick={() => { const t2 = turn.text||turn.transcript; const b = new Blob([t2],{type:'text/plain'}); const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href=u; a.download=`kelion-${new Date().toISOString().slice(0,10)}.txt`; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(u); }} style={{ width: 28, height: 28, borderRadius: 6, background: 'transparent', border: 'none', color: '#999', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>💾</button>
+                    <button title="Email" onClick={() => { window.open('mailto:?subject=Kelion AI&body=' + encodeURIComponent(turn.text||turn.transcript),'_blank') }} style={{ width: 28, height: 28, borderRadius: 6, background: 'transparent', border: 'none', color: '#999', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>📧</button>
+                    <button title="Share" onClick={() => { const t2=turn.text||turn.transcript; if(navigator.share) navigator.share({title:'Kelion',text:t2}).catch(()=>{}); else navigator.clipboard.writeText(t2).catch(()=>{}); }} style={{ width: 28, height: 28, borderRadius: 6, background: 'transparent', border: 'none', color: '#999', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>🔗</button>
+                  </div>
+                )}
+              </div>
+            ))}
+            {status === 'thinking' && (<div style={{ display: 'inline-flex', gap: 4, padding: '12px 18px', alignSelf: 'flex-start' }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#bbb', animation: 'pulse 1.4s ease-in-out infinite' }} /><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#bbb', animation: 'pulse 1.4s ease-in-out 0.2s infinite' }} /><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#bbb', animation: 'pulse 1.4s ease-in-out 0.4s infinite' }} /></div>)}
+            {chatError && (<div style={{ padding: '8px 16px', borderRadius: 10, background: '#fef2f2', color: '#dc2626', fontSize: 14, alignSelf: 'center' }}>{chatError}</div>)}
+          </div>
+          <div style={{ padding: '12px 24px 16px', borderTop: '1px solid #f0f0f0' }}>
+            <form onSubmit={(e) => { e.preventDefault(); sendTextMessage() }} style={{ display: 'flex', alignItems: 'flex-end', gap: 10, padding: '10px 14px', borderRadius: 26, background: '#f7f7f8', border: '1px solid #e5e5e5' }}>
+              <input ref={fileInputRef} type="file" accept="*/*" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files && e.target.files[0]; if (f) setAttachedFile(f) }} />
+              <button type="button" onClick={() => fileInputRef.current && fileInputRef.current.click()} disabled={status === 'thinking'} title="Attach file" style={{ width: 34, height: 34, borderRadius: '50%', background: 'transparent', border: '1.5px solid #ccc', color: '#555', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>+</button>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                {attachedFile && (<div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', marginBottom: 6, borderRadius: 10, background: '#e8e8e8', color: '#555', fontSize: 12, width: 'fit-content' }}><span style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>📎 {attachedFile.name}</span><button type="button" onClick={() => setAttachedFile(null)} style={{ background: 'transparent', border: 'none', color: '#999', cursor: 'pointer', padding: 0, fontSize: 14 }}>×</button></div>)}
+                <textarea value={chatInput} onChange={(e) => { setChatInput(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 150) + 'px'; }} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendTextMessage(); } }} onPaste={(e) => { try { const cd = e.clipboardData || window.clipboardData; if (!cd) return; const items = cd.items ? Array.from(cd.items) : []; const imgItem = items.find((it) => it && it.kind === 'file' && typeof it.type === 'string' && it.type.startsWith('image/')); if (imgItem) { const blob = imgItem.getAsFile(); if (blob) { e.preventDefault(); const ext = (blob.type.split('/')[1] || 'png').split(';')[0]; const stamp = new Date().toISOString().replace(/[:.]/g, '-'); setAttachedFile((typeof File !== 'undefined') ? new File([blob], `pasted-${stamp}.${ext}`, { type: blob.type }) : blob); return; } } } catch (_) {} }} placeholder="Ask anything" disabled={status === 'thinking'} rows={1} style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', color: '#1a1a1a', fontSize: 16, fontFamily: 'system-ui, -apple-system, sans-serif', resize: 'none', maxHeight: 150, overflowY: 'auto', minHeight: 24, padding: '4px 0', lineHeight: 1.5 }} />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                <button type="button" onClick={() => { if (status === 'idle' || status === 'error') { startVoiceWithPriorTurns(); setMicOff(false); setIntendedVoiceActive(true) } else if (status === 'listening' || status === 'speaking' || status === 'thinking') { if (typeof stop === 'function') stop(); setIntendedVoiceActive(false) } }} style={{ width: 34, height: 34, borderRadius: '50%', background: 'transparent', border: 'none', color: status === 'listening' ? '#ef4444' : '#888', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }} title="Voice">🎤</button>
+                {chatInput.trim().length > 0 || attachedFile ? (
+                  <button type="submit" disabled={status === 'thinking'} title="Send" style={{ width: 36, height: 36, borderRadius: '50%', background: '#1a1a1a', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 700 }}>↑</button>
+                ) : (
+                  <button type="button" onClick={() => { if (status === 'idle' || status === 'error') { startVoiceWithPriorTurns(); setMicOff(false); setIntendedVoiceActive(true) } }} title="Voice mode" style={{ width: 36, height: 36, borderRadius: '50%', background: (status === 'listening' || status === 'speaking') ? '#ef4444' : '#f0f0f0', border: 'none', color: (status === 'listening' || status === 'speaking') ? '#fff' : '#888', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>{(status === 'listening' || status === 'speaking') ? '■' : (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="4" y="6" width="3" height="12" rx="1.5" /><rect x="10.5" y="3" width="3" height="18" rx="1.5" /><rect x="17" y="8" width="3" height="8" rx="1.5" /></svg>)}</button>
+                )}
+              </div>
+            </form>
+            <div style={{ textAlign: 'center', fontSize: 11, color: '#bbb', marginTop: 6 }}>Kelion can make mistakes. Consider verifying important information.</div>
+          </div>
+        </div>
+        {/* RIGHT PANEL — Avatar 3D */}
+        <div style={{ flex: '0 0 30%', maxWidth: '30%', height: '100%', position: 'relative', overflow: 'hidden' }}>
+          <Canvas shadows={{ type: THREE.VSMShadowMap }} camera={{ position: [0, 0.2, 4.2], fov: 36 }} dpr={[1, 2]} gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.8, outputColorSpace: THREE.SRGBColorSpace, powerPreference: 'low-power' }} onCreated={({ gl }) => { const canvas = gl.domElement; if (canvas) { canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); console.warn('[kelion] WebGL context lost') }); canvas.addEventListener('webglcontextrestored', () => { console.log('[kelion] WebGL context restored') }) } }}>
+            <color attach="background" args={['#0a0d1a']} />
+            <fog attach="fog" args={['#0e0b20', 6, 14]} />
+            <CameraRig />
+            <Suspense fallback={null}>
+              <ambientLight intensity={0.5} />
+              <directionalLight position={[10, 10, 5]} intensity={1} />
+              <StudioDecor />
+              <group position={[1.6, 0, 0]}>
+                <AvatarModel mouthOpen={mouthOpen} status={status} emotion={emotion} presenting={false} />
+              </group>
+              <ContactShadows position={[1.6, -1.65, 0]} opacity={0.55} scale={5} blur={2.6} far={2.5} />
+            </Suspense>
+          </Canvas>
+        </div>
+      </div>
 {/* Guest trial countdown — Adrian: "timer se afiseaza dreapta sus
           vizibil". Renders top-right, above the action bar, only while
           the server reports `applicable: true` (guests only — signed-in
