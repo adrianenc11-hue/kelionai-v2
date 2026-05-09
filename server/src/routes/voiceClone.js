@@ -258,17 +258,21 @@ router.post('/select-voice', async (req, res) => {
     return res.status(400).json({ error: 'voiceId is required.' });
   }
 
+  // Evict the oldest (by timestamp) entry if map is at the size cap
+  if (_userVoicePreference.size >= USER_PREF_MAX_SIZE) {
+    let oldestKey = null, oldestTs = Infinity;
+    for (const [key, val] of _userVoicePreference) {
+      if (val.ts < oldestTs) { oldestTs = val.ts; oldestKey = key; }
+    }
+    if (oldestKey !== null) _userVoicePreference.delete(oldestKey);
+  }
+
   _userVoicePreference.set(String(userId), {
     voiceId: voiceId.trim(),
     voiceName: voiceName || null,
     lang: lang || null,
     ts: Date.now(),
   });
-
-  // Evict oldest entry if map exceeds the size cap
-  if (_userVoicePreference.size > USER_PREF_MAX_SIZE) {
-    _userVoicePreference.delete(_userVoicePreference.keys().next().value);
-  }
 
   console.log(`[voice/select] User ${userId} selected voice: ${voiceName || voiceId} (lang=${lang})`);
   res.json({ ok: true, voiceId, voiceName, lang });
