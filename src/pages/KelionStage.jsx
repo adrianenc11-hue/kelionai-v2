@@ -870,11 +870,6 @@ export default function KelionStage() {
   const [chatPanelOpen, setChatPanelOpen] = useState(true)
   const [plusMenuOpen, setPlusMenuOpen] = useState(false)
   const chatScrollRef = useRef(null)
-  useEffect(() => {
-    if (chatScrollRef.current) {
-      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
-    }
-  }, [turns, status])
   const [copiedIdx, setCopiedIdx] = useState(null)
   const [chatError, setChatError] = useState(null)
   // Conversation history — user-requested ("sa aiba optiune de save").
