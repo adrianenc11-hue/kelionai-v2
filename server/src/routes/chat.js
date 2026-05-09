@@ -101,22 +101,26 @@ router.post('/', async (req, res) => {
     const { KELION_TOOLS } = require('./realtime');
     const { selectTools } = require('../services/toolRouter');
     
-    // Find the last user message to use for tool routing, especially when handling toolResponses
+    // Find the last user message and last assistant message for robust tool routing context
     let lastUserMessage = message || '';
-    if (!lastUserMessage) {
-      for (let i = session.history.length - 1; i >= 0; i--) {
-        if (session.history[i].role === 'user') {
-          const parts = session.history[i].parts;
-          const textPart = parts.find(p => p.text);
-          if (textPart) {
-            lastUserMessage = textPart.text;
-          }
-          break;
+    let lastAssistantMessage = '';
+    
+    for (let i = session.history.length - 1; i >= 0; i--) {
+      const parts = session.history[i].parts;
+      const textPart = parts.find(p => p.text);
+      if (textPart) {
+        if (session.history[i].role === 'model' && !lastAssistantMessage) {
+          lastAssistantMessage = textPart.text;
+        }
+        if (session.history[i].role === 'user' && !lastUserMessage) {
+          lastUserMessage = textPart.text;
         }
       }
+      if (lastUserMessage && lastAssistantMessage) break;
     }
     
-    let routingResult = selectTools(lastUserMessage, KELION_TOOLS);
+    const contextForRouting = `${lastAssistantMessage} ${lastUserMessage}`.trim();
+    let routingResult = selectTools(contextForRouting, KELION_TOOLS);
     let relevantTools = routingResult ? routingResult.tools : null;
     if (!relevantTools || relevantTools.length === 0) {
       relevantTools = KELION_TOOLS;
