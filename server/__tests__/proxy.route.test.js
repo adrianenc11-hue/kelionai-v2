@@ -58,6 +58,14 @@ describe('proxy route security + stream behavior', () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
+  test('rejects expanded-form private IPv6 literals', async () => {
+    const app = makeApp();
+    const res = await request(app).get('/api/proxy?url=http%3A%2F%2F%5Bfc00%3A0%3A0%3A0%3A0%3A0%3A0%3A1%5D%2F');
+    expect(res.status).toBe(400);
+    expect(res.text).toMatch(/private or internal/i);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
   test('does not forward stale upstream content-length/content-encoding for rewritten HTML', async () => {
     dns.lookup.mockResolvedValue([{ address: '93.184.216.34', family: 4 }]);
     global.fetch.mockResolvedValue({

@@ -20,6 +20,8 @@ const router = Router();
 
 // Simple in-memory rate limiter (30 req/min per IP)
 const WINDOW_MS = 60_000;
+const UPSTREAM_TIMEOUT_MS = 15_000;
+const STREAM_HEADER_TIMEOUT_MS = 15_000;
 const ratemap = new Map();
 function rateLimit(ip) {
   const now = Date.now();
@@ -74,29 +76,66 @@ function isPrivateIPv4(ip) {
   return false;
 }
 
+function parseIPv6ToBytes(ip) {
+  const zoneIndex = ip.indexOf('%');
+  const clean = (zoneIndex >= 0 ? ip.slice(0, zoneIndex) : ip).toLowerCase();
+  if (!clean) return null;
+
+  const ipv4Match = clean.match(/(.+):(\d+\.\d+\.\d+\.\d+)$/);
+  let expanded = clean;
+  if (ipv4Match) {
+    const v4 = ipv4Match[2].split('.').map((n) => Number.parseInt(n, 10));
+    if (v4.length !== 4 || v4.some((n) => !Number.isFinite(n) || n < 0 || n > 255)) return null;
+    expanded = `${ipv4Match[1]}:${((v4[0] << 8) | v4[1]).toString(16)}:${((v4[2] << 8) | v4[3]).toString(16)}`;
+  }
+
+  const halves = expanded.split('::');
+  if (halves.length > 2) return null;
+  const left = halves[0] ? halves[0].split(':') : [];
+  const right = halves[1] ? halves[1].split(':') : [];
+  const leftNums = left.map((part) => Number.parseInt(part || '0', 16));
+  const rightNums = right.map((part) => Number.parseInt(part || '0', 16));
+  if (leftNums.some((n) => !Number.isFinite(n) || n < 0 || n > 0xffff)) return null;
+  if (rightNums.some((n) => !Number.isFinite(n) || n < 0 || n > 0xffff)) return null;
+
+  let hextets;
+  if (halves.length === 1) {
+    if (leftNums.length !== 8) return null;
+    hextets = leftNums;
+  } else {
+    if (leftNums.length + rightNums.length > 8) return null;
+    hextets = [...leftNums, ...Array(8 - leftNums.length - rightNums.length).fill(0), ...rightNums];
+  }
+
+  const bytes = [];
+  for (const h of hextets) {
+    bytes.push((h >> 8) & 0xff, h & 0xff);
+  }
+  return bytes;
+}
+
 function isPrivateIPv6(ip) {
-  const lower = ip.toLowerCase();
-  if (lower === '::' || lower === '::1') return true;
-  if (lower.startsWith('fc') || lower.startsWith('fd')) return true; // unique local
-  if (/^fe[89ab]/i.test(lower)) return true; // link-local fe80::/10
-  if (/^fe[cdef]/i.test(lower)) return true; // deprecated site-local
-  if (lower.startsWith('ff')) return true; // multicast
-  if (lower.startsWith('::ffff:')) {
-    const mapped = lower.slice('::ffff:'.length);
-    const hexMapped = mapped.match(/^([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
-    if (hexMapped) {
-      const hi = Number.parseInt(hexMapped[1], 16);
-      const lo = Number.parseInt(hexMapped[2], 16);
-      const dotted = `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`;
-      return isPrivateIPv4(dotted);
-    }
-    return isPrivateIPv4(mapped);
+  const bytes = parseIPv6ToBytes(ip);
+  if (!bytes || bytes.length !== 16) return true;
+
+  const isAllZero = bytes.every((b) => b === 0);
+  const isLoopback = bytes.slice(0, 15).every((b) => b === 0) && bytes[15] === 1;
+  if (isAllZero || isLoopback) return true;
+  if ((bytes[0] & 0xfe) === 0xfc) return true; // fc00::/7 unique-local
+  if (bytes[0] === 0xfe && (bytes[1] & 0xc0) === 0x80) return true; // fe80::/10 link-local
+  if (bytes[0] === 0xfe && (bytes[1] & 0xc0) === 0xc0) return true; // fec0::/10 site-local
+  if (bytes[0] === 0xff) return true; // ff00::/8 multicast
+
+  const isIpv4Mapped = bytes.slice(0, 10).every((b) => b === 0) && bytes[10] === 0xff && bytes[11] === 0xff;
+  if (isIpv4Mapped) {
+    return isPrivateIPv4(`${bytes[12]}.${bytes[13]}.${bytes[14]}.${bytes[15]}`);
   }
   return false;
 }
 
 async function assertPublicUrl(targetUrl) {
-  const host = (targetUrl.hostname || '').toLowerCase();
+  const rawHost = (targetUrl.hostname || '').toLowerCase();
+  const host = rawHost.startsWith('[') && rawHost.endsWith(']') ? rawHost.slice(1, -1) : rawHost;
   if (!host) throw new Error('Invalid URL host');
   // Block local hostnames up-front even if a custom DNS resolver rewrites them.
   if (host === 'localhost' || host.endsWith('.localhost') || host === '0.0.0.0' || host === '::') {
@@ -155,7 +194,7 @@ router.get('/', async (req, res) => {
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9',
       },
-      signal: AbortSignal.timeout(15_000),
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
     });
 
     // Forward status
@@ -277,7 +316,7 @@ router.get('/stream', async (req, res) => {
 
   try {
     const controller = new AbortController();
-    const fetchTimeout = setTimeout(() => controller.abort(), 15_000);
+    const fetchTimeout = setTimeout(() => controller.abort(), STREAM_HEADER_TIMEOUT_MS);
     const requestHeaders = {
       'User-Agent': 'Mozilla/5.0 (compatible; KelionMonitor/1.0)',
       'Accept': 'audio/*, video/*, */*',
