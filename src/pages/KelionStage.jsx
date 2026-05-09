@@ -1764,7 +1764,8 @@ export default function KelionStage() {
                       }} />
                     )}
                     {status === 'listening' && 'Recepție...'}
-                    {status === 'thinking' && 'Gândește / Lucrează...'}
+                    {status === 'thinking' && 'Gândește...'}
+                    {status === 'working' && 'Aplică unelte...'}
                     {status === 'speaking' && 'Răspunde...'}
                     {status === 'idle' && 'Inactiv'}
                     {status === 'error' && 'Eroare'}

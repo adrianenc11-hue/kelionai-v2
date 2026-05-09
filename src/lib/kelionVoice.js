@@ -595,6 +595,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
     // /api/tools/* backend endpoint, then send back a toolResponse with the
     // matching id so the model can continue the turn with the result.
     if (msg.toolCall?.functionCalls?.length) {
+      setStatus('working')
       const fcs = msg.toolCall.functionCalls
       // Suppress narration during tool execution — the cooldown prevents
       // the narrator from jumping in between chained tool calls.
@@ -1657,6 +1658,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
           const data = await r.json()
           
           if (data.toolCalls && data.toolCalls.length > 0) {
+            setStatus('working')
             const results = [];
             for (const call of data.toolCalls) {
               const res = await runTool(call.name, call.args);
