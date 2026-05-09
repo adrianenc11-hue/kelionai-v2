@@ -710,11 +710,11 @@ const KELION_TOOLS = [
   },
   {
     name: 'ask_expert_coder',
-    description: "Consult an expert coding model on OpenRouter to solve complex programming problems or do deep reasoning. Use 'google/gemma-4-31b-it' for strong reasoning and code generation.",
+    description: "Consult an expert coding model on OpenRouter to solve complex programming problems or do deep reasoning. Use 'anthropic/claude-opus-4.7' for strong reasoning and code generation.",
     properties: {
       question: { type: 'string', description: "The exact problem or question for the expert." },
       context: { type: 'string', description: "Relevant code snippets, error messages, or file contents." },
-      model: { type: 'string', enum: ['google/gemma-4-31b-it', 'google/gemma-4-31b-it'], description: "Which model to use. Default is google/gemma-4-31b-it." },
+      model: { type: 'string', enum: ['anthropic/claude-opus-4.7', 'anthropic/claude-opus-4.7'], description: "Which model to use. Default is anthropic/claude-opus-4.7." },
     },
     required: ['question', 'context'],
   },
@@ -1613,7 +1613,7 @@ const voiceTokenHandler = async (req, res) => {
     //   Browser SpeechRecognition → /api/realtime/pipeline (Gemma 4 via
     //   OpenRouter) → /api/voice/clone/tts (ElevenLabs TTS).
     // We still build the full persona + tools so /pipeline can use them.
-    const chatModel = process.env.OPENROUTER_MODEL || 'google/gemma-4-31b-it';
+    const chatModel = process.env.OPENROUTER_MODEL || 'anthropic/claude-opus-4.7';
     
     // Restore variables needed for JSON payload
     const user = adminUser;
@@ -1720,7 +1720,7 @@ router.post('/vision', visionLimiter, async (req, res) => {
         'X-Title': 'Kelion AI Vision'
       },
       body: JSON.stringify({
-        model: 'google/gemma-4-31b-it',
+        model: 'anthropic/claude-opus-4.7',
         messages: [
           {
             role: 'user',
@@ -1872,7 +1872,7 @@ router.post('/pipeline', async (req, res) => {
       console.log('[resourceGov] All resources OFF (simple chat)');
     }
 
-    const chatModel = process.env.OPENROUTER_MODEL || 'google/gemma-4-31b-it';
+    const chatModel = process.env.OPENROUTER_MODEL || 'anthropic/claude-opus-4.7';
     const url = 'https://openrouter.ai/api/v1/chat/completions';
 
     const body = {
@@ -1906,7 +1906,7 @@ router.post('/pipeline', async (req, res) => {
       if (!r.ok && r.status === 402 && !fallbackTriggered) {
         console.warn('[pipeline] OpenRouter 402 Payment Required. Falling back to free model.');
         fallbackTriggered = true;
-        currentModel = 'google/gemma-4-31b-it';
+        currentModel = 'anthropic/claude-opus-4.7';
         reqBody.model = currentModel;
         
         // Retry with free model

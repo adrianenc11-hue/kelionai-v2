@@ -1852,7 +1852,7 @@ async function toolReadPdf({ url, base64, file_id, max_chars, max_pages }) {
         generationConfig: { temperature: 0.1 }
       };
 
-      const gemmaModel = process.env.GOOGLE_CHAT_MODEL || 'google/gemma-4-31b-it';
+      const gemmaModel = process.env.GOOGLE_CHAT_MODEL || 'anthropic/claude-opus-4.7';
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${gemmaModel}:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
