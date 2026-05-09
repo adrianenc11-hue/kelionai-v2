@@ -615,6 +615,14 @@ router.post('/tts', async (req, res) => {
       // Priority 4: Cloned voice
       voiceId = cloneInfo.voiceId;
     }
+  } else {
+    // Priority 3: User has an active cloned voice
+    voiceId = cloneInfo.voiceId;
+  }
+
+  // Final fallback: auto-discover ANY male voice if language-specific failed
+  if (!voiceId) {
+    voiceId = await discoverNativeMaleVoice(apiKey, 'en');
   }
 
   // Final fallback: auto-discover ANY male voice if language-specific failed
