@@ -104,22 +104,23 @@ export default function VoicePicker({ style }) {
         onClick={handleToggle}
         title="Alege vocea"
         style={{
-          width: 34,
-          height: 34,
-          borderRadius: '50%',
-          background: open ? '#7c3aed' : 'transparent',
-          border: '1.5px solid ' + (open ? '#7c3aed' : '#ccc'),
-          color: open ? '#fff' : '#555',
+          height: 36,
+          padding: '0 14px',
+          borderRadius: 999,
+          background: open ? 'rgba(124,58,237,0.85)' : 'rgba(10,8,20,0.5)',
+          backdropFilter: 'blur(12px)',
+          border: '1px solid ' + (open ? 'rgba(124,58,237,0.6)' : 'rgba(167,139,250,0.25)'),
+          color: '#ede9fe',
+          fontSize: 12,
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: 16,
-          flexShrink: 0,
+          gap: 6,
           transition: 'all 0.2s ease',
         }}
       >
-        🎙
+        <span style={{ fontSize: 14 }}>🎙</span>
+        <span>Voce</span>
       </button>
 
       {/* Dropdown */}
