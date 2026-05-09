@@ -18,7 +18,7 @@ import { test, expect } from '@playwright/test';
  *   2. The homepage HTML actually renders the Kelion shell (root div + JS).
  *   3. Old product routes do not leave the user on an admin/chat/plans page.
  *   4. The voice token endpoint responds with a structured JSON response
- *      containing the Gemma 4 model info for REST Voice Mode.
+ *      containing the configured chat model info for REST Voice Mode.
  */
 
 const BASE = process.env.BASE_URL || 'http://127.0.0.1:5173';
@@ -104,11 +104,13 @@ test.describe('Kelion Studio API (DS-1 / DS-3) wiring', () => {
   });
 });
 
-test.describe('Voice session token endpoint (Gemma 4)', () => {
-  test('Returns Gemma 4 model with openrouter backend', async ({ request }) => {
-    // The voice token endpoint now returns Gemma 4 model info for REST
-    // Voice Mode (SpeechRecognition → OpenRouter → TTS).
-    // No ephemeral token is minted — model name triggers REST mode on client.
+test.describe('Voice session token endpoint (Claude Opus)', () => {
+  test('Returns Claude Opus model with openrouter backend', async ({ request }) => {
+    // The voice token endpoint returns the configured chat model info for
+    // REST Voice Mode (SpeechRecognition → OpenRouter → TTS).
+    // No ephemeral token is minted — the client uses REST mode.
+    // PR #505 upgraded the default model from google/gemma-4-31b-it to
+    // anthropic/claude-opus-4.7 (see server/src/routes/realtime.js).
     const res = await request.get(`${BASE}/api/realtime/voice-token?lang=en-US`);
     if (res.status() === 503) {
       const body = await res.json();
@@ -118,7 +120,14 @@ test.describe('Voice session token endpoint (Gemma 4)', () => {
     expect(res.status()).toBe(200);
     const body = await res.json();
     expect(body.backend).toBe('openrouter');
-    expect(body.model).toContain('gemma');
+    expect(body.provider).toBe('openrouter');
+    // Model is configurable via OPENROUTER_MODEL env var; the default is
+    // anthropic/claude-opus-4.7. Assert a non-empty string + the openrouter
+    // "vendor/model" shape rather than hard-coding a specific model name,
+    // so future model bumps don't break this contract test.
+    expect(typeof body.model).toBe('string');
+    expect(body.model.length).toBeGreaterThan(0);
+    expect(body.model).toMatch(/\//); // OpenRouter uses "vendor/model" slugs
     expect(body.token).toBeNull();
   });
 });
