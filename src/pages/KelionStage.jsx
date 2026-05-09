@@ -1796,9 +1796,39 @@ export default function KelionStage() {
               </div>
             ))}
             {status === 'thinking' && (<div style={{ display: 'inline-flex', gap: 4, padding: '12px 18px', alignSelf: 'flex-start' }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#bbb', animation: 'pulse 1.4s ease-in-out infinite' }} /><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#bbb', animation: 'pulse 1.4s ease-in-out 0.2s infinite' }} /><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#bbb', animation: 'pulse 1.4s ease-in-out 0.4s infinite' }} /></div>)}
-            {chatError && (<div style={{ padding: '8px 16px', borderRadius: 10, background: '#fef2f2', color: '#dc2626', fontSize: 14, alignSelf: 'center' }}>{chatError}</div>)}
+              </form>
+            <div style={{ textAlign: 'center', fontSize: 11, color: '#bbb', marginTop: 6 }}>Kelion can make mistakes. Consider verifying important information.</div>
+            </div>
+            </div>
+            {/* Back Face (Monitor) */}
+            <div style={{
+              position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+              backfaceVisibility: 'hidden', transform: 'rotateY(180deg)',
+              background: '#0d0b1d', overflow: 'hidden'
+            }}>
+              <MonitorOverlay />
+            </div>
           </div>
-          <div style={{ padding: '12px 24px 16px', borderTop: '1px solid #f0f0f0' }}>
+        </div>
+        {/* RIGHT PANEL — Avatar 3D & Chat Input */}
+        <div style={{ flex: '0 0 30%', maxWidth: '30%', height: '100%', position: 'relative', display: 'flex', flexDirection: 'column', background: '#0a0d1a' }}>
+          <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+            <Canvas shadows={{ type: THREE.VSMShadowMap }} camera={{ position: [0, 0.2, 3.0], fov: 42 }} dpr={[1, 2]} gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.8, outputColorSpace: THREE.SRGBColorSpace, powerPreference: 'low-power' }} onCreated={({ gl }) => { const canvas = gl.domElement; if (canvas) { canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); console.warn('[kelion] WebGL context lost') }); canvas.addEventListener('webglcontextrestored', () => { console.log('[kelion] WebGL context restored') }) } }}>
+              <color attach="background" args={['#0a0d1a']} />
+              <fog attach="fog" args={['#0e0b20', 6, 14]} />
+              <Suspense fallback={null}>
+                <ambientLight intensity={0.5} />
+                <directionalLight position={[10, 10, 5]} intensity={1} />
+                <StudioDecor />
+                <group position={[0, -0.4, 0]}>
+                  <AvatarModel mouthOpen={mouthOpen} status={status} emotion={emotion} presenting={false} />
+                </group>
+                <ContactShadows position={[0, -1.25, 0]} opacity={0.55} scale={5} blur={2.6} far={2.5} />
+              </Suspense>
+            </Canvas>
+          </div>
+          {/* Chat Input Container */}
+          <div style={{ padding: '12px 24px 16px', background: '#ffffff', borderTop: '1px solid #e0e0e0', zIndex: 10 }}>
             <form onSubmit={(e) => { e.preventDefault(); sendTextMessage() }} style={{ display: 'flex', alignItems: 'flex-end', gap: 10, padding: '10px 14px', borderRadius: 26, background: '#f7f7f8', border: '1px solid #e5e5e5' }}>
               <input ref={fileInputRef} type="file" accept="*/*" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files && e.target.files[0]; if (f) setAttachedFile(f) }} />
               <button type="button" onClick={() => fileInputRef.current && fileInputRef.current.click()} disabled={status === 'thinking'} title="Attach file" style={{ width: 34, height: 34, borderRadius: '50%', background: 'transparent', border: '1.5px solid #ccc', color: '#555', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>+</button>
@@ -1816,33 +1846,7 @@ export default function KelionStage() {
               </div>
             </form>
             <div style={{ textAlign: 'center', fontSize: 11, color: '#bbb', marginTop: 6 }}>Kelion can make mistakes. Consider verifying important information.</div>
-            </div>
-            </div>
-            {/* Back Face (Monitor) */}
-            <div style={{
-              position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
-              backfaceVisibility: 'hidden', transform: 'rotateY(180deg)',
-              background: '#0d0b1d', overflow: 'hidden'
-            }}>
-              <MonitorOverlay />
-            </div>
           </div>
-        </div>
-        {/* RIGHT PANEL — Avatar 3D */}
-        <div style={{ flex: '0 0 30%', maxWidth: '30%', height: '100%', position: 'relative', overflow: 'hidden' }}>
-          <Canvas shadows={{ type: THREE.VSMShadowMap }} camera={{ position: [0, 0.2, 3.0], fov: 42 }} dpr={[1, 2]} gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.8, outputColorSpace: THREE.SRGBColorSpace, powerPreference: 'low-power' }} onCreated={({ gl }) => { const canvas = gl.domElement; if (canvas) { canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); console.warn('[kelion] WebGL context lost') }); canvas.addEventListener('webglcontextrestored', () => { console.log('[kelion] WebGL context restored') }) } }}>
-            <color attach="background" args={['#0a0d1a']} />
-            <fog attach="fog" args={['#0e0b20', 6, 14]} />
-            <Suspense fallback={null}>
-              <ambientLight intensity={0.5} />
-              <directionalLight position={[10, 10, 5]} intensity={1} />
-              <StudioDecor />
-              <group position={[0, -0.4, 0]}>
-                <AvatarModel mouthOpen={mouthOpen} status={status} emotion={emotion} presenting={false} />
-              </group>
-              <ContactShadows position={[0, -1.25, 0]} opacity={0.55} scale={5} blur={2.6} far={2.5} />
-            </Suspense>
-          </Canvas>
         </div>
       </div>
 {/* Guest trial countdown — Adrian: "timer se afiseaza dreapta sus
