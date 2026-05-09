@@ -934,7 +934,7 @@ export default function KelionStage() {
   const muteModeRef = useRef(false)
 
   // Single voice source — TTS audio drives the avatar mouth.
-  const mouthOpen = micMouthOpen || 0
+  const mouthOpen = finalMouthOpen || 0
 
   // Track whether the half-page MonitorOverlay is currently rendered,
   // so the bottom UI (chat input bar, voice "tap to talk" pill, chat
