@@ -1,6 +1,6 @@
-// voiceModeStore.js — tracks whether Kelion uses ElevenLabs cloned voice or Gemma 4 native.
+// voiceModeStore.js — tracks whether Kelion uses ElevenLabs cloned voice or Claude Opus native.
 // The language code (e.g. "ro", "en", "fr") is tracked so ElevenLabs TTS respects
-// the same language Gemma 4 is speaking in.
+// the same language Claude Opus is speaking in.
 
 let mode = 'default' // 'default' | 'cloned'
 let detectedLang = 'ro' // BCP-47 primary subtag from conversation

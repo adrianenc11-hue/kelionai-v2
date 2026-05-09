@@ -40,7 +40,7 @@ const MAX_TURN_CHARS = 500;
 const MAX_BLOCK_CHARS = 8000;
 
 // Role markers that the prior-turns rendering itself uses, plus the other
-// common OpenAI/Anthropic/Gemma role names. If a user text starts with
+// common OpenAI/Anthropic/Claude role names. If a user text starts with
 // one of these (case-insensitive, optional leading whitespace / bullets),
 // we replace the colon with an em-dash so the model doesn't misread the
 // turn as a nested fake turn.
@@ -53,7 +53,7 @@ const ROLE_MARKER_RE = new RegExp(
 
 // Closing/opening tag-style fences that might match a delimiter the
 // token-mint endpoint wraps around user-authored blocks. We don't know
-// what the downstream prompt framing looks like on Gemma 4 vs OpenAI,
+// what the downstream prompt framing looks like on Claude Opus vs OpenAI,
 // so we neutralise the whole class rather than whitelist specific
 // words. Matches `<foo>`, `</foo>`, `<|foo|>`, `<|/foo|>` for short
 // word payloads. Requires at least one letter so `< 5`, `x > 3` and

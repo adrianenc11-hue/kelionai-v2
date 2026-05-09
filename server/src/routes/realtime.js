@@ -496,12 +496,12 @@ const KELION_TOOLS = [
 
   {
     name: 'switch_voice',
-    description: "Switch Kelion's speaking voice. Call when user says 'folosește vocea mea clonată', 'use my cloned voice', 'schimbă vocea la a mea', 'switch to my voice', 'vocea ta normală', 'use your default voice'. Cloned mode uses ElevenLabs with the user's cloned voice ID. Default mode uses Gemma 4's built-in voice.",
+    description: "Switch Kelion's speaking voice. Call when user says 'folosește vocea mea clonată', 'use my cloned voice', 'schimbă vocea la a mea', 'switch to my voice', 'vocea ta normală', 'use your default voice'. Cloned mode uses ElevenLabs with the user's cloned voice ID. Default mode uses Claude Opus's built-in voice.",
     properties: {
       mode: {
         type: 'string',
         enum: ['cloned', 'default'],
-        description: "'cloned' = switch to user's ElevenLabs cloned voice. 'default' = switch back to Gemma 4 built-in voice.",
+        description: "'cloned' = switch to user's ElevenLabs cloned voice. 'default' = switch back to Claude Opus built-in voice.",
       },
     },
     required: ['mode'],
@@ -1473,7 +1473,7 @@ function buildKelionToolsChatCompletionsForMessage(userMessage) {
 
 
 // ──────────────────────────────────────────────────────────────────
-// Gemma 4 Voice — session token with Kelion config.
+// Claude Opus Voice — session token with Kelion config.
 // Docs: https://ai.google.dev/api/docs/ephemeral-tokens
 // Client cannot override system prompt / voice — stays secure.
 // ──────────────────────────────────────────────────────────────────
@@ -1538,7 +1538,7 @@ const voiceTokenHandler = async (req, res) => {
     }
   }
   // The Vertex backend and AI Studio legacy paths are no longer relevant 
-  // since we migrated to OpenRouter/Gemma 4 natively. We removed the
+  // since we migrated to OpenRouter/Claude Opus natively. We removed the
   // GOOGLE_API_KEY block requirement here.
   
   const adminUser = await peekSignedInUser(req);
@@ -1607,10 +1607,10 @@ const voiceTokenHandler = async (req, res) => {
   }
 
   try {
-    // ── Gemma 4 REST Voice Mode ──────────────────────────────────────
+    // ── Claude Opus REST Voice Mode ──────────────────────────────────────
     // No ephemeral token or WebSocket is needed. The client detects
-    // 'gemma' in the model name and switches to REST Voice Mode:
-    //   Browser SpeechRecognition → /api/realtime/pipeline (Gemma 4 via
+    // 'claude' in the model name and switches to REST Voice Mode:
+    //   Browser SpeechRecognition → /api/realtime/pipeline (Claude Opus via
     //   OpenRouter) → /api/voice/clone/tts (ElevenLabs TTS).
     // We still build the full persona + tools so /pipeline can use them.
     const chatModel = process.env.OPENROUTER_MODEL || 'anthropic/claude-opus-4.7';
@@ -1663,8 +1663,8 @@ router.post('/voice-token', voiceTokenHandler);
 // Legacy aliases removed — all clients now use /voice-token.
 
 // ──────────────────────────────────────────────────────────────────
-// /vision — Gemma 4 camera frame description.
-// The client captures JPEG frames and POSTs them here. Gemma 4 describes
+// /vision — Claude Opus camera frame description.
+// The client captures JPEG frames and POSTs them here. Claude Opus describes
 // the scene in 1-2 sentences, and the client injects that description
 // back into the realtime session as context.
 // ──────────────────────────────────────────────────────────────────
@@ -1781,15 +1781,15 @@ router.post('/vision', visionLimiter, async (req, res) => {
       console.warn('[vision] client sent invalid image:', err.message?.slice(0, 200));
       return res.status(400).json({ error: 'Invalid image. Please make sure your image is valid.' });
     }
-    console.error('[vision] Gemma 4 error:', err.message);
+    console.error('[vision] Claude Opus error:', err.message);
     return res.status(500).json({ error: 'Vision processing failed' });
   }
 });
 
 // ──────────────────────────────────────────────────────────────────
-// /pipeline — Gemma 4 text-chat pipeline (tools supported).
-// For typed messages: text → Gemma 4 chat → tool loop → text back.
-// Voice goes directly through Gemma 4 REST Voice Mode — not this route.
+// /pipeline — Claude Opus text-chat pipeline (tools supported).
+// For typed messages: text → Claude Opus chat → tool loop → text back.
+// Voice goes directly through Claude Opus REST Voice Mode — not this route.
 // ──────────────────────────────────────────────────────────────────
 router.post('/pipeline', async (req, res) => {
   const { history, textOverride, visionContext } = req.body || {};
@@ -1988,7 +1988,7 @@ router.post('/pipeline', async (req, res) => {
     // Extract final text — only return .content (ignore any reasoning_content from CoT models)
     let assistantText = (finalMessage?.content || '').trim();
     if (fallbackTriggered) {
-      assistantText = "[SISTEM: Contul OpenRouter a rămas fără credit! Am trecut automat pe modelul de rezervă Gemma 4.]\n" + assistantText;
+      assistantText = "[SISTEM: Contul OpenRouter a rămas fără credit! Am trecut automat pe modelul de rezervă Claude Opus.]\n" + assistantText;
     }
     console.log('[pipeline] OpenRouter:', assistantText.slice(0, 100));
 

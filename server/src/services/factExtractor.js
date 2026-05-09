@@ -3,11 +3,11 @@
 // Stage 3 — M15: Fact extraction.
 //
 // Given a list of conversation turns (role + text), distills durable
-// facts about the user via a Gemma 4 call. Durable = "worth
+// facts about the user via a Claude Opus call. Durable = "worth
 // remembering next week", not "Kelion said hi".
 //
 // Returns an array of { kind, fact } objects, bounded to a small size.
-// Fails closed (returns []) if Gemma 4 is unavailable or returns junk.
+// Fails closed (returns []) if Claude Opus is unavailable or returns junk.
 
 const config = require('../config');
 
@@ -61,7 +61,7 @@ async function extractFacts(turns, options = {}) {
   const url = 'https://openrouter.ai/api/v1/chat/completions';
 
   const body = {
-    model: options.model || 'anthropic/claude-opus-4.7', // Gemma 4 — project-wide default via OpenRouter
+    model: options.model || 'anthropic/claude-opus-4.7', // Claude Opus — project-wide default via OpenRouter
     messages: [
       { role: 'system', content: EXTRACTION_SYSTEM },
       { role: 'user', content: `Transcript:\n${transcript}` }
@@ -83,9 +83,9 @@ async function extractFacts(turns, options = {}) {
       body: JSON.stringify(body),
     });
     
-    // Fallback if Gemma is rate-limited
+    // Fallback if Claude is rate-limited
     if (!r.ok && r.status === 429) {
-      console.warn('[factExtractor] OpenRouter HTTP 429 for Gemma. Falling back to Gemini 2.5 Pro...');
+      console.warn('[factExtractor] OpenRouter HTTP 429 for Claude. Falling back to Gemini 2.5 Pro...');
       body.model = 'google/gemini-2.5-pro';
       r = await fetch(url, {
         method: 'POST',

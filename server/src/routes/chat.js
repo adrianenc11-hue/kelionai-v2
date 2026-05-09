@@ -1,9 +1,9 @@
 'use strict';
 
-// POST /api/chat — text chat using Gemma 4 via generateContent API.
+// POST /api/chat — text chat using Claude Opus via generateContent API.
 // This is a fallback/primary text chat route that does NOT require
-// This is the primary text chat route using Gemma 4 via OpenRouter.
-// generateContent, including Gemma 4.
+// This is the primary text chat route using Claude Opus via OpenRouter.
+// generateContent, including Claude Opus.
 
 const { Router } = require('express');
 const { trialStatus, stampTrialIfFresh } = require('../services/trialQuota');

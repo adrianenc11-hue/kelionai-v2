@@ -148,7 +148,7 @@ const EXPECTED_TOOL_NAMES = [
   // delivered without an explicit user click.
   'compose_email_draft',
   // ElevenLabs cloned voice toggle — switches Kelion's TTS between
-  // Gemma 4 built-in voice and the user's ElevenLabs cloned voice.
+  // Claude Opus built-in voice and the user's ElevenLabs cloned voice.
   'switch_voice',
   // Agentic loop — multi-step plan execution
   'execute_plan',
