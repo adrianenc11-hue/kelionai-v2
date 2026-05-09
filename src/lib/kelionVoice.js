@@ -886,7 +886,11 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
         rec.onresult = async (ev) => {
           setUserLevel(0.6 + Math.random() * 0.4);
           
-          if (!ev.results[0].isFinal) return; // Wait for final transcript
+          if (!ev.results[0].isFinal) {
+            // Barge-in: immediately stop TTS when user starts speaking
+            clearAudioQueue();
+            return; // Wait for final transcript
+          }
           
           const transcript = ev.results[0][0].transcript;
           if (!transcript) return;
