@@ -1719,18 +1719,58 @@ export default function KelionStage() {
       <UIActionToast />
       {/* ═══ SPLIT LAYOUT: Chat Left 70% + Avatar Right 30% ═══ */}
       <div style={{ display: 'flex', width: '100%', height: '100%' }}>
-        {/* LEFT PANEL — Chat / Monitor */}
-        <div style={{ flex: '0 0 70%', maxWidth: '70%', height: '100%', background: '#ffffff', display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
-          <MonitorOverlay />
-          <audio ref={audioRef} autoPlay playsInline onPlay={(e) => attachTts(e.target)} onPause={resetTts} onEnded={resetTts} onError={resetTts} />
-          <div style={{ padding: '16px 24px', borderBottom: '1px solid #e5e5e5', display: 'flex', alignItems: 'center' }}>
-            <div style={{ fontSize: 18, fontWeight: 700, color: '#1a1a1a' }}>KelionAI</div>
-            <div style={{ fontSize: 12, color: '#999', marginLeft: 'auto' }}>
-              {status === 'listening' && '🎤 Listening...'}
-              {status === 'speaking' && '🔊 Speaking...'}
-              {status === 'thinking' && '💭 Thinking...'}
-            </div>
-          </div>
+        {/* LEFT PANEL — Chat / Monitor (3D Flip Container) */}
+        <div style={{ flex: '0 0 70%', maxWidth: '70%', height: '100%', position: 'relative', perspective: '1500px' }}>
+          
+          <div style={{
+            width: '100%', height: '100%', position: 'relative',
+            transformStyle: 'preserve-3d',
+            transition: 'transform 0.8s cubic-bezier(0.4, 0, 0.2, 1)',
+            transform: monitorOpen ? 'rotateY(-180deg)' : 'rotateY(0deg)'
+          }}>
+
+            {/* Front Face (Chat) */}
+            <div style={{
+              position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+              backfaceVisibility: 'hidden', background: '#ffffff',
+              display: 'flex', flexDirection: 'column', overflow: 'hidden'
+            }}>
+              <audio ref={audioRef} autoPlay playsInline onPlay={(e) => attachTts(e.target)} onPause={resetTts} onEnded={resetTts} onError={resetTts} />
+              <div style={{ padding: '16px 24px', borderBottom: '1px solid #e5e5e5', display: 'flex', alignItems: 'center' }}>
+                <div style={{ fontSize: 18, fontWeight: 700, color: '#1a1a1a' }}>KelionAI</div>
+                
+                {/* NEW HIGHLY VISIBLE ORANGE STATUS */}
+                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
+                  <div style={{
+                    background: status === 'idle' ? '#f5f5f5' : 'rgba(255, 106, 0, 0.1)',
+                    border: `1px solid ${status === 'idle' ? '#e0e0e0' : '#ff6a00'}`,
+                    padding: '6px 16px',
+                    borderRadius: 20,
+                    color: status === 'idle' ? '#888' : '#ff6a00',
+                    fontSize: 14,
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    letterSpacing: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    boxShadow: status === 'idle' ? 'none' : '0 0 12px rgba(255, 106, 0, 0.3)',
+                    transition: 'all 0.3s ease'
+                  }}>
+                    {status !== 'idle' && status !== 'error' && (
+                      <span style={{
+                        width: 8, height: 8, borderRadius: '50%', background: '#ff6a00',
+                        boxShadow: '0 0 8px #ff6a00', animation: 'pulse 1.5s infinite'
+                      }} />
+                    )}
+                    {status === 'listening' && 'Recepție...'}
+                    {status === 'thinking' && 'Gândește / Lucrează...'}
+                    {status === 'speaking' && 'Răspunde...'}
+                    {status === 'idle' && 'Inactiv'}
+                    {status === 'error' && 'Eroare'}
+                  </div>
+                </div>
+              </div>
           <div ref={chatScrollRef} style={{ flex: 1, overflowY: 'auto', padding: '24px 32px', display: 'flex', flexDirection: 'column', gap: 20 }}>
             {turns.length === 0 && (<div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#bbb', fontSize: 16, gap: 8 }}><div style={{ fontSize: 40 }}>💬</div><div>Ask anything or use voice</div></div>)}
             {turns.map((turn, i) => (
@@ -1775,6 +1815,16 @@ export default function KelionStage() {
               </div>
             </form>
             <div style={{ textAlign: 'center', fontSize: 11, color: '#bbb', marginTop: 6 }}>Kelion can make mistakes. Consider verifying important information.</div>
+            </div>
+            </div>
+            {/* Back Face (Monitor) */}
+            <div style={{
+              position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+              backfaceVisibility: 'hidden', transform: 'rotateY(180deg)',
+              background: '#0d0b1d', overflow: 'hidden'
+            }}>
+              <MonitorOverlay />
+            </div>
           </div>
         </div>
         {/* RIGHT PANEL — Avatar 3D */}
