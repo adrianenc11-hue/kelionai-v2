@@ -1777,288 +1777,150 @@ export default function KelionStage() {
 
       <audio ref={audioRef} autoPlay playsInline onPlay={(e) => attachTts(e.target)} onPause={resetTts} onEnded={resetTts} onError={resetTts} />
 
-            {/* ChatGPT-Style Chat Interface */}
-      {chatPanelOpen && (
-        <div style={{
-          position: 'absolute',
-          top: 70, bottom: 0, left: 0, right: 0,
-          display: 'flex', flexDirection: 'column',
-          alignItems: 'center',
-          pointerEvents: 'none',
-          zIndex: bottomZIndex || 4,
-          background: 'linear-gradient(to bottom, rgba(10,8,20,0) 0%, rgba(10,8,20,0.6) 60%, rgba(10,8,20,0.95) 100%)',
-        }}>
-          
-          {/* Scrollable Chat History */}
+            {/* Minimal Chat — last message + input bar only, avatar stays visible */}
+      {chatPanelOpen && (() => {
+        const lastTurn = turns.length > 0 ? turns[turns.length - 1] : null;
+        const lastIdx = turns.length - 1;
+        return (
           <div style={{
-            flex: 1, width: '100%', maxWidth: 800,
-            overflowY: 'auto', pointerEvents: 'auto',
-            padding: '20px 20px 120px 20px',
-            display: 'flex', flexDirection: 'column', gap: 24,
-            maskImage: 'linear-gradient(to bottom, transparent, black 5%, black)',
-            WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 5%, black)',
+            position: 'absolute', bottom: 0, left: 0, right: 0,
+            display: 'flex', flexDirection: 'column', alignItems: 'center',
+            pointerEvents: 'none', zIndex: bottomZIndex || 4,
           }}>
-            <div style={{ flex: 1 }} /> {/* Spacer to push messages to bottom if few */}
-            {turns.map((turn, i) => (
-              <div key={i} style={{
-                alignSelf: turn.role === 'user' ? 'flex-end' : 'flex-start',
-                maxWidth: '85%',
-                display: 'flex', flexDirection: 'column', gap: 4,
+
+            {/* Last message bubble — floating above input */}
+            {lastTurn && (lastTurn.text || lastTurn.transcript) && (
+              <div style={{
+                width: '100%', maxWidth: 768, padding: '0 20px',
+                pointerEvents: 'auto', marginBottom: 8,
               }}>
                 <div style={{
-                  padding: '12px 16px',
-                  borderRadius: 18,
-                  background: turn.role === 'user' ? 'rgba(59, 59, 59, 0.8)' : 'transparent',
-                  color: '#ececec',
-                  fontSize: 15, lineHeight: 1.5,
-                  whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-                  fontFamily: 'system-ui, -apple-system, sans-serif',
+                  display: 'flex', flexDirection: 'column', gap: 2,
+                  alignSelf: lastTurn.role === 'user' ? 'flex-end' : 'flex-start',
+                  maxWidth: '85%',
+                  marginLeft: lastTurn.role === 'user' ? 'auto' : 0,
                 }}>
-                  {turn.text || turn.transcript}
+                  <div style={{
+                    padding: '10px 16px', borderRadius: 18,
+                    background: lastTurn.role === 'user'
+                      ? 'rgba(59,59,59,0.85)'
+                      : 'rgba(20,18,30,0.8)',
+                    backdropFilter: 'blur(12px)',
+                    color: '#ececec', fontSize: 15, lineHeight: 1.5,
+                    whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                    fontFamily: 'system-ui, -apple-system, sans-serif',
+                    maxHeight: 200, overflowY: 'auto',
+                  }}>
+                    {lastTurn.text || lastTurn.transcript}
+                  </div>
+                  {/* Action buttons for AI messages */}
+                  {lastTurn.role !== 'user' && (
+                    <div style={{ display: 'flex', gap: 2, marginTop: 2 }}>
+                      <button title="Copy" onClick={() => {
+                        navigator.clipboard.writeText(lastTurn.text || lastTurn.transcript)
+                          .then(() => { setCopiedIdx(lastIdx); setTimeout(() => setCopiedIdx(null), 2000) }).catch(() => {})
+                      }} style={{ width: 28, height: 28, borderRadius: 6, background: 'transparent', border: 'none', color: copiedIdx === lastIdx ? '#4ade80' : '#b0b0b0', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}
+                      >{copiedIdx === lastIdx ? '✓' : '📋'}</button>
+                      <button title="Save as file" onClick={() => {
+                        const txt = lastTurn.text || lastTurn.transcript;
+                        const blob = new Blob([txt], { type: 'text/plain;charset=utf-8' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a'); a.href = url;
+                        a.download = `kelion-${new Date().toISOString().slice(0,10)}.txt`;
+                        document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+                      }} style={{ width: 28, height: 28, borderRadius: 6, background: 'transparent', border: 'none', color: '#b0b0b0', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}
+                      >💾</button>
+                      <button title="Send to email" onClick={() => {
+                        const txt = encodeURIComponent(lastTurn.text || lastTurn.transcript);
+                        window.open(`mailto:?subject=Kelion AI&body=${txt}`, '_blank');
+                      }} style={{ width: 28, height: 28, borderRadius: 6, background: 'transparent', border: 'none', color: '#b0b0b0', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}
+                      >📧</button>
+                      <button title="Share" onClick={() => {
+                        const txt = lastTurn.text || lastTurn.transcript;
+                        if (navigator.share) navigator.share({ title: 'Kelion', text: txt }).catch(() => {});
+                        else navigator.clipboard.writeText(txt).catch(() => {});
+                      }} style={{ width: 28, height: 28, borderRadius: 6, background: 'transparent', border: 'none', color: '#b0b0b0', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}
+                      >🔗</button>
+                    </div>
+                  )}
                 </div>
-                {/* Action buttons for AI messages */}
-                {turn.role !== 'user' && (turn.text || turn.transcript) && (
-                  <div style={{
-                    display: 'flex', gap: 2, marginTop: 4, marginLeft: 0,
-                  }}>
-                    {/* Copy */}
-                    <button
-                      title="Copy"
-                      onClick={() => {
-                        const txt = turn.text || turn.transcript
-                        navigator.clipboard.writeText(txt).then(() => {
-                          setCopiedIdx(i); setTimeout(() => setCopiedIdx(null), 2000)
-                        }).catch(() => {})
-                      }}
-                      style={{
-                        width: 30, height: 30, borderRadius: 6,
-                        background: 'transparent', border: 'none',
-                        color: copiedIdx === i ? '#4ade80' : '#b0b0b0', cursor: 'pointer',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: 14, transition: 'background 0.15s, color 0.15s',
-                      }}
-                      onMouseEnter={(e) => { if (copiedIdx !== i) e.currentTarget.style.color = '#e0e0e0' }}
-                      onMouseLeave={(e) => { if (copiedIdx !== i) e.currentTarget.style.color = '#b0b0b0' }}
-                    >{copiedIdx === i ? '✓' : '📋'}</button>
-                    {/* Thumbs up */}
-                    <button title="Good response" style={{
-                      width: 30, height: 30, borderRadius: 6, background: 'transparent', border: 'none',
-                      color: '#b0b0b0', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14,
-                    }}
-                      onMouseEnter={(e) => e.currentTarget.style.color = '#e0e0e0'}
-                      onMouseLeave={(e) => e.currentTarget.style.color = '#b0b0b0'}
-                    >👍</button>
-                    {/* Thumbs down */}
-                    <button title="Bad response" style={{
-                      width: 30, height: 30, borderRadius: 6, background: 'transparent', border: 'none',
-                      color: '#b0b0b0', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14,
-                    }}
-                      onMouseEnter={(e) => e.currentTarget.style.color = '#e0e0e0'}
-                      onMouseLeave={(e) => e.currentTarget.style.color = '#b0b0b0'}
-                    >👎</button>
-                    {/* Save / Download */}
-                    <button
-                      title="Save as file"
-                      onClick={() => {
-                        const txt = turn.text || turn.transcript
-                        const blob = new Blob([txt], { type: 'text/plain;charset=utf-8' })
-                        const url = URL.createObjectURL(blob)
-                        const a = document.createElement('a')
-                        a.href = url
-                        a.download = `kelion-response-${new Date().toISOString().slice(0,10)}.txt`
-                        document.body.appendChild(a); a.click()
-                        document.body.removeChild(a); URL.revokeObjectURL(url)
-                      }}
-                      style={{
-                        width: 30, height: 30, borderRadius: 6, background: 'transparent', border: 'none',
-                        color: '#b0b0b0', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14,
-                      }}
-                      onMouseEnter={(e) => e.currentTarget.style.color = '#e0e0e0'}
-                      onMouseLeave={(e) => e.currentTarget.style.color = '#b0b0b0'}
-                    >⬆️</button>
-                    {/* Share */}
-                    <button
-                      title="Share"
-                      onClick={() => {
-                        const txt = turn.text || turn.transcript
-                        if (navigator.share) {
-                          navigator.share({ title: 'Kelion', text: txt }).catch(() => {})
-                        } else {
-                          navigator.clipboard.writeText(txt).then(() => {
-                            setCopiedIdx(i); setTimeout(() => setCopiedIdx(null), 2000)
-                          }).catch(() => {})
-                        }
-                      }}
-                      style={{
-                        width: 30, height: 30, borderRadius: 6, background: 'transparent', border: 'none',
-                        color: '#b0b0b0', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14,
-                      }}
-                      onMouseEnter={(e) => e.currentTarget.style.color = '#e0e0e0'}
-                      onMouseLeave={(e) => e.currentTarget.style.color = '#b0b0b0'}
-                    >🔗</button>
-                  </div>
-                )}
               </div>
-            ))}
+            )}
+
+            {/* Thinking indicator */}
             {status === 'thinking' && (
-              <div style={{
-                alignSelf: 'flex-start', padding: '12px 16px',
-                color: '#ececec', opacity: 0.6, fontSize: 15,
-                fontFamily: 'system-ui, -apple-system, sans-serif',
-              }}>
-                <div className="typing-indicator">Kelion is thinking...</div>
+              <div style={{ width: '100%', maxWidth: 768, padding: '0 20px 8px', pointerEvents: 'none' }}>
+                <div style={{ color: '#b0b0b0', fontSize: 14, display: 'inline-flex', gap: 4, padding: '8px 16px', borderRadius: 18, background: 'rgba(20,18,30,0.7)', backdropFilter: 'blur(8px)' }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#b0b0b0', animation: 'pulse 1.4s ease-in-out infinite' }} />
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#b0b0b0', animation: 'pulse 1.4s ease-in-out 0.2s infinite' }} />
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#b0b0b0', animation: 'pulse 1.4s ease-in-out 0.4s infinite' }} />
+                </div>
               </div>
             )}
+
             {chatError && (
-              <div style={{
-                alignSelf: 'center', padding: '8px 16px', borderRadius: 8,
-                background: 'rgba(220, 38, 38, 0.2)', color: '#fca5a5', fontSize: 14,
-                fontFamily: 'system-ui, -apple-system, sans-serif',
-              }}>
-                {chatError}
+              <div style={{ width: '100%', maxWidth: 768, padding: '0 20px 8px', pointerEvents: 'auto' }}>
+                <div style={{ padding: '8px 16px', borderRadius: 8, background: 'rgba(220,38,38,0.2)', color: '#fca5a5', fontSize: 14 }}>{chatError}</div>
               </div>
             )}
-          </div>
 
-          {/* ChatGPT-Style Input Bar */}
-          <div style={{
-            position: 'absolute', bottom: 'calc(max(20px, env(safe-area-inset-bottom)))',
-            width: '100%', maxWidth: 800, padding: '0 20px',
-            pointerEvents: 'auto',
-          }}>
-            <form
-              onSubmit={(e) => { e.preventDefault(); sendTextMessage() }}
-              style={{
-                position: 'relative',
+            {/* Input Bar */}
+            <div style={{
+              width: '100%', maxWidth: 768, padding: '0 16px 16px',
+              pointerEvents: 'auto',
+            }}>
+              <form onSubmit={(e) => { e.preventDefault(); sendTextMessage() }} style={{
                 display: 'flex', alignItems: 'flex-end', gap: 8,
-                padding: '10px 12px',
-                borderRadius: 24,
-                background: 'rgba(47, 47, 47, 0.95)',
-                backdropFilter: 'blur(10px)',
-                boxShadow: '0 0 15px rgba(0,0,0,0.5)',
-              }}
-            >
-              <input
-                ref={fileInputRef} type="file" accept="*/*" style={{ display: 'none' }}
-                onChange={(e) => {
-                  const f = e.target.files && e.target.files[0]
-                  if (f) setAttachedFile(f)
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => fileInputRef.current && fileInputRef.current.click()}
-                disabled={status === 'thinking' || status === 'error'}
-                style={{
-                  width: 32, height: 32, borderRadius: '50%',
-                  background: 'transparent', border: 'none', color: '#ececec',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 20, flexShrink: 0, paddingBottom: 2,
-                  opacity: 0.7,
-                }}
-                title="Attach file"
-              >+</button>
-              
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                {attachedFile && (
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: 4,
-                    padding: '4px 10px', marginBottom: 8,
-                    borderRadius: 12, background: 'rgba(66, 66, 66, 0.8)',
-                    color: '#ececec', fontSize: 12, width: 'fit-content',
-                  }}>
-                    <span style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      📎 {attachedFile.name}
-                    </span>
-                    <button type="button" onClick={() => setAttachedFile(null)} style={{ background: 'transparent', border: 'none', color: '#ececec', cursor: 'pointer', padding: 0 }}>×</button>
-                  </div>
-                )}
-                <textarea
-                  value={chatInput}
-                  onChange={(e) => {
-                    setChatInput(e.target.value);
-                    e.target.style.height = 'auto';
-                    e.target.style.height = Math.min(e.target.scrollHeight, 150) + 'px';
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      sendTextMessage();
-                    }
-                  }}
-                  onPaste={(e) => {
-                    try {
-                      const cd = e.clipboardData || window.clipboardData;
-                      if (!cd) return;
-                      const items = cd.items ? Array.from(cd.items) : [];
-                      const imgItem = items.find((it) => it && it.kind === 'file' && typeof it.type === 'string' && it.type.startsWith('image/'));
-                      if (imgItem) {
-                        const blob = imgItem.getAsFile();
-                        if (blob) {
-                          e.preventDefault();
-                          const ext = (blob.type.split('/')[1] || 'png').split(';')[0];
-                          const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-                          const named = (typeof File !== 'undefined') ? new File([blob], `pasted-${stamp}.${ext}`, { type: blob.type }) : blob;
-                          setAttachedFile(named);
-                          return;
-                        }
-                      }
-                    } catch (_) {}
-                  }}
-                  placeholder="Ask anything"
-                  disabled={status === 'thinking'}
-                  style={{
-                    width: '100%', background: 'transparent', border: 'none', outline: 'none',
-                    color: '#ececec', fontSize: 16, fontFamily: 'system-ui, -apple-system, sans-serif',
-                    resize: 'none', maxHeight: 150, overflowY: 'auto',
-                    minHeight: 24, padding: 0, lineHeight: 1.5,
-                  }}
-                />
+                padding: '10px 12px', borderRadius: 26,
+                background: 'rgba(47,47,47,0.92)', backdropFilter: 'blur(12px)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                boxShadow: '0 2px 20px rgba(0,0,0,0.4)',
+              }}>
+                <input ref={fileInputRef} type="file" accept="*/*" style={{ display: 'none' }}
+                  onChange={(e) => { const f = e.target.files && e.target.files[0]; if (f) setAttachedFile(f) }} />
+                <button type="button" onClick={() => fileInputRef.current && fileInputRef.current.click()}
+                  disabled={status === 'thinking'} title="Attach file"
+                  style={{ width: 34, height: 34, borderRadius: '50%', background: 'transparent', border: '1.5px solid rgba(255,255,255,0.25)', color: '#e0e0e0', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}
+                >+</button>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                  {attachedFile && (
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', marginBottom: 6, borderRadius: 10, background: 'rgba(255,255,255,0.08)', color: '#d0d0d0', fontSize: 12, width: 'fit-content' }}>
+                      <span style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>📎 {attachedFile.name}</span>
+                      <button type="button" onClick={() => setAttachedFile(null)} style={{ background: 'transparent', border: 'none', color: '#999', cursor: 'pointer', padding: 0, fontSize: 14 }}>×</button>
+                    </div>
+                  )}
+                  <textarea value={chatInput}
+                    onChange={(e) => { setChatInput(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 150) + 'px'; }}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendTextMessage(); } }}
+                    onPaste={(e) => { try { const cd = e.clipboardData || window.clipboardData; if (!cd) return; const items = cd.items ? Array.from(cd.items) : []; const imgItem = items.find((it) => it && it.kind === 'file' && typeof it.type === 'string' && it.type.startsWith('image/')); if (imgItem) { const blob = imgItem.getAsFile(); if (blob) { e.preventDefault(); const ext = (blob.type.split('/')[1] || 'png').split(';')[0]; const stamp = new Date().toISOString().replace(/[:.]/g, '-'); setAttachedFile((typeof File !== 'undefined') ? new File([blob], `pasted-${stamp}.${ext}`, { type: blob.type }) : blob); return; } } } catch (_) {} }}
+                    placeholder="Ask anything" disabled={status === 'thinking'} rows={1}
+                    style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', color: '#e8e8e8', fontSize: 16, fontFamily: 'system-ui, -apple-system, sans-serif', resize: 'none', maxHeight: 150, overflowY: 'auto', minHeight: 24, padding: '6px 0', lineHeight: 1.5 }}
+                  />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, marginLeft: 4 }}>
+                  <button type="button" onClick={() => { if (status === 'idle' || status === 'error') { startVoiceWithPriorTurns(); setMicOff(false); setIntendedVoiceActive(true) } else if (status === 'listening' || status === 'speaking' || status === 'thinking') { if (typeof stop === 'function') stop(); setIntendedVoiceActive(false) } }}
+                    style={{ width: 34, height: 34, borderRadius: '50%', background: 'transparent', border: 'none', color: status === 'listening' ? '#ef4444' : '#b0b0b0', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }} title="Voice input"
+                  >🎤</button>
+                  {chatInput.trim().length > 0 || attachedFile ? (
+                    <button type="submit" disabled={status === 'thinking'} title="Send"
+                      style={{ width: 36, height: 36, borderRadius: '50%', background: '#e0e0e0', border: 'none', color: '#212121', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 700 }}
+                    >↑</button>
+                  ) : (
+                    <button type="button" onClick={() => { if (status === 'idle' || status === 'error') { startVoiceWithPriorTurns(); setMicOff(false); setIntendedVoiceActive(true) } }} title="Voice mode"
+                      style={{ width: 36, height: 36, borderRadius: '50%', background: (status === 'listening' || status === 'speaking') ? '#ef4444' : 'rgba(255,255,255,0.08)', border: 'none', color: (status === 'listening' || status === 'speaking') ? '#fff' : '#b0b0b0', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}
+                    >{(status === 'listening' || status === 'speaking') ? '■' : (
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="4" y="6" width="3" height="12" rx="1.5" /><rect x="10.5" y="3" width="3" height="18" rx="1.5" /><rect x="17" y="8" width="3" height="8" rx="1.5" /></svg>
+                    )}</button>
+                  )}
+                </div>
+              </form>
+              <div style={{ textAlign: 'center', fontSize: 11, color: '#7a7a7a', marginTop: 6 }}>
+                Kelion can make mistakes. Consider verifying important information.
               </div>
-
-              {chatInput.trim().length > 0 || attachedFile ? (
-                <button
-                  type="submit"
-                  disabled={status === 'thinking'}
-                  style={{
-                    width: 32, height: 32, borderRadius: '50%',
-                    background: '#ececec', border: 'none', color: '#2f2f2f',
-                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 16, flexShrink: 0,
-                  }}
-                >↑</button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (status === 'idle' || status === 'error') {
-                      startVoiceWithPriorTurns()
-                      setMicOff(false)
-                      setIntendedVoiceActive(true)
-                    } else if (status === 'listening' || status === 'speaking' || status === 'thinking') {
-                      if (typeof stop === 'function') stop()
-                      setIntendedVoiceActive(false)
-                    }
-                  }}
-                  style={{
-                    width: 32, height: 32, borderRadius: '50%',
-                    background: (status === 'listening' || status === 'speaking') ? '#ef4444' : 'transparent',
-                    border: 'none', color: (status === 'listening' || status === 'speaking') ? '#ececec' : '#ececec',
-                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 16, flexShrink: 0, opacity: 0.8,
-                  }}
-                  title="Voice Mode"
-                >
-                  {(status === 'listening' || status === 'speaking') ? '■' : '🎤'}
-                </button>
-              )}
-            </form>
-            <div style={{ textAlign: 'center', fontSize: 11, color: '#a0a0a0', marginTop: 8 }}>
-              Kelion can make mistakes. Consider verifying important information.
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
 {/* Guest trial countdown — Adrian: "timer se afiseaza dreapta sus
           vizibil". Renders top-right, above the action bar, only while
