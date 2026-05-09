@@ -89,7 +89,7 @@ const password = 'Money-' + Math.random().toString(36).slice(2, 10) + '!';
   check('/api/realtime/token (no auth) returns 401', r.status() === 401, `status=${r.status()}`);
   await ctxNoAuth.dispose();
 
-  // 9. /api/realtime/token with auth returns 200 or 503 (Gemma 4 Voice has its own flow)
+  // 9. /api/realtime/token with auth returns 200 or 503 (Claude Voice has its own flow)
   r = await ctx.get('/api/realtime/token');
   check('/api/realtime/token (auth) returns 200/500/503',
     [200, 500, 503].includes(r.status()),

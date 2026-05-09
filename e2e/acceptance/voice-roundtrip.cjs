@@ -5,7 +5,7 @@
  * ACCEPTANCE: voice-roundtrip
  *
  * Kelion is "Alive" (Stage 1) only if a real user — with no account —
- * can open https://kelionai.app, tap-to-talk, and receive Gemma 4 Voice
+ * can open https://kelionai.app, tap-to-talk, and receive Claude Voice
  * audio back. This acceptance script validates the server-side
  * precondition for that flow: the ephemeral-token endpoint must mint
  * a valid token that the browser can use to open a WebSocket to
@@ -64,7 +64,7 @@
  *     require OAuth credentials in CI and a live Google Cloud call.
  *
  * A real response means: the token handler can mint a session the
- * browser can use to open Gemma 4 Voice. That is the operative
+ * browser can use to open Claude Voice. That is the operative
  * definition of "Kelion can speak" on the server side.
  */
 
@@ -90,7 +90,7 @@ async function getJson(path) {
 }
 
 (async () => {
-  // 1. /health must be green and advertise Gemma 4 as configured.
+  // 1. /health must be green and advertise Claude as configured.
   const health = await getJson('/health');
   if (health.status !== 200) {
     return fail('/health not 200', 'status=' + health.status + ' body=' + health.text.slice(0, 400));
@@ -189,7 +189,7 @@ async function getJson(path) {
     }
   }
 
-  // Everything the browser needs to open Gemma 4 Voice is present.
+  // Everything the browser needs to open Claude Voice is present.
   process.stdout.write('ACCEPTANCE PASS: voice-roundtrip\n');
   process.stdout.write('  base:       ' + BASE + '\n');
   process.stdout.write('  backend:    ' + backend + '\n');

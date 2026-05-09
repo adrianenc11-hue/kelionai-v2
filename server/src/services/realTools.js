@@ -1838,7 +1838,7 @@ async function toolReadPdf({ url, base64, file_id, max_chars, max_pages }) {
   const cap = Math.max(500, Math.min(200000, Number.parseInt(max_chars, 10) || 100000)); // Cap marit pt analize profunde
 
   try {
-    // Gemma 4 multimodal analysis via Google API (Text + Images)
+    // Claude Opus multimodal analysis via Google API (Text + Images)
     const apiKey = process.env.GOOGLE_API_KEY;
     if (apiKey) {
       const base64Data = loaded.buffer.toString('base64');
@@ -1852,8 +1852,8 @@ async function toolReadPdf({ url, base64, file_id, max_chars, max_pages }) {
         generationConfig: { temperature: 0.1 }
       };
 
-      const gemmaModel = process.env.GOOGLE_CHAT_MODEL || 'google/gemma-4-31b-it';
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${gemmaModel}:generateContent?key=${apiKey}`, {
+      const claudeModel = process.env.GOOGLE_CHAT_MODEL || 'anthropic/claude-opus-4.7';
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${claudeModel}:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -1866,7 +1866,7 @@ async function toolReadPdf({ url, base64, file_id, max_chars, max_pages }) {
           const truncated = text.length > cap;
           return {
             ok: true,
-            method: 'gemma4-multimodal',
+            method: 'claude_opus-multimodal',
             text: truncated ? text.slice(0, cap) + '… [truncated]' : text,
             truncated,
             chars: text.length,
@@ -1876,10 +1876,10 @@ async function toolReadPdf({ url, base64, file_id, max_chars, max_pages }) {
       }
     }
   } catch (err) {
-    console.warn('[read_pdf] Gemma 4 vision fallback failed:', err.message);
+    console.warn('[read_pdf] Claude Opus vision fallback failed:', err.message);
   }
 
-  // Fallback: pdf-parse clasic (doar text) dacă Gemma 4 pică sau nu e setat API KEY
+  // Fallback: pdf-parse clasic (doar text) dacă Claude Opus pică sau nu e setat API KEY
   const maxPages = Math.max(1, Math.min(200, Number.parseInt(max_pages, 10) || 50));
   try {
     const pdfParse = require('pdf-parse');
@@ -3503,7 +3503,7 @@ async function executeRealTool(name, args, ctx) {
     case 'search_files': return toolSearchFiles(a, ctx);
     // ── Agentic Loop ──
     case 'execute_plan': return toolExecutePlan(a, ctx);
-    // ── Gemma 4 Deep Reasoning ──
+    // ── Claude Opus Deep Reasoning ──
 
     // ── Position 0 — Super LLM capabilities ──
     case 'query_database': return toolQueryDatabase(a, ctx);

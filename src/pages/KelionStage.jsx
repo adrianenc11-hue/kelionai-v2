@@ -865,7 +865,7 @@ export default function KelionStage() {
     if (resolved) setVoiceStyleState(resolved)
   }, [])
 
-  // Text input for typed messages (goes through Gemma 4 REST pipeline).
+  // Text input for typed messages (goes through Claude Opus REST pipeline).
   const [chatInput, setChatInput] = useState('')
   const [chatPanelOpen, setChatPanelOpen] = useState(true)
   const [plusMenuOpen, setPlusMenuOpen] = useState(false)
@@ -971,7 +971,7 @@ export default function KelionStage() {
   const bubbleHideTimerRef = useRef(null)
   // NOTE: bubbleVisible useEffect moved after useKelionVoice (needs turns + status)
 
-  // Voice transport — Gemma 4 REST (SpeechRecognition → OpenRouter → TTS).
+  // Voice transport — Claude Opus REST (SpeechRecognition → OpenRouter → TTS).
   const liveHook = useKelionVoice({
     audioRef,
     coords: clientGeo,
@@ -1106,7 +1106,7 @@ export default function KelionStage() {
     setAttachedFile(null)
     const payloadStr = finalPayload.trim()
     // Always use liveSendText — it tries WebSocket first, then falls back
-    // to /api/chat HTTP endpoint (Gemma 4). Never call start() for text-only
+    // to /api/chat HTTP endpoint (Claude Opus). Never call start() for text-only
     // messages; start() fetches a voice token which may fail (500).
     if (liveSendTextRef.current) await liveSendTextRef.current(payloadStr, null, true)
   }, [chatInput, attachedFile, applyMuteCommand])
@@ -2978,7 +2978,7 @@ export default function KelionStage() {
           {/* Revenue-split panel — shows how much of the last 30 days of
               top-up revenue is earmarked for AI provider spend vs owner
               net, and compares against the known portion of that spend
-              (ElevenLabs via API; Gemma 4 is manual). Renders above the
+              (ElevenLabs via API; Claude Opus is manual). Renders above the
               provider cards so the admin sees the budget context first.
               */}
           {revenueSplitLoading && (
@@ -3059,7 +3059,7 @@ export default function KelionStage() {
                     ? (revenueSplit.spend?.elevenlabs?.estSpendDisplay || '—')
                     : 'not configured',
                   { dim: true })}
-                {row('  Gemma 4',
+                {row('  Claude Opus',
                   'manual — open GCP Billing',
                   { dim: true })}
                 <div style={{
@@ -4177,7 +4177,7 @@ export default function KelionStage() {
               nimic — odata configurat, fiecare top-up al unui user trece
               prin: Stripe Checkout ? Stripe balance ? payout automat (zilnic
               sau saptamânal, dupa setarea ta). Jumatate din fiecare top-up
-              e deja rezervata intern pentru costurile AI (Gemma 4,
+              e deja rezervata intern pentru costurile AI (Claude Opus,
               ElevenLabs), cealalta jumatate e profitul net.
             </div>
           </div>

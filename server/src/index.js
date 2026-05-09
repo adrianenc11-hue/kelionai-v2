@@ -384,7 +384,7 @@ app.get('/health', async (_req, res) => {
     health.services.database = 'error';
   }
 
-  // AI providers — Gemma 4 only
+  // AI providers — Claude Opus only
   const hasGoogleAI = !!process.env.GOOGLE_API_KEY;
   health.services.google = hasGoogleAI ? 'configured' : 'not configured';
   health.services.ai = hasGoogleAI ? 'configured' : 'not configured';

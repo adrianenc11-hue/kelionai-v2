@@ -1,6 +1,6 @@
 // Continuous narration mode — accessibility feature for visually-impaired
 // users. When enabled, the voice transport periodically pulls
-// a frame from the camera buffer, asks Gemma 4 Vision to describe it, and
+// a frame from the camera buffer, asks Claude Opus Vision to describe it, and
 // injects that description back into the voice session so Kelion speaks
 // a short natural narration. Adrian's requirement (2026-04-20):
 //   "aplicatia se va vinde si pentru cei cu deficiente de vedere"

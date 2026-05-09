@@ -665,7 +665,7 @@ function download(){
       return 'narration_off'
     }
     case 'switch_voice': {
-      // Switch between Gemma 4 built-in voice and user's ElevenLabs cloned voice.
+      // Switch between Claude Opus built-in voice and user's ElevenLabs cloned voice.
       const targetMode = args?.mode || 'default'
       const next = setVoiceMode(targetMode)
       // Also toggle the server-side DB `enabled` flag so the TTS endpoint

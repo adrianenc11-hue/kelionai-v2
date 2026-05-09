@@ -1,4 +1,4 @@
-// Kelion voice client hook (Gemma 4 via OpenRouter REST + Browser SpeechRecognition).
+// Kelion voice client hook (Claude Opus via OpenRouter REST + Browser SpeechRecognition).
 // Manages: mic capture → SpeechRecognition → OpenRouter → TTS playback → lipsync → transcript.
 // Stage 1 modules: M3 (mic+VAD), M4 (voice loop), M5 (auto-language),
 //   M6 (turn-taking), M8 (Kelion persona).
@@ -855,7 +855,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
         setTrial(null)
       }
 
-      if (tokenBody?.model?.includes('gemma')) {
+      if (tokenBody?.model?.includes('claude')) {
         // OpenRouter REST Voice Mode
         console.log('[kelionVoice] OpenRouter model detected, switching to REST Voice Mode');
         // We MUST NOT stop micStreamRef.current here because if the soundbars are flat,
@@ -1625,7 +1625,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
         console.error('[kelionVoice] sendText failed', err)
       }
     } else {
-      // HTTP fallback — Gemma 4 text/voice chat via /api/chat
+      // HTTP fallback — Claude Opus text/voice chat via /api/chat
       setStatus('thinking')
       try {
         let currentMessage = clean;
