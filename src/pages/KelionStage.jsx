@@ -29,6 +29,7 @@ import VoiceCloneModal from '../components/VoiceCloneModal'
 import EmailComposerModal from '../components/EmailComposerModal'
 import { getCsrfToken } from '../lib/api'
 import { getVoiceMode } from '../lib/voiceModeStore'
+import VoicePicker from '../components/stage/VoicePicker'
 import {
   supportsPasskey,
   registerPasskey,
@@ -1908,6 +1909,16 @@ export default function KelionStage() {
           )}
         </div>
       )}
+
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          position: 'absolute', top: 18, left: 18, zIndex: 20,
+          display: 'flex', alignItems: 'center', gap: 8,
+        }}
+      >
+        <VoicePicker />
+      </div>
 
       {/* Top-right action bar — Adrian: "panoul cu butoane e gândit
           greșit". Simplified to: Credits/Admin pill + Sign in/out + ⋯.

@@ -7,7 +7,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { runTool } from './kelionTools'
-import { isClonedVoiceActive, setDetectedLang, getDetectedLang } from './voiceModeStore'
+import { isClonedVoiceActive, setDetectedLang, getDetectedLang, getSelectedVoice } from './voiceModeStore'
 import { setCameraController, setCurrentFacingMode } from './cameraControl'
 import { getCsrfToken } from './api'
 import { subscribeNarrationMode, getNarrationMode } from './narrationMode'
@@ -487,7 +487,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
                   'X-CSRF-Token': getCsrfToken(),
                 },
                 credentials: 'include',
-                body: JSON.stringify({ text: textToSpeak, lang: getDetectedLang() }),
+                body: JSON.stringify({ text: textToSpeak, lang: getDetectedLang(), voiceId: getSelectedVoice()?.voiceId || undefined }),
               })
               if (!r.ok) {
                 const errText = await r.text().catch(() => '')
@@ -1699,7 +1699,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
               credentials: 'include',
-              body: JSON.stringify({ text: finalReply, lang: getDetectedLang() }),
+              body: JSON.stringify({ text: finalReply, lang: getDetectedLang(), voiceId: getSelectedVoice()?.voiceId || undefined }),
             })
             console.log('[TTS-DEBUG] TTS response status:', r.status)
             if (r.ok) {
@@ -1724,12 +1724,16 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
               audioEl.src = blobUrl;
               audioEl.volume = 1;
               activeAudioElRef.current = audioEl
+              let playbackStarted = false
               audioEl.onended = () => {
                 URL.revokeObjectURL(blobUrl)
                 activeAudioElRef.current = null
                 setStatus('idle')
               }
               audioEl.onerror = (e) => {
+                // Ignore spurious error events that fire AFTER playback
+                // already started successfully (common with blob URL revocation)
+                if (playbackStarted) return
                 console.error('[kelionVoice] Audio playback error:', e)
                 appendTurn('assistant', `⚠️ Eroare la redarea audio în browser.`, true, '⚙️ System')
                 URL.revokeObjectURL(blobUrl)
@@ -1738,6 +1742,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
               
               console.log('[TTS-DEBUG] calling audioEl.play()')
               audioEl.play().then(() => {
+                playbackStarted = true
                 console.log('[TTS-DEBUG] AUDIO PLAYING OK')
               }).catch((e) => {
                 console.error('[kelionVoice] Audio play() blocked:', e)

@@ -120,16 +120,36 @@ async function probeElevenLabs() {
       const used = Number(j.character_count || 0);
       const limit = Number(j.character_limit || 0);
       const remaining = Math.max(0, limit - used);
-      card.balance = remaining;
+
+      // ElevenLabs usage-based billing: when enabled, the user can exceed
+      // their included character_limit and pay per-character overage.
+      // The API signals this via `can_extend_character_limit` or simply
+      // by character_count > character_limit (already consuming overage).
+      const hasUsageBilling = Boolean(j.can_extend_character_limit)
+        || Boolean(j.can_extend_voice_limit)
+        || used > limit;
+
+      card.balance = hasUsageBilling ? null : remaining; // null = unlimited/pay-as-you-go
       card.balanceLimit = limit > 0 ? limit : null;
-      card.balanceDisplay = limit > 0
-        ? `${remaining.toLocaleString()} / ${limit.toLocaleString()} chars`
-        : 'unlimited';
+
+      if (hasUsageBilling) {
+        card.balanceDisplay = `${used.toLocaleString()} / ${limit.toLocaleString()} chars (usage billing ON)`;
+      } else {
+        card.balanceDisplay = limit > 0
+          ? `${remaining.toLocaleString()} / ${limit.toLocaleString()} chars`
+          : 'unlimited';
+      }
+
       const tier = typeof j.tier === 'string' ? j.tier : null;
       card.message = tier ? `Tier: ${tier}` : null;
       card.subtitle = tier ? `Neural TTS (${tier})` : card.subtitle;
-      // Alert threshold: 10% of limit remaining
-      if (limit > 0 && remaining < limit * 0.10) {
+
+      // Status: if usage-based billing is ON, never report 'low' — the
+      // user pays overage automatically. Only flag 'low' when on a
+      // fixed-quota plan and < 10% remains.
+      if (hasUsageBilling) {
+        card.status = 'ok';
+      } else if (limit > 0 && remaining < limit * 0.10) {
         card.status = 'low';
       } else {
         card.status = 'ok';

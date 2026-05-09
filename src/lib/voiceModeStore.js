@@ -18,3 +18,11 @@ export function setDetectedLang(lang) {
 }
 
 export function getDetectedLang() { return detectedLang }
+
+// ── Selected voice from voice picker UI ──
+let selectedVoice = null // { voiceId, voiceName, lang } or null (auto)
+
+export function getSelectedVoice() { return selectedVoice }
+export function setSelectedVoice(voice) {
+  selectedVoice = voice // { voiceId, voiceName, lang } or null
+}
