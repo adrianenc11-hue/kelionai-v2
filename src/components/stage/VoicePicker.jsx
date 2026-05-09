@@ -1,6 +1,7 @@
 'use strict'
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { getDetectedLang, getSelectedVoice, setSelectedVoice } from '../../lib/voiceModeStore'
+import { getCsrfToken } from '../../lib/api.js'
 
 /**
  * VoicePicker — floating button on the avatar stage that opens a dropdown
@@ -9,16 +10,11 @@ import { getDetectedLang, getSelectedVoice, setSelectedVoice } from '../../lib/v
  * used for all subsequent TTS calls.
  */
 
-function getCsrfToken() {
-  try {
-    return document.cookie.split(';').map(c => c.trim()).find(c => c.startsWith('csrf='))?.split('=')[1] || ''
-  } catch { return '' }
-}
-
 export default function VoicePicker({ style }) {
   const [open, setOpen] = useState(false)
   const [voices, setVoices] = useState([])
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
   const [currentVoiceId, setCurrentVoiceId] = useState(null)
   const [previewAudio, setPreviewAudio] = useState(null)
   const [previewingId, setPreviewingId] = useState(null)
@@ -34,8 +30,21 @@ export default function VoicePicker({ style }) {
     return () => document.removeEventListener('mousedown', handler)
   }, [open])
 
+  // Pause preview audio whenever the dropdown closes or on component unmount
+  useEffect(() => {
+    if (!open && previewAudio) {
+      previewAudio.pause()
+      setPreviewAudio(null)
+      setPreviewingId(null)
+    }
+    return () => {
+      if (previewAudio) previewAudio.pause()
+    }
+  }, [open, previewAudio])
+
   const fetchVoices = useCallback(async () => {
     setLoading(true)
+    setError(null)
     try {
       const lang = getDetectedLang() || 'en'
       const r = await fetch(`/api/voice/clone/voices?lang=${lang}`, { credentials: 'include' })
@@ -43,9 +52,14 @@ export default function VoicePicker({ style }) {
         const data = await r.json()
         setVoices(data.voices || [])
         setCurrentVoiceId(data.currentVoiceId || getSelectedVoice()?.voiceId || null)
+      } else if (r.status === 401 || r.status === 403) {
+        setError('Trebuie să te autentifici pentru a alege vocea.')
+      } else {
+        setError('Serviciu indisponibil. Încearcă din nou.')
       }
     } catch (e) {
       console.error('[VoicePicker] fetch error:', e)
+      setError('Eroare de rețea.')
     }
     setLoading(false)
   }, [])
@@ -101,6 +115,7 @@ export default function VoicePicker({ style }) {
     <div ref={dropdownRef} style={{ position: 'relative', display: 'inline-block', ...style }}>
       {/* Trigger Button */}
       <button
+        type="button"
         onClick={handleToggle}
         title="Alege vocea"
         style={{
@@ -213,6 +228,7 @@ export default function VoicePicker({ style }) {
                 {/* Preview Button */}
                 {v.preview_url && (
                   <button
+                    type="button"
                     onClick={(e) => handlePreview(e, v)}
                     title="Ascultă preview"
                     style={{
@@ -235,8 +251,8 @@ export default function VoicePicker({ style }) {
           })}
 
           {voices.length === 0 && !loading && (
-            <div style={{ padding: 20, textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: 13 }}>
-              Nu s-au găsit voci masculine disponibile.
+            <div style={{ padding: 20, textAlign: 'center', color: error ? '#f87171' : 'rgba(255,255,255,0.3)', fontSize: 13 }}>
+              {error || 'Nu s-au găsit voci masculine disponibile.'}
             </div>
           )}
         </div>
