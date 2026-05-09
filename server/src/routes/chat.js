@@ -99,9 +99,29 @@ router.post('/', async (req, res) => {
     // Default: all tools OFF. Activate only tools relevant to this
     // specific message. After the request completes, tools go back to OFF.
     const { KELION_TOOLS } = require('./realtime');
-    // Provide ALL tools natively so the LLM has full semantic understanding.
-    // No more artificial keyword filters.
-    let relevantTools = KELION_TOOLS;
+    const { selectTools } = require('../services/toolRouter');
+    
+    // Find the last user message to use for tool routing, especially when handling toolResponses
+    let lastUserMessage = message || '';
+    if (!lastUserMessage) {
+      for (let i = session.history.length - 1; i >= 0; i--) {
+        if (session.history[i].role === 'user') {
+          const parts = session.history[i].parts;
+          const textPart = parts.find(p => p.text);
+          if (textPart) {
+            lastUserMessage = textPart.text;
+          }
+          break;
+        }
+      }
+    }
+    
+    let routingResult = selectTools(lastUserMessage, KELION_TOOLS);
+    let relevantTools = routingResult ? routingResult.tools : null;
+    if (!relevantTools || relevantTools.length === 0) {
+      relevantTools = KELION_TOOLS;
+    }
+    
     const openRouterTools = relevantTools.map(t => ({
       type: 'function',
       function: {
@@ -110,7 +130,7 @@ router.post('/', async (req, res) => {
         parameters: { type: 'object', properties: t.properties, required: t.required },
       },
     }));
-    console.log(`[chat] Native mode: passed all ${openRouterTools.length} tools to LLM.`);
+    console.log(`[chat] Routed ${openRouterTools.length} tools to LLM for message: "${lastUserMessage.slice(0, 50)}"`);
 
     const locationContext = (lat && lon)
       ? `\n\n[SYSTEM CONTEXT: The user's current GPS coordinates are: Latitude ${lat}, Longitude ${lon}. If asked about location, weather, or directions, you have access to this.]`

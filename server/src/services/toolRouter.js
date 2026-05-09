@@ -271,7 +271,7 @@ const CATEGORY_TRIGGERS = {
   },
   GITHUB: {
     patterns: [
-      /\bgithub\b/i, /\bgit\b/i, /pull.*request|\bpr\s*#?\d/i, /\bcommit\b|\bbranch\b|\bmerge\b/i,
+      /\bgithub\b/i, /\bgit\b/i, /pull.*request|\bpr\b/i, /\bcommit\b|\bbranch\b|\bmerge\b/i,
       /\brepo(zitor)?\b/i, /\bstars\b|\bfork\b/i,
     ],
     keywords: ['github', 'git', 'pull request', 'pr', 'commit', 'branch',
