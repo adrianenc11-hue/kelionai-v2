@@ -870,11 +870,6 @@ export default function KelionStage() {
   const [chatPanelOpen, setChatPanelOpen] = useState(true)
   const [plusMenuOpen, setPlusMenuOpen] = useState(false)
   const chatScrollRef = useRef(null)
-  useEffect(() => {
-    if (chatScrollRef.current) {
-      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
-    }
-  }, [turns, status])
   const [copiedIdx, setCopiedIdx] = useState(null)
   const [chatError, setChatError] = useState(null)
   // Conversation history — user-requested ("sa aiba optiune de save").
@@ -1032,6 +1027,13 @@ export default function KelionStage() {
     if (status === 'thinking' || status === 'speaking') return
     bubbleHideTimerRef.current = setTimeout(() => setBubbleVisible(false), 8000)
     return () => { if (bubbleHideTimerRef.current) clearTimeout(bubbleHideTimerRef.current) }
+  }, [turns, status])
+
+  // Auto-scroll the chat panel whenever turns or status change
+  useEffect(() => {
+    if (chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+    }
   }, [turns, status])
   // -- Mute mode ----------------------------------------------------------
   // Activated when the user explicitly says "nu mai vorbi", "mute",
