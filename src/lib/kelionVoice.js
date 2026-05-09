@@ -855,7 +855,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
         setTrial(null)
       }
 
-      if (tokenBody?.model?.includes('gemma')) {
+      if (tokenBody?.backend === 'openrouter') {
         // OpenRouter REST Voice Mode
         console.log('[kelionVoice] OpenRouter model detected, switching to REST Voice Mode');
         // We MUST NOT stop micStreamRef.current here because if the soundbars are flat,

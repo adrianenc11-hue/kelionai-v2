@@ -104,11 +104,11 @@ test.describe('Kelion Studio API (DS-1 / DS-3) wiring', () => {
   });
 });
 
-test.describe('Voice session token endpoint (Gemma 4)', () => {
-  test('Returns Gemma 4 model with openrouter backend', async ({ request }) => {
-    // The voice token endpoint now returns Gemma 4 model info for REST
-    // Voice Mode (SpeechRecognition → OpenRouter → TTS).
-    // No ephemeral token is minted — model name triggers REST mode on client.
+test.describe('Voice session token endpoint (OpenRouter REST Voice Mode)', () => {
+  test('Returns OpenRouter backend with a model and null token', async ({ request }) => {
+    // The voice token endpoint returns model info for REST Voice Mode
+    // (SpeechRecognition → OpenRouter → TTS). No ephemeral token is minted —
+    // `backend === 'openrouter'` is what triggers REST mode on the client.
     const res = await request.get(`${BASE}/api/realtime/voice-token?lang=en-US`);
     if (res.status() === 503) {
       const body = await res.json();
@@ -118,7 +118,8 @@ test.describe('Voice session token endpoint (Gemma 4)', () => {
     expect(res.status()).toBe(200);
     const body = await res.json();
     expect(body.backend).toBe('openrouter');
-    expect(body.model).toContain('gemma');
+    expect(typeof body.model).toBe('string');
+    expect(body.model.length).toBeGreaterThan(0);
     expect(body.token).toBeNull();
   });
 });

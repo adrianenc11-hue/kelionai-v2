@@ -1607,11 +1607,11 @@ const voiceTokenHandler = async (req, res) => {
   }
 
   try {
-    // ── Gemma 4 REST Voice Mode ──────────────────────────────────────
+    // ── OpenRouter REST Voice Mode ────────────────────────────────────
     // No ephemeral token or WebSocket is needed. The client detects
-    // 'gemma' in the model name and switches to REST Voice Mode:
-    //   Browser SpeechRecognition → /api/realtime/pipeline (Gemma 4 via
-    //   OpenRouter) → /api/voice/clone/tts (ElevenLabs TTS).
+    // `backend === 'openrouter'` and switches to REST Voice Mode:
+    //   Browser SpeechRecognition → /api/realtime/pipeline (OpenRouter)
+    //   → /api/voice/clone/tts (ElevenLabs TTS).
     // We still build the full persona + tools so /pipeline can use them.
     const chatModel = process.env.OPENROUTER_MODEL || 'anthropic/claude-opus-4.7';
     
