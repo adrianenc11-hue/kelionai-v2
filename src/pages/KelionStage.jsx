@@ -870,6 +870,11 @@ export default function KelionStage() {
   const [chatPanelOpen, setChatPanelOpen] = useState(true)
   const [plusMenuOpen, setPlusMenuOpen] = useState(false)
   const chatScrollRef = useRef(null)
+  useEffect(() => {
+    if (chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+    }
+  }, [turns, status])
   const [copiedIdx, setCopiedIdx] = useState(null)
   const [chatError, setChatError] = useState(null)
   // Conversation history — user-requested ("sa aiba optiune de save").
@@ -1731,10 +1736,18 @@ export default function KelionStage() {
                 <div style={{ padding: '12px 18px', borderRadius: 20, background: turn.role === 'user' ? '#f0f0f0' : 'transparent', color: '#1a1a1a', fontSize: 15, lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'system-ui, -apple-system, sans-serif' }}>{turn.text || turn.transcript}</div>
                 {turn.role !== 'user' && (turn.text || turn.transcript) && (
                   <div style={{ display: 'flex', gap: 4, marginTop: 2 }}>
-                    <button title="Copy" onClick={() => { navigator.clipboard.writeText(turn.text || turn.transcript).then(() => { setCopiedIdx(i); setTimeout(() => setCopiedIdx(null), 2000) }).catch(() => {}) }} style={{ width: 28, height: 28, borderRadius: 6, background: 'transparent', border: 'none', color: copiedIdx === i ? '#22c55e' : '#999', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>{copiedIdx === i ? '✓' : '📋'}</button>
-                    <button title="Save" onClick={() => { const t2 = turn.text||turn.transcript; const b = new Blob([t2],{type:'text/plain'}); const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href=u; a.download=`kelion-${new Date().toISOString().slice(0,10)}.txt`; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(u); }} style={{ width: 28, height: 28, borderRadius: 6, background: 'transparent', border: 'none', color: '#999', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>💾</button>
-                    <button title="Email" onClick={() => { window.open('mailto:?subject=Kelion AI&body=' + encodeURIComponent(turn.text||turn.transcript),'_blank') }} style={{ width: 28, height: 28, borderRadius: 6, background: 'transparent', border: 'none', color: '#999', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>📧</button>
-                    <button title="Share" onClick={() => { const t2=turn.text||turn.transcript; if(navigator.share) navigator.share({title:'Kelion',text:t2}).catch(()=>{}); else navigator.clipboard.writeText(t2).catch(()=>{}); }} style={{ width: 28, height: 28, borderRadius: 6, background: 'transparent', border: 'none', color: '#999', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>🔗</button>
+                    <button title="Copy" onClick={() => { navigator.clipboard.writeText(turn.text || turn.transcript).then(() => { setCopiedIdx(i); setTimeout(() => setCopiedIdx(null), 2000) }).catch(() => {}) }} style={{ width: 28, height: 28, borderRadius: 6, background: 'transparent', border: 'none', color: copiedIdx === i ? '#10a37f' : '#888', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {copiedIdx === i ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>}
+                    </button>
+                    <button title="Download" onClick={() => { const t2 = turn.text||turn.transcript; const b = new Blob([t2],{type:'text/plain'}); const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href=u; a.download=`kelion-${new Date().toISOString().slice(0,10)}.txt`; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(u); }} style={{ width: 28, height: 28, borderRadius: 6, background: 'transparent', border: 'none', color: '#888', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                    </button>
+                    <button title="Email" onClick={() => { window.open('mailto:?subject=Kelion AI&body=' + encodeURIComponent(turn.text||turn.transcript),'_blank') }} style={{ width: 28, height: 28, borderRadius: 6, background: 'transparent', border: 'none', color: '#888', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                    </button>
+                    <button title="Share" onClick={() => { const t2=turn.text||turn.transcript; if(navigator.share) navigator.share({title:'Kelion',text:t2}).catch(()=>{}); else navigator.clipboard.writeText(t2).catch(()=>{}); }} style={{ width: 28, height: 28, borderRadius: 6, background: 'transparent', border: 'none', color: '#888', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+                    </button>
                   </div>
                 )}
               </div>
@@ -1764,18 +1777,17 @@ export default function KelionStage() {
         </div>
         {/* RIGHT PANEL — Avatar 3D */}
         <div style={{ flex: '0 0 30%', maxWidth: '30%', height: '100%', position: 'relative', overflow: 'hidden' }}>
-          <Canvas shadows={{ type: THREE.VSMShadowMap }} camera={{ position: [0, 0.2, 4.2], fov: 36 }} dpr={[1, 2]} gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.8, outputColorSpace: THREE.SRGBColorSpace, powerPreference: 'low-power' }} onCreated={({ gl }) => { const canvas = gl.domElement; if (canvas) { canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); console.warn('[kelion] WebGL context lost') }); canvas.addEventListener('webglcontextrestored', () => { console.log('[kelion] WebGL context restored') }) } }}>
+          <Canvas shadows={{ type: THREE.VSMShadowMap }} camera={{ position: [0, 0.4, 3.2], fov: 45 }} dpr={[1, 2]} gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.8, outputColorSpace: THREE.SRGBColorSpace, powerPreference: 'low-power' }} onCreated={({ gl }) => { const canvas = gl.domElement; if (canvas) { canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); console.warn('[kelion] WebGL context lost') }); canvas.addEventListener('webglcontextrestored', () => { console.log('[kelion] WebGL context restored') }) } }}>
             <color attach="background" args={['#0a0d1a']} />
             <fog attach="fog" args={['#0e0b20', 6, 14]} />
-            <CameraRig />
             <Suspense fallback={null}>
               <ambientLight intensity={0.5} />
               <directionalLight position={[10, 10, 5]} intensity={1} />
               <StudioDecor />
-              <group position={[1.6, 0, 0]}>
+              <group position={[0, -0.8, 0]}>
                 <AvatarModel mouthOpen={mouthOpen} status={status} emotion={emotion} presenting={false} />
               </group>
-              <ContactShadows position={[1.6, -1.65, 0]} opacity={0.55} scale={5} blur={2.6} far={2.5} />
+              <ContactShadows position={[0, -1.65, 0]} opacity={0.55} scale={5} blur={2.6} far={2.5} />
             </Suspense>
           </Canvas>
         </div>
