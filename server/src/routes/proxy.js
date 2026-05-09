@@ -63,10 +63,10 @@ function isPrivateIPv4(ip) {
   const parts = ip.split('.').map((n) => Number.parseInt(n, 10));
   if (parts.length !== 4 || parts.some((p) => !Number.isFinite(p) || p < 0 || p > 255)) return true;
   const [a, b, c] = parts;
-  if (a === 0) return true; // "this network"
+  if (a === 0) return true; // 0.0.0.0/8 ("this network")
   if (a === 10) return true;
   if (a === 127) return true;
-  if (a === 169 && b === 254) return true; // link-local + metadata endpoint space
+  if (a === 169 && b === 254) return true; // link-local (includes cloud metadata endpoints)
   if (a === 172 && b >= 16 && b <= 31) return true;
   if (a === 192 && b === 168) return true;
   if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT
@@ -91,12 +91,15 @@ function parseIPv6ToBytes(ip) {
 
   const halves = expanded.split('::');
   if (halves.length > 2) return null;
-  const left = halves[0] ? halves[0].split(':') : [];
-  const right = halves[1] ? halves[1].split(':') : [];
-  const leftNums = left.map((part) => Number.parseInt(part || '0', 16));
-  const rightNums = right.map((part) => Number.parseInt(part || '0', 16));
-  if (leftNums.some((n) => !Number.isFinite(n) || n < 0 || n > 0xffff)) return null;
-  if (rightNums.some((n) => !Number.isFinite(n) || n < 0 || n > 0xffff)) return null;
+  const parseHextets = (segment) => {
+    if (!segment) return [];
+    const parts = segment.split(':');
+    if (parts.some((part) => !/^[0-9a-f]{1,4}$/i.test(part))) return null;
+    return parts.map((part) => Number.parseInt(part, 16));
+  };
+  const leftNums = parseHextets(halves[0]);
+  const rightNums = parseHextets(halves[1] || '');
+  if (!leftNums || !rightNums) return null;
 
   let hextets;
   if (halves.length === 1) {
@@ -135,6 +138,9 @@ function isPrivateIPv6(ip) {
 
 async function assertPublicUrl(targetUrl) {
   const rawHost = (targetUrl.hostname || '').toLowerCase();
+  if (rawHost.includes('[') || rawHost.includes(']')) {
+    if (!(rawHost.startsWith('[') && rawHost.endsWith(']'))) throw new Error('Invalid URL host');
+  }
   const host = rawHost.startsWith('[') && rawHost.endsWith(']') ? rawHost.slice(1, -1) : rawHost;
   if (!host) throw new Error('Invalid URL host');
   // Block local hostnames up-front even if a custom DNS resolver rewrites them.
