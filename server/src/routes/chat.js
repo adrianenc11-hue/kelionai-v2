@@ -100,7 +100,16 @@ router.post('/', async (req, res) => {
     // specific message. After the request completes, tools go back to OFF.
     const { selectTools } = require('../services/toolRouter');
     const { KELION_TOOLS } = require('./realtime');
-    const { tools: relevantTools, categories } = selectTools(message, KELION_TOOLS);
+    let relevantTools = [];
+    let categories = [];
+    if (isAdmin) {
+      relevantTools = KELION_TOOLS;
+      categories = ['ALL_TOOLS_ADMIN'];
+    } else {
+      const selection = selectTools(message, KELION_TOOLS);
+      relevantTools = selection.tools;
+      categories = selection.categories;
+    }
     const openRouterTools = relevantTools.map(t => ({
       type: 'function',
       function: {
