@@ -1724,12 +1724,16 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
               audioEl.src = blobUrl;
               audioEl.volume = 1;
               activeAudioElRef.current = audioEl
+              let playbackStarted = false
               audioEl.onended = () => {
                 URL.revokeObjectURL(blobUrl)
                 activeAudioElRef.current = null
                 setStatus('idle')
               }
               audioEl.onerror = (e) => {
+                // Ignore spurious error events that fire AFTER playback
+                // already started successfully (common with blob URL revocation)
+                if (playbackStarted) return
                 console.error('[kelionVoice] Audio playback error:', e)
                 appendTurn('assistant', `⚠️ Eroare la redarea audio în browser.`, true, '⚙️ System')
                 URL.revokeObjectURL(blobUrl)
@@ -1738,6 +1742,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
               
               console.log('[TTS-DEBUG] calling audioEl.play()')
               audioEl.play().then(() => {
+                playbackStarted = true
                 console.log('[TTS-DEBUG] AUDIO PLAYING OK')
               }).catch((e) => {
                 console.error('[kelionVoice] Audio play() blocked:', e)
