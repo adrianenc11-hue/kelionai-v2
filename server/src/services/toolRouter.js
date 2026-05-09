@@ -254,9 +254,10 @@ const CATEGORY_TRIGGERS = {
   },
   CODE_DEV: {
     patterns: [
-      /rulează|run|execut/i, /scri[eu].*fișier|write.*file|creea.*fișier/i,
+      /rulează|run|execut/i, /scri[eu].*(fișier|soft|program|cod|code|app|aplicați)/i,
+      /creea.*(fișier|soft|program|cod|code|app|aplicați)/i,
       /înlocui|replace|edit.*fișier|edit.*file/i,
-      /cod|code|script|python|javascript|node|npm/i,
+      /cod|code|script|python|javascript|node|npm|soft|program|app/i,
       /terminal|command|comand[aă]/i, /build|deploy|install/i,
       /bug|eroare|error|fix|repar/i, /funcți[ei]|function/i,
       /plan.*execut|execute.*plan/i, /expert.*cod/i,
@@ -266,7 +267,7 @@ const CATEGORY_TRIGGERS = {
       'python', 'javascript', 'node', 'npm', 'terminal', 'command',
       'build', 'deploy', 'install', 'bug', 'eroare', 'error', 'fix',
       'repară', 'fișier', 'file', 'funcție', 'function', 'plan', 'expert',
-      'verifică', 'verify', 'check', 'test'],
+      'verifică', 'verify', 'check', 'test', 'soft', 'program', 'aplicație', 'app', 'creează', 'dezvoltă'],
   },
   GITHUB: {
     patterns: [
