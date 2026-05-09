@@ -868,6 +868,9 @@ export default function KelionStage() {
   // Text input for typed messages (goes through Gemma 4 REST pipeline).
   const [chatInput, setChatInput] = useState('')
   const [chatPanelOpen, setChatPanelOpen] = useState(true)
+  const [plusMenuOpen, setPlusMenuOpen] = useState(false)
+  const chatScrollRef = useRef(null)
+  const [copiedIdx, setCopiedIdx] = useState(null)
   const [chatError, setChatError] = useState(null)
   // Conversation history — user-requested ("sa aiba optiune de save").
   // Signed-in users get server persistence via /api/conversations; guests
@@ -1813,6 +1816,88 @@ export default function KelionStage() {
                 }}>
                   {turn.text || turn.transcript}
                 </div>
+                {/* Action buttons for AI messages */}
+                {turn.role !== 'user' && (turn.text || turn.transcript) && (
+                  <div style={{
+                    display: 'flex', gap: 2, marginTop: 4, marginLeft: 0,
+                  }}>
+                    {/* Copy */}
+                    <button
+                      title="Copy"
+                      onClick={() => {
+                        const txt = turn.text || turn.transcript
+                        navigator.clipboard.writeText(txt).then(() => {
+                          setCopiedIdx(i); setTimeout(() => setCopiedIdx(null), 2000)
+                        }).catch(() => {})
+                      }}
+                      style={{
+                        width: 30, height: 30, borderRadius: 6,
+                        background: 'transparent', border: 'none',
+                        color: copiedIdx === i ? '#4ade80' : '#b0b0b0', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 14, transition: 'background 0.15s, color 0.15s',
+                      }}
+                      onMouseEnter={(e) => { if (copiedIdx !== i) e.currentTarget.style.color = '#e0e0e0' }}
+                      onMouseLeave={(e) => { if (copiedIdx !== i) e.currentTarget.style.color = '#b0b0b0' }}
+                    >{copiedIdx === i ? '✓' : '📋'}</button>
+                    {/* Thumbs up */}
+                    <button title="Good response" style={{
+                      width: 30, height: 30, borderRadius: 6, background: 'transparent', border: 'none',
+                      color: '#b0b0b0', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14,
+                    }}
+                      onMouseEnter={(e) => e.currentTarget.style.color = '#e0e0e0'}
+                      onMouseLeave={(e) => e.currentTarget.style.color = '#b0b0b0'}
+                    >👍</button>
+                    {/* Thumbs down */}
+                    <button title="Bad response" style={{
+                      width: 30, height: 30, borderRadius: 6, background: 'transparent', border: 'none',
+                      color: '#b0b0b0', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14,
+                    }}
+                      onMouseEnter={(e) => e.currentTarget.style.color = '#e0e0e0'}
+                      onMouseLeave={(e) => e.currentTarget.style.color = '#b0b0b0'}
+                    >👎</button>
+                    {/* Save / Download */}
+                    <button
+                      title="Save as file"
+                      onClick={() => {
+                        const txt = turn.text || turn.transcript
+                        const blob = new Blob([txt], { type: 'text/plain;charset=utf-8' })
+                        const url = URL.createObjectURL(blob)
+                        const a = document.createElement('a')
+                        a.href = url
+                        a.download = `kelion-response-${new Date().toISOString().slice(0,10)}.txt`
+                        document.body.appendChild(a); a.click()
+                        document.body.removeChild(a); URL.revokeObjectURL(url)
+                      }}
+                      style={{
+                        width: 30, height: 30, borderRadius: 6, background: 'transparent', border: 'none',
+                        color: '#b0b0b0', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14,
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.color = '#e0e0e0'}
+                      onMouseLeave={(e) => e.currentTarget.style.color = '#b0b0b0'}
+                    >⬆️</button>
+                    {/* Share */}
+                    <button
+                      title="Share"
+                      onClick={() => {
+                        const txt = turn.text || turn.transcript
+                        if (navigator.share) {
+                          navigator.share({ title: 'Kelion', text: txt }).catch(() => {})
+                        } else {
+                          navigator.clipboard.writeText(txt).then(() => {
+                            setCopiedIdx(i); setTimeout(() => setCopiedIdx(null), 2000)
+                          }).catch(() => {})
+                        }
+                      }}
+                      style={{
+                        width: 30, height: 30, borderRadius: 6, background: 'transparent', border: 'none',
+                        color: '#b0b0b0', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14,
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.color = '#e0e0e0'}
+                      onMouseLeave={(e) => e.currentTarget.style.color = '#b0b0b0'}
+                    >🔗</button>
+                  </div>
+                )}
               </div>
             ))}
             {status === 'thinking' && (

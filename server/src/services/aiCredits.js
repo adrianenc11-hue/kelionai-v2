@@ -199,6 +199,60 @@ async function probeStripe() {
   return card;
 }
 
+async function probeOpenRouter() {
+  const apiKey = process.env.OPENROUTER_API_KEY || '';
+  const card = {
+    id: 'openrouter',
+    name: 'OpenRouter',
+    subtitle: 'LLM routing (Gemma 4, GPT-4o, Claude)',
+    configured: Boolean(apiKey),
+    keyFingerprint: maskKey(apiKey),
+    balance: null,
+    balanceDisplay: '—',
+    unit: 'USD',
+    status: 'unknown',
+    message: null,
+    topUpUrl: 'https://openrouter.ai/settings/credits',
+    billingUrl: 'https://openrouter.ai/settings/credits',
+  };
+  if (!apiKey) {
+    card.status = 'error';
+    card.message = 'OPENROUTER_API_KEY not set';
+    return card;
+  }
+  try {
+    const r = await fetchWithTimeout('https://openrouter.ai/api/v1/auth/key', {
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${apiKey}` },
+    });
+    if (r.ok) {
+      const j = await r.json();
+      const data = j.data || j;
+      const limit = typeof data.limit === 'number' ? data.limit : null;
+      const usage = typeof data.usage === 'number' ? data.usage : 0;
+      const remaining = limit != null ? Math.max(0, limit - usage) : null;
+      card.balance = remaining;
+      if (limit != null) {
+        card.balanceDisplay = `$${remaining.toFixed(2)} / $${limit.toFixed(2)}`;
+        card.status = remaining < 1 ? 'low' : 'ok';
+      } else {
+        // Unlimited key
+        card.balanceDisplay = `$${usage.toFixed(2)} used (no limit)`;
+        card.status = 'ok';
+      }
+      card.message = data.label ? `Key: ${data.label}` : null;
+    } else {
+      const body = await r.text().catch(() => '');
+      card.status = 'error';
+      card.message = `HTTP ${r.status}: ${body.slice(0, 200)}`;
+    }
+  } catch (err) {
+    card.status = 'error';
+    card.message = err && err.message ? err.message : 'network error';
+  }
+  return card;
+}
+
 async function probeRailway() {
   // Railway exposes usage via GraphQL. We don't call it here (requires a
   // dedicated API token with project scope) — instead we show a link. If
@@ -227,13 +281,14 @@ async function probeRailway() {
  */
 async function getAllCredits() {
   // Order is display order in the admin grid.
-  const [googleAI, elevenlabs, stripe, railway] = await Promise.all([
+  const [googleAI, openrouter, elevenlabs, stripe, railway] = await Promise.all([
     probeGoogleAI(),
+    probeOpenRouter(),
     probeElevenLabs(),
     probeStripe(),
     probeRailway(),
   ]);
-  return [googleAI, elevenlabs, stripe, railway];
+  return [googleAI, openrouter, elevenlabs, stripe, railway];
 }
 
 /**
@@ -412,7 +467,7 @@ async function buildRevenueSplit(revenueSummary, { days = 30, currency = 'gbp' }
 module.exports = {
   getAllCredits,
   probeGoogleAI,
-
+  probeOpenRouter,
   probeElevenLabs,
   probeStripe,
   probeRailway,
