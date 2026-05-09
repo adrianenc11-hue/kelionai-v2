@@ -1844,6 +1844,16 @@ export default function KelionStage() {
               </div>
             </form>
             <div style={{ textAlign: 'center', fontSize: 11, color: '#bbb', marginTop: 6 }}>Kelion can make mistakes. Consider verifying important information.</div>
+            </div>
+            </div>
+            {/* Back Face (Monitor) */}
+            <div style={{
+              position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+              backfaceVisibility: 'hidden', transform: 'rotateY(180deg)',
+              background: '#0d0b1d', overflow: 'hidden'
+            }}>
+              <MonitorOverlay />
+            </div>
           </div>
         </div>
       </div>
