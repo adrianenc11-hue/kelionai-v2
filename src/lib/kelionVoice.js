@@ -6,6 +6,7 @@
 //   M11 (vision reasoning via multimodal frames), M12 (emotion mirror via persona).
 
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { correctTranscript } from './transcriptProcessor'
 import { runTool } from './kelionTools'
 import { isClonedVoiceActive, setDetectedLang, getDetectedLang, getSelectedVoice } from './voiceModeStore'
 import { setCameraController, setCurrentFacingMode } from './cameraControl'
@@ -400,8 +401,12 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
           logAiEvent('transcript_in', { text: sc.inputTranscription.text, source: 'narration-synthetic-skipped' })
         } else {
           userHasSpokenRef.current = true
-          appendTurn('user', sc.inputTranscription.text, false, '🎤 Voice (Mic)')
-          logAiEvent('transcript_in', { text: sc.inputTranscription.text })
+          if (sc.inputTranscription.text.trim()) {
+            const rawIn = sc.inputTranscription.text;
+            const correctedIn = correctTranscript(rawIn);
+            appendTurn('user', correctedIn, false, '🎤 Voice (Mic)')
+            logAiEvent('transcript_in', { text: correctedIn })
+          }
           lastActivityAtRef.current = Date.now()
           narrationCooldownRef.current = Date.now()
           // Detect language from what the user says (first word heuristic)
@@ -904,8 +909,9 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
             return; // Wait for final transcript
           }
           
-          const transcript = ev.results[ev.results.length - 1][0].transcript;
-          if (!transcript) return;
+          const rawTranscript = ev.results[ev.results.length - 1][0].transcript;
+          if (!rawTranscript) return;
+          const transcript = correctTranscript(rawTranscript);
           
           if (statusRef.current !== 'listening' && statusRef.current !== 'idle') {
             console.log('[kelionVoice] Buffering speech because status is', statusRef.current);
