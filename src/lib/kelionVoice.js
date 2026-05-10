@@ -1,4 +1,4 @@
-// Kelion voice client hook (Claude Opus via OpenRouter REST + Browser SpeechRecognition).
+// Kelion voice client hook (Gemini via OpenRouter REST + Browser SpeechRecognition).
 // Manages: mic capture → SpeechRecognition → OpenRouter → TTS playback → lipsync → transcript.
 // Stage 1 modules: M3 (mic+VAD), M4 (voice loop), M5 (auto-language),
 //   M6 (turn-taking), M8 (Kelion persona).
@@ -871,7 +871,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
         setTrial(null)
       }
 
-      if (tokenBody?.model?.includes('claude')) {
+      if (tokenBody?.model?.includes('gemini') || tokenBody?.model?.includes('google')) {
         // OpenRouter REST Voice Mode
         console.log('[kelionVoice] OpenRouter model detected, switching to REST Voice Mode');
         // We MUST NOT stop micStreamRef.current here because if the soundbars are flat,
@@ -1670,7 +1670,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
         console.error('[kelionVoice] sendText failed', err)
       }
     } else {
-      // HTTP fallback — Claude Opus text/voice chat via /api/chat
+      // HTTP fallback — Gemini text/voice chat via /api/chat
       // If a loop is already running, queue the message and let the active loop pick it up
       if (httpBusyRef.current) {
         httpMsgBufferRef.current.push({ clean, image })

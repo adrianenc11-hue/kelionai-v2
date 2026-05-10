@@ -1,6 +1,6 @@
-// voiceModeStore.js — tracks whether Kelion uses ElevenLabs cloned voice or Claude Opus native.
+// voiceModeStore.js — tracks whether Kelion uses ElevenLabs cloned voice or Gemini native.
 // The language code (e.g. "ro", "en", "fr") is tracked so ElevenLabs TTS respects
-// the same language Claude Opus is speaking in.
+// the same language Gemini is speaking in.
 
 let mode = 'default'; // 'default' | 'cloned'
 try {

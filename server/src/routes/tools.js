@@ -132,7 +132,7 @@ router.post('/browser/browse', async (req, res) => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: process.env.OPENROUTER_MODEL || 'anthropic/claude-opus-4.7',
+        model: config.google.chatModel,
         messages: [
           {
             role: 'system',

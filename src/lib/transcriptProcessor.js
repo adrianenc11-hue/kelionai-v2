@@ -7,8 +7,8 @@ const DICTIONARY = [
   [/\b(kelion ai|kelion a i|chellion ai|chelion ai|calion ai)\b/gi, "KelionAI"],
   [/\b(open router|open ruter)\b/gi, "OpenRouter"],
   [/\b(gemini|gemeni|jemini)\b/gi, "Gemini"],
-  [/\b(claude|clod|kloud|cloud)\b/gi, "Claude"],
-  [/\b(opus|apus)\b/gi, "Opus"],
+  [/\b(gemini|gemeny|jiminy|germany)\b/gi, "Gemini"],
+  [/\b(flash|flas|fles)\b/gi, "Flash"],
   [/\b(eleven labs|ileven labs)\b/gi, "ElevenLabs"],
   
   // DevOps / Git / Tech

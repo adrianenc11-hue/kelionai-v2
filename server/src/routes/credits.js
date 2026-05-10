@@ -406,9 +406,10 @@ router.post('/consume', requireAuth, async (req, res) => {
     const isAdmin = (req.user && req.user.role === 'admin')
       || isAdminEmail((user && user.email) || req.user.email)
       || (user && (user.role === 'admin' || isAdminEmail(user.email)));
-    if (isAdmin) {
-      // Admins never burn credits. Short-circuit so the client loop keeps
-      // running without any DB writes.
+    const isFreeModel = config.google.freeMode;
+    if (isAdmin || isFreeModel) {
+      // Admins and free-tier models never burn credits. Short-circuit so the
+      // client loop keeps running without any DB writes.
       return res.json({ balance_minutes: null, deducted: 0, exempt: true });
     }
 

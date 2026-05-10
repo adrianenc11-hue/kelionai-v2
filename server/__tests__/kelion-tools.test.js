@@ -150,6 +150,8 @@ const EXPECTED_TOOL_NAMES = [
   // ElevenLabs cloned voice toggle — switches Kelion's TTS between
   // Claude Opus built-in voice and the user's ElevenLabs cloned voice.
   'switch_voice',
+  'list_voice_clones',
+  'activate_voice_clone',
   // Song identification.
   'identify_song',
   // Agentic loop — multi-step plan execution
