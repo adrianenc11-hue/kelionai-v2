@@ -2,7 +2,7 @@
 //
 // Keeps the most recent camera frame as a data URL. Used by the
 // narration mode (set_narration_mode) which periodically sends the
-// latest frame to Claude Opus Vision for continuous scene description.
+// latest frame to Gemini Vision for continuous scene description.
 // The voice transport now handles direct vision via realtimeInput.video,
 // so the old what_do_you_see tool no longer uses this buffer.
 //
