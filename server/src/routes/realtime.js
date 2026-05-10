@@ -1967,9 +1967,9 @@ router.post('/pipeline', async (req, res) => {
       let authHeader = `Bearer ${openRouterKey}`;
 
       if (googleKey && isGoogleModel) {
-        apiUrl = `https://generativelanguage.googleapis.com/v1/openai/chat/completions`;
+        apiUrl = `https://generativelanguage.googleapis.com/v1beta/openai/chat/completions`;
         authHeader = `Bearer ${googleKey}`;
-        reqBody.model = currentModel.replace('google/', '').replace(':free', '');
+        reqBody.model = `models/${currentModel.replace('google/', '').replace(':free', '')}`;
       } else {
         reqBody.model = currentModel;
       }
