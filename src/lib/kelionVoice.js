@@ -130,7 +130,6 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
   const translatorModeRef = useRef(false)
   const initialTextRef = useRef(null)
   const sessionIdRef = useRef(null)
-  const httpMsgBufferRef = useRef('')
 
   const wsRef = useRef(null)
   const audioCtxRef = useRef(null)       // 16kHz capture context for voice — MUST match SAMPLE_RATE_IN
@@ -912,13 +911,6 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
           const rawTranscript = ev.results[ev.results.length - 1][0].transcript;
           if (!rawTranscript) return;
           const transcript = correctTranscript(rawTranscript);
-          
-          if (statusRef.current !== 'listening' && statusRef.current !== 'idle') {
-            console.log('[kelionVoice] Buffering speech because status is', statusRef.current);
-            httpMsgBufferRef.current += (httpMsgBufferRef.current ? ' ' : '') + transcript;
-            appendTurn('user', `[Buffered] ${transcript}`, true, '⏳');
-            return;
-          }
 
           setStatus('thinking');
           setUserLevel(0);
@@ -1227,16 +1219,6 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
 
   const statusRef = useRef(status)
   useEffect(() => { statusRef.current = status }, [status])
-  
-  // Auto-flush buffered speech when returning to idle/listening state
-  useEffect(() => {
-    if ((status === 'idle' || status === 'listening') && httpMsgBufferRef.current) {
-      const buffered = httpMsgBufferRef.current;
-      httpMsgBufferRef.current = '';
-      console.log('[kelionVoice] Flushing buffered speech:', buffered);
-      sendText(buffered, null, true);
-    }
-  }, [status, sendText]);
 
   // ───── Video frame sender (M9 camera + M10 screen share) ─────
   // Streams a MediaStream to the Live API as a continuous sequence of JPEG
