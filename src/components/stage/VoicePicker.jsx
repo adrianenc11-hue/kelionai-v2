@@ -13,6 +13,7 @@ import { getCsrfToken } from '../../lib/api.js'
 export default function VoicePicker({ style }) {
   const [open, setOpen] = useState(false)
   const [voices, setVoices] = useState([])
+  const [clones, setClones] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [currentVoiceId, setCurrentVoiceId] = useState(null)
@@ -47,6 +48,7 @@ export default function VoicePicker({ style }) {
     setError(null)
     try {
       const lang = getDetectedLang() || 'en'
+      // Fetch public voices
       const r = await fetch(`/api/voice/clone/voices?lang=${lang}`, { credentials: 'include' })
       if (r.ok) {
         const data = await r.json()
@@ -56,6 +58,18 @@ export default function VoicePicker({ style }) {
         setError('Trebuie să te autentifici pentru a alege vocea.')
       } else {
         setError('Serviciu indisponibil. Încearcă din nou.')
+      }
+      
+      // Fetch user's clones
+      const rc = await fetch('/api/voice/clone/library', { credentials: 'include' })
+      if (rc.ok) {
+        const cdata = await rc.json()
+        setClones(cdata.clones || [])
+        // If an active clone exists, that's our current voice
+        const activeClone = (cdata.clones || []).find(c => c.is_active)
+        if (activeClone) {
+          setCurrentVoiceId(activeClone.voice_id)
+        }
       }
     } catch (e) {
       console.error('[VoicePicker] fetch error:', e)
@@ -69,19 +83,32 @@ export default function VoicePicker({ style }) {
     setOpen(!open)
   }
 
-  const handleSelect = async (voice) => {
+  const handleSelect = async (voice, isClone = false) => {
     const lang = getDetectedLang() || 'en'
     setCurrentVoiceId(voice.voice_id)
-    setSelectedVoice({ voiceId: voice.voice_id, voiceName: voice.name, lang })
+    setSelectedVoice({ voiceId: voice.voice_id, voiceName: voice.name || voice.display_name, lang })
 
-    // Save to server
     try {
-      await fetch('/api/voice/clone/select-voice', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
-        credentials: 'include',
-        body: JSON.stringify({ voiceId: voice.voice_id, voiceName: voice.name, lang }),
-      })
+      if (isClone) {
+        await fetch(`/api/voice/clone/library/${voice.id}/activate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+          credentials: 'include',
+        })
+      } else {
+        // Switching to public voice deactivates clones
+        await fetch('/api/voice/clone/library/deactivate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+          credentials: 'include',
+        })
+        await fetch('/api/voice/clone/select-voice', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+          credentials: 'include',
+          body: JSON.stringify({ voiceId: voice.voice_id, voiceName: voice.name, lang }),
+        })
+      }
     } catch (e) {
       console.error('[VoicePicker] save error:', e)
     }
@@ -150,16 +177,73 @@ export default function VoicePicker({ style }) {
           borderRadius: 8,
           padding: '8px 0',
         }}>
-          {/* Header */}
+          {/* Clones Header */}
+          {clones.length > 0 && (
+            <div style={{
+              padding: '10px 16px 8px',
+              borderBottom: '1px solid rgba(255,255,255,0.08)',
+              fontSize: 12,
+              color: '#4ade80',
+              textTransform: 'uppercase',
+              letterSpacing: 1,
+              fontWeight: 600,
+            }}>
+              Vocile Mele Clonate
+            </div>
+          )}
+
+          {/* Clones List */}
+          {clones.map((c) => {
+            const isSelected = c.voice_id === currentVoiceId
+            return (
+              <div
+                key={c.voice_id}
+                onClick={() => handleSelect(c, true)}
+                style={{
+                  padding: '10px 16px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  background: isSelected ? 'rgba(34,197,94,0.15)' : 'transparent',
+                  borderLeft: isSelected ? '3px solid #22c55e' : '3px solid transparent',
+                  transition: 'all 0.15s ease',
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = isSelected ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.05)'}
+                onMouseLeave={(e) => e.currentTarget.style.background = isSelected ? 'rgba(34,197,94,0.15)' : 'transparent'}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{
+                    fontSize: 14,
+                    fontWeight: isSelected ? 600 : 400,
+                    color: isSelected ? '#4ade80' : '#fff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}>
+                    👤 {c.display_name}
+                    {isSelected && <span style={{ fontSize: 11, color: '#22c55e' }}>✓</span>}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
+                    Clonă Privată · Limba: {c.language === 'auto' ? 'Auto' : c.language}
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+
+          {/* Public Voices Header */}
           <div style={{
             padding: '10px 16px 8px',
+            borderTop: clones.length > 0 ? '1px solid rgba(255,255,255,0.08)' : 'none',
             borderBottom: '1px solid rgba(255,255,255,0.08)',
             fontSize: 12,
             color: 'rgba(255,255,255,0.5)',
             textTransform: 'uppercase',
             letterSpacing: 1,
+            marginTop: clones.length > 0 ? 8 : 0,
           }}>
-            {loading ? '⏳ Se încarcă...' : `${langMatches} voci pentru limba detectată · ${voices.length} total`}
+            {loading ? '⏳ Se încarcă...' : `Voci Publice (${langMatches} native · ${voices.length} total)`}
           </div>
 
           {/* Voice List */}
