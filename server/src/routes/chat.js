@@ -282,7 +282,9 @@ Your replies must be direct, conversational, and concise.${locationContext}${tim
       authHeader = `Bearer ${googleKey}`;
     }
 
-    const r = await fetch(apiUrl, {
+    let r;
+    try {
+      r = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
