@@ -45,12 +45,12 @@ module.exports = {
     clientSecret: optional('GOOGLE_CLIENT_SECRET'),
     redirectUri:  optional('GOOGLE_REDIRECT_URI', ''),
     apiKey:       optional('GOOGLE_API_KEY'),
-    chatModel:    optional('GOOGLE_CHAT_MODEL', 'google/gemma-4-31b-it:free'),
-    liveModel:    optional('GOOGLE_LIVE_MODEL', 'google/gemma-4-31b-it:free'),
-    ttsModel:     optional('GOOGLE_TTS_MODEL', 'google/gemma-4-31b-it:free'),
+    chatModel:    optional('GOOGLE_CHAT_MODEL', 'google/gemini-1.5-flash:free'),
+    liveModel:    optional('GOOGLE_LIVE_MODEL', 'google/gemini-1.5-flash:free'),
+    ttsModel:     optional('GOOGLE_TTS_MODEL', 'google/gemini-1.5-flash:free'),
     ttsVoiceKelion: optional('GOOGLE_TTS_VOICE_KELION', 'Kore'),
     // Set FREE_MODE=true to disable all credit consumption
-    freeMode: process.env.FREE_MODE === 'true' || (process.env.GOOGLE_CHAT_MODEL || 'google/gemma-4-31b-it:free').includes(':free'),
+    freeMode: process.env.FREE_MODE === 'true' || (process.env.GOOGLE_CHAT_MODEL || 'google/gemini-1.5-flash:free').includes(':free'),
   },
 
   session: {
