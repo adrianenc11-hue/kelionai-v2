@@ -6,6 +6,7 @@
 //   M11 (vision reasoning via multimodal frames), M12 (emotion mirror via persona).
 
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { correctTranscript } from './transcriptProcessor'
 import { runTool } from './kelionTools'
 import { isClonedVoiceActive, setDetectedLang, getDetectedLang, getSelectedVoice } from './voiceModeStore'
 import { setCameraController, setCurrentFacingMode } from './cameraControl'
@@ -399,8 +400,12 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
           logAiEvent('transcript_in', { text: sc.inputTranscription.text, source: 'narration-synthetic-skipped' })
         } else {
           userHasSpokenRef.current = true
-          appendTurn('user', sc.inputTranscription.text, false, '🎤 Voice (Mic)')
-          logAiEvent('transcript_in', { text: sc.inputTranscription.text })
+          if (sc.inputTranscription.text.trim()) {
+            const rawIn = sc.inputTranscription.text;
+            const correctedIn = correctTranscript(rawIn);
+            appendTurn('user', correctedIn, false, '🎤 Voice (Mic)')
+            logAiEvent('transcript_in', { text: correctedIn })
+          }
           lastActivityAtRef.current = Date.now()
           narrationCooldownRef.current = Date.now()
           // Detect language from what the user says (first word heuristic)
@@ -897,15 +902,16 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
         rec.onresult = async (ev) => {
           setUserLevel(0.6 + Math.random() * 0.4);
           
-          if (!ev.results[0].isFinal) {
+          if (!ev.results[ev.results.length - 1].isFinal) {
             // Barge-in: immediately stop TTS when user starts speaking
             clearAudioQueue();
             return; // Wait for final transcript
           }
           
-          const transcript = ev.results[0][0].transcript;
-          if (!transcript) return;
-          
+          const rawTranscript = ev.results[ev.results.length - 1][0].transcript;
+          if (!rawTranscript) return;
+          const transcript = correctTranscript(rawTranscript);
+
           setStatus('thinking');
           setUserLevel(0);
           if (fakeAnimFrame) cancelAnimationFrame(fakeAnimFrame);
@@ -936,10 +942,10 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
             setError('Microphone error: ' + ev.error);
             setStatus('error');
           } else {
-            // Keep listening if still supposed to be listening
-            if (statusRef.current === 'listening') {
+            // Keep listening permanently unless stopped
+            if (statusRef.current !== 'stopped' && statusRef.current !== 'error') {
               try { rec.start(); } catch(e) {}
-              startFakeAnim();
+              if (statusRef.current === 'listening') startFakeAnim();
             }
           }
         };
@@ -947,10 +953,10 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
         rec.onend = () => {
           if (fakeAnimFrame) cancelAnimationFrame(fakeAnimFrame);
           setUserLevel(0);
-          if (statusRef.current === 'listening') {
-             // Restart seamlessly without dropping to idle
+          // Keep listening permanently unless stopped
+          if (statusRef.current !== 'stopped' && statusRef.current !== 'error') {
              try { rec.start(); } catch(e) {}
-             startFakeAnim();
+             if (statusRef.current === 'listening') startFakeAnim();
           }
         };
         

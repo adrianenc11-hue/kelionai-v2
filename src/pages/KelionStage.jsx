@@ -1808,6 +1808,21 @@ export default function KelionStage() {
               background: '#0d0b1d', overflow: 'hidden'
             }}>
               <MonitorOverlay />
+              {/* Transcript Overlay for Monitor Mode */}
+              {(() => {
+                const lastDisplayMessage = [...messages].reverse().find(m => !m.isThought && m.text && typeof m.text === 'string' && m.text.trim().length > 0);
+                if (!lastDisplayMessage) return null;
+                return (
+                  <div style={{ position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)', width: '80%', maxWidth: 800, background: 'rgba(10,13,26,0.85)', padding: '16px 24px', borderRadius: 16, color: 'white', fontFamily: 'Inter, sans-serif', fontSize: 16, textAlign: 'center', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 8px 32px rgba(0,0,0,0.5)', zIndex: 9999, pointerEvents: 'none', transition: 'all 0.3s ease' }}>
+                    <span style={{ color: lastDisplayMessage.isUser ? '#58a6ff' : '#4ade80', fontWeight: 'bold', marginRight: 12 }}>
+                      {lastDisplayMessage.isUser ? 'Tu:' : 'Kelion:'}
+                    </span>
+                    <span style={{ opacity: 0.95, lineHeight: 1.5 }}>
+                      {lastDisplayMessage.text}
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>
