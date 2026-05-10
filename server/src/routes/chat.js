@@ -9,7 +9,7 @@ const { Router } = require('express');
 const { trialStatus, stampTrialIfFresh } = require('../services/trialQuota');
 const { peekSignedInUser, isAdminUser } = require('../middleware/optionalAuth');
 const ipGeo = require('../services/ipGeo');
-const { buildKelionToolsGoogle } = require('./realtime');
+const { buildKelionToolsChatCompletions } = require('./realtime');
 
 const router = Router();
 
@@ -98,7 +98,7 @@ router.post('/', async (req, res) => {
     // ── Demand-driven tool activation ─────────────────────────────────
     // Default: all tools OFF. Activate only tools relevant to this
     // specific message. After the request completes, tools go back to OFF.
-    const openRouterTools = buildKelionToolsGoogle();
+    const openRouterTools = buildKelionToolsChatCompletions();
     
     // Convert history to OpenAI format for OpenRouter
     const sanitizedMessages = session.history.map(h => {
