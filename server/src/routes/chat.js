@@ -131,15 +131,7 @@ router.post('/', async (req, res) => {
     const isGoogleModel = model.startsWith('google/');
     let apiUrl = url;
     let authHeader = `Bearer ${orKey}`;
-
-    if (googleKey && isGoogleModel) {
-      // Use direct Google AI Studio endpoint (OpenAI-compatible)
-      // This bypasses OpenRouter limits and provides a true "free/unlimited" experience
-      const modelSlug = model.replace('google/', '').replace(':free', '');
-      apiUrl = `https://generativelanguage.googleapis.com/v1beta/openai/chat/completions`;
-      authHeader = `Bearer ${googleKey}`;
-      body.model = `models/${modelSlug}`; // Google OpenAI shim often requires the models/ prefix
-    }
+    // Always use OpenRouter to ensure stability and avoid Google's strict shim requirements
 
     let r;
     try {

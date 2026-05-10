@@ -1965,14 +1965,8 @@ router.post('/pipeline', async (req, res) => {
       const isGoogleModel = currentModel.startsWith('google/');
       let apiUrl = url;
       let authHeader = `Bearer ${openRouterKey}`;
-
-      if (googleKey && isGoogleModel) {
-        apiUrl = `https://generativelanguage.googleapis.com/v1beta/openai/chat/completions`;
-        authHeader = `Bearer ${googleKey}`;
-        reqBody.model = `models/${currentModel.replace('google/', '').replace(':free', '')}`;
-      } else {
-        reqBody.model = currentModel;
-      }
+      reqBody.model = currentModel;
+      // Always use OpenRouter to ensure stability and avoid Google's strict shim requirements
 
       let r = await fetch(apiUrl, {
         method: 'POST',
