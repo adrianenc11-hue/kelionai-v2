@@ -229,9 +229,31 @@ Your replies must be direct, conversational, and concise.${locationContext}${tim
       }
     }
 
+    // Sanitize messages array to prevent Anthropic 400 errors (unexpected tool_use_id)
+    // 1. Ensure every 'tool' message has a corresponding 'assistant' tool_call preceding it.
+    // 2. OpenRouter combines consecutive 'user' and 'tool' messages.
+    const validToolCallIds = new Set();
+    const sanitizedMessages = [];
+    for (let i = 0; i < messages.length; i++) {
+      const msg = messages[i];
+      if (msg.role === 'assistant' && msg.tool_calls) {
+        msg.tool_calls.forEach(tc => validToolCallIds.add(tc.id));
+        sanitizedMessages.push(msg);
+      } else if (msg.role === 'tool') {
+        if (validToolCallIds.has(msg.tool_call_id)) {
+          sanitizedMessages.push(msg);
+        } else {
+          console.warn(`[chat] Dropping orphaned tool_result for ${msg.tool_call_id}`);
+          // If we drop a tool_result, we should ideally not break the flow, but sending an orphaned one is a fatal 400 error.
+        }
+      } else {
+        sanitizedMessages.push(msg);
+      }
+    }
+
     const body = {
       model,
-      messages,
+      messages: sanitizedMessages,
       temperature: 0.7,
       max_tokens: 1024,
     };
@@ -317,12 +339,18 @@ Your replies must be direct, conversational, and concise.${locationContext}${tim
         return { name: tc.function.name, args, id: tc.id };
       });
 
+      const parts = [];
+      if (choice.content) {
+        parts.push({ text: choice.content });
+      }
+      parts.push(...toolCalls.map(tc => ({ functionCall: tc })));
+
       // Save the model's turn so history is valid
       session.history.push({
         role: 'model',
-        parts: toolCalls.map(tc => ({ functionCall: tc }))
+        parts: parts
       });
-      return res.json({ toolCalls, model });
+      return res.json({ toolCalls, model, reply: choice.content });
     }
 
     const reply = choice.content || 'Sorry, I could not generate a response.';

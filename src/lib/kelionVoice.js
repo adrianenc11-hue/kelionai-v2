@@ -749,7 +749,14 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
       let stream = null
       if (!textOnly) {
         stream = await navigator.mediaDevices.getUserMedia({
-          audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, sampleRate: SAMPLE_RATE_IN },
+          audio: { 
+            channelCount: 1, 
+            echoCancellation: true, 
+            noiseSuppression: true, 
+            autoGainControl: true,
+            voiceIsolation: true,
+            sampleRate: SAMPLE_RATE_IN 
+          },
           video: false,
         })
         micStreamRef.current = stream
