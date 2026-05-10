@@ -92,7 +92,7 @@ router.post('/', async (req, res) => {
     }
 
     // Model: via OpenRouter — explicitly supports tool_calls.
-    const model = process.env.CHAT_MODEL || process.env.OPENROUTER_MODEL || 'google/gemini-1.5-flash:free';
+    const model = process.env.CHAT_MODEL || process.env.OPENROUTER_MODEL || 'google/gemini-flash-1.5';
     const url = 'https://openrouter.ai/api/v1/chat/completions';
 
     // ── Demand-driven tool activation ─────────────────────────────────
