@@ -797,8 +797,28 @@ async function addVoiceClone(userId, { voiceId, displayName, language, consentVe
   return { id: r.lastID, voice_id: voiceId, display_name: name, language: lang };
 }
 
+async function _ensureLegacyVoiceMigrated(userId) {
+  if (!userId) return;
+  const count = await db.get('SELECT COUNT(*) as c FROM voice_clones WHERE user_id = ?', [userId]);
+  if (count && count.c > 0) return;
+  
+  const user = await db.get('SELECT cloned_voice_id, cloned_voice_consent_version, cloned_voice_enabled FROM users WHERE id = ?', [userId]);
+  if (user && user.cloned_voice_id) {
+    const added = await addVoiceClone(userId, {
+      voiceId: user.cloned_voice_id,
+      displayName: 'Vocea mea originală',
+      language: 'auto',
+      consentVersion: user.cloned_voice_consent_version || 'auto-migrated'
+    });
+    if (added && user.cloned_voice_enabled) {
+      await db.run('UPDATE voice_clones SET is_active = 1 WHERE id = ? AND user_id = ?', [added.id, userId]);
+    }
+  }
+}
+
 async function listVoiceClones(userId) {
   if (!userId) return [];
+  await _ensureLegacyVoiceMigrated(userId);
   return db.all(
     `SELECT id, voice_id, display_name, language, is_active, consent_version, consent_at, created_at
        FROM voice_clones WHERE user_id = ? ORDER BY created_at DESC`,
@@ -832,6 +852,7 @@ async function setActiveVoiceClone(userId, cloneId) {
 
 async function getActiveVoiceClone(userId) {
   if (!userId) return null;
+  await _ensureLegacyVoiceMigrated(userId);
   const row = await db.get(
     `SELECT id, voice_id, display_name, language, is_active, created_at
        FROM voice_clones WHERE user_id = ? AND is_active = 1 LIMIT 1`,

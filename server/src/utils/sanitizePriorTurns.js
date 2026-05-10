@@ -53,7 +53,7 @@ const ROLE_MARKER_RE = new RegExp(
 
 // Closing/opening tag-style fences that might match a delimiter the
 // token-mint endpoint wraps around user-authored blocks. We don't know
-// what the downstream prompt framing looks like on Claude Opus vs OpenAI,
+// what the downstream prompt framing looks like on Gemini vs OpenAI,
 // so we neutralise the whole class rather than whitelist specific
 // words. Matches `<foo>`, `</foo>`, `<|foo|>`, `<|/foo|>` for short
 // word payloads. Requires at least one letter so `< 5`, `x > 3` and

@@ -525,7 +525,7 @@ const KELION_TOOLS = [
 
   {
     name: 'switch_voice',
-    description: "Switch Kelion's speaking voice. Call when user says 'folosește vocea mea clonată', 'use my cloned voice', 'schimbă vocea la a mea', 'switch to my voice', 'vocea ta normală', 'use your default voice'. Cloned mode uses ElevenLabs with the user's cloned voice ID. Default mode uses Claude Opus's built-in voice.",
+    description: "Switch Kelion's speaking voice between cloned and default. Call when user says 'folosește vocea mea clonată', 'use my cloned voice', 'vocea ta normală', 'use your default voice'. When switching to cloned mode, first call list_voice_clones to see available voices and ask the user which one they want if multiple exist. Then call activate_voice_clone with the chosen clone ID.",
     properties: {
       mode: {
         type: 'string',
@@ -534,6 +534,22 @@ const KELION_TOOLS = [
       },
     },
     required: ['mode'],
+  },
+
+  {
+    name: 'list_voice_clones',
+    description: "List all cloned voices the user has in their voice library. Call when the user asks 'ce voci ai clonate?', 'what voices do I have?', 'arată-mi vocile', 'show my cloned voices', 'câte voci clonate am?'. Returns the list of all cloned voices with their names, languages, and which one is active.",
+    properties: {},
+    required: [],
+  },
+
+  {
+    name: 'activate_voice_clone',
+    description: "Activate a specific cloned voice from the user's library. Call after list_voice_clones when the user picks a voice. Use the clone ID from the list. Set id=0 to deactivate all clones and return to native voice.",
+    properties: {
+      id: { type: 'number', description: "The clone ID to activate (from list_voice_clones results). Set to 0 to deactivate and use native voice." },
+    },
+    required: ['id'],
   },
 
   {
@@ -749,11 +765,11 @@ const KELION_TOOLS = [
   },
   {
     name: 'ask_expert_coder',
-    description: "Consult an expert coding model on OpenRouter to solve complex programming problems or do deep reasoning. Use 'anthropic/claude-opus-4.7' for strong reasoning and code generation.",
+    description: "Consult an expert coding model on OpenRouter to solve complex programming problems or do deep reasoning. Uses Gemini 2.0 Flash for speed and intelligence.",
     properties: {
       question: { type: 'string', description: "The exact problem or question for the expert." },
       context: { type: 'string', description: "Relevant code snippets, error messages, or file contents." },
-      model: { type: 'string', enum: ['anthropic/claude-opus-4.7', 'anthropic/claude-opus-4.7'], description: "Which model to use. Default is anthropic/claude-opus-4.7." },
+      model: { type: 'string', enum: ['google/gemini-2.0-flash-exp:free', 'google/gemini-flash-1.5'], description: "Which model to use. Default is google/gemini-2.0-flash-exp:free." },
     },
     required: ['question', 'context'],
   },
@@ -1653,7 +1669,7 @@ const voiceTokenHandler = async (req, res) => {
     //   Browser SpeechRecognition → /api/realtime/pipeline (Claude Opus via
     //   OpenRouter) → /api/voice/clone/tts (ElevenLabs TTS).
     // We still build the full persona + tools so /pipeline can use them.
-    const chatModel = process.env.OPENROUTER_MODEL || 'anthropic/claude-opus-4.7';
+    const chatModel = process.env.OPENROUTER_MODEL || 'google/gemini-2.0-flash-exp:free';
     
     // Restore variables needed for JSON payload
     const user = adminUser;
@@ -1751,16 +1767,26 @@ router.post('/vision', visionLimiter, async (req, res) => {
     // Convert base64 data to OpenAI image_url format
     const base64Data = `data:${mimeType || 'image/jpeg'};base64,${image}`;
 
-    const r = await fetch(url, {
+    const googleKey = process.env.GOOGLE_API_KEY;
+    const modelName = 'google/gemini-2.0-flash-exp:free';
+    let apiUrl = url;
+    let authHeader = `Bearer ${openRouterKey}`;
+    
+    if (googleKey) {
+      apiUrl = `https://generativelanguage.googleapis.com/v1beta/openai/chat/completions`;
+      authHeader = `Bearer ${googleKey}`;
+    }
+
+    const r = await fetch(apiUrl, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${openRouterKey}`,
+        'Authorization': authHeader,
         'HTTP-Referer': 'https://kelion.ai',
         'X-Title': 'Kelion AI Vision'
       },
       body: JSON.stringify({
-        model: 'anthropic/claude-opus-4.7',
+        model: googleKey ? 'gemini-1.5-flash' : modelName,
         messages: [
           {
             role: 'user',
@@ -1770,7 +1796,7 @@ router.post('/vision', visionLimiter, async (req, res) => {
                 text: `You are a vision system analyzing a real camera frame from a user's device. RULES:\n1. Describe ONLY what you can LITERALLY see in this image. Never invent, assume, or hallucinate details.\n2. If the image is blurry, dark, or unclear, say so honestly — do NOT guess what might be there.\n3. Focus on: people (position, clothing, actions), objects, text visible, environment (indoor/outdoor, vehicle, room type).\n4. If you see a steering wheel, dashboard, or road — the user is in a vehicle. Describe the driving scene.\n5. If you see a face close-up — this is likely a front-facing (selfie) camera.\n6. Keep to 1-2 factual sentences. No creative writing.${timeInfo}`
               },
               {
-                type: 'image_url',
+                method: 'gemini-multimodal',
                 image_url: {
                   url: base64Data
                 }
@@ -1821,15 +1847,15 @@ router.post('/vision', visionLimiter, async (req, res) => {
       console.warn('[vision] client sent invalid image:', err.message?.slice(0, 200));
       return res.status(400).json({ error: 'Invalid image. Please make sure your image is valid.' });
     }
-    console.error('[vision] Claude Opus error:', err.message);
+    console.error('[vision] Gemini error:', err.message);
     return res.status(500).json({ error: 'Vision processing failed' });
   }
 });
 
 // ──────────────────────────────────────────────────────────────────
-// /pipeline — Claude Opus text-chat pipeline (tools supported).
-// For typed messages: text → Claude Opus chat → tool loop → text back.
-// Voice goes directly through Claude Opus REST Voice Mode — not this route.
+// /pipeline — Gemini text-chat pipeline (tools supported).
+// For typed messages: text → Gemini chat → tool loop → text back.
+// Voice goes directly through Gemini REST Voice Mode — not this route.
 // ──────────────────────────────────────────────────────────────────
 router.post('/pipeline', async (req, res) => {
   const { history, textOverride, visionContext, clientTimezone, clientLocalTime: clientLocalTimeRaw } = req.body || {};
@@ -1917,7 +1943,7 @@ router.post('/pipeline', async (req, res) => {
       console.log('[resourceGov] All resources OFF (simple chat)');
     }
 
-    const chatModel = process.env.OPENROUTER_MODEL || 'anthropic/claude-opus-4.7';
+    const chatModel = process.env.OPENROUTER_MODEL || 'google/gemini-2.0-flash-exp:free';
     const url = 'https://openrouter.ai/api/v1/chat/completions';
 
     const body = {
@@ -1935,12 +1961,24 @@ router.post('/pipeline', async (req, res) => {
     let fallbackTriggered = false;
 
     async function fetchOpenRouter(reqBody) {
-      reqBody.model = currentModel;
-      let r = await fetch(url, {
+      const googleKey = process.env.GOOGLE_API_KEY;
+      const isGoogleModel = currentModel.startsWith('google/');
+      let apiUrl = url;
+      let authHeader = `Bearer ${openRouterKey}`;
+
+      if (googleKey && isGoogleModel) {
+        apiUrl = `https://generativelanguage.googleapis.com/v1beta/openai/chat/completions`;
+        authHeader = `Bearer ${googleKey}`;
+        reqBody.model = currentModel.replace('google/', '').replace(':free', '');
+      } else {
+        reqBody.model = currentModel;
+      }
+
+      let r = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${openRouterKey}`,
+          'Authorization': authHeader,
           'HTTP-Referer': 'https://kelion.ai',
           'X-Title': 'Kelion AI'
         },
@@ -1951,7 +1989,7 @@ router.post('/pipeline', async (req, res) => {
       if (!r.ok && r.status === 402 && !fallbackTriggered) {
         console.warn('[pipeline] OpenRouter 402 Payment Required. Falling back to free model.');
         fallbackTriggered = true;
-        currentModel = 'anthropic/claude-opus-4.7';
+        currentModel = 'google/gemini-2.0-flash-exp:free';
         reqBody.model = currentModel;
         
         // Retry with free model
@@ -2033,7 +2071,7 @@ router.post('/pipeline', async (req, res) => {
     // Extract final text — only return .content (ignore any reasoning_content from CoT models)
     let assistantText = (finalMessage?.content || '').trim();
     if (fallbackTriggered) {
-      assistantText = "[SISTEM: Contul OpenRouter a rămas fără credit! Am trecut automat pe modelul de rezervă Claude Opus.]\n" + assistantText;
+      assistantText = "[SISTEM: Contul OpenRouter a rămas fără credit! Am trecut automat pe modelul de rezervă Gemini Free.]\n" + assistantText;
     }
     console.log('[pipeline] OpenRouter:', assistantText.slice(0, 100));
 
