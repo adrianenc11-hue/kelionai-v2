@@ -769,7 +769,7 @@ const KELION_TOOLS = [
     properties: {
       question: { type: 'string', description: "The exact problem or question for the expert." },
       context: { type: 'string', description: "Relevant code snippets, error messages, or file contents." },
-      model: { type: 'string', enum: ['google/gemini-flash-1.5'], description: "Which model to use. Default is google/gemini-flash-1.5." },
+      model: { type: 'string', enum: ['anthropic/claude-3-haiku'], description: "Which model to use. Default is anthropic/claude-3-haiku." },
     },
     required: ['question', 'context'],
   },
@@ -1768,7 +1768,7 @@ router.post('/vision', visionLimiter, async (req, res) => {
     const base64Data = `data:${mimeType || 'image/jpeg'};base64,${image}`;
 
     const googleKey = process.env.GOOGLE_API_KEY;
-    const modelName = 'google/gemini-flash-1.5';
+    const modelName = 'anthropic/claude-3-haiku';
     let apiUrl = url;
     let authHeader = `Bearer ${openRouterKey}`;
     
@@ -1943,7 +1943,7 @@ router.post('/pipeline', async (req, res) => {
       console.log('[resourceGov] All resources OFF (simple chat)');
     }
 
-    const chatModel = process.env.OPENROUTER_MODEL || 'google/gemini-flash-1.5';
+    const chatModel = process.env.OPENROUTER_MODEL || 'anthropic/claude-3-haiku';
     const url = 'https://openrouter.ai/api/v1/chat/completions';
 
     const body = {
@@ -1983,7 +1983,7 @@ router.post('/pipeline', async (req, res) => {
       if (!r.ok && r.status === 402 && !fallbackTriggered) {
         console.warn('[pipeline] OpenRouter 402 Payment Required. Falling back to free model.');
         fallbackTriggered = true;
-        currentModel = 'google/gemini-flash-1.5';
+        currentModel = 'anthropic/claude-3-haiku';
         reqBody.model = currentModel;
         
         // Retry with free model

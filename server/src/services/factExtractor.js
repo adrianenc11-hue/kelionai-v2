@@ -61,7 +61,7 @@ async function extractFacts(turns, options = {}) {
   const url = 'https://openrouter.ai/api/v1/chat/completions';
 
   const body = {
-    model: options.model || 'google/gemini-flash-1.5', // Gemini 1.5 Flash — free project-wide default via OpenRouter
+    model: options.model || 'anthropic/claude-3-haiku', // Claude 3 Haiku — ultra-fast premium default
     messages: [
       { role: 'system', content: EXTRACTION_SYSTEM },
       { role: 'user', content: `Transcript:\n${transcript}` }
