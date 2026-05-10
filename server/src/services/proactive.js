@@ -100,9 +100,9 @@ function composeMessage(memoryItem) {
 }
 
 // Global flag to ensure we only alert once per server lifecycle
-let _gemma4AlertSent = false;
-async function checkGemma4Availability() {
-  if (_gemma4AlertSent) return null;
+let _claude_opusAlertSent = false;
+async function checkClaude4Availability() {
+  if (_claude_opusAlertSent) return null;
   const apiKey = process.env.GOOGLE_API_KEY;
   if (!apiKey) return null;
   try {
@@ -111,15 +111,15 @@ async function checkGemma4Availability() {
     if (!res.ok) return null;
     const data = await res.json();
     const models = data.models || [];
-    // We check if any Gemma 4 model supports BidiGenerateContent (Live WebSocket)
-    const gemmaLive = models.find(m => 
-      m.name.toLowerCase().includes('gemma-4') && 
+    // We check if any Claude Opus model supports BidiGenerateContent (Live WebSocket)
+    const claudeLive = models.find(m => 
+      m.name.toLowerCase().includes('claude-4') && 
       (m.supportedGenerationMethods || []).includes('bidiGenerateContent')
     );
-    if (gemmaLive) {
-      _gemma4AlertSent = true;
-      console.log('🚨 [PROACTIVE] GEMMA 4 NATIVE AUDIO IS AVAILABLE! 🚨', gemmaLive.name);
-      return { title: 'Kelion AI Update', body: `Gemma 4 is ready for full voice replacement! Model: ${gemmaLive.displayName || gemmaLive.name}`, reason: 'system_alert:gemma4' };
+    if (claudeLive) {
+      _claude_opusAlertSent = true;
+      console.log('🚨 [PROACTIVE] GEMMA 4 NATIVE AUDIO IS AVAILABLE! 🚨', claudeLive.name);
+      return { title: 'Kelion AI Update', body: `Claude Opus is ready for full voice replacement! Model: ${claudeLive.displayName || claudeLive.name}`, reason: 'system_alert:claude_opus' };
     }
   } catch (err) {
     // Ignore fetch errors to not pollute logs
@@ -143,8 +143,8 @@ async function runOnce({ webpush, now = new Date() } = {}) {
 
   const report = { users_considered: byUser.size, sent: 0, skipped_gap: 0, no_memory: 0, failed: 0 };
   
-  // 1. Check for systemic alerts (like Gemma 4 Availability)
-  const systemAlertMsg = await checkGemma4Availability();
+  // 1. Check for systemic alerts (like Claude Opus Availability)
+  const systemAlertMsg = await checkClaude4Availability();
 
   for (const [userId, userSubs] of byUser) {
       let msg = systemAlertMsg;

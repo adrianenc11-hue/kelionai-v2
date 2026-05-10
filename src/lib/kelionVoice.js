@@ -1,4 +1,4 @@
-// Kelion voice client hook (Gemma 4 via OpenRouter REST + Browser SpeechRecognition).
+// Kelion voice client hook (Claude Opus via OpenRouter REST + Browser SpeechRecognition).
 // Manages: mic capture → SpeechRecognition → OpenRouter → TTS playback → lipsync → transcript.
 // Stage 1 modules: M3 (mic+VAD), M4 (voice loop), M5 (auto-language),
 //   M6 (turn-taking), M8 (Kelion persona).
@@ -7,7 +7,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { runTool } from './kelionTools'
-import { isClonedVoiceActive, setDetectedLang, getDetectedLang } from './voiceModeStore'
+import { isClonedVoiceActive, setDetectedLang, getDetectedLang, getSelectedVoice } from './voiceModeStore'
 import { setCameraController, setCurrentFacingMode } from './cameraControl'
 import { getCsrfToken } from './api'
 import { subscribeNarrationMode, getNarrationMode } from './narrationMode'
@@ -487,7 +487,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
                   'X-CSRF-Token': getCsrfToken(),
                 },
                 credentials: 'include',
-                body: JSON.stringify({ text: textToSpeak, lang: getDetectedLang() }),
+                body: JSON.stringify({ text: textToSpeak, lang: getDetectedLang(), voiceId: getSelectedVoice()?.voiceId || undefined }),
               })
               if (!r.ok) {
                 const errText = await r.text().catch(() => '')
@@ -595,6 +595,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
     // /api/tools/* backend endpoint, then send back a toolResponse with the
     // matching id so the model can continue the turn with the result.
     if (msg.toolCall?.functionCalls?.length) {
+      setStatus('working')
       const fcs = msg.toolCall.functionCalls
       // Suppress narration during tool execution — the cooldown prevents
       // the narrator from jumping in between chained tool calls.
@@ -854,7 +855,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
         setTrial(null)
       }
 
-      if (tokenBody?.model?.includes('gemma')) {
+      if (tokenBody?.model?.includes('claude')) {
         // OpenRouter REST Voice Mode
         console.log('[kelionVoice] OpenRouter model detected, switching to REST Voice Mode');
         // We MUST NOT stop micStreamRef.current here because if the soundbars are flat,
@@ -885,7 +886,11 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
         rec.onresult = async (ev) => {
           setUserLevel(0.6 + Math.random() * 0.4);
           
-          if (!ev.results[0].isFinal) return; // Wait for final transcript
+          if (!ev.results[0].isFinal) {
+            // Barge-in: immediately stop TTS when user starts speaking
+            clearAudioQueue();
+            return; // Wait for final transcript
+          }
           
           const transcript = ev.results[0][0].transcript;
           if (!transcript) return;
@@ -1620,7 +1625,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
         console.error('[kelionVoice] sendText failed', err)
       }
     } else {
-      // HTTP fallback — Gemma 4 text/voice chat via /api/chat
+      // HTTP fallback — Claude Opus text/voice chat via /api/chat
       setStatus('thinking')
       try {
         let currentMessage = clean;
@@ -1657,6 +1662,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
           const data = await r.json()
           
           if (data.toolCalls && data.toolCalls.length > 0) {
+            setStatus('working')
             const results = [];
             for (const call of data.toolCalls) {
               const res = await runTool(call.name, call.args);
@@ -1693,7 +1699,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
               credentials: 'include',
-              body: JSON.stringify({ text: finalReply, lang: getDetectedLang() }),
+              body: JSON.stringify({ text: finalReply, lang: getDetectedLang(), voiceId: getSelectedVoice()?.voiceId || undefined }),
             })
             console.log('[TTS-DEBUG] TTS response status:', r.status)
             if (r.ok) {
@@ -1718,12 +1724,16 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
               audioEl.src = blobUrl;
               audioEl.volume = 1;
               activeAudioElRef.current = audioEl
+              let playbackStarted = false
               audioEl.onended = () => {
                 URL.revokeObjectURL(blobUrl)
                 activeAudioElRef.current = null
                 setStatus('idle')
               }
               audioEl.onerror = (e) => {
+                // Ignore spurious error events that fire AFTER playback
+                // already started successfully (common with blob URL revocation)
+                if (playbackStarted) return
                 console.error('[kelionVoice] Audio playback error:', e)
                 appendTurn('assistant', `⚠️ Eroare la redarea audio în browser.`, true, '⚙️ System')
                 URL.revokeObjectURL(blobUrl)
@@ -1732,6 +1742,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
               
               console.log('[TTS-DEBUG] calling audioEl.play()')
               audioEl.play().then(() => {
+                playbackStarted = true
                 console.log('[TTS-DEBUG] AUDIO PLAYING OK')
               }).catch((e) => {
                 console.error('[kelionVoice] Audio play() blocked:', e)

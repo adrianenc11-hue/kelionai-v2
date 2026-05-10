@@ -843,7 +843,7 @@ async function listRecentActions(userId, { limit = 40, sessionId = null } = {}) 
 // `setPreferredLanguage` persists the short BCP-47 primary tag on the
 // users row AND mirrors it as a `locale` memory_item. The memory row is
 // what chat.js / realtime.js already inject into the persona via
-// `listMemoryItems`, so every provider (text chat + Gemma 4
+// `listMemoryItems`, so every provider (text chat + Claude Opus
 // Live) sees the fact without chat.js being touched.
 //
 // Older `locale` rows for the same user are pruned first so the persona
@@ -851,16 +851,23 @@ async function listRecentActions(userId, { limit = 40, sessionId = null } = {}) 
 // "Preferred language: Romanian" lines after the user changes it.
 async function setPreferredLanguage(userId, shortTag, factText) {
   if (!userId || !shortTag) return null;
+  const userExists = await getUserById(userId);
+  if (!userExists) return null;
+
   await db.run(
     'UPDATE users SET preferred_language = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
     [shortTag, userId]
   );
   if (factText && typeof factText === 'string') {
     await db.run('DELETE FROM memory_items WHERE user_id = ? AND kind = ?', [userId, 'locale']);
-    await db.run(
-      'INSERT INTO memory_items (user_id, kind, fact) VALUES (?, ?, ?)',
-      [userId, 'locale', factText.slice(0, 500)]
-    );
+    try {
+      await db.run(
+        'INSERT INTO memory_items (user_id, kind, fact) VALUES (?, ?, ?)',
+        [userId, 'locale', factText.slice(0, 500)]
+      );
+    } catch (err) {
+      console.warn('[db] setPreferredLanguage memory_items insert failed:', err && err.message);
+    }
   }
   return getUserById(userId);
 }

@@ -1,9 +1,9 @@
 'use strict';
 
-// POST /api/chat — text chat using Gemma 4 via generateContent API.
+// POST /api/chat — text chat using Claude Opus via generateContent API.
 // This is a fallback/primary text chat route that does NOT require
-// This is the primary text chat route using Gemma 4 via OpenRouter.
-// generateContent, including Gemma 4.
+// This is the primary text chat route using Claude Opus via OpenRouter.
+// generateContent, including Claude Opus.
 
 const { Router } = require('express');
 const { trialStatus, stampTrialIfFresh } = require('../services/trialQuota');
@@ -92,7 +92,7 @@ router.post('/', async (req, res) => {
     }
 
     // Model: via OpenRouter — explicitly supports tool_calls.
-    const model = process.env.CHAT_MODEL || process.env.OPENROUTER_MODEL || 'google/gemma-4-31b-it';
+    const model = process.env.CHAT_MODEL || process.env.OPENROUTER_MODEL || 'anthropic/claude-opus-4.7';
     const url = 'https://openrouter.ai/api/v1/chat/completions';
 
     // ── Demand-driven tool activation ─────────────────────────────────
@@ -101,22 +101,26 @@ router.post('/', async (req, res) => {
     const { KELION_TOOLS } = require('./realtime');
     const { selectTools } = require('../services/toolRouter');
     
-    // Find the last user message to use for tool routing, especially when handling toolResponses
+    // Find the last user message and last assistant message for robust tool routing context
     let lastUserMessage = message || '';
-    if (!lastUserMessage) {
-      for (let i = session.history.length - 1; i >= 0; i--) {
-        if (session.history[i].role === 'user') {
-          const parts = session.history[i].parts;
-          const textPart = parts.find(p => p.text);
-          if (textPart) {
-            lastUserMessage = textPart.text;
-          }
-          break;
+    let lastAssistantMessage = '';
+    
+    for (let i = session.history.length - 1; i >= 0; i--) {
+      const parts = session.history[i].parts;
+      const textPart = parts.find(p => p.text);
+      if (textPart) {
+        if (session.history[i].role === 'model' && !lastAssistantMessage) {
+          lastAssistantMessage = textPart.text;
+        }
+        if (session.history[i].role === 'user' && !lastUserMessage) {
+          lastUserMessage = textPart.text;
         }
       }
+      if (lastUserMessage && lastAssistantMessage) break;
     }
     
-    let routingResult = selectTools(lastUserMessage, KELION_TOOLS);
+    const contextForRouting = `${lastAssistantMessage} ${lastUserMessage}`.trim();
+    let routingResult = selectTools(contextForRouting, KELION_TOOLS);
     let relevantTools = routingResult ? routingResult.tools : null;
     if (!relevantTools || relevantTools.length === 0) {
       relevantTools = KELION_TOOLS;

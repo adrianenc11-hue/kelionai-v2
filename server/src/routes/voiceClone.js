@@ -32,6 +32,242 @@ const ipGeo = require('../services/ipGeo');
 
 const router = Router();
 
+// ── Native masculine voice auto-discovery (per language) ──────────
+// Queries ElevenLabs /v1/voices once per language, finds the best
+// male voice that matches the detected user language, and caches the
+// result in-memory so subsequent TTS calls are instant.
+// No voice IDs are ever hardcoded — everything comes from the API.
+const _nativeVoiceCache = new Map(); // lang → { voiceId, name, ts }
+const VOICE_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+// ElevenLabs language codes mapped from ISO 639-1 (what browsers send)
+const LANG_NAMES = {
+  ro: 'romanian', en: 'english', es: 'spanish', fr: 'french',
+  de: 'german', it: 'italian', pt: 'portuguese', nl: 'dutch',
+  pl: 'polish', sv: 'swedish', da: 'danish', no: 'norwegian',
+  fi: 'finnish', cs: 'czech', hu: 'hungarian', el: 'greek',
+  tr: 'turkish', ru: 'russian', uk: 'ukrainian', ar: 'arabic',
+  hi: 'hindi', ja: 'japanese', ko: 'korean', zh: 'chinese',
+  bg: 'bulgarian', hr: 'croatian', sk: 'slovak', sl: 'slovenian',
+};
+
+/**
+ * Auto-discover a native masculine voice from ElevenLabs for a given
+ * language code (ISO 639-1, e.g. "ro", "en", "fr").
+ *
+ * Strategy (in priority order):
+ *   1. Check in-memory cache (TTL = 1h)
+ *   2. Query ElevenLabs GET /v1/voices
+ *   3. Filter: gender=male + language matches detected lang
+ *   4. Prefer "premade" voices (ElevenLabs library) over user-created
+ *   5. Cache the winner and return its voice_id
+ *
+ * Returns null if no matching voice is found.
+ */
+async function discoverNativeMaleVoice(apiKey, langCode) {
+  if (!apiKey || !langCode) return null;
+  const lang = langCode.toLowerCase().split('-')[0]; // "ro-RO" → "ro"
+
+  // Check cache
+  const cached = _nativeVoiceCache.get(lang);
+  if (cached && Date.now() - cached.ts < VOICE_CACHE_TTL_MS) {
+    return cached.voiceId;
+  }
+
+  try {
+    const r = await fetch('https://api.elevenlabs.io/v1/voices', {
+      headers: { 'xi-api-key': apiKey },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!r.ok) {
+      console.warn(`[voice/discover] ElevenLabs /voices returned ${r.status}`);
+      return cached?.voiceId || null; // stale cache better than nothing
+    }
+
+    const data = await r.json();
+    const voices = data.voices || [];
+    const langName = LANG_NAMES[lang] || lang;
+
+    // Score each voice: higher = better match
+    function scoreVoice(v) {
+      const labels = v.labels || {};
+      const isMale = (labels.gender || '').toLowerCase() === 'male';
+      if (!isMale) return -1; // MUST be male
+
+      let score = 0;
+      // Language match (check labels.language, labels.accent, voice name)
+      const voiceLang = (labels.language || '').toLowerCase();
+      const voiceAccent = (labels.accent || '').toLowerCase();
+      const voiceName = (v.name || '').toLowerCase();
+      const voiceDesc = (v.description || '').toLowerCase();
+
+      if (voiceLang.includes(langName) || voiceLang.includes(lang)) score += 100;
+      else if (voiceAccent.includes(langName) || voiceAccent.includes(lang)) score += 80;
+      else if (voiceName.includes(langName) || voiceName.includes(lang)) score += 60;
+      else if (voiceDesc.includes(langName) || voiceDesc.includes(lang)) score += 40;
+
+      // Prefer premade/library voices over cloned
+      if (v.category === 'premade' || v.category === 'professional') score += 20;
+      // Prefer "professional" or "narration" use case
+      const useCase = (labels.use_case || '').toLowerCase();
+      if (useCase.includes('narration') || useCase.includes('news')) score += 10;
+      // Prefer voices with higher sample count (better quality)
+      if (v.high_quality_base_model_ids?.length) score += 5;
+
+      return score;
+    }
+
+    // Score all voices and pick the best
+    const scored = voices
+      .map(v => ({ voice: v, score: scoreVoice(v) }))
+      .filter(s => s.score > 0) // only male voices
+      .sort((a, b) => b.score - a.score);
+
+    if (scored.length > 0) {
+      const best = scored[0].voice;
+      const result = { voiceId: best.voice_id, name: best.name, ts: Date.now() };
+      _nativeVoiceCache.set(lang, result);
+      console.log(`[voice/discover] lang="${lang}" → ${best.name} (${best.voice_id}), score=${scored[0].score}, candidates=${scored.length}`);
+      return best.voice_id;
+    }
+
+    // No language-specific male voice found — fall back to any male voice
+    const anyMale = voices.find(v => (v.labels?.gender || '').toLowerCase() === 'male');
+    if (anyMale) {
+      const result = { voiceId: anyMale.voice_id, name: anyMale.name, ts: Date.now() };
+      _nativeVoiceCache.set(lang, result);
+      console.log(`[voice/discover] lang="${lang}" no exact match → fallback to ${anyMale.name} (${anyMale.voice_id})`);
+      return anyMale.voice_id;
+    }
+
+    console.warn(`[voice/discover] No male voices found at all in ElevenLabs account`);
+    return null;
+  } catch (err) {
+    console.error(`[voice/discover] API error:`, err?.message);
+    return cached?.voiceId || null; // stale cache on error
+  }
+}
+
+// ── Voice listing cache (shared with discovery) ──
+const _voicesListCache = { data: null, ts: 0 };
+const VOICES_LIST_CACHE_TTL = 30 * 60 * 1000; // 30 min
+
+/**
+ * GET /api/voice/clone/voices?lang=ro
+ * Returns all available masculine voices for the given language.
+ * The client displays these in a voice picker dropdown on the avatar.
+ */
+router.get('/voices', async (req, res) => {
+  const apiKey = process.env.ELEVENLABS_API_KEY;
+  if (!apiKey) return res.status(503).json({ error: 'ElevenLabs not configured.' });
+
+  const langParam = (req.query.lang || 'en').toLowerCase().split('-')[0];
+  const langName = LANG_NAMES[langParam] || langParam;
+
+  try {
+    // Use cache if fresh
+    let voices;
+    if (_voicesListCache.data && Date.now() - _voicesListCache.ts < VOICES_LIST_CACHE_TTL) {
+      voices = _voicesListCache.data;
+    } else {
+      const r = await fetch('https://api.elevenlabs.io/v1/voices', {
+        headers: { 'xi-api-key': apiKey },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!r.ok) return res.status(502).json({ error: `ElevenLabs API error: ${r.status}` });
+      const data = await r.json();
+      voices = data.voices || [];
+      _voicesListCache.data = voices;
+      _voicesListCache.ts = Date.now();
+    }
+
+    // Filter: male only, score by language match
+    const results = voices
+      .filter(v => (v.labels?.gender || '').toLowerCase() === 'male')
+      .map(v => {
+        const labels = v.labels || {};
+        const vLang = (labels.language || '').toLowerCase();
+        const vAccent = (labels.accent || '').toLowerCase();
+        const vName = (v.name || '').toLowerCase();
+        let langScore = 0;
+        if (vLang.includes(langName) || vLang.includes(langParam)) langScore = 100;
+        else if (vAccent.includes(langName) || vAccent.includes(langParam)) langScore = 80;
+        else if (vName.includes(langName) || vName.includes(langParam)) langScore = 40;
+
+        return {
+          voice_id: v.voice_id,
+          name: v.name,
+          category: v.category || 'unknown',
+          language: labels.language || null,
+          accent: labels.accent || null,
+          age: labels.age || null,
+          use_case: labels.use_case || null,
+          description: (v.description || '').slice(0, 200),
+          preview_url: v.preview_url || null,
+          langScore,
+        };
+      })
+      .sort((a, b) => b.langScore - a.langScore);
+
+    // Return all male voices, with lang-matching ones first
+    const currentVoiceId = _nativeVoiceCache.get(langParam)?.voiceId || null;
+
+    res.json({
+      lang: langParam,
+      langName,
+      currentVoiceId,
+      voices: results,
+      total: results.length,
+    });
+  } catch (err) {
+    console.error('[voice/voices] Error:', err?.message);
+    res.status(500).json({ error: 'Failed to fetch voices.' });
+  }
+});
+
+// ── User voice preference (in-memory, per session) ──
+// When a user picks a specific voice from the voice picker UI, we store
+// it here. The TTS endpoint checks this before auto-discovery.
+const _userVoicePreference = new Map(); // userId → { voiceId, voiceName, lang }
+
+/**
+ * POST /api/voice/clone/select-voice
+ * Body: { voiceId: string, voiceName?: string, lang?: string }
+ * Saves the user's preferred native voice. Used by the avatar voice picker.
+ */
+router.post('/select-voice', async (req, res) => {
+  const userId = uidOf(req);
+  if (!userId) return res.status(401).json({ error: 'Not authenticated.' });
+
+  const { voiceId, voiceName, lang } = req.body || {};
+  if (!voiceId || typeof voiceId !== 'string') {
+    return res.status(400).json({ error: 'voiceId is required.' });
+  }
+
+  _userVoicePreference.set(String(userId), {
+    voiceId: voiceId.trim(),
+    voiceName: voiceName || null,
+    lang: lang || null,
+    ts: Date.now(),
+  });
+
+  console.log(`[voice/select] User ${userId} selected voice: ${voiceName || voiceId} (lang=${lang})`);
+  res.json({ ok: true, voiceId, voiceName, lang });
+});
+
+/**
+ * GET /api/voice/clone/selected-voice
+ * Returns the user's currently selected voice preference.
+ */
+router.get('/selected-voice', (req, res) => {
+  const userId = uidOf(req);
+  if (!userId) return res.status(401).json({ error: 'Not authenticated.' });
+
+  const pref = _userVoicePreference.get(String(userId));
+  res.json({ selected: pref || null });
+});
+
+
 // Audit M5 — hard cap on the base64 payload BEFORE we allocate a
 // Buffer. ElevenLabs Instant Voice Cloning caps at ~10 MB of decoded
 // audio; 4 base64 chars encode 3 bytes, so the decoded length is at
@@ -348,45 +584,39 @@ router.post('/tts', async (req, res) => {
   }
   
   const isNative = req.query.native === 'true';
-  let nativeVoiceId = process.env.ELEVENLABS_NATIVE_VOICE_ID || 'pNInz6obpgDQGcFmaJgB'; // Adam - Professional, deep male voice
-  
-  if (isNative && lang) {
-    const l = lang.toLowerCase();
-    if (l.startsWith('ro')) nativeVoiceId = process.env.ELEVENLABS_NATIVE_VOICE_ID_RO || nativeVoiceId;
-    else if (l.startsWith('es')) nativeVoiceId = process.env.ELEVENLABS_NATIVE_VOICE_ID_ES || nativeVoiceId;
-    else if (l.startsWith('fr')) nativeVoiceId = process.env.ELEVENLABS_NATIVE_VOICE_ID_FR || nativeVoiceId;
-    else if (l.startsWith('de')) nativeVoiceId = process.env.ELEVENLABS_NATIVE_VOICE_ID_DE || nativeVoiceId;
-    else if (l.startsWith('it')) nativeVoiceId = process.env.ELEVENLABS_NATIVE_VOICE_ID_IT || nativeVoiceId;
-  }
-  
-  let voiceId = isNative 
-    ? nativeVoiceId
-    : (cloneInfo?.voiceId || process.env.ELEVENLABS_CLONED_VOICE_ID);
-
   const apiKey = process.env.ELEVENLABS_API_KEY;
   if (!apiKey) return res.status(503).json({ error: 'ElevenLabs not configured on server.' });
 
-  // Auto-discover a voice if none is configured
-  if (!voiceId) {
-    try {
-      const vr = await fetch('https://api.elevenlabs.io/v1/voices', {
-        headers: { 'xi-api-key': apiKey },
-      });
-      if (vr.ok) {
-        const vd = await vr.json();
-        const voices = vd.voices || [];
-        // Prefer a male voice, fall back to any
-        const male = voices.find(v => v.labels?.gender === 'male');
-        voiceId = (male || voices[0])?.voice_id;
-        if (voiceId) console.log(`[voice/tts] Auto-discovered voice: ${voiceId} (${(male || voices[0])?.name})`);
-      }
-    } catch (e) {
-      console.error('[voice/tts] Voice auto-discovery failed:', e.message);
+  // ── Voice selection priority ──
+  // 1. User's manually selected voice (from voice picker UI)
+  // 2. Auto-detected native masculine voice (per detected language)
+  // 3. User's cloned voice (if active)
+  let voiceId;
+
+  // Priority 1: User selected a specific voice from the picker
+  const userPref = _userVoicePreference.get(String(userId));
+  if (isNative && userPref?.voiceId) {
+    voiceId = userPref.voiceId;
+    console.log(`[voice/tts] Using user-selected voice: ${userPref.voiceName || voiceId}`);
+  } else if (isNative || !cloneInfo?.voiceId) {
+    // Priority 2: Auto-detect native masculine voice for detected language
+    const detectedLang = (lang || 'en').toLowerCase().split('-')[0];
+    voiceId = await discoverNativeMaleVoice(apiKey, detectedLang);
+    if (voiceId) {
+      console.log(`[voice/tts] Using auto-discovered voice for lang="${detectedLang}": ${voiceId}`);
     }
+  } else {
+    // Priority 3: User has an active cloned voice
+    voiceId = cloneInfo.voiceId;
+  }
+
+  // Final fallback: auto-discover ANY male voice if language-specific failed
+  if (!voiceId) {
+    voiceId = await discoverNativeMaleVoice(apiKey, 'en');
   }
     
   if (!voiceId) {
-    return res.status(500).json({ error: 'Nu s-a găsit nicio voce configurată sau disponibilă în ElevenLabs.' });
+    return res.status(500).json({ error: 'Nu s-a găsit nicio voce masculină disponibilă în ElevenLabs.' });
   }
 
   // Helper to call TTS with a given voiceId
@@ -416,25 +646,17 @@ router.post('/tts', async (req, res) => {
   try {
     let r = await callTTS(voiceId);
 
-    // If 404 voice_not_found, auto-discover and retry once
+    // If 404 voice_not_found, invalidate cache and re-discover
     if (r.status === 404) {
-      console.warn(`[voice/tts] Voice ${voiceId} not found, auto-discovering...`);
-      try {
-        const vr = await fetch('https://api.elevenlabs.io/v1/voices', {
-          headers: { 'xi-api-key': apiKey },
-        });
-        if (vr.ok) {
-          const vd = await vr.json();
-          const voices = vd.voices || [];
-          const male = voices.find(v => v.labels?.gender === 'male');
-          const fallback = (male || voices[0])?.voice_id;
-          if (fallback && fallback !== voiceId) {
-            console.log(`[voice/tts] Retrying with discovered voice: ${fallback}`);
-            r = await callTTS(fallback);
-            voiceId = fallback;
-          }
-        }
-      } catch (_) { /* ignore discovery error, will fall through to error handler below */ }
+      console.warn(`[voice/tts] Voice ${voiceId} not found, re-discovering...`);
+      _nativeVoiceCache.clear(); // force fresh discovery
+      const detectedLang = (lang || 'en').toLowerCase().split('-')[0];
+      const fallback = await discoverNativeMaleVoice(apiKey, detectedLang);
+      if (fallback && fallback !== voiceId) {
+        console.log(`[voice/tts] Retrying with discovered voice: ${fallback}`);
+        r = await callTTS(fallback);
+        voiceId = fallback;
+      }
     }
 
     if (!r.ok) {

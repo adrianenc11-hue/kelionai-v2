@@ -81,6 +81,10 @@ const REAL_TOOL_NAMES = new Set([
   'get_action_history',
   // Silent vision auto-learn (PR #210).
   'learn_from_observation',
+  // Explicit memory fact
+  'remember_fact',
+  // Missing recent tools
+  'identify_song', 'commit_and_push_to_github', 'read_past_conversation',
   // Faza A — global live-radio search via radio-browser.info.
   'play_radio',
   // Google Account tools (Calendar, Gmail, Drive)
@@ -665,7 +669,7 @@ function download(){
       return 'narration_off'
     }
     case 'switch_voice': {
-      // Switch between Gemma 4 built-in voice and user's ElevenLabs cloned voice.
+      // Switch between Claude Opus built-in voice and user's ElevenLabs cloned voice.
       const targetMode = args?.mode || 'default'
       const next = setVoiceMode(targetMode)
       // Also toggle the server-side DB `enabled` flag so the TTS endpoint

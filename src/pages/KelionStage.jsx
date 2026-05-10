@@ -29,6 +29,7 @@ import VoiceCloneModal from '../components/VoiceCloneModal'
 import EmailComposerModal from '../components/EmailComposerModal'
 import { getCsrfToken } from '../lib/api'
 import { getVoiceMode } from '../lib/voiceModeStore'
+import VoicePicker from '../components/stage/VoicePicker'
 import {
   supportsPasskey,
   registerPasskey,
@@ -865,7 +866,7 @@ export default function KelionStage() {
     if (resolved) setVoiceStyleState(resolved)
   }, [])
 
-  // Text input for typed messages (goes through Gemma 4 REST pipeline).
+  // Text input for typed messages (goes through Claude Opus REST pipeline).
   const [chatInput, setChatInput] = useState('')
   const [chatPanelOpen, setChatPanelOpen] = useState(true)
   const [plusMenuOpen, setPlusMenuOpen] = useState(false)
@@ -934,7 +935,7 @@ export default function KelionStage() {
   const muteModeRef = useRef(false)
 
   // Single voice source — TTS audio drives the avatar mouth.
-  const mouthOpen = micMouthOpen || 0
+  const mouthOpen = finalMouthOpen || 0
 
   // Track whether the half-page MonitorOverlay is currently rendered,
   // so the bottom UI (chat input bar, voice "tap to talk" pill, chat
@@ -971,7 +972,7 @@ export default function KelionStage() {
   const bubbleHideTimerRef = useRef(null)
   // NOTE: bubbleVisible useEffect moved after useKelionVoice (needs turns + status)
 
-  // Voice transport — Gemma 4 REST (SpeechRecognition → OpenRouter → TTS).
+  // Voice transport — Claude Opus REST (SpeechRecognition → OpenRouter → TTS).
   const liveHook = useKelionVoice({
     audioRef,
     coords: clientGeo,
@@ -1106,7 +1107,7 @@ export default function KelionStage() {
     setAttachedFile(null)
     const payloadStr = finalPayload.trim()
     // Always use liveSendText — it tries WebSocket first, then falls back
-    // to /api/chat HTTP endpoint (Gemma 4). Never call start() for text-only
+    // to /api/chat HTTP endpoint (Claude Opus). Never call start() for text-only
     // messages; start() fetches a voice token which may fail (500).
     if (liveSendTextRef.current) await liveSendTextRef.current(payloadStr, null, true)
   }, [chatInput, attachedFile, applyMuteCommand])
@@ -1719,18 +1720,59 @@ export default function KelionStage() {
       <UIActionToast />
       {/* ═══ SPLIT LAYOUT: Chat Left 70% + Avatar Right 30% ═══ */}
       <div style={{ display: 'flex', width: '100%', height: '100%' }}>
-        {/* LEFT PANEL — Chat / Monitor */}
-        <div style={{ flex: '0 0 70%', maxWidth: '70%', height: '100%', background: '#ffffff', display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
-          <MonitorOverlay />
-          <audio ref={audioRef} autoPlay playsInline onPlay={(e) => attachTts(e.target)} onPause={resetTts} onEnded={resetTts} onError={resetTts} />
-          <div style={{ padding: '16px 24px', borderBottom: '1px solid #e5e5e5', display: 'flex', alignItems: 'center' }}>
-            <div style={{ fontSize: 18, fontWeight: 700, color: '#1a1a1a' }}>KelionAI</div>
-            <div style={{ fontSize: 12, color: '#999', marginLeft: 'auto' }}>
-              {status === 'listening' && '🎤 Listening...'}
-              {status === 'speaking' && '🔊 Speaking...'}
-              {status === 'thinking' && '💭 Thinking...'}
-            </div>
-          </div>
+        {/* LEFT PANEL — Chat / Monitor (3D Flip Container) */}
+        <div style={{ flex: '0 0 70%', maxWidth: '70%', height: '100%', position: 'relative', perspective: '1500px' }}>
+          
+          <div style={{
+            width: '100%', height: '100%', position: 'relative',
+            transformStyle: 'preserve-3d',
+            transition: 'transform 0.8s cubic-bezier(0.4, 0, 0.2, 1)',
+            transform: monitorOpen ? 'rotateY(-180deg)' : 'rotateY(0deg)'
+          }}>
+
+            {/* Front Face (Chat) */}
+            <div style={{
+              position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+              backfaceVisibility: 'hidden', background: '#ffffff',
+              display: 'flex', flexDirection: 'column', overflow: 'hidden'
+            }}>
+              <audio ref={audioRef} autoPlay playsInline onPlay={(e) => attachTts(e.target)} onPause={resetTts} onEnded={resetTts} onError={resetTts} />
+              <div style={{ padding: '16px 24px', borderBottom: '1px solid #e5e5e5', display: 'flex', alignItems: 'center' }}>
+                <div style={{ fontSize: 18, fontWeight: 700, color: '#1a1a1a' }}>KelionAI</div>
+                
+                {/* NEW HIGHLY VISIBLE ORANGE STATUS */}
+                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
+                  <div style={{
+                    background: status === 'idle' ? '#f5f5f5' : 'rgba(255, 106, 0, 0.1)',
+                    border: `1px solid ${status === 'idle' ? '#e0e0e0' : '#ff6a00'}`,
+                    padding: '6px 16px',
+                    borderRadius: 20,
+                    color: status === 'idle' ? '#888' : '#ff6a00',
+                    fontSize: 14,
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    letterSpacing: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    boxShadow: status === 'idle' ? 'none' : '0 0 12px rgba(255, 106, 0, 0.3)',
+                    transition: 'all 0.3s ease'
+                  }}>
+                    {status !== 'idle' && status !== 'error' && (
+                      <span style={{
+                        width: 8, height: 8, borderRadius: '50%', background: '#ff6a00',
+                        boxShadow: '0 0 8px #ff6a00', animation: 'pulse 1.5s infinite'
+                      }} />
+                    )}
+                    {status === 'listening' && 'Recepție...'}
+                    {status === 'thinking' && 'Gândește...'}
+                    {status === 'working' && 'Aplică unelte...'}
+                    {status === 'speaking' && 'Răspunde...'}
+                    {status === 'idle' && 'Inactiv'}
+                    {status === 'error' && 'Eroare'}
+                  </div>
+                </div>
+              </div>
           <div ref={chatScrollRef} style={{ flex: 1, overflowY: 'auto', padding: '24px 32px', display: 'flex', flexDirection: 'column', gap: 20 }}>
             {turns.length === 0 && (<div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#bbb', fontSize: 16, gap: 8 }}><div style={{ fontSize: 40 }}>💬</div><div>Ask anything or use voice</div></div>)}
             {turns.map((turn, i) => (
@@ -1754,10 +1796,38 @@ export default function KelionStage() {
                 )}
               </div>
             ))}
-            {status === 'thinking' && (<div style={{ display: 'inline-flex', gap: 4, padding: '12px 18px', alignSelf: 'flex-start' }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#bbb', animation: 'pulse 1.4s ease-in-out infinite' }} /><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#bbb', animation: 'pulse 1.4s ease-in-out 0.2s infinite' }} /><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#bbb', animation: 'pulse 1.4s ease-in-out 0.4s infinite' }} /></div>)}
             {chatError && (<div style={{ padding: '8px 16px', borderRadius: 10, background: '#fef2f2', color: '#dc2626', fontSize: 14, alignSelf: 'center' }}>{chatError}</div>)}
           </div>
-          <div style={{ padding: '12px 24px 16px', borderTop: '1px solid #f0f0f0' }}>
+          </div>
+            {/* Back Face (Monitor) */}
+            <div style={{
+              position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+              backfaceVisibility: 'hidden', transform: 'rotateY(180deg)',
+              background: '#0d0b1d', overflow: 'hidden'
+            }}>
+              <MonitorOverlay />
+            </div>
+          </div>
+        </div>
+        {/* RIGHT PANEL — Avatar 3D & Chat Input */}
+        <div style={{ flex: '0 0 30%', maxWidth: '30%', height: '100%', position: 'relative', display: 'flex', flexDirection: 'column', background: '#0a0d1a' }}>
+          <div style={{ flex: 1, position: 'relative', overflow: 'hidden', minHeight: 0 }}>
+            <Canvas shadows={{ type: THREE.VSMShadowMap }} camera={{ position: [0, 0.2, 3.0], fov: 42 }} dpr={[1, 2]} gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.8, outputColorSpace: THREE.SRGBColorSpace, powerPreference: 'low-power' }} onCreated={({ gl }) => { const canvas = gl.domElement; if (canvas) { canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); console.warn('[kelion] WebGL context lost') }); canvas.addEventListener('webglcontextrestored', () => { console.log('[kelion] WebGL context restored') }) } }}>
+              <color attach="background" args={['#0a0d1a']} />
+              <fog attach="fog" args={['#0e0b20', 6, 14]} />
+              <Suspense fallback={null}>
+                <ambientLight intensity={0.5} />
+                <directionalLight position={[10, 10, 5]} intensity={1} />
+                <StudioDecor />
+                <group position={[0, -0.4, 0]}>
+                  <AvatarModel mouthOpen={mouthOpen} status={status} emotion={emotion} presenting={false} />
+                </group>
+                <ContactShadows position={[0, -1.25, 0]} opacity={0.55} scale={5} blur={2.6} far={2.5} />
+              </Suspense>
+            </Canvas>
+          </div>
+          {/* Chat Input Container */}
+          <div style={{ padding: '12px 24px 16px', background: '#ffffff', borderTop: '1px solid #e0e0e0', zIndex: 10, flexShrink: 0 }}>
             <form onSubmit={(e) => { e.preventDefault(); sendTextMessage() }} style={{ display: 'flex', alignItems: 'flex-end', gap: 10, padding: '10px 14px', borderRadius: 26, background: '#f7f7f8', border: '1px solid #e5e5e5' }}>
               <input ref={fileInputRef} type="file" accept="*/*" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files && e.target.files[0]; if (f) setAttachedFile(f) }} />
               <button type="button" onClick={() => fileInputRef.current && fileInputRef.current.click()} disabled={status === 'thinking'} title="Attach file" style={{ width: 34, height: 34, borderRadius: '50%', background: 'transparent', border: '1.5px solid #ccc', color: '#555', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>+</button>
@@ -1766,7 +1836,16 @@ export default function KelionStage() {
                 <textarea value={chatInput} onChange={(e) => { setChatInput(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 150) + 'px'; }} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendTextMessage(); } }} onPaste={(e) => { try { const cd = e.clipboardData || window.clipboardData; if (!cd) return; const items = cd.items ? Array.from(cd.items) : []; const imgItem = items.find((it) => it && it.kind === 'file' && typeof it.type === 'string' && it.type.startsWith('image/')); if (imgItem) { const blob = imgItem.getAsFile(); if (blob) { e.preventDefault(); const ext = (blob.type.split('/')[1] || 'png').split(';')[0]; const stamp = new Date().toISOString().replace(/[:.]/g, '-'); setAttachedFile((typeof File !== 'undefined') ? new File([blob], `pasted-${stamp}.${ext}`, { type: blob.type }) : blob); return; } } } catch (_) {} }} placeholder="Ask anything" disabled={status === 'thinking'} rows={1} style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', color: '#1a1a1a', fontSize: 16, fontFamily: 'system-ui, -apple-system, sans-serif', resize: 'none', maxHeight: 150, overflowY: 'auto', minHeight: 24, padding: '4px 0', lineHeight: 1.5 }} />
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                <button type="button" onClick={() => { if (status === 'idle' || status === 'error') { startVoiceWithPriorTurns(); setMicOff(false); setIntendedVoiceActive(true) } else if (status === 'listening' || status === 'speaking' || status === 'thinking') { if (typeof stop === 'function') stop(); setIntendedVoiceActive(false) } }} style={{ width: 34, height: 34, borderRadius: '50%', background: 'transparent', border: 'none', color: status === 'listening' ? '#ef4444' : '#888', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }} title="Voice">🎤</button>
+                <button type="button" onClick={() => { if (status === 'idle' || status === 'error') { startVoiceWithPriorTurns(); setMicOff(false); setIntendedVoiceActive(true) } else if (status === 'listening' || status === 'speaking' || status === 'thinking') { if (typeof stop === 'function') stop(); setIntendedVoiceActive(false) } }} style={{ width: 34, height: 34, borderRadius: '50%', background: 'transparent', border: 'none', color: status === 'listening' ? '#ef4444' : '#888', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }} title="Voice">
+                  {(status === 'listening' || status === 'speaking') ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 2, height: 16 }}>
+                      <div style={{ width: 3, borderRadius: 2, background: '#ef4444', height: `${20 + userLevel * 80}%`, transition: 'height 0.1s' }} />
+                      <div style={{ width: 3, borderRadius: 2, background: '#ef4444', height: `${20 + userLevel * 50}%`, transition: 'height 0.1s' }} />
+                      <div style={{ width: 3, borderRadius: 2, background: '#ef4444', height: `${20 + userLevel * 100}%`, transition: 'height 0.1s' }} />
+                      <div style={{ width: 3, borderRadius: 2, background: '#ef4444', height: `${20 + userLevel * 60}%`, transition: 'height 0.1s' }} />
+                    </div>
+                  ) : '🎤'}
+                </button>
                 {chatInput.trim().length > 0 || attachedFile ? (
                   <button type="submit" disabled={status === 'thinking'} title="Send" style={{ width: 36, height: 36, borderRadius: '50%', background: '#1a1a1a', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 700 }}>↑</button>
                 ) : (
@@ -1776,22 +1855,6 @@ export default function KelionStage() {
             </form>
             <div style={{ textAlign: 'center', fontSize: 11, color: '#bbb', marginTop: 6 }}>Kelion can make mistakes. Consider verifying important information.</div>
           </div>
-        </div>
-        {/* RIGHT PANEL — Avatar 3D */}
-        <div style={{ flex: '0 0 30%', maxWidth: '30%', height: '100%', position: 'relative', overflow: 'hidden' }}>
-          <Canvas shadows={{ type: THREE.VSMShadowMap }} camera={{ position: [0, 0.2, 3.0], fov: 42 }} dpr={[1, 2]} gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.8, outputColorSpace: THREE.SRGBColorSpace, powerPreference: 'low-power' }} onCreated={({ gl }) => { const canvas = gl.domElement; if (canvas) { canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); console.warn('[kelion] WebGL context lost') }); canvas.addEventListener('webglcontextrestored', () => { console.log('[kelion] WebGL context restored') }) } }}>
-            <color attach="background" args={['#0a0d1a']} />
-            <fog attach="fog" args={['#0e0b20', 6, 14]} />
-            <Suspense fallback={null}>
-              <ambientLight intensity={0.5} />
-              <directionalLight position={[10, 10, 5]} intensity={1} />
-              <StudioDecor />
-              <group position={[0, -0.4, 0]}>
-                <AvatarModel mouthOpen={mouthOpen} status={status} emotion={emotion} presenting={false} />
-              </group>
-              <ContactShadows position={[0, -1.25, 0]} opacity={0.55} scale={5} blur={2.6} far={2.5} />
-            </Suspense>
-          </Canvas>
         </div>
       </div>
 {/* Guest trial countdown — Adrian: "timer se afiseaza dreapta sus
@@ -1846,6 +1909,16 @@ export default function KelionStage() {
           )}
         </div>
       )}
+
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          position: 'absolute', top: 18, left: 18, zIndex: 20,
+          display: 'flex', alignItems: 'center', gap: 8,
+        }}
+      >
+        <VoicePicker />
+      </div>
 
       {/* Top-right action bar — Adrian: "panoul cu butoane e gândit
           greșit". Simplified to: Credits/Admin pill + Sign in/out + ⋯.
@@ -2916,7 +2989,7 @@ export default function KelionStage() {
           {/* Revenue-split panel — shows how much of the last 30 days of
               top-up revenue is earmarked for AI provider spend vs owner
               net, and compares against the known portion of that spend
-              (ElevenLabs via API; Gemma 4 is manual). Renders above the
+              (ElevenLabs via API; Claude Opus is manual). Renders above the
               provider cards so the admin sees the budget context first.
               */}
           {revenueSplitLoading && (
@@ -2997,7 +3070,7 @@ export default function KelionStage() {
                     ? (revenueSplit.spend?.elevenlabs?.estSpendDisplay || '—')
                     : 'not configured',
                   { dim: true })}
-                {row('  Gemma 4',
+                {row('  Claude Opus',
                   'manual — open GCP Billing',
                   { dim: true })}
                 <div style={{
@@ -4115,7 +4188,7 @@ export default function KelionStage() {
               nimic — odata configurat, fiecare top-up al unui user trece
               prin: Stripe Checkout ? Stripe balance ? payout automat (zilnic
               sau saptamânal, dupa setarea ta). Jumatate din fiecare top-up
-              e deja rezervata intern pentru costurile AI (Gemma 4,
+              e deja rezervata intern pentru costurile AI (Claude Opus,
               ElevenLabs), cealalta jumatate e profitul net.
             </div>
           </div>

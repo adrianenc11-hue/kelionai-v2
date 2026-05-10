@@ -10,7 +10,7 @@
  * Providers vary a lot:
  *
  *
- *  - Gemma 4 (Google AI Studio / OpenRouter): no public balance endpoint. We test the key
+ *  - Claude Opus (Google AI Studio / OpenRouter): no public balance endpoint. We test the key
  *    with a cheap models.list call and return a "configured" signal + link
  *    to the aistudio console where the admin can rotate/check billing.
  *
@@ -48,7 +48,7 @@ async function probeGoogleAI() {
   const apiKey = config.google && config.google.apiKey;
   const card = {
     id: 'google',
-    name: 'Gemma 4 (Google)',
+    name: 'Claude Opus (Google)',
     subtitle: 'Live voice + chat',
     configured: Boolean(apiKey),
     keyFingerprint: maskKey(apiKey),
@@ -120,16 +120,36 @@ async function probeElevenLabs() {
       const used = Number(j.character_count || 0);
       const limit = Number(j.character_limit || 0);
       const remaining = Math.max(0, limit - used);
-      card.balance = remaining;
+
+      // ElevenLabs usage-based billing: when enabled, the user can exceed
+      // their included character_limit and pay per-character overage.
+      // The API signals this via `can_extend_character_limit` or simply
+      // by character_count > character_limit (already consuming overage).
+      const hasUsageBilling = Boolean(j.can_extend_character_limit)
+        || Boolean(j.can_extend_voice_limit)
+        || used > limit;
+
+      card.balance = hasUsageBilling ? null : remaining; // null = unlimited/pay-as-you-go
       card.balanceLimit = limit > 0 ? limit : null;
-      card.balanceDisplay = limit > 0
-        ? `${remaining.toLocaleString()} / ${limit.toLocaleString()} chars`
-        : 'unlimited';
+
+      if (hasUsageBilling) {
+        card.balanceDisplay = `${used.toLocaleString()} / ${limit.toLocaleString()} chars (usage billing ON)`;
+      } else {
+        card.balanceDisplay = limit > 0
+          ? `${remaining.toLocaleString()} / ${limit.toLocaleString()} chars`
+          : 'unlimited';
+      }
+
       const tier = typeof j.tier === 'string' ? j.tier : null;
       card.message = tier ? `Tier: ${tier}` : null;
       card.subtitle = tier ? `Neural TTS (${tier})` : card.subtitle;
-      // Alert threshold: 10% of limit remaining
-      if (limit > 0 && remaining < limit * 0.10) {
+
+      // Status: if usage-based billing is ON, never report 'low' — the
+      // user pays overage automatically. Only flag 'low' when on a
+      // fixed-quota plan and < 10% remains.
+      if (hasUsageBilling) {
+        card.status = 'ok';
+      } else if (limit > 0 && remaining < limit * 0.10) {
         card.status = 'low';
       } else {
         card.status = 'ok';
@@ -204,7 +224,7 @@ async function probeOpenRouter() {
   const card = {
     id: 'openrouter',
     name: 'OpenRouter',
-    subtitle: 'LLM routing (Gemma 4, GPT-4o, Claude)',
+    subtitle: 'LLM routing (Claude Opus, GPT-4o, Claude)',
     configured: Boolean(apiKey),
     keyFingerprint: maskKey(apiKey),
     balance: null,
@@ -294,7 +314,7 @@ async function getAllCredits() {
 /**
  * Revenue-split contract: for every credit top-up the user pays, a
  * fixed fraction (default 50%) is earmarked for AI provider spend
- * (Gemma 4, ElevenLabs). The remainder is the owner's
+ * (Claude Opus, ElevenLabs). The remainder is the owner's
  * net. We do NOT transfer money automatically — Stripe cannot pay GCP
  * directly. Instead we compute the allocation off the existing credit
  * ledger and surface it next to the raw provider cards so the admin
@@ -308,7 +328,7 @@ async function getAllCredits() {
  *     per 1k chars, which is the effective rate for pay-as-you-go
  *     overage; real tier pricing varies, but this is a conservative
  *     upper bound suitable for budget tracking).
- *   - Gemma 4: Google does NOT expose per-project spend via any public
+ *   - Claude Opus: Google does NOT expose per-project spend via any public
  *     API that works with AI Studio keys. The only option is the
  *     Google Cloud Billing API with a service-account + billing
  *     account ID (most users don't bother). We report "unknown" and
@@ -401,16 +421,16 @@ async function buildRevenueSplit(revenueSummary, { days = 30, currency = 'gbp' }
   // currencies explicit so the admin can eyeball the buffer.
   const knownSpendCents = Number(elevenlabs.estSpendCents || 0);
 
-  // Gemma 4 cost is unknown from our side. Honest "null" so UI can
+  // Claude Opus cost is unknown from our side. Honest "null" so UI can
   // render a manual-entry placeholder instead of pretending $0.
   const googleAI = {
     source: 'manual',
-    note: 'Gemma 4 spend is not exposed via AI Studio keys. Use GCP Billing dashboard to cross-check.',
+    note: 'Claude Opus spend is not exposed via AI Studio keys. Use GCP Billing dashboard to cross-check.',
     billingUrl: 'https://console.cloud.google.com/billing',
   };
 
   // Delta compares allocated revenue against *known* spend only. When
-  // Gemma 4 cost is added manually we'll subtract it from this delta.
+  // Claude Opus cost is added manually we'll subtract it from this delta.
   // Status is conservative: if known spend already eats > 80% of
   // allocation, we flag warn; over 100%, over.
   let status = 'ok';
