@@ -278,7 +278,7 @@ Your replies must be direct, conversational, and concise.${locationContext}${tim
       // Use direct Google AI Studio endpoint (OpenAI-compatible)
       // This bypasses OpenRouter limits and provides a true "free/unlimited" experience
       const modelSlug = model.replace('google/', '').replace(':free', '');
-      apiUrl = `https://generativelanguage.googleapis.com/v1beta/openai/chat/completions`;
+      apiUrl = `https://generativelanguage.googleapis.com/v1/openai/chat/completions`;
       authHeader = `Bearer ${googleKey}`;
       body.model = modelSlug; // CRITICAL: Google expects the slug, not the OpenRouter full name
     }
