@@ -938,7 +938,13 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
         rec.onerror = (ev) => {
           if (fakeAnimFrame) cancelAnimationFrame(fakeAnimFrame);
           setUserLevel(0);
-          if (ev.error !== 'no-speech') {
+          // 'no-speech' and 'aborted' are normal operational events:
+          // - no-speech: user was silent during the recognition window
+          // - aborted: recognition was stopped/restarted during a status transition
+          // Both should just restart the recognizer, not show an error badge.
+          const harmless = ['no-speech', 'aborted'];
+          if (!harmless.includes(ev.error)) {
+            console.warn('[kelionVoice] SpeechRecognition error:', ev.error);
             setError('Microphone error: ' + ev.error);
             setStatus('error');
           } else {
@@ -956,7 +962,11 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
           // Keep listening permanently unless stopped
           if (statusRef.current !== 'stopped' && statusRef.current !== 'error') {
              try { rec.start(); } catch(e) {}
-             if (statusRef.current === 'listening') startFakeAnim();
+             // Always transition back to 'listening' when we restart the recognizer
+             // (sendText sets 'idle' after TTS completes; we need to go back to 'listening'
+             // so the status badge shows the correct state and the animation runs)
+             setStatus('listening');
+             startFakeAnim();
           }
         };
         
@@ -1759,7 +1769,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
 
               if (audioData.byteLength < 100) {
                 appendTurn('assistant', `⚠️ Eroare audio: Răspunsul vocal a fost gol. Verificați cota ElevenLabs.`, true, '⚙️ System')
-                setStatus('idle')
+                setStatus(window.__restRecRef ? 'listening' : 'idle')
                 return
               }
               const blob = new Blob([audioData], { type: 'audio/mpeg' })
@@ -1780,7 +1790,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
               audioEl.onended = () => {
                 URL.revokeObjectURL(blobUrl)
                 activeAudioElRef.current = null
-                setStatus('idle')
+                setStatus(window.__restRecRef ? 'listening' : 'idle')
               }
               audioEl.onerror = (e) => {
                 // Ignore spurious error events that fire AFTER playback
@@ -1789,7 +1799,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
                 console.error('[kelionVoice] Audio playback error:', e)
                 appendTurn('assistant', `⚠️ Eroare la redarea audio în browser.`, true, '⚙️ System')
                 URL.revokeObjectURL(blobUrl)
-                setStatus('idle')
+                setStatus(window.__restRecRef ? 'listening' : 'idle')
               }
               
 
@@ -1799,21 +1809,21 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
               }).catch((e) => {
                 console.error('[kelionVoice] Audio play() blocked:', e)
                 appendTurn('assistant', `⚠️ Browserul a blocat redarea audio automată.`, true, '⚙️ System')
-                setStatus('idle')
+                setStatus(window.__restRecRef ? 'listening' : 'idle')
               })
             } else {
               const errText = await r.text().catch(() => '')
               console.error('[kelionVoice] TTS network error:', r.status, errText)
               appendTurn('assistant', `⚠️ Eroare rețea voce (${r.status}): ${errText.slice(0, 100)}`, true, '⚙️ System')
-              setStatus('idle')
+              setStatus(window.__restRecRef ? 'listening' : 'idle')
             }
           } catch(e) {
             console.error('[kelionVoice] TTS catch error:', e)
             appendTurn('assistant', `⚠️ Eroare internă voce: ${e.message}`, true, '⚙️ System')
-            setStatus('idle')
+            setStatus(window.__restRecRef ? 'listening' : 'idle')
           }
         } else {
-          setStatus('idle')
+          setStatus(window.__restRecRef ? 'listening' : 'idle')
         }
       } catch (err) {
         if (err.name === 'AbortError') {
