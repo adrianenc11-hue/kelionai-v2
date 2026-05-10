@@ -1773,7 +1773,7 @@ export default function KelionStage() {
                   </div>
                 </div>
               </div>
-          <div ref={chatScrollRef} style={{ flex: 1, overflowY: 'auto', padding: '24px 32px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+          <div ref={chatScrollRef} style={{ flex: 1, overflowY: 'auto', padding: '24px 32px', display: 'flex', flexDirection: 'column', gap: 20, userSelect: 'text', WebkitUserSelect: 'text' }}>
             {turns.length === 0 && (<div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#bbb', fontSize: 16, gap: 8 }}><div style={{ fontSize: 40 }}>💬</div><div>Ask anything or use voice</div></div>)}
             {turns.map((turn, i) => (
               <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 4, alignSelf: turn.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '80%' }}>
