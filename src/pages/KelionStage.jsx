@@ -1910,15 +1910,7 @@ export default function KelionStage() {
         </div>
       )}
 
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          position: 'absolute', top: 18, left: 18, zIndex: 20,
-          display: 'flex', alignItems: 'center', gap: 8,
-        }}
-      >
-        <VoicePicker />
-      </div>
+      {/* VoicePicker moved to the ... menu */}
 
       {/* Top-right action bar — Adrian: "panoul cu butoane e gândit
           greșit". Simplified to: Credits/Admin pill + Sign in/out + ⋯.
@@ -2080,6 +2072,19 @@ export default function KelionStage() {
           <MenuItem onClick={() => { navigate('/contact'); setMenuOpen(false) }}>
             {t('contactUs')}
           </MenuItem>
+          <div
+            style={{
+              height: 1,
+              background: 'rgba(167, 139, 250, 0.15)',
+              margin: '6px 8px',
+            }}
+          />
+
+          {/* Voice Picker integrated into menu */}
+          <div style={{ padding: '0 6px', margin: '4px 0' }}>
+            <VoicePicker style={{ width: '100%' }} />
+          </div>
+
           <div
             style={{
               height: 1,

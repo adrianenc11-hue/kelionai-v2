@@ -537,7 +537,7 @@ const KELION_TOOLS = [
   {
     name: 'show_on_monitor',
 
-    description: "Display something on the big presentation monitor in the scene behind you. Use whenever the user asks (in any language) to see / open / show / display a map, the weather, a video, an image, a Wikipedia / reference page, any web page, or to PLAY a live audio stream. Pick the right `kind` — the client resolves it to the best embed URL. All external websites (including google.com) are proxied server-side to bypass iframe restrictions. Call again with a new query to swap the content on screen. For radio: first call play_radio to get the stream URL, then call show_on_monitor with kind='audio' query=<that URL> title=<station name> so the audio actually starts playing in the user's browser.",
+    description: "Display something on the big presentation monitor in the scene behind you. EXTREMELY IMPORTANT: ONLY use this tool when the user EXPLICITLY asks to 'arata-mi pe ecran', 'pune pe monitor', 'see', 'open', 'show', or 'display' something. DO NOT use it automatically after searches or queries unless explicitly requested. Pick the right `kind` — the client resolves it to the best embed URL. All external websites (including google.com) are proxied server-side to bypass iframe restrictions. Call again with a new query to swap the content on screen. For radio: first call play_radio to get the stream URL, then call show_on_monitor with kind='audio' query=<that URL> title=<station name> so the audio actually starts playing in the user's browser.",
     properties: {
       kind: {
         type: 'string',
