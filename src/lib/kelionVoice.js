@@ -129,6 +129,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
   const translatorModeRef = useRef(false)
   const initialTextRef = useRef(null)
   const sessionIdRef = useRef(null)
+  const httpMsgBufferRef = useRef('')
 
   const wsRef = useRef(null)
   const audioCtxRef = useRef(null)       // 16kHz capture context for voice — MUST match SAMPLE_RATE_IN
@@ -897,15 +898,22 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
         rec.onresult = async (ev) => {
           setUserLevel(0.6 + Math.random() * 0.4);
           
-          if (!ev.results[0].isFinal) {
+          if (!ev.results[ev.results.length - 1].isFinal) {
             // Barge-in: immediately stop TTS when user starts speaking
             clearAudioQueue();
             return; // Wait for final transcript
           }
           
-          const transcript = ev.results[0][0].transcript;
+          const transcript = ev.results[ev.results.length - 1][0].transcript;
           if (!transcript) return;
           
+          if (statusRef.current !== 'listening' && statusRef.current !== 'idle') {
+            console.log('[kelionVoice] Buffering speech because status is', statusRef.current);
+            httpMsgBufferRef.current += (httpMsgBufferRef.current ? ' ' : '') + transcript;
+            appendTurn('user', `[Buffered] ${transcript}`, true, '⏳');
+            return;
+          }
+
           setStatus('thinking');
           setUserLevel(0);
           if (fakeAnimFrame) cancelAnimationFrame(fakeAnimFrame);
@@ -936,10 +944,10 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
             setError('Microphone error: ' + ev.error);
             setStatus('error');
           } else {
-            // Keep listening if still supposed to be listening
-            if (statusRef.current === 'listening') {
+            // Keep listening permanently unless stopped
+            if (statusRef.current !== 'stopped' && statusRef.current !== 'error') {
               try { rec.start(); } catch(e) {}
-              startFakeAnim();
+              if (statusRef.current === 'listening') startFakeAnim();
             }
           }
         };
@@ -947,10 +955,10 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
         rec.onend = () => {
           if (fakeAnimFrame) cancelAnimationFrame(fakeAnimFrame);
           setUserLevel(0);
-          if (statusRef.current === 'listening') {
-             // Restart seamlessly without dropping to idle
+          // Keep listening permanently unless stopped
+          if (statusRef.current !== 'stopped' && statusRef.current !== 'error') {
              try { rec.start(); } catch(e) {}
-             startFakeAnim();
+             if (statusRef.current === 'listening') startFakeAnim();
           }
         };
         
@@ -1211,8 +1219,17 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
     }
   }, [handleMessage, startMicLevel])
 
-  const statusRef = useRef(status)
   useEffect(() => { statusRef.current = status }, [status])
+  
+  // Auto-flush buffered speech when returning to idle/listening state
+  useEffect(() => {
+    if ((status === 'idle' || status === 'listening') && httpMsgBufferRef.current) {
+      const buffered = httpMsgBufferRef.current;
+      httpMsgBufferRef.current = '';
+      console.log('[kelionVoice] Flushing buffered speech:', buffered);
+      sendText(buffered, null, true);
+    }
+  }, [status, sendText]);
 
   // ───── Video frame sender (M9 camera + M10 screen share) ─────
   // Streams a MediaStream to the Live API as a continuous sequence of JPEG
