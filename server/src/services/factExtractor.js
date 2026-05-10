@@ -61,7 +61,7 @@ async function extractFacts(turns, options = {}) {
   const url = 'https://openrouter.ai/api/v1/chat/completions';
 
   const body = {
-    model: options.model || 'google/gemini-pro-1.5', // Gemini 1.5 Pro — premium fallback
+    model: options.model || 'anthropic/claude-3-haiku', // Claude 3 Haiku — ultra-fast premium default
     messages: [
       { role: 'system', content: EXTRACTION_SYSTEM },
       { role: 'user', content: `Transcript:\n${transcript}` }

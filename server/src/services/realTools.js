@@ -2928,9 +2928,8 @@ async function toolAskExpertCoder(args) {
   const prompt = `You are an expert coder. Answer the question precisely.\n\nContext:\n${context}\n\nQuestion:\n${question}`;
 
   const MODELS = [
-    args?.model || 'google/gemini-pro-1.5',
-    'google/gemini-flash-1.5',
-    'google/gemini-pro-1.5',
+    args?.model || 'anthropic/claude-3-haiku',
+    'anthropic/claude-3-haiku',
   ];
   // Deduplicate in case args.model matches one of the fallbacks
   const uniqueModels = [...new Set(MODELS)];
