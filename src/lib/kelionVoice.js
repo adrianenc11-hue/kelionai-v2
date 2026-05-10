@@ -949,7 +949,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
             setStatus('error');
           } else {
             // Keep listening permanently unless stopped
-            if (statusRef.current !== 'stopped' && statusRef.current !== 'error') {
+            if (statusRef.current !== 'stopped' && statusRef.current !== 'error' && statusRef.current !== 'idle') {
               try { rec.start(); } catch(e) {}
               if (statusRef.current === 'listening') startFakeAnim();
             }
@@ -959,8 +959,8 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
         rec.onend = () => {
           if (fakeAnimFrame) cancelAnimationFrame(fakeAnimFrame);
           setUserLevel(0);
-          // Keep listening permanently unless stopped
-          if (statusRef.current !== 'stopped' && statusRef.current !== 'error') {
+          // Keep listening permanently unless stopped or returned to idle by user
+          if (statusRef.current !== 'stopped' && statusRef.current !== 'error' && statusRef.current !== 'idle') {
              try { rec.start(); } catch(e) {}
              // Always transition back to 'listening' when we restart the recognizer
              // (sendText sets 'idle' after TTS completes; we need to go back to 'listening'
