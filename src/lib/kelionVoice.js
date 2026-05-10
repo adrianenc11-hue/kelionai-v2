@@ -1225,6 +1225,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
     }
   }, [handleMessage, startMicLevel])
 
+  const statusRef = useRef(status)
   useEffect(() => { statusRef.current = status }, [status])
   
   // Auto-flush buffered speech when returning to idle/listening state
