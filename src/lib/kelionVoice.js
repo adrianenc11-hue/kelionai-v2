@@ -1736,7 +1736,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
           appendTurn('assistant', finalReply, true, finalModel ? `🤖 ${finalModel}` : undefined)
         }
         
-        console.log('[TTS-DEBUG] playAudio=', playAudio, 'finalReply length=', finalReply.length)
+
         // Skip TTS if there is actually nothing to say (fixes Point 9: ElevenLabs text required error & playback crash)
         if (playAudio && finalReply.trim() !== '') {
           // VOICE UNIQUENESS: stop any previous audio before starting new TTS
@@ -1744,7 +1744,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
           setStatus('speaking')
           const isNative = !isClonedVoiceActive();
           const ttsUrl = isNative ? '/api/voice/clone/tts?native=true' : '/api/voice/clone/tts';
-          console.log('[TTS-DEBUG] calling TTS:', ttsUrl, 'text:', finalReply.slice(0, 60))
+
           
           try {
             const r = await fetch(ttsUrl, {
@@ -1753,10 +1753,10 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
               credentials: 'include',
               body: JSON.stringify({ text: finalReply, lang: getDetectedLang(), voiceId: getSelectedVoice()?.voiceId || undefined }),
             })
-            console.log('[TTS-DEBUG] TTS response status:', r.status)
+
             if (r.ok) {
               const audioData = await r.arrayBuffer()
-              console.log('[TTS-DEBUG] TTS audio bytes:', audioData.byteLength)
+
               if (audioData.byteLength < 100) {
                 appendTurn('assistant', `⚠️ Eroare audio: Răspunsul vocal a fost gol. Verificați cota ElevenLabs.`, true, '⚙️ System')
                 setStatus('idle')
@@ -1792,10 +1792,10 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
                 setStatus('idle')
               }
               
-              console.log('[TTS-DEBUG] calling audioEl.play()')
+
               audioEl.play().then(() => {
                 playbackStarted = true
-                console.log('[TTS-DEBUG] AUDIO PLAYING OK')
+
               }).catch((e) => {
                 console.error('[kelionVoice] Audio play() blocked:', e)
                 appendTurn('assistant', `⚠️ Browserul a blocat redarea audio automată.`, true, '⚙️ System')
