@@ -1769,7 +1769,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
 
               if (audioData.byteLength < 100) {
                 appendTurn('assistant', `⚠️ Eroare audio: Răspunsul vocal a fost gol. Verificați cota ElevenLabs.`, true, '⚙️ System')
-                setStatus(playAudio ? 'listening' : 'idle')
+                setStatus(window.__restRecRef ? 'listening' : 'idle')
                 return
               }
               const blob = new Blob([audioData], { type: 'audio/mpeg' })
@@ -1790,7 +1790,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
               audioEl.onended = () => {
                 URL.revokeObjectURL(blobUrl)
                 activeAudioElRef.current = null
-                setStatus(playAudio ? 'listening' : 'idle')
+                setStatus(window.__restRecRef ? 'listening' : 'idle')
               }
               audioEl.onerror = (e) => {
                 // Ignore spurious error events that fire AFTER playback
@@ -1799,7 +1799,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
                 console.error('[kelionVoice] Audio playback error:', e)
                 appendTurn('assistant', `⚠️ Eroare la redarea audio în browser.`, true, '⚙️ System')
                 URL.revokeObjectURL(blobUrl)
-                setStatus(playAudio ? 'listening' : 'idle')
+                setStatus(window.__restRecRef ? 'listening' : 'idle')
               }
               
 
@@ -1809,21 +1809,21 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
               }).catch((e) => {
                 console.error('[kelionVoice] Audio play() blocked:', e)
                 appendTurn('assistant', `⚠️ Browserul a blocat redarea audio automată.`, true, '⚙️ System')
-                setStatus(playAudio ? 'listening' : 'idle')
+                setStatus(window.__restRecRef ? 'listening' : 'idle')
               })
             } else {
               const errText = await r.text().catch(() => '')
               console.error('[kelionVoice] TTS network error:', r.status, errText)
               appendTurn('assistant', `⚠️ Eroare rețea voce (${r.status}): ${errText.slice(0, 100)}`, true, '⚙️ System')
-              setStatus(playAudio ? 'listening' : 'idle')
+              setStatus(window.__restRecRef ? 'listening' : 'idle')
             }
           } catch(e) {
             console.error('[kelionVoice] TTS catch error:', e)
             appendTurn('assistant', `⚠️ Eroare internă voce: ${e.message}`, true, '⚙️ System')
-            setStatus(playAudio ? 'listening' : 'idle')
+            setStatus(window.__restRecRef ? 'listening' : 'idle')
           }
         } else {
-          setStatus(playAudio ? 'listening' : 'idle')
+          setStatus(window.__restRecRef ? 'listening' : 'idle')
         }
       } catch (err) {
         if (err.name === 'AbortError') {
