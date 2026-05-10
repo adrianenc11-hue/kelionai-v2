@@ -49,6 +49,8 @@ module.exports = {
     liveModel:    optional('GOOGLE_LIVE_MODEL', 'google/gemini-2.0-flash-exp:free'),
     ttsModel:     optional('GOOGLE_TTS_MODEL', 'google/gemini-2.0-flash-exp:free'),
     ttsVoiceKelion: optional('GOOGLE_TTS_VOICE_KELION', 'Kore'),
+    // Set FREE_MODE=true to disable all credit consumption
+    freeMode: process.env.FREE_MODE === 'true' || (process.env.GOOGLE_CHAT_MODEL || 'google/gemini-2.0-flash-exp:free').includes(':free'),
   },
 
   session: {
