@@ -1740,40 +1740,42 @@ export default function KelionStage() {
               <div style={{ padding: '16px 24px', borderBottom: '1px solid #e5e5e5', display: 'flex', alignItems: 'center' }}>
                 <div style={{ fontSize: 18, fontWeight: 700, color: '#1a1a1a' }}>KelionAI</div>
                 
-                {/* NEW HIGHLY VISIBLE ORANGE STATUS */}
+                {/* NEW HIGHLY VISIBLE STATUS */}
                 <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
-                  <div style={{
-                    background: status === 'idle' ? '#f5f5f5' : 'rgba(255, 106, 0, 0.1)',
-                    border: `1px solid ${status === 'idle' ? '#e0e0e0' : '#ff6a00'}`,
-                    padding: '6px 16px',
-                    borderRadius: 20,
-                    color: status === 'idle' ? '#888' : '#ff6a00',
-                    fontSize: 14,
-                    fontWeight: 700,
-                    textTransform: 'uppercase',
-                    letterSpacing: 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    boxShadow: status === 'idle' ? 'none' : '0 0 12px rgba(255, 106, 0, 0.3)',
-                    transition: 'all 0.3s ease'
-                  }}>
-                    {status !== 'idle' && status !== 'error' && (
-                      <span style={{
-                        width: 8, height: 8, borderRadius: '50%', background: '#ff6a00',
-                        boxShadow: '0 0 8px #ff6a00', animation: 'pulse 1.5s infinite'
-                      }} />
-                    )}
-                    {status === 'listening' && 'Recepție...'}
-                    {status === 'thinking' && 'Gândește...'}
-                    {status === 'working' && 'Aplică unelte...'}
-                    {status === 'speaking' && 'Răspunde...'}
-                    {status === 'idle' && 'Inactiv'}
-                    {status === 'error' && 'Eroare'}
-                  </div>
+                  {(() => {
+                    const statusColors = {
+                      idle: { color: '#888', bg: '#f5f5f5', border: '#e0e0e0', glow: 'none' },
+                      listening: { color: '#10b981', bg: 'rgba(16, 185, 129, 0.1)', border: '#10b981', glow: '0 0 12px rgba(16, 185, 129, 0.3)' },
+                      error: { color: '#dc2626', bg: 'rgba(220, 38, 38, 0.1)', border: '#dc2626', glow: '0 0 12px rgba(220, 38, 38, 0.3)' },
+                    };
+                    const sc = statusColors[status] || { color: '#ff6a00', bg: 'rgba(255, 106, 0, 0.1)', border: '#ff6a00', glow: '0 0 12px rgba(255, 106, 0, 0.3)' };
+
+                    return (
+                      <div style={{
+                        background: sc.bg, border: `1px solid ${sc.border}`,
+                        padding: '6px 16px', borderRadius: 20, color: sc.color,
+                        fontSize: 14, fontWeight: 700, textTransform: 'uppercase',
+                        letterSpacing: 1, display: 'flex', alignItems: 'center', gap: 8,
+                        boxShadow: sc.glow, transition: 'all 0.3s ease'
+                      }}>
+                        {status !== 'idle' && status !== 'error' && (
+                          <span style={{
+                            width: 8, height: 8, borderRadius: '50%', background: sc.color,
+                            boxShadow: `0 0 8px ${sc.color}`, animation: 'pulse 1.5s infinite'
+                          }} />
+                        )}
+                        {status === 'listening' && 'Recepție...'}
+                        {status === 'thinking' && 'Gândește...'}
+                        {status === 'working' && 'Aplică unelte...'}
+                        {status === 'speaking' && 'Răspunde...'}
+                        {status === 'idle' && 'Inactiv'}
+                        {status === 'error' && 'Eroare'}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
-          <div ref={chatScrollRef} style={{ flex: 1, overflowY: 'auto', padding: '24px 32px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+          <div ref={chatScrollRef} style={{ flex: 1, overflowY: 'auto', padding: '24px 32px', display: 'flex', flexDirection: 'column', gap: 20, userSelect: 'text', WebkitUserSelect: 'text' }}>
             {turns.length === 0 && (<div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#bbb', fontSize: 16, gap: 8 }}><div style={{ fontSize: 40 }}>💬</div><div>Ask anything or use voice</div></div>)}
             {turns.map((turn, i) => (
               <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 4, alignSelf: turn.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '80%' }}>
