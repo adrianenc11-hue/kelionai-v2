@@ -1832,9 +1832,17 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
         }
         console.error('[kelionVoice] HTTP chat fallback failed', err)
         appendTurn('assistant', 'Connection error. Please try again.', true)
-        setStatus('idle')
+        setStatus(window.__restRecRef ? 'listening' : 'idle')
       } finally {
         httpBusyRef.current = false
+        // Drain any messages that were buffered while we were busy.
+        // Without this, voice messages arriving during a request are
+        // silently lost — the user speaks, Kelion hears, but never responds.
+        if (httpMsgBufferRef.current.length > 0) {
+          const next = httpMsgBufferRef.current.shift()
+          // Use setTimeout to avoid recursive stack overflow
+          setTimeout(() => sendText(next.clean, next.image, true), 50)
+        }
       }
     }
   }, [appendTurn, audioRef])
