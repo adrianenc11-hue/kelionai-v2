@@ -3376,6 +3376,86 @@ async function toolGenerateImage(args) {
   return generateImage({ prompt, size });
 }
 
+// ── identify_song: search for a song by lyrics, humming description, or melody.
+// Uses web_search internally to find the song, then structures the result.
+async function toolIdentifySong(args) {
+  const query = typeof args?.query === 'string' ? args.query.trim() : '';
+  if (!query) return { ok: false, error: 'query is required — provide lyrics, melody description, or humming context.' };
+  const source = typeof args?.source === 'string' ? args.source : 'lyrics';
+
+  // Build an optimized search query based on source type
+  let searchQuery;
+  switch (source) {
+    case 'lyrics':
+      searchQuery = `"${query.slice(0, 120)}" song lyrics artist`;
+      break;
+    case 'humming':
+      searchQuery = `song melody ${query.slice(0, 120)} what song`;
+      break;
+    case 'description':
+      searchQuery = `song ${query.slice(0, 120)} identify artist title`;
+      break;
+    case 'audio':
+      searchQuery = `"${query.slice(0, 120)}" song identify`;
+      break;
+    default:
+      searchQuery = `${query.slice(0, 120)} song lyrics artist title`;
+  }
+
+  try {
+    const searchResult = await toolWebSearch({ query: searchQuery, limit: 5 });
+    if (!searchResult?.ok || !Array.isArray(searchResult.results) || !searchResult.results.length) {
+      return {
+        ok: false,
+        error: 'Could not identify the song. Try providing more lyrics or details.',
+        query,
+        source,
+      };
+    }
+
+    // Extract song info from search results
+    const results = searchResult.results.slice(0, 5).map(r => ({
+      title: r.title || '',
+      url: r.url || '',
+      snippet: r.snippet || r.description || '',
+    }));
+
+    // Try to extract artist/title from the first result title
+    // Common patterns: "Artist - Song Title Lyrics" or "Song Title by Artist"
+    const firstTitle = results[0]?.title || '';
+    let artist = '';
+    let songTitle = '';
+
+    const dashMatch = firstTitle.match(/^([^–-]+)\s*[–-]\s*([^|([]+)/);
+    const byMatch = firstTitle.match(/^(.+?)\s+by\s+(.+?)(?:\s*[-|([)]|$)/i);
+    if (dashMatch) {
+      artist = dashMatch[1].trim();
+      songTitle = dashMatch[2].replace(/lyrics?|official|video|audio|hd/gi, '').trim();
+    } else if (byMatch) {
+      songTitle = byMatch[1].trim();
+      artist = byMatch[2].replace(/lyrics?|official|video|audio/gi, '').trim();
+    }
+
+    // Build YouTube and Spotify search URLs
+    const searchTerm = artist && songTitle ? `${artist} ${songTitle}` : query.slice(0, 80);
+    const youtubeUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(searchTerm)}`;
+    const spotifyUrl = `https://open.spotify.com/search/${encodeURIComponent(searchTerm)}`;
+
+    return {
+      ok: true,
+      artist: artist || '(check results)',
+      title: songTitle || '(check results)',
+      source,
+      query: query.slice(0, 200),
+      youtube_search: youtubeUrl,
+      spotify_search: spotifyUrl,
+      search_results: results,
+    };
+  } catch (err) {
+    return { ok: false, error: 'Song identification failed: ' + (err?.message || err) };
+  }
+}
+
 async function executeRealTool(name, args, ctx) {
   // Strip any leading-underscore keys from caller-supplied args. These are
   // reserved for internal wrappers (e.g. toolGetForecast passes `_maxDays`
@@ -3547,6 +3627,7 @@ async function executeRealTool(name, args, ctx) {
     case 'scheduled_task': return toolScheduledTask(a, ctx);
     case 'qr_code': return toolQrCode(a);
     case 'smart_alert': return toolSmartAlert(a, ctx);
+    case 'identify_song': return toolIdentifySong(a);
 
     default: return null; // signal "not handled here"
   }
