@@ -1853,7 +1853,7 @@ async function toolReadPdf({ url, base64, file_id, max_chars, max_pages }) {
       };
 
       const chatModelName = (config.google.chatModel || 'gemini-1.5-flash').replace('google/', '').replace(':free', '');
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${chatModelName}:generateContent?key=${apiKey}`, {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/${chatModelName}:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
