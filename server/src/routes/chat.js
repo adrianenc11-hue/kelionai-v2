@@ -92,7 +92,7 @@ router.post('/', async (req, res) => {
     }
 
     // Model: via OpenRouter — explicitly supports tool_calls.
-    const model = process.env.CHAT_MODEL || process.env.OPENROUTER_MODEL || 'google/gemini-2.0-flash-exp:free';
+    const model = process.env.CHAT_MODEL || process.env.OPENROUTER_MODEL || 'google/gemma-4-31b-it:free';
     const url = 'https://openrouter.ai/api/v1/chat/completions';
 
     // ── Demand-driven tool activation ─────────────────────────────────
@@ -100,11 +100,11 @@ router.post('/', async (req, res) => {
     // specific message. After the request completes, tools go back to OFF.
     const { KELION_TOOLS } = require('./realtime');
     const { selectTools } = require('../services/toolRouter');
-    
+
     // Find the last user message and last assistant message for robust tool routing context
     let lastUserMessage = message || '';
     let lastAssistantMessage = '';
-    
+
     for (let i = session.history.length - 1; i >= 0; i--) {
       const parts = session.history[i].parts;
       const textPart = parts.find(p => p.text);
@@ -118,14 +118,14 @@ router.post('/', async (req, res) => {
       }
       if (lastUserMessage && lastAssistantMessage) break;
     }
-    
+
     const contextForRouting = `${lastAssistantMessage} ${lastUserMessage}`.trim();
     let routingResult = selectTools(contextForRouting, KELION_TOOLS);
     let relevantTools = routingResult ? routingResult.tools : null;
     if (!relevantTools || relevantTools.length === 0) {
       relevantTools = KELION_TOOLS;
     }
-    
+
     const openRouterTools = relevantTools.map(t => ({
       type: 'function',
       function: {
@@ -140,7 +140,7 @@ router.post('/', async (req, res) => {
       ? `\n\n[SYSTEM CONTEXT: The user's current GPS coordinates are: Latitude ${lat}, Longitude ${lon}. If asked about location, weather, or directions, you have access to this.]`
       : '';
 
-    const timeContext = clientLocalTime 
+    const timeContext = clientLocalTime
       ? `\n\n[SYSTEM CONTEXT: The user's real local time is ${clientLocalTime} (${clientTimezone || 'Unknown Timezone'}). Ground your responses in this reality. If the user says "buna seara" at 6 PM, reply with an evening greeting.]`
       : '';
 
@@ -286,16 +286,16 @@ Your replies must be direct, conversational, and concise.${locationContext}${tim
     let r;
     try {
       r = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': authHeader,
-        'HTTP-Referer': 'https://kelion.ai',
-        'X-Title': 'Kelion AI'
-      },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': authHeader,
+          'HTTP-Referer': 'https://kelion.ai',
+          'X-Title': 'Kelion AI'
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
     } finally {
       clearTimeout(timer);
     }
@@ -303,7 +303,7 @@ Your replies must be direct, conversational, and concise.${locationContext}${tim
     if (!r.ok) {
       let errText = await r.text();
       console.error('[chat] OpenRouter generation failed:', r.status, errText.slice(0, 500));
-      
+
       // Fallback model if rate limited or insufficient quota
       if (r.status === 429 || errText.toLowerCase().includes('insufficient_quota') || errText.toLowerCase().includes('rate-limited')) {
         console.log('[chat] Attempting fallback to gemini-1.5-flash due to rate limit...');
