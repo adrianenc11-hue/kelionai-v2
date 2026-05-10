@@ -276,6 +276,20 @@ CREATE TABLE IF NOT EXISTS demo_requests (
 CREATE INDEX IF NOT EXISTS idx_demo_requests_email ON demo_requests(email);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_demo_requests_code ON demo_requests(demo_code) WHERE demo_code IS NOT NULL;
 
+CREATE TABLE IF NOT EXISTS voice_clones (
+  id              BIGSERIAL PRIMARY KEY,
+  user_id         BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  voice_id        TEXT NOT NULL,
+  display_name    TEXT NOT NULL DEFAULT 'Unnamed Voice',
+  language        TEXT DEFAULT 'auto',
+  is_active       INTEGER NOT NULL DEFAULT 0,
+  consent_version TEXT,
+  consent_at      TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  created_at      TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_voice_clones_user ON voice_clones(user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_voice_clones_voice ON voice_clones(user_id, voice_id);
+
 -- ═══════════════════════════════════════════════════════════════════════
 -- Row Level Security (RLS) — Supabase Security Advisor P0
 -- ═══════════════════════════════════════════════════════════════════════
@@ -301,6 +315,7 @@ ALTER TABLE studio_workspaces      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE credits_consume_state  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE trial_usage            ENABLE ROW LEVEL SECURITY;
 ALTER TABLE demo_requests           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE voice_clones            ENABLE ROW LEVEL SECURITY;
 
 -- Allow the postgres/service_role to bypass RLS (idempotent).
 -- These policies are named kelion_service_* so they don't conflict with
@@ -309,6 +324,10 @@ DO $$ BEGIN
   -- Users
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'kelion_service_users') THEN
     CREATE POLICY kelion_service_users ON users FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+  -- Voice clones library
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'kelion_service_voice_clones_lib') THEN
+    CREATE POLICY kelion_service_voice_clones_lib ON voice_clones FOR ALL USING (true) WITH CHECK (true);
   END IF;
   -- Referrals
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'kelion_service_referrals') THEN
