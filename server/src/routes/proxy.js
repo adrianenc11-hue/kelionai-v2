@@ -13,16 +13,20 @@
 // - Rate-limited to 30 req/min per IP to prevent abuse.
 
 const { Router } = require('express');
+const dns = require('dns/promises');
+const net = require('net');
+const { Readable } = require('stream');
 const router = Router();
 
-// Simple in-memory rate limiter (30 req/min per IP)
+const WINDOW_MS = 60_000;
+const UPSTREAM_TIMEOUT_MS = 15_000;
+const STREAM_HEADER_TIMEOUT_MS = 15_000;
 const ratemap = new Map();
 function rateLimit(ip) {
   const now = Date.now();
-  const window = 60_000;
   const max = 30;
   let entry = ratemap.get(ip);
-  if (!entry || now - entry.start > window) {
+  if (!entry || now - entry.start > WINDOW_MS) {
     entry = { start: now, count: 0 };
     ratemap.set(ip, entry);
   }
@@ -32,7 +36,7 @@ function rateLimit(ip) {
 }
 // Cleanup stale entries every 5 min
 setInterval(() => {
-  const cutoff = Date.now() - 120_000;
+  const cutoff = Date.now() - WINDOW_MS * 2;
   for (const [k, v] of ratemap) {
     if (v.start < cutoff) ratemap.delete(k);
   }
@@ -49,7 +53,69 @@ const BLOCKED_HEADERS = new Set([
   'transfer-encoding',
   'connection',
   'keep-alive',
+  // HTML is rewritten below, so upstream length/encoding may become stale.
+  'content-length',
+  'content-encoding',
 ]);
+
+function isPrivateIPv4(ip) {
+  const parts = ip.split('.').map((n) => Number.parseInt(n, 10));
+  if (parts.length !== 4 || parts.some((p) => !Number.isFinite(p) || p < 0 || p > 255)) return true;
+  const [a, b] = parts;
+  if (a === 0) return true;
+  if (a === 10) return true;
+  if (a === 127) return true;
+  if (a === 169 && b === 254) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 100 && b >= 64 && b <= 127) return true;
+  if (a >= 224) return true;
+  return false;
+}
+
+function isPrivateIPv6(ip) {
+  const zoneIndex = ip.indexOf('%');
+  const clean = (zoneIndex >= 0 ? ip.slice(0, zoneIndex) : ip).toLowerCase();
+  if (!clean) return true;
+  const halves = clean.split('::');
+  if (halves.length > 2) return true;
+  const parseH = (s) => { if (!s) return []; const p = s.split(':'); if (p.some(x => !/^[0-9a-f]{1,4}$/i.test(x))) return null; return p.map(x => parseInt(x, 16)); };
+  const left = parseH(halves[0]);
+  const right = parseH(halves[1] || '');
+  if (!left || !right) return true;
+  let h;
+  if (halves.length === 1) { if (left.length !== 8) return true; h = left; }
+  else { if (left.length + right.length > 8) return true; h = [...left, ...Array(8 - left.length - right.length).fill(0), ...right]; }
+  const b = []; for (const x of h) { b.push((x >> 8) & 0xff, x & 0xff); }
+  if (b.length !== 16) return true;
+  if (b.every(x => x === 0)) return true;
+  if (b.slice(0, 15).every(x => x === 0) && b[15] === 1) return true;
+  if ((b[0] & 0xfe) === 0xfc) return true;
+  if (b[0] === 0xfe && (b[1] & 0xc0) === 0x80) return true;
+  if (b[0] === 0xff) return true;
+  if (b.slice(0, 10).every(x => x === 0) && b[10] === 0xff && b[11] === 0xff) {
+    return isPrivateIPv4(`${b[12]}.${b[13]}.${b[14]}.${b[15]}`);
+  }
+  return false;
+}
+
+async function assertPublicUrl(targetUrl) {
+  const rawHost = (targetUrl.hostname || '').toLowerCase();
+  const host = rawHost.startsWith('[') && rawHost.endsWith(']') ? rawHost.slice(1, -1) : rawHost;
+  if (!host) throw new Error('Invalid URL host');
+  if (host === 'localhost' || host.endsWith('.localhost') || host === '0.0.0.0' || host === '::') {
+    throw new Error('Private or internal URLs are not allowed');
+  }
+  const ipFamily = net.isIP(host);
+  if (ipFamily === 4 && isPrivateIPv4(host)) throw new Error('Private or internal URLs are not allowed');
+  if (ipFamily === 6 && isPrivateIPv6(host)) throw new Error('Private or internal URLs are not allowed');
+  const resolved = await dns.lookup(host, { all: true, verbatim: true });
+  if (!resolved.length) throw new Error('Could not resolve target host');
+  for (const addr of resolved) {
+    if (addr.family === 4 && isPrivateIPv4(addr.address)) throw new Error('Private or internal URLs are not allowed');
+    if (addr.family === 6 && isPrivateIPv6(addr.address)) throw new Error('Private or internal URLs are not allowed');
+  }
+}
 
 router.get('/', async (req, res) => {
   const ip = (req.headers['x-forwarded-for'] || req.ip || '').toString().split(',')[0].trim();
@@ -73,6 +139,11 @@ router.get('/', async (req, res) => {
   } catch {
     return res.status(400).send('Invalid URL');
   }
+  try {
+    await assertPublicUrl(targetUrl);
+  } catch (err) {
+    return res.status(400).send(err && err.message ? err.message : 'Invalid target URL');
+  }
 
   try {
     const upstream = await fetch(targetUrl.toString(), {
@@ -82,7 +153,7 @@ router.get('/', async (req, res) => {
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9',
       },
-      signal: AbortSignal.timeout(15_000),
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
     });
 
     // Forward status
@@ -173,12 +244,9 @@ try {
   }
 });
 
-// ── Streaming media proxy ─────────────────────────────────────────
+// ── Streaming media proxy ─────────────────────────────────────────────
 // GET /api/proxy/stream?url=http://... — pipes audio/video data directly
-// without buffering the entire response in memory. The main proxy above
-// uses arrayBuffer() which would consume unlimited RAM on infinite live
-// streams (radio, IPTV). This endpoint streams chunk-by-chunk.
-const { Readable } = require('stream');
+// without buffering the entire response in memory.
 
 router.get('/stream', async (req, res) => {
   const ip = (req.headers['x-forwarded-for'] || req.ip || '').toString().split(',')[0].trim();
@@ -198,51 +266,63 @@ router.get('/stream', async (req, res) => {
   } catch {
     return res.status(400).send('Invalid URL');
   }
+  try {
+    await assertPublicUrl(targetUrl);
+  } catch (err) {
+    return res.status(400).send(err && err.message ? err.message : 'Invalid target URL');
+  }
 
   try {
-    const upstream = await fetch(targetUrl.toString(), {
-      redirect: 'follow',
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; KelionMonitor/1.0)',
-        'Accept': 'audio/*, video/*, */*',
-        'Icy-MetaData': '0',
-      },
-    });
-
-    if (!upstream.ok) {
-      return res.status(upstream.status).send('Upstream error');
+    const controller = new AbortController();
+    const fetchTimeout = setTimeout(() => controller.abort(), STREAM_HEADER_TIMEOUT_MS);
+    const requestHeaders = {
+      'User-Agent': 'Mozilla/5.0 (compatible; KelionMonitor/1.0)',
+      'Accept': 'audio/*, video/*, */*',
+      'Icy-MetaData': '0',
+    };
+    for (const headerName of ['Range', 'If-Range', 'If-Modified-Since', 'If-None-Match']) {
+      const headerValue = req.get(headerName);
+      if (headerValue) requestHeaders[headerName] = headerValue;
     }
 
-    // Forward content-type and set CORS/CSP headers
+    let upstream;
+    try {
+      upstream = await fetch(targetUrl.toString(), {
+        redirect: 'follow',
+        headers: requestHeaders,
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(fetchTimeout);
+    }
+
+    res.status(upstream.status);
+
+    // Forward content-type and range headers
     const ct = upstream.headers.get('content-type');
     if (ct) res.setHeader('Content-Type', ct);
+    for (const headerName of ['Content-Length', 'Content-Range', 'Accept-Ranges', 'Last-Modified', 'ETag']) {
+      const headerValue = upstream.headers.get(headerName);
+      if (headerValue) res.setHeader(headerName, headerValue);
+    }
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Cache-Control', 'no-cache');
 
-    // Pipe the stream — never buffer the entire body
-    if (upstream.body && typeof upstream.body.pipe === 'function') {
-      // Node.js native fetch returns a web ReadableStream; convert to Node stream
-      upstream.body.pipe(res);
-    } else if (upstream.body) {
-      // Web ReadableStream (Node 18+ fetch)
-      const reader = upstream.body.getReader();
-      const push = async () => {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) { res.end(); break; }
-          if (!res.write(value)) {
-            await new Promise(resolve => res.once('drain', resolve));
-          }
-        }
-      };
-      push().catch(() => res.end());
+    // Native fetch uses a Web ReadableStream; convert it before piping to Express.
+    let nodeStream = null;
+    if (upstream.body) {
+      nodeStream = Readable.fromWeb(upstream.body);
+      nodeStream.pipe(res);
     } else {
       res.status(502).send('No response body');
     }
 
     // Clean up if client disconnects
     req.on('close', () => {
-      try { if (upstream.body && upstream.body.cancel) upstream.body.cancel(); } catch {}
+      try { if (nodeStream) nodeStream.destroy(); } catch {}
+      try {
+        if (upstream.body && upstream.body.cancel && !upstream.body.locked) upstream.body.cancel();
+      } catch {}
     });
   } catch (err) {
     console.warn('[proxy/stream] error:', err && err.message);

@@ -210,7 +210,10 @@ router.get('/voices', async (req, res) => {
       .sort((a, b) => b.langScore - a.langScore);
 
     // Return all male voices, with lang-matching ones first
-    const currentVoiceId = _nativeVoiceCache.get(langParam)?.voiceId || null;
+    // Prefer the user's saved voice preference over the auto-discovered native voice
+    const userId = uidOf(req);
+    const userPref = userId ? _userVoicePreference.get(String(userId)) : null;
+    const currentVoiceId = userPref?.voiceId || _nativeVoiceCache.get(langParam)?.voiceId || null;
 
     res.json({
       lang: langParam,
@@ -228,7 +231,18 @@ router.get('/voices', async (req, res) => {
 // ── User voice preference (in-memory, per session) ──
 // When a user picks a specific voice from the voice picker UI, we store
 // it here. The TTS endpoint checks this before auto-discovery.
-const _userVoicePreference = new Map(); // userId → { voiceId, voiceName, lang }
+const _userVoicePreference = new Map(); // userId → { voiceId, voiceName, lang, ts }
+const USER_PREF_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+const USER_PREF_MAX_SIZE = 10_000;
+
+// Periodic sweep: evict expired entries (every hour)
+const _prefSweepInterval = setInterval(() => {
+  const now = Date.now();
+  for (const [key, val] of _userVoicePreference) {
+    if (now - val.ts > USER_PREF_TTL_MS) _userVoicePreference.delete(key);
+  }
+}, 60 * 60 * 1000);
+_prefSweepInterval.unref(); // don't keep the process alive in tests
 
 /**
  * POST /api/voice/clone/select-voice
@@ -242,6 +256,15 @@ router.post('/select-voice', async (req, res) => {
   const { voiceId, voiceName, lang } = req.body || {};
   if (!voiceId || typeof voiceId !== 'string') {
     return res.status(400).json({ error: 'voiceId is required.' });
+  }
+
+  // Evict the oldest (by timestamp) entry if map is at the size cap
+  if (_userVoicePreference.size >= USER_PREF_MAX_SIZE) {
+    let oldestKey = null, oldestTs = Infinity;
+    for (const [key, val] of _userVoicePreference) {
+      if (val.ts < oldestTs) { oldestTs = val.ts; oldestKey = key; }
+    }
+    if (oldestKey !== null) _userVoicePreference.delete(oldestKey);
   }
 
   _userVoicePreference.set(String(userId), {
