@@ -1810,15 +1810,17 @@ export default function KelionStage() {
               <MonitorOverlay />
               {/* Transcript Overlay for Monitor Mode */}
               {(() => {
-                const lastDisplayMessage = [...messages].reverse().find(m => !m.isThought && m.text && typeof m.text === 'string' && m.text.trim().length > 0);
+                const lastDisplayMessage = [...turns].reverse().find(m => !m.isThought && (m.text || m.transcript) && typeof (m.text || m.transcript) === 'string' && (m.text || m.transcript).trim().length > 0);
                 if (!lastDisplayMessage) return null;
+                const displayText = lastDisplayMessage.text || lastDisplayMessage.transcript;
+                const isUser = lastDisplayMessage.role === 'user';
                 return (
                   <div style={{ position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)', width: '80%', maxWidth: 800, background: 'rgba(10,13,26,0.85)', padding: '16px 24px', borderRadius: 16, color: 'white', fontFamily: 'Inter, sans-serif', fontSize: 16, textAlign: 'center', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 8px 32px rgba(0,0,0,0.5)', zIndex: 9999, pointerEvents: 'none', transition: 'all 0.3s ease' }}>
-                    <span style={{ color: lastDisplayMessage.isUser ? '#58a6ff' : '#4ade80', fontWeight: 'bold', marginRight: 12 }}>
-                      {lastDisplayMessage.isUser ? 'Tu:' : 'Kelion:'}
+                    <span style={{ color: isUser ? '#58a6ff' : '#4ade80', fontWeight: 'bold', marginRight: 12 }}>
+                      {isUser ? 'Tu:' : 'Kelion:'}
                     </span>
                     <span style={{ opacity: 0.95, lineHeight: 1.5 }}>
-                      {lastDisplayMessage.text}
+                      {displayText}
                     </span>
                   </div>
                 );
