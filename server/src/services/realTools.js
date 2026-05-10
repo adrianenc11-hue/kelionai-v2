@@ -2928,7 +2928,7 @@ async function toolAskExpertCoder(args) {
   const prompt = `You are an expert coder. Answer the question precisely.\n\nContext:\n${context}\n\nQuestion:\n${question}`;
 
   const MODELS = [
-    args?.model || 'google/gemini-2.0-flash-exp:free',
+    args?.model || 'google/gemma-4-31b-it:free',
     'google/gemini-flash-1.5',
     'google/gemini-pro-1.5',
   ];
