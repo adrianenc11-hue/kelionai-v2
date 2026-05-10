@@ -1852,8 +1852,8 @@ async function toolReadPdf({ url, base64, file_id, max_chars, max_pages }) {
         generationConfig: { temperature: 0.1 }
       };
 
-      const claudeModel = config.google.chatModel;
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${claudeModel}:generateContent?key=${apiKey}`, {
+      const chatModelName = (config.google.chatModel || 'gemini-1.5-flash').replace('google/', '').replace(':free', '');
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${chatModelName}:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

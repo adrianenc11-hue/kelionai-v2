@@ -280,6 +280,7 @@ Your replies must be direct, conversational, and concise.${locationContext}${tim
       const modelSlug = model.replace('google/', '').replace(':free', '');
       apiUrl = `https://generativelanguage.googleapis.com/v1beta/openai/chat/completions`;
       authHeader = `Bearer ${googleKey}`;
+      body.model = modelSlug; // CRITICAL: Google expects the slug, not the OpenRouter full name
     }
 
     let r;
@@ -305,8 +306,8 @@ Your replies must be direct, conversational, and concise.${locationContext}${tim
       
       // Fallback model if rate limited or insufficient quota
       if (r.status === 429 || errText.toLowerCase().includes('insufficient_quota') || errText.toLowerCase().includes('rate-limited')) {
-        console.log('[chat] Attempting fallback to google/gemini-2.5-pro due to rate limit...');
-        const fallbackBody = { ...body, model: 'google/gemini-flash-1.5' };
+        console.log('[chat] Attempting fallback to gemini-1.5-flash due to rate limit...');
+        const fallbackBody = { ...body, model: 'gemini-1.5-flash' };
         try {
           const r2 = await fetch(url, {
             method: 'POST',
