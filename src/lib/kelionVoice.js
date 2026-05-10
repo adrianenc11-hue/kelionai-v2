@@ -1613,9 +1613,27 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
   // sendText — sends a typed message through the live WebSocket as a
   // clientContent turn. The model responds with voice + transcript just
   // like a spoken turn. Enables the chat panel (⌨ button) to work.
+  // AbortController and message buffer for HTTP chat mode
+  const httpAbortRef = useRef(null);
+  const httpMsgBufferRef = useRef([]);
+  const httpBusyRef = useRef(false);
+
   const sendText = useCallback(async (text, image = null, playAudio = false) => {
     const clean = (text || '').trim()
     if (!clean && !image) return
+    
+    // Immediate STOP intercept
+    if (['stop', 'oprește', 'gata', 'oprește-te', 'stop it'].includes(clean.toLowerCase().replace(/[.,!]/g, ''))) {
+      clearAudioQueue()
+      if (httpAbortRef.current) {
+        httpAbortRef.current.abort()
+        httpAbortRef.current = null
+      }
+      setStatus('listening')
+      httpBusyRef.current = false
+      return
+    }
+    
     userHasSpokenRef.current = true
     narrationCooldownRef.current = Date.now()
     if (clean) appendTurn('user', clean, true, playAudio ? '🎤 Voice' : '⌨️ Keyboard')
@@ -1637,6 +1655,13 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
       }
     } else {
       // HTTP fallback — Claude Opus text/voice chat via /api/chat
+      // If a loop is already running, queue the message and let the active loop pick it up
+      if (httpBusyRef.current) {
+        httpMsgBufferRef.current.push({ clean, image })
+        return
+      }
+      
+      httpBusyRef.current = true
       setStatus('thinking')
       try {
         let currentMessage = clean;
@@ -1646,14 +1671,22 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
         let finalReply = '';
         let finalModel = '';
         
-        // Use an existing session ID if possible or generate one for this hook instance
         if (!sessionIdRef.current) {
           sessionIdRef.current = 'ses_' + Math.random().toString(36).substring(2, 10);
         }
         
         while (maxLoops-- > 0) {
+          // If buffered messages arrived while tools were running, append them
+          while (httpMsgBufferRef.current.length > 0) {
+            const next = httpMsgBufferRef.current.shift()
+            currentMessage = currentMessage ? currentMessage + '\n' + next.clean : next.clean
+            if (next.image) currentImage = next.image
+          }
+
+          httpAbortRef.current = new AbortController()
           const r = await fetch('/api/chat', {
             method: 'POST',
+            signal: httpAbortRef.current.signal,
             headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
             credentials: 'include',
             body: JSON.stringify({ 
@@ -1777,9 +1810,15 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
           setStatus('idle')
         }
       } catch (err) {
+        if (err.name === 'AbortError') {
+          console.log('[kelionVoice] HTTP chat aborted by user stop command')
+          return
+        }
         console.error('[kelionVoice] HTTP chat fallback failed', err)
         appendTurn('assistant', 'Connection error. Please try again.', true)
         setStatus('idle')
+      } finally {
+        httpBusyRef.current = false
       }
     }
   }, [appendTurn, audioRef])
