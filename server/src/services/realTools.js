@@ -3456,6 +3456,66 @@ async function toolIdentifySong(args) {
   }
 }
 
+// ── Voice clone library tools ─────────────────────────────────────
+// Let the AI model list and manage the user's cloned voices.
+
+async function toolListVoiceClones(_args, ctx) {
+  const userId = ctx?.user?.id;
+  if (!userId) return { ok: false, signed_in: false, error: 'Voice clone library requires sign-in.' };
+  try {
+    const db = require('../db');
+    const clones = await db.listVoiceClones(userId);
+    if (!clones.length) {
+      return { ok: true, clones: [], count: 0, message: 'No cloned voices found. The user can create one from the voice settings.' };
+    }
+    return {
+      ok: true,
+      count: clones.length,
+      clones: clones.map(c => ({
+        id: c.id,
+        name: c.display_name,
+        language: c.language || 'auto',
+        active: !!c.is_active,
+        created: c.created_at,
+      })),
+    };
+  } catch (err) {
+    return { ok: false, error: 'Failed to list voice clones: ' + (err?.message || err) };
+  }
+}
+
+async function toolActivateVoiceClone(args, ctx) {
+  const userId = ctx?.user?.id;
+  if (!userId) return { ok: false, signed_in: false, error: 'Voice clone activation requires sign-in.' };
+  const cloneId = Number(args?.id);
+  if (!Number.isFinite(cloneId)) return { ok: false, error: 'id (number) is required. Use 0 to deactivate.' };
+  try {
+    const db = require('../db');
+    if (cloneId === 0) {
+      // Deactivate all clones — switch to native voice
+      await db.setActiveVoiceClone(userId, null);
+      return { ok: true, mode: 'native', message: 'Switched to native voice. No clone is active.' };
+    }
+    const active = await db.setActiveVoiceClone(userId, cloneId);
+    if (!active) return { ok: false, error: `Clone ID ${cloneId} not found in your library.` };
+    // Also update legacy field for backward compatibility
+    await db.setClonedVoice(userId, active.voice_id, '2.0');
+    return {
+      ok: true,
+      mode: 'cloned',
+      active: {
+        id: active.id,
+        name: active.display_name,
+        language: active.language,
+        voice_id: active.voice_id,
+      },
+      message: `Activated clone "${active.display_name}". TTS will now use this voice.`,
+    };
+  } catch (err) {
+    return { ok: false, error: 'Failed to activate voice clone: ' + (err?.message || err) };
+  }
+}
+
 async function executeRealTool(name, args, ctx) {
   // Strip any leading-underscore keys from caller-supplied args. These are
   // reserved for internal wrappers (e.g. toolGetForecast passes `_maxDays`
@@ -3628,6 +3688,9 @@ async function executeRealTool(name, args, ctx) {
     case 'qr_code': return toolQrCode(a);
     case 'smart_alert': return toolSmartAlert(a, ctx);
     case 'identify_song': return toolIdentifySong(a);
+    // ── Voice clone library tools ──
+    case 'list_voice_clones': return toolListVoiceClones(a, ctx);
+    case 'activate_voice_clone': return toolActivateVoiceClone(a, ctx);
 
     default: return null; // signal "not handled here"
   }
@@ -4997,6 +5060,12 @@ const REAL_TOOL_NAMES = [
   'image_generator_editor', 'hardware_manager', 'cloud_manager',
   'communication_hub', 'automation_engine', 'devops_toolkit',
   'scheduler_pro', 'smart_monitor', 'deep_memory_architect', 'task_orchestrator', 'universal_executor',
+  // Voice clone library
+  'list_voice_clones', 'activate_voice_clone',
+  // Song identification
+  'identify_song',
+  // Past conversation reading
+  'read_past_conversation',
 ];
 
 module.exports = {

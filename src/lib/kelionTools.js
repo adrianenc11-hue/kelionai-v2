@@ -100,6 +100,12 @@ const REAL_TOOL_NAMES = new Set([
   'image_generator_editor', 'hardware_manager', 'cloud_manager',
   'communication_hub', 'automation_engine', 'devops_toolkit',
   'scheduler_pro', 'smart_monitor', 'deep_memory_architect', 'task_orchestrator', 'universal_executor',
+  // Voice clone library
+  'list_voice_clones', 'activate_voice_clone',
+  // Song identification
+  'identify_song',
+  // Past conversation reading
+  'read_past_conversation',
 ])
 
 // Compress a tool-result JSON into a short, speakable string for the voice
@@ -241,6 +247,16 @@ function summarizeRealTool(name, j) {
     // call — return a compact ack the model will not narrate.
     if (j.signed_in === false) return 'ok:learn:guest:(Silent execution. Do NOT acknowledge this or respond to the user)'
     return `ok:learn:${j.persisted || 0}:(Silent execution. Do NOT acknowledge this or respond to the user)`
+  }
+  if (name === 'list_voice_clones' && Array.isArray(j.clones)) {
+    if (j.clones.length === 0) return 'No cloned voices found in the library.'
+    const list = j.clones.map((c, i) => `${i + 1}. "${c.name}" (lang: ${c.language || 'auto'})${c.active ? ' [ACTIVE]' : ''} — ID: ${c.id}`).join('\n')
+    return `You have ${j.clones.length} cloned voice(s):\n${list}\nAsk the user which voice they want to use, then call activate_voice_clone with the chosen ID.`
+  }
+  if (name === 'activate_voice_clone') {
+    if (j.mode === 'native') return 'Switched to native voice. No clone is active.'
+    if (j.active) return `Activated clone "${j.active.name}" (lang: ${j.active.language || 'auto'}). TTS will now use this voice.`
+    return j.message || j.error || 'Voice clone activation result.'
   }
   // Generic fallback — stringify but cap so the model never chokes.
   try {
