@@ -147,13 +147,16 @@ function buildKelionPersona(opts = {}) {
     geo = null,
     priorTurns = [],
     lockedLangTag = null,
+    clientTz = null,
+    clientLocalTime = null,
   } = opts;
   const lockedLangName = languageNameForTag(lockedLangTag) || null;
   const now = new Date();
-  const tz = geo?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  // Priority: client timezone > GPS geo timezone > server timezone
+  const tz = clientTz || geo?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
   const iso = now.toISOString();
   const weekday = now.toLocaleDateString('en-US', { weekday: 'long', timeZone: tz });
-  const localTime = now.toLocaleString('en-US', { timeZone: tz, dateStyle: 'full', timeStyle: 'short' });
+  const localTime = clientLocalTime || now.toLocaleString('en-US', { timeZone: tz, dateStyle: 'full', timeStyle: 'short' });
   // Adrian: "permanent trebuie sa foloseasca coordonatele gps reale ale
   // aparatului". We only include user location in the persona when the
   // browser has resolved a REAL GPS fix (source === 'client-gps').
@@ -1817,7 +1820,7 @@ router.post('/vision', visionLimiter, async (req, res) => {
 // Voice goes directly through Claude Opus REST Voice Mode — not this route.
 // ──────────────────────────────────────────────────────────────────
 router.post('/pipeline', async (req, res) => {
-  const { history, textOverride, visionContext } = req.body || {};
+  const { history, textOverride, visionContext, clientTimezone, clientLocalTime: clientLocalTimeRaw } = req.body || {};
   if (!textOverride) return res.status(400).json({ error: 'No text provided' });
 
   try {
@@ -1858,9 +1861,14 @@ router.post('/pipeline', async (req, res) => {
     const styleFromCookie = req.cookies?.['kelion.voice_style'];
     const voiceStyle = resolveVoiceStyle(styleFromCookie || '');
     const ipGeoData = await ipGeo.lookup(ipGeo.clientIp(req));
+    // Use client timezone as highest priority (real device time)
+    const clientTz = (typeof clientTimezone === 'string' && clientTimezone.length < 64) ? clientTimezone : null;
+    const clientLT = (typeof clientLocalTimeRaw === 'string' && clientLocalTimeRaw.length < 100) ? clientLocalTimeRaw : null;
     const systemPrompt = buildKelionPersona({
       user, memoryItems, voiceStyle, geo: ipGeoData, priorTurns: [],
       lockedLangTag: await resolveLockedLangTag({ req, user, forcedLang }),
+      clientTz,
+      clientLocalTime: clientLT,
     });
 
     const systemText = systemPrompt + '\n\nCRITICAL RULES:\n0. ALWAYS RESPOND IN THE EXACT SAME LANGUAGE AS THE USER\'S LATEST MESSAGE. If the user speaks Romanian, answer in Romanian. If they speak German, answer in German.\n1. MAXIMUM CONCISENESS. Answer precisely and directly. Do not use filler words. Do not explain your thought process. Keep answers extremely short unless a detailed explanation is specifically requested. This is crucial to save tokens and avoid verbosity.\n2. ACADEMIC & PROFESSIONAL TONE. Use highly professional, grammatically perfect language. In Romanian, use natural vocabulary, flawless grammar, and diacritics. Avoid weird translations or robotic phrasing.\n3. ZERO HALLUCINATIONS. NEVER fabricate, guess, or make up information. If you don\'t know, simply say "Nu am această informație." (I don\'t have this information). \n4. When asked about facts, news, people, places, events — ALWAYS use web_search or wikipedia_search. NEVER answer from memory alone.\n5. You have tools: web_search, wikipedia_search, browse_web, calculate, get_weather, etc. USE THEM proactively.';

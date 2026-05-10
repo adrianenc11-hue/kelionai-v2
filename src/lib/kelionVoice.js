@@ -783,7 +783,11 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
         if (raw === 'aistudio') liveBackend = 'aistudio'
       } catch (_) { /* window/localStorage missing in SSR — default stays */ }
       const backendQuery = liveBackend === 'aistudio' ? '&backend=aistudio' : '&backend=vertex'
-      const tokenUrl = `/api/realtime/voice-token?lang=${encodeURIComponent(langHint)}${geoQuery}${backendQuery}`
+      // Send client's real timezone so Kelion knows the actual time of day
+      const clientTz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''
+      const clientLocalTime = new Date().toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' })
+      const tzQuery = `&tz=${encodeURIComponent(clientTz)}&localTime=${encodeURIComponent(clientLocalTime)}`
+      const tokenUrl = `/api/realtime/voice-token?lang=${encodeURIComponent(langHint)}${geoQuery}${backendQuery}${tzQuery}`
       const tokenRes = priorTurns.length
         ? await fetch(tokenUrl, {
             method: 'POST',
@@ -1651,7 +1655,9 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
               image: currentImage,
               sessionId: sessionIdRef.current,
               lat: coords?.lat,
-              lon: coords?.lon
+              lon: coords?.lon,
+              clientTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone || '',
+              clientLocalTime: new Date().toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' })
             }),
           })
           if (!r.ok) {
