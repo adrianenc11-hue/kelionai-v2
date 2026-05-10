@@ -3946,7 +3946,7 @@ async function toolQueryDatabase(args, ctx) {
     if (query.includes('credit') || query.includes('minut') || query.includes('balanț') || query.includes('usage')) {
       // Credits + transactions
       const user = await db.getUserById(userId);
-      const txRows = await db.getRecentTransactions(userId, limit);
+      const txRows = await db.listCreditTransactions(userId, limit);
       return {
         ok: true,
         type: 'credits',

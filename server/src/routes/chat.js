@@ -51,7 +51,7 @@ router.post('/', async (req, res) => {
       await stampTrialIfFresh(guestIp, trial);
     }
 
-    const { message, sessionId, toolResponses, image, lat, lon } = req.body || {};
+    const { message, sessionId, toolResponses, image, lat, lon, clientTimezone, clientLocalTime } = req.body || {};
     if (!message && !toolResponses) {
       return res.status(400).json({ error: 'message or toolResponses is required' });
     }
@@ -140,6 +140,10 @@ router.post('/', async (req, res) => {
       ? `\n\n[SYSTEM CONTEXT: The user's current GPS coordinates are: Latitude ${lat}, Longitude ${lon}. If asked about location, weather, or directions, you have access to this.]`
       : '';
 
+    const timeContext = clientLocalTime 
+      ? `\n\n[SYSTEM CONTEXT: The user's real local time is ${clientLocalTime} (${clientTimezone || 'Unknown Timezone'}). Ground your responses in this reality. If the user says "buna seara" at 6 PM, reply with an evening greeting.]`
+      : '';
+
     // Convert session history to OpenAI format
     const messages = [
       {
@@ -161,7 +165,7 @@ UNDER NO CIRCUMSTANCES should you provide instructions for the user to execute t
 **TOOL SELECTION**: You MUST carefully review all available tools before acting. Always prioritize using a specific, dedicated tool (e.g., \`self_verify\`, \`check_updates\`, \`data_visualize\`) over generic terminal commands. Use \`run_terminal_command\` ONLY if no specific tool exists for the task. If verifying a file, ALWAYS use \`self_verify\`. If asked to open a website or extract its content/title, ALWAYS use \`computer_use\` or \`fetch_url\` instead of \`show_on_monitor\`. If you must test a file via terminal, use the correct tool for its type (e.g., \`node -c\` is ONLY for JavaScript; for JSON use \`jq\` or \`node -e 'require("./file.json")'\`).
 **KELION SELF-REPAIR (SILENT)**: If the user asks you to fix or modify Kelion's own code, YOU MUST do this ENTIRELY IN THE BACKGROUND. 1. Call 'ask_expert_coder' to get the solution (which routes to Claude 4.7 Opus). 2. Call 'replace_file_content' or 'run_terminal_command' to apply the fix. 3. NEVER output the raw code, thought process, or debug logs into the text or voice chat. When done, reply with extreme brevity and modesty: "Problema a fost rezolvată." (The problem has been resolved).
 **TOOL OUTPUT RULES**: When you receive results from a tool call, NEVER show the raw JSON, internal markup, tool names, function names, or any debug information to the user. Instead, present the information in clean, natural language. If the tool result contains a "summary" field, use that text as the basis for your response. NEVER output text like "Apelează Tool:", "Rezultat Tool:", code blocks with JSON, or curly braces in your response. The user should see ONLY a natural, conversational answer.
-Your replies must be direct, conversational, and concise.${locationContext}`
+Your replies must be direct, conversational, and concise.${locationContext}${timeContext}`
       }
     ];
 
