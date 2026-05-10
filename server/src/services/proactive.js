@@ -112,13 +112,13 @@ async function checkClaude4Availability() {
     const models = data.models || [];
     // We check if any Claude Opus model supports BidiGenerateContent (Live WebSocket)
     const claudeLive = models.find(m => 
-      m.name.toLowerCase().includes('claude-4') && 
+      m.name.toLowerCase().includes('gemini-2.0') && 
       (m.supportedGenerationMethods || []).includes('bidiGenerateContent')
     );
     if (claudeLive) {
       _claude_opusAlertSent = true;
-      console.log('🚨 [PROACTIVE] GEMMA 4 NATIVE AUDIO IS AVAILABLE! 🚨', claudeLive.name);
-      return { title: 'Kelion AI Update', body: `Claude Opus is ready for full voice replacement! Model: ${claudeLive.displayName || claudeLive.name}`, reason: 'system_alert:claude_opus' };
+      console.log('🚨 [PROACTIVE] GEMINI 2.0 FLASH IS AVAILABLE! 🚨', claudeLive.name);
+      return { title: 'Kelion AI Update', body: `Gemini 2.0 Flash is ready! Model: ${claudeLive.displayName || claudeLive.name}`, reason: 'system_alert:gemini_flash' };
     }
   } catch (err) {
     // Ignore fetch errors to not pollute logs

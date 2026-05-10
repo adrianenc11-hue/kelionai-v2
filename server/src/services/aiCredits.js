@@ -224,7 +224,7 @@ async function probeOpenRouter() {
   const card = {
     id: 'openrouter',
     name: 'OpenRouter',
-    subtitle: 'LLM routing (Claude Opus, GPT-4o, Claude)',
+    subtitle: 'LLM routing (Gemini 2.0 Flash - Free, Gemini Pro)',
     configured: Boolean(apiKey),
     keyFingerprint: maskKey(apiKey),
     balance: null,

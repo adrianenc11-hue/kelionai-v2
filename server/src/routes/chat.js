@@ -92,7 +92,7 @@ router.post('/', async (req, res) => {
     }
 
     // Model: via OpenRouter — explicitly supports tool_calls.
-    const model = process.env.CHAT_MODEL || process.env.OPENROUTER_MODEL || 'anthropic/claude-opus-4.7';
+    const model = process.env.CHAT_MODEL || process.env.OPENROUTER_MODEL || 'google/gemini-2.0-flash-exp:free';
     const url = 'https://openrouter.ai/api/v1/chat/completions';
 
     // ── Demand-driven tool activation ─────────────────────────────────
@@ -269,19 +269,30 @@ Your replies must be direct, conversational, and concise.${locationContext}${tim
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 30_000);
-    let r;
-    try {
-      r = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${orKey}`,
-          'HTTP-Referer': 'https://kelion.ai',
-          'X-Title': 'Kelion AI'
-        },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
+    const googleKey = process.env.GOOGLE_API_KEY;
+    const isGoogleModel = model.startsWith('google/');
+    let apiUrl = url;
+    let authHeader = `Bearer ${orKey}`;
+
+    if (googleKey && isGoogleModel) {
+      // Use direct Google AI Studio endpoint (OpenAI-compatible)
+      // This bypasses OpenRouter limits and provides a true "free/unlimited" experience
+      const modelSlug = model.replace('google/', '').replace(':free', '');
+      apiUrl = `https://generativelanguage.googleapis.com/v1beta/openai/chat/completions`;
+      authHeader = `Bearer ${googleKey}`;
+    }
+
+    const r = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': authHeader,
+        'HTTP-Referer': 'https://kelion.ai',
+        'X-Title': 'Kelion AI'
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
     } finally {
       clearTimeout(timer);
     }
@@ -293,7 +304,7 @@ Your replies must be direct, conversational, and concise.${locationContext}${tim
       // Fallback model if rate limited or insufficient quota
       if (r.status === 429 || errText.toLowerCase().includes('insufficient_quota') || errText.toLowerCase().includes('rate-limited')) {
         console.log('[chat] Attempting fallback to google/gemini-2.5-pro due to rate limit...');
-        const fallbackBody = { ...body, model: 'google/gemini-2.5-pro' };
+        const fallbackBody = { ...body, model: 'google/gemini-flash-1.5' };
         try {
           const r2 = await fetch(url, {
             method: 'POST',

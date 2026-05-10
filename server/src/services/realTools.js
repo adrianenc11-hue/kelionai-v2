@@ -1852,7 +1852,7 @@ async function toolReadPdf({ url, base64, file_id, max_chars, max_pages }) {
         generationConfig: { temperature: 0.1 }
       };
 
-      const claudeModel = process.env.GOOGLE_CHAT_MODEL || 'anthropic/claude-opus-4.7';
+      const claudeModel = config.google.chatModel;
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${claudeModel}:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2928,9 +2928,9 @@ async function toolAskExpertCoder(args) {
   const prompt = `You are an expert coder. Answer the question precisely.\n\nContext:\n${context}\n\nQuestion:\n${question}`;
 
   const MODELS = [
-    args?.model || 'anthropic/claude-4.7-opus',
-    'anthropic/claude-4.6-sonnet',
-    'google/gemini-3.1-pro',
+    args?.model || 'google/gemini-2.0-flash-exp:free',
+    'google/gemini-flash-1.5',
+    'google/gemini-pro-1.5',
   ];
   // Deduplicate in case args.model matches one of the fallbacks
   const uniqueModels = [...new Set(MODELS)];

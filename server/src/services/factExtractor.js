@@ -61,7 +61,7 @@ async function extractFacts(turns, options = {}) {
   const url = 'https://openrouter.ai/api/v1/chat/completions';
 
   const body = {
-    model: options.model || 'anthropic/claude-opus-4.7', // Claude Opus — project-wide default via OpenRouter
+    model: options.model || 'google/gemini-2.0-flash-exp:free', // Gemini 2.0 Flash — free project-wide default via OpenRouter
     messages: [
       { role: 'system', content: EXTRACTION_SYSTEM },
       { role: 'user', content: `Transcript:\n${transcript}` }
@@ -85,17 +85,15 @@ async function extractFacts(turns, options = {}) {
     
     // Fallback if Claude is rate-limited
     if (!r.ok && r.status === 429) {
-      console.warn('[factExtractor] OpenRouter HTTP 429 for Claude. Falling back to Gemini 2.5 Pro...');
-      body.model = 'google/gemini-2.5-pro';
+      console.warn('[factExtractor] OpenRouter HTTP 429. Falling back to Gemini Flash...');
       r = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${openRouterKey}`,
-          'HTTP-Referer': 'https://kelion.ai',
-          'X-Title': 'Kelion AI Memory'
+          'X-Title': 'Kelion AI'
         },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ ...body, model: 'google/gemini-flash-1.5' }),
       });
     }
 
