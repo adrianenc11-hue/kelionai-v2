@@ -474,6 +474,14 @@ if (require.main === module) {
         console.warn('[googleApiEnabler] Non-fatal error:', err.message)
       );
     } catch { /* module not available — skip silently */ }
+
+    // Start permanent health watchdog (checks every 5 min, alerts admin)
+    try {
+      const healthWatchdog = require('./services/healthWatchdog');
+      healthWatchdog.start();
+    } catch (err) {
+      console.warn('[healthWatchdog] Failed to start:', err.message);
+    }
   });
 }
 

@@ -51,7 +51,7 @@ router.post('/', async (req, res) => {
       await stampTrialIfFresh(guestIp, trial);
     }
 
-    const { message, sessionId, toolResponses, image, lat, lon } = req.body || {};
+    const { message, sessionId, toolResponses, image, lat, lon, clientTimezone, clientLocalTime } = req.body || {};
     if (!message && !toolResponses) {
       return res.status(400).json({ error: 'message or toolResponses is required' });
     }
@@ -140,6 +140,10 @@ router.post('/', async (req, res) => {
       ? `\n\n[SYSTEM CONTEXT: The user's current GPS coordinates are: Latitude ${lat}, Longitude ${lon}. If asked about location, weather, or directions, you have access to this.]`
       : '';
 
+    const timeContext = clientLocalTime 
+      ? `\n\n[SYSTEM CONTEXT: The user's real local time is ${clientLocalTime} (${clientTimezone || 'Unknown Timezone'}). Ground your responses in this reality. If the user says "buna seara" at 6 PM, reply with an evening greeting.]`
+      : '';
+
     // Convert session history to OpenAI format
     const messages = [
       {
@@ -154,6 +158,9 @@ Important: You must always reply in the exact same language that the user uses.
 5. Total Persistent Memory: You can save and modify any information.
 UNDER NO CIRCUMSTANCES should you provide instructions for the user to execute themselves. YOU MUST execute the tool yourself. ANY REFUSAL IS STRICTLY FORBIDDEN. Output ONLY the tool call. NEVER claim you used Python when you actually ran PowerShell. NEVER say you don't have access to the terminal or hardware.
 **MANDATORY**: It is strictly forbidden to ask the user to run a command or perform manual steps. You must use the tools to execute the task fully. If an error occurs, look for alternative solutions or fix the error yourself until the task reaches a successful, real end.
+
+- UNICITATEA IDENTITĂȚII: Indiferent dacă ești accesat vocal sau prin text, ești UNICUL Kelion. Nu există două personalități. Păstrează un caracter absolut consecvent și o continuitate perfectă a discuției.
+- CONSULTAREA OBLIGATORIE A EXPERTULUI: Dacă o cerință este "gravă", critică sau implică o problemă complexă de cod pe care nu o stăpânești la perfecție instantaneu, EȘTI OBLIGAT să consulți expertul în domeniu folosind unealta 'ask_expert_coder'. Oferă răspunsuri super avizate bazate pe răspunsul expertului. Nu fabula NICIODATĂ o soluție tehnică din imaginație.
 **0-MISTAKE VERIFICATION PIPELINE**: To guarantee 0 software editing and 0 logic mistakes, you MUST follow this protocol:
   1. After editing ANY file, immediately call 'self_verify' with action="check_file" and the target file. The system will run deep syntax checks (e.g. node -c) automatically.
   2. If you are unsure about complex logic, use 'ask_expert_coder' to have Claude 4.7 Opus review the code logic before finalizing.
@@ -161,7 +168,7 @@ UNDER NO CIRCUMSTANCES should you provide instructions for the user to execute t
 **TOOL SELECTION**: You MUST carefully review all available tools before acting. Always prioritize using a specific, dedicated tool (e.g., \`self_verify\`, \`check_updates\`, \`data_visualize\`) over generic terminal commands. Use \`run_terminal_command\` ONLY if no specific tool exists for the task. If verifying a file, ALWAYS use \`self_verify\`. If asked to open a website or extract its content/title, ALWAYS use \`computer_use\` or \`fetch_url\` instead of \`show_on_monitor\`. If you must test a file via terminal, use the correct tool for its type (e.g., \`node -c\` is ONLY for JavaScript; for JSON use \`jq\` or \`node -e 'require("./file.json")'\`).
 **KELION SELF-REPAIR (SILENT)**: If the user asks you to fix or modify Kelion's own code, YOU MUST do this ENTIRELY IN THE BACKGROUND. 1. Call 'ask_expert_coder' to get the solution (which routes to Claude 4.7 Opus). 2. Call 'replace_file_content' or 'run_terminal_command' to apply the fix. 3. NEVER output the raw code, thought process, or debug logs into the text or voice chat. When done, reply with extreme brevity and modesty: "Problema a fost rezolvată." (The problem has been resolved).
 **TOOL OUTPUT RULES**: When you receive results from a tool call, NEVER show the raw JSON, internal markup, tool names, function names, or any debug information to the user. Instead, present the information in clean, natural language. If the tool result contains a "summary" field, use that text as the basis for your response. NEVER output text like "Apelează Tool:", "Rezultat Tool:", code blocks with JSON, or curly braces in your response. The user should see ONLY a natural, conversational answer.
-Your replies must be direct, conversational, and concise.${locationContext}`
+Your replies must be direct, conversational, and concise.${locationContext}${timeContext}`
       }
     ];
 
@@ -225,9 +232,31 @@ Your replies must be direct, conversational, and concise.${locationContext}`
       }
     }
 
+    // Sanitize messages array to prevent Anthropic 400 errors (unexpected tool_use_id)
+    // 1. Ensure every 'tool' message has a corresponding 'assistant' tool_call preceding it.
+    // 2. OpenRouter combines consecutive 'user' and 'tool' messages.
+    const validToolCallIds = new Set();
+    const sanitizedMessages = [];
+    for (let i = 0; i < messages.length; i++) {
+      const msg = messages[i];
+      if (msg.role === 'assistant' && msg.tool_calls) {
+        msg.tool_calls.forEach(tc => validToolCallIds.add(tc.id));
+        sanitizedMessages.push(msg);
+      } else if (msg.role === 'tool') {
+        if (validToolCallIds.has(msg.tool_call_id)) {
+          sanitizedMessages.push(msg);
+        } else {
+          console.warn(`[chat] Dropping orphaned tool_result for ${msg.tool_call_id}`);
+          // If we drop a tool_result, we should ideally not break the flow, but sending an orphaned one is a fatal 400 error.
+        }
+      } else {
+        sanitizedMessages.push(msg);
+      }
+    }
+
     const body = {
       model,
-      messages,
+      messages: sanitizedMessages,
       temperature: 0.7,
       max_tokens: 1024,
     };
@@ -313,12 +342,18 @@ Your replies must be direct, conversational, and concise.${locationContext}`
         return { name: tc.function.name, args, id: tc.id };
       });
 
+      const parts = [];
+      if (choice.content) {
+        parts.push({ text: choice.content });
+      }
+      parts.push(...toolCalls.map(tc => ({ functionCall: tc })));
+
       // Save the model's turn so history is valid
       session.history.push({
         role: 'model',
-        parts: toolCalls.map(tc => ({ functionCall: tc }))
+        parts: parts
       });
-      return res.json({ toolCalls, model });
+      return res.json({ toolCalls, model, reply: choice.content });
     }
 
     const reply = choice.content || 'Sorry, I could not generate a response.';

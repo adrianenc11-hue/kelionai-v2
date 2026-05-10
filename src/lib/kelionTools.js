@@ -81,6 +81,10 @@ const REAL_TOOL_NAMES = new Set([
   'get_action_history',
   // Silent vision auto-learn (PR #210).
   'learn_from_observation',
+  // Explicit memory fact
+  'remember_fact',
+  // Missing recent tools
+  'identify_song', 'commit_and_push_to_github', 'read_past_conversation',
   // Faza A — global live-radio search via radio-browser.info.
   'play_radio',
   // Google Account tools (Calendar, Gmail, Drive)
@@ -247,6 +251,22 @@ function summarizeRealTool(name, j) {
 }
 
 async function runRealToolRemote(name, args) {
+  const devTools = ['run_terminal_command', 'run_command', 'replace_file_content', 'multi_replace_file_content', 'edit_local_file', 'commit_and_push_to_github', 'ask_expert_coder', 'create_github_pr', 'write_to_file', 'run_code', 'search_codebase'];
+  if (devTools.includes(name)) {
+    const argsJson = JSON.stringify(args, null, 2);
+    const html = `
+      <div style="padding:32px;font-family:'Consolas',monospace;background:#0d1117;color:#e6edf3;min-height:100%;box-sizing:border-box;">
+        <div style="font-size:14px;color:#8b949e;margin-bottom:12px;text-transform:uppercase;letter-spacing:1px;display:flex;align-items:center;gap:8px;">
+          <div style="width:12px;height:12px;border-radius:50%;border:2px solid #58a6ff;border-top-color:transparent;animation:spin 1s linear infinite;"></div>
+          Executing Tool: <span style="color:#58a6ff">${name}</span>
+        </div>
+        <pre style="background:#161b22;padding:16px;border-radius:8px;border:1px solid #30363d;overflow-x:auto;font-size:13px;line-height:1.5;white-space:pre-wrap;color:#a5d6ff;">${(argsJson||'').replace(/</g,'&lt;')}</pre>
+        <style>@keyframes spin { 100% { transform: rotate(360deg); } }</style>
+      </div>
+    `;
+    handleShowOnMonitor({ kind: 'html', query: html, title: `DevOps: ${name}` });
+  }
+
   const j = await postJSON('/api/tools/execute', { name, args: args || {} })
   // Auto-display results on monitor for tools that produce visual data.
   // This ensures the monitor is ALWAYS used — no dependency on the model
@@ -258,7 +278,27 @@ async function runRealToolRemote(name, args) {
 // Auto-display results on the monitor using REAL professional services.
 // EVERY tool that returns data opens a real website — no custom HTML.
 function autoDisplayOnMonitor(name, j, args) {
-  if (!j || j.ok === false || j.error) return
+  if (!j) return;
+  const devTools = ['run_terminal_command', 'run_command', 'replace_file_content', 'multi_replace_file_content', 'edit_local_file', 'commit_and_push_to_github', 'ask_expert_coder', 'create_github_pr', 'write_to_file', 'run_code', 'search_codebase'];
+  if (devTools.includes(name)) {
+    const isOk = j.ok !== false && !j.error;
+    const statusColor = isOk ? '#3fb950' : '#f85149';
+    const statusText = isOk ? 'SUCCESS' : 'FAILED';
+    const output = j.stdout || j.result || j.content || j.answer || j.matches || j.url || j.error || JSON.stringify(j);
+    const stderr = j.stderr ? `\n\n[STDERR]\n${j.stderr}` : '';
+    const html = `
+      <div style="padding:32px;font-family:'Consolas',monospace;background:#0d1117;color:#e6edf3;min-height:100%;box-sizing:border-box;">
+        <div style="font-size:14px;color:${statusColor};margin-bottom:12px;text-transform:uppercase;letter-spacing:1px;font-weight:bold;">
+          [${statusText}] ${name}
+        </div>
+        <pre style="background:#161b22;padding:16px;border-radius:8px;border:1px solid #30363d;overflow-x:auto;font-size:13px;line-height:1.5;white-space:pre-wrap;">${String(output).replace(/</g,'&lt;')}${String(stderr).replace(/</g,'&lt;')}</pre>
+      </div>
+    `;
+    handleShowOnMonitor({ kind: 'html', query: html, title: `DevOps: ${name}` });
+    return;
+  }
+
+  if (j.ok === false || j.error) return
   try {
     // Weather → inline HTML card with real data (Windy iframes get blocked)
     if ((name === 'get_weather' || name === 'get_forecast') && (j.current || j.daily)) {

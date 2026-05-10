@@ -3376,6 +3376,86 @@ async function toolGenerateImage(args) {
   return generateImage({ prompt, size });
 }
 
+// ── identify_song: search for a song by lyrics, humming description, or melody.
+// Uses web_search internally to find the song, then structures the result.
+async function toolIdentifySong(args) {
+  const query = typeof args?.query === 'string' ? args.query.trim() : '';
+  if (!query) return { ok: false, error: 'query is required — provide lyrics, melody description, or humming context.' };
+  const source = typeof args?.source === 'string' ? args.source : 'lyrics';
+
+  // Build an optimized search query based on source type
+  let searchQuery;
+  switch (source) {
+    case 'lyrics':
+      searchQuery = `"${query.slice(0, 120)}" song lyrics artist`;
+      break;
+    case 'humming':
+      searchQuery = `song melody ${query.slice(0, 120)} what song`;
+      break;
+    case 'description':
+      searchQuery = `song ${query.slice(0, 120)} identify artist title`;
+      break;
+    case 'audio':
+      searchQuery = `"${query.slice(0, 120)}" song identify`;
+      break;
+    default:
+      searchQuery = `${query.slice(0, 120)} song lyrics artist title`;
+  }
+
+  try {
+    const searchResult = await toolWebSearch({ query: searchQuery, limit: 5 });
+    if (!searchResult?.ok || !Array.isArray(searchResult.results) || !searchResult.results.length) {
+      return {
+        ok: false,
+        error: 'Could not identify the song. Try providing more lyrics or details.',
+        query,
+        source,
+      };
+    }
+
+    // Extract song info from search results
+    const results = searchResult.results.slice(0, 5).map(r => ({
+      title: r.title || '',
+      url: r.url || '',
+      snippet: r.snippet || r.description || '',
+    }));
+
+    // Try to extract artist/title from the first result title
+    // Common patterns: "Artist - Song Title Lyrics" or "Song Title by Artist"
+    const firstTitle = results[0]?.title || '';
+    let artist = '';
+    let songTitle = '';
+
+    const dashMatch = firstTitle.match(/^([^–-]+)\s*[–-]\s*([^|([]+)/);
+    const byMatch = firstTitle.match(/^(.+?)\s+by\s+(.+?)(?:\s*[-|([)]|$)/i);
+    if (dashMatch) {
+      artist = dashMatch[1].trim();
+      songTitle = dashMatch[2].replace(/lyrics?|official|video|audio|hd/gi, '').trim();
+    } else if (byMatch) {
+      songTitle = byMatch[1].trim();
+      artist = byMatch[2].replace(/lyrics?|official|video|audio/gi, '').trim();
+    }
+
+    // Build YouTube and Spotify search URLs
+    const searchTerm = artist && songTitle ? `${artist} ${songTitle}` : query.slice(0, 80);
+    const youtubeUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(searchTerm)}`;
+    const spotifyUrl = `https://open.spotify.com/search/${encodeURIComponent(searchTerm)}`;
+
+    return {
+      ok: true,
+      artist: artist || '(check results)',
+      title: songTitle || '(check results)',
+      source,
+      query: query.slice(0, 200),
+      youtube_search: youtubeUrl,
+      spotify_search: spotifyUrl,
+      search_results: results,
+    };
+  } catch (err) {
+    return { ok: false, error: 'Song identification failed: ' + (err?.message || err) };
+  }
+}
+
 async function executeRealTool(name, args, ctx) {
   // Strip any leading-underscore keys from caller-supplied args. These are
   // reserved for internal wrappers (e.g. toolGetForecast passes `_maxDays`
@@ -3547,6 +3627,7 @@ async function executeRealTool(name, args, ctx) {
     case 'scheduled_task': return toolScheduledTask(a, ctx);
     case 'qr_code': return toolQrCode(a);
     case 'smart_alert': return toolSmartAlert(a, ctx);
+    case 'identify_song': return toolIdentifySong(a);
 
     default: return null; // signal "not handled here"
   }
@@ -3865,7 +3946,7 @@ async function toolQueryDatabase(args, ctx) {
     if (query.includes('credit') || query.includes('minut') || query.includes('balanț') || query.includes('usage')) {
       // Credits + transactions
       const user = await db.getUserById(userId);
-      const txRows = await db.getRecentTransactions(userId, limit);
+      const txRows = await db.listCreditTransactions(userId, limit);
       return {
         ok: true,
         type: 'credits',
@@ -4711,17 +4792,100 @@ async function toolMcpProtocol(args, ctx) {
   const action = String(args?.action || 'status').trim();
   const userId = ctx?.user?.id;
   if (!userId) return { ok: false, signed_in: false, error: 'MCP requires sign-in.' };
+
   const googleMcpMod = require('./googleMcp');
-  if (action === 'status') {
-    const connected = await googleMcpMod.hasGoogleConnection(userId).catch(() => false);
-    return { ok: true, mcp_enabled: !!process.env.MCP_ENABLED, google_connected: connected, available_services: ['google_calendar', 'gmail', 'google_drive'] };
+  const mcp = require('./mcpAutoDiscovery');
+
+  switch (action) {
+    case 'status': {
+      const connected = await googleMcpMod.hasGoogleConnection(userId).catch(() => false);
+      const mcpStatus = mcp.getStatus();
+      return {
+        ok: true,
+        mcp_enabled: !!process.env.MCP_ENABLED,
+        google_connected: connected,
+        available_services: ['google_calendar', 'gmail', 'google_drive'],
+        auto_discovery: {
+          installed_servers: mcpStatus.installed_count,
+          running_servers: mcpStatus.running_count,
+          max_servers: mcpStatus.max_servers,
+          last_registry_fetch: mcpStatus.last_registry_fetch,
+          servers: mcpStatus.servers,
+        },
+      };
+    }
+
+    case 'connect': {
+      const url = googleMcpMod.getConnectUrl(userId);
+      return { ok: true, connect_url: url, instruction: 'Open this URL to connect your Google account.' };
+    }
+
+    // ── Auto-Discovery actions ──
+
+    case 'discover':
+    case 'auto_discover': {
+      // Auto-find and install the best MCP server for a need
+      const need = String(args?.query || args?.need || '').trim();
+      if (!need) return { ok: false, error: 'Specify what capability you need (e.g., "postgres database", "slack messaging")' };
+      return mcp.autoDiscover(need);
+    }
+
+    case 'search': {
+      // Search the registry without installing
+      const query = String(args?.query || '').trim();
+      if (!query) return { ok: false, error: 'query is required' };
+      const results = await mcp.searchServers(query);
+      return { ok: true, count: results.length, servers: results.slice(0, 10).map(s => ({ id: s.id, name: s.name, description: s.description, package: s.package, version: s.version, categories: s.categories })) };
+    }
+
+    case 'install': {
+      const pkg = String(args?.package || args?.name || '').trim();
+      if (!pkg) return { ok: false, error: 'package name is required' };
+      return mcp.installServer(pkg, { version: args?.version, config: args?.config, force: !!args?.force });
+    }
+
+    case 'uninstall': {
+      const serverId = String(args?.server_id || args?.id || '').trim();
+      if (!serverId) return { ok: false, error: 'server_id is required' };
+      return mcp.uninstallServer(serverId);
+    }
+
+    case 'start': {
+      const serverId = String(args?.server_id || args?.id || '').trim();
+      if (!serverId) return { ok: false, error: 'server_id is required' };
+      return mcp.startServer(serverId, args?.config);
+    }
+
+    case 'stop': {
+      const serverId = String(args?.server_id || args?.id || '').trim();
+      if (!serverId) return { ok: false, error: 'server_id is required' };
+      return mcp.stopServer(serverId);
+    }
+
+    case 'updates':
+    case 'check_updates': {
+      const updates = await mcp.checkForUpdates();
+      return { ok: true, count: updates.length, updates };
+    }
+
+    case 'update': {
+      const serverId = String(args?.server_id || args?.id || '').trim();
+      if (!serverId) return { ok: false, error: 'server_id is required' };
+      return mcp.updateServer(serverId);
+    }
+
+    case 'registry':
+    case 'browse': {
+      // Browse the full registry
+      const servers = await mcp.fetchRegistry();
+      return { ok: true, count: servers.length, servers: servers.slice(0, 20).map(s => ({ id: s.id, name: s.name, description: s.description?.slice(0, 120), categories: s.categories })) };
+    }
+
+    default:
+      return { ok: true, action, note: 'Available actions: status, connect, discover, search, install, uninstall, start, stop, updates, update, registry' };
   }
-  if (action === 'connect') {
-    const url = googleMcpMod.getConnectUrl(userId);
-    return { ok: true, connect_url: url, instruction: 'Open this URL to connect your Google account.' };
-  }
-  return { ok: true, action, note: 'Use action: status or connect' };
 }
+
 
 // 0.21 — scheduled_task: Schedule a reminder or future action.
 const _scheduledTasks = new Map();

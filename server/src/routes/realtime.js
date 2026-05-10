@@ -147,13 +147,16 @@ function buildKelionPersona(opts = {}) {
     geo = null,
     priorTurns = [],
     lockedLangTag = null,
+    clientTz = null,
+    clientLocalTime = null,
   } = opts;
   const lockedLangName = languageNameForTag(lockedLangTag) || null;
   const now = new Date();
-  const tz = geo?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  // Priority: client timezone > GPS geo timezone > server timezone
+  const tz = clientTz || geo?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
   const iso = now.toISOString();
   const weekday = now.toLocaleDateString('en-US', { weekday: 'long', timeZone: tz });
-  const localTime = now.toLocaleString('en-US', { timeZone: tz, dateStyle: 'full', timeStyle: 'short' });
+  const localTime = clientLocalTime || now.toLocaleString('en-US', { timeZone: tz, dateStyle: 'full', timeStyle: 'short' });
   // Adrian: "permanent trebuie sa foloseasca coordonatele gps reale ale
   // aparatului". We only include user location in the persona when the
   // browser has resolved a REAL GPS fix (source === 'client-gps').
@@ -212,11 +215,14 @@ AUTONOMOUS SOFTWARE ENGINEERING & AGENTIC LOOP:
 - **REAL BROWSER AUTOMATION**: If you need to physically open a browser window to click things or test a UI, you can write a short Playwright/Puppeteer script using 'edit_local_file' and run it via 'run_terminal_command'. You have the power to automate the user's screen.
 - You are connected to OpenRouter via 'ask_expert_coder'. This is your "Deep Thinking" module. Use it whenever you need complex architectural decisions, advanced code generation, or to debug a difficult error.
 - You can navigate the file system, install dependencies, and build production-ready software completely independently.
+- **PERMANENT JOB MEMORY**: You MUST maintain state of what you are currently working on. When you start a complex task, save your objective using the 'context_cache' tool (action="set", key="current_job"). When you resume or receive new input, use 'context_cache' (action="get") to recall what you were doing.
+- **MEMORY INTERROGATION**: You must proactively use the 'query_database' or 'memory_sources' tools to interrogate all saved memories when the user asks you about past context, saved facts, or previous jobs.
 
 CRITICAL — Silence discipline (violation = removal from production):
 - Do NOT speak first. NEVER. Wait silently until the user speaks or writes to you.
 - GREETINGS: When the user says "salut", "bună", "hey", "hi", "ce faci", "cum ești" or similar — reply NATURALLY and casually (e.g. "Bine, tu?" / "Salut!" / "Bine mersi"). NEVER add "Cu ce te pot ajuta?" or "Cu ce te pot ajuta azi?" or "Ce pot face pentru tine?" or any offer-to-help phrase. You are a friend, not a call center agent.
 - SILENCE BY DEFAULT: If the user is silent, you are silent. Never fill silence. Never volunteer information, observations, or suggestions unless directly asked.
+- IGNORE UNADDRESSED MESSAGES & WAKE-WORD: Dacă utilizatorul îți dă o comandă de oprire ("taci", "oprește-te", "liniște"), OPREȘTE-TE INSTANTANEU FĂRĂ NICIUN RĂSPUNS AUDIO! Nu zice "Ok", nu confirma în engleză "I will stop", absolut nicio silabă. TACI COMPLET! Ulterior, ignoră orice mesaj care nu conține explicit numele tău ("Kelion"). Dacă mesajul nu îți este adresat (vorbește cu altcineva din cameră), NU AI VOIE să răspunzi neîntrebat.
 - Answer ONLY what is asked. Nothing extra. No preambles, no follow-up suggestions, no "apropo", no "de altfel".
 - VIDEO FRAMES ARE SILENT CONTEXT ONLY: Receive frames as background — do NOT comment unless user asks "ce vezi?", "describe", "what do you see?" or similar.
 - MONITOR CONTENT: After show_on_monitor, say only a brief 1-sentence confirmation ("Am afișat harta"). NEVER narrate or repeat the content — the user can see it.
@@ -234,6 +240,7 @@ Language flexibility (user can override at any time):
 - The locked language is the DEFAULT. The user can temporarily or permanently override it with voice commands.
 
 Language-specific rules (apply automatically for the detected language):
+- PERFECT GRAMMAR: Trebuie să folosești scrierea gramaticală și ortografia absolut corectă pentru ORICE limbă vorbită (inclusiv diacritice, punctuație, cratime, majuscule). Fără scurtături de chat.
 - Use correct time format for the language (e.g. Romanian: "ora 14:30" not "2:30 PM"; German: "14 Uhr 30"; French: "14h30").
 - Use correct number/currency formatting (e.g. Romanian: "1.000,50 lei"; English: "1,000.50"; German: "1.000,50 €").
 - Use proper date formats (e.g. Romanian: "DD luna YYYY"; English US: "Month DD, YYYY"; German: "DD. Monat YYYY").
@@ -245,6 +252,8 @@ VOICE MODE: When the user says "folosește vocea mea clonată", "use my cloned v
 IDENTITY RULE: You are ALWAYS called Kelion. NEVER say you are named after the cloned voice label or any ElevenLabs voice name. The voice is just a sound — your name, personality, and identity remain "Kelion" at all times, regardless of which TTS engine is speaking.
 
 Honesty (ABSOLUTE — violation means removal from production):
+- UNICITATEA IDENTITĂȚII: Indiferent dacă ești accesat vocal sau prin text, ești UNICUL Kelion. Nu există două personalități. Păstrează un caracter absolut consecvent și o continuitate perfectă a discuției.
+- CONSULTAREA OBLIGATORIE A EXPERTULUI: Dacă o cerință este "gravă", critică sau implică o problemă complexă de cod pe care nu o stăpânești la perfecție instantaneu, EȘTI OBLIGAT să consulți expertul în domeniu folosind unealta 'ask_expert_coder'. Oferă răspunsuri super avizate bazate pe răspunsul expertului. Nu fabula NICIODATĂ o soluție tehnică din imaginație.
 - NEVER fabricate, invent, or guess ANY information: numbers, names, URLs, dates, prices, facts, locations, weather, news.
 - NEVER say "I assumed", "I presume", "I think", "probably". Either you KNOW (from a tool result) or you say "I don't know".
 - If you do not KNOW the answer with certainty, you MUST either call a tool or say "I don't know".
@@ -534,7 +543,7 @@ const KELION_TOOLS = [
   {
     name: 'show_on_monitor',
 
-    description: "Display something on the big presentation monitor in the scene behind you. Use whenever the user asks (in any language) to see / open / show / display a map, the weather, a video, an image, a Wikipedia / reference page, any web page, or to PLAY a live audio stream. Pick the right `kind` — the client resolves it to the best embed URL. All external websites (including google.com) are proxied server-side to bypass iframe restrictions. Call again with a new query to swap the content on screen. For radio: first call play_radio to get the stream URL, then call show_on_monitor with kind='audio' query=<that URL> title=<station name> so the audio actually starts playing in the user's browser.",
+    description: "Display something on the big presentation monitor in the scene behind you. EXTREMELY IMPORTANT: ONLY use this tool when the user EXPLICITLY asks to 'arata-mi pe ecran', 'pune pe monitor', 'see', 'open', 'show', or 'display' something. DO NOT use it automatically after searches or queries unless explicitly requested. Pick the right `kind` — the client resolves it to the best embed URL. All external websites (including google.com) are proxied server-side to bypass iframe restrictions. Call again with a new query to swap the content on screen. For radio: first call play_radio to get the stream URL, then call show_on_monitor with kind='audio' query=<that URL> title=<station name> so the audio actually starts playing in the user's browser.",
     properties: {
       kind: {
         type: 'string',
@@ -1395,7 +1404,8 @@ const KELION_TOOLS = [
   { name: 'task_planner', description: "Create a structured task plan with priorities, time estimates, and dependencies. Use when the user asks 'planifică', 'make a plan for', 'break this down into tasks'.", properties: { goal: { type: 'string', description: "The goal or project to plan." } }, required: ['goal'] },
   { name: 'clipboard_manager', description: "Read from or write to the user's clipboard. Use when the user asks 'copiază', 'copy this', 'paste', 'ce am in clipboard'.", properties: { action: { type: 'string', description: "'read' or 'write'." }, text: { type: 'string', description: "Text to copy (for write action)." } }, required: [] },
   { name: 'context_cache', description: "Cache and retrieve data across conversation turns. In-memory key-value store scoped to the user. Use for temporary storage during multi-step workflows.", properties: { action: { type: 'string', description: "'get', 'set', 'delete', or 'list'." }, key: { type: 'string', description: "Cache key name." }, value: { type: 'string', description: "Value to cache (for set action)." } }, required: ['key'] },
-  { name: 'mcp_protocol', description: "Check or manage Model Context Protocol connections (Google Calendar, Gmail, Drive). Use when the user asks 'verifică conexiunile', 'conectează Google', 'MCP status'.", properties: { action: { type: 'string', description: "'status' or 'connect'." } }, required: [] },
+  { name: 'mcp_protocol', description: "Manage Model Context Protocol: Google integrations + self-evolving auto-discovery system. Use 'discover' to auto-find and install new tool servers from the MCP registry when you lack a capability. Use 'search' to browse available servers. Use 'status' to see installed servers and Google connections. Use 'install'/'uninstall' for manual management. Use 'updates' to check for newer versions. Use 'update' to upgrade a server. Use 'start'/'stop' to manage running servers. Use 'registry' to browse all available MCP servers.", properties: { action: { type: 'string', description: "'status', 'connect', 'discover', 'search', 'install', 'uninstall', 'start', 'stop', 'updates', 'update', or 'registry'." }, query: { type: 'string', description: "For 'discover'/'search': what capability you need (e.g., 'postgres', 'slack', 'github'). For 'install': package name." }, package: { type: 'string', description: "npm package name for 'install' action." }, server_id: { type: 'string', description: "Server ID for 'uninstall'/'start'/'stop'/'update' actions." } }, required: [] },
+
   { name: 'scheduled_task', description: "Schedule a reminder or task for future execution. Use when the user asks 'amintește-mi', 'remind me in 10 minutes', 'programează', 'schedule'.", properties: { action: { type: 'string', description: "'create', 'list', or 'cancel'." }, description: { type: 'string', description: "What to remind/do." }, delay_minutes: { type: 'integer', description: "Minutes from now (1-1440). Default 5." }, id: { type: 'string', description: "Task ID (for cancel action)." } }, required: [] },
   { name: 'qr_code', description: "Generate a QR code for any text, URL, or data. Returns an image URL ready to display on the monitor.", properties: { text: { type: 'string', description: "The text/URL to encode in the QR code." }, size: { type: 'integer', description: "QR image size in pixels (100-1000, default 300)." } }, required: ['text'] },
   { name: 'smart_alert', description: "Set up a condition-based alert that notifies the user when a condition is met. Use when the user asks 'alertă-mă când', 'notify me when', 'monitor this'.", properties: { action: { type: 'string', description: "'create', 'list', or 'delete'." }, condition: { type: 'string', description: "The condition to monitor." }, message: { type: 'string', description: "Alert message when triggered." }, id: { type: 'string', description: "Alert ID (for delete action)." } }, required: [] },
@@ -1816,7 +1826,7 @@ router.post('/vision', visionLimiter, async (req, res) => {
 // Voice goes directly through Claude Opus REST Voice Mode — not this route.
 // ──────────────────────────────────────────────────────────────────
 router.post('/pipeline', async (req, res) => {
-  const { history, textOverride, visionContext } = req.body || {};
+  const { history, textOverride, visionContext, clientTimezone, clientLocalTime: clientLocalTimeRaw } = req.body || {};
   if (!textOverride) return res.status(400).json({ error: 'No text provided' });
 
   try {
@@ -1857,9 +1867,14 @@ router.post('/pipeline', async (req, res) => {
     const styleFromCookie = req.cookies?.['kelion.voice_style'];
     const voiceStyle = resolveVoiceStyle(styleFromCookie || '');
     const ipGeoData = await ipGeo.lookup(ipGeo.clientIp(req));
+    // Use client timezone as highest priority (real device time)
+    const clientTz = (typeof clientTimezone === 'string' && clientTimezone.length < 64) ? clientTimezone : null;
+    const clientLT = (typeof clientLocalTimeRaw === 'string' && clientLocalTimeRaw.length < 100) ? clientLocalTimeRaw : null;
     const systemPrompt = buildKelionPersona({
       user, memoryItems, voiceStyle, geo: ipGeoData, priorTurns: [],
       lockedLangTag: await resolveLockedLangTag({ req, user, forcedLang }),
+      clientTz,
+      clientLocalTime: clientLT,
     });
 
     const systemText = systemPrompt + '\n\nCRITICAL RULES:\n0. ALWAYS RESPOND IN THE EXACT SAME LANGUAGE AS THE USER\'S LATEST MESSAGE. If the user speaks Romanian, answer in Romanian. If they speak German, answer in German.\n1. MAXIMUM CONCISENESS. Answer precisely and directly. Do not use filler words. Do not explain your thought process. Keep answers extremely short unless a detailed explanation is specifically requested. This is crucial to save tokens and avoid verbosity.\n2. ACADEMIC & PROFESSIONAL TONE. Use highly professional, grammatically perfect language. In Romanian, use natural vocabulary, flawless grammar, and diacritics. Avoid weird translations or robotic phrasing.\n3. ZERO HALLUCINATIONS. NEVER fabricate, guess, or make up information. If you don\'t know, simply say "Nu am această informație." (I don\'t have this information). \n4. When asked about facts, news, people, places, events — ALWAYS use web_search or wikipedia_search. NEVER answer from memory alone.\n5. You have tools: web_search, wikipedia_search, browse_web, calculate, get_weather, etc. USE THEM proactively.';

@@ -126,20 +126,14 @@ export default function VoicePicker({ style }) {
       {/* Dropdown */}
       {open && (
         <div style={{
-          position: 'absolute',
-          bottom: '100%',
-          left: 0,
-          marginBottom: 8,
-          width: 320,
-          maxHeight: 400,
+          marginTop: 8,
+          width: '100%',
+          maxHeight: 250,
           overflowY: 'auto',
-          background: 'rgba(18,18,28,0.95)',
+          background: 'rgba(0,0,0,0.2)',
           border: '1px solid rgba(124,58,237,0.3)',
-          borderRadius: 14,
-          backdropFilter: 'blur(20px)',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+          borderRadius: 8,
           padding: '8px 0',
-          zIndex: 9999,
         }}>
           {/* Header */}
           <div style={{

@@ -150,8 +150,7 @@ const EXPECTED_TOOL_NAMES = [
   // ElevenLabs cloned voice toggle — switches Kelion's TTS between
   // Claude Opus built-in voice and the user's ElevenLabs cloned voice.
   'switch_voice',
-  // Song recognition — identifies songs from lyrics, humming, or description
-  // via web search chaining (browse_web + show_on_monitor).
+  // Song identification.
   'identify_song',
   // Agentic loop — multi-step plan execution
   'execute_plan',

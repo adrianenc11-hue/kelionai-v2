@@ -616,8 +616,22 @@ router.post('/tts', async (req, res) => {
       voiceId = cloneInfo.voiceId;
     }
   } else {
-    // Priority 3: User has an active cloned voice
-    voiceId = cloneInfo.voiceId;
+    // Priority 2: Server-side preference
+    const userPref = _userVoicePreference.get(String(userId));
+    if (isNative && userPref?.voiceId) {
+      voiceId = userPref.voiceId;
+      console.log(`[voice/tts] Using server-stored preference: ${userPref.voiceName || voiceId}`);
+    } else if (isNative || !cloneInfo?.voiceId) {
+      // Priority 3: Auto-discover native masculine voice
+      const detectedLang = (lang || 'en').toLowerCase().split('-')[0];
+      voiceId = await discoverNativeMaleVoice(apiKey, detectedLang);
+      if (voiceId) {
+        console.log(`[voice/tts] Using auto-discovered voice for lang="${detectedLang}": ${voiceId}`);
+      }
+    } else {
+      // Priority 4: Cloned voice
+      voiceId = cloneInfo.voiceId;
+    }
   }
 
   // Final fallback: auto-discover ANY male voice if language-specific failed

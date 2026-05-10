@@ -1017,4 +1017,18 @@ setTimeout(() => {
   setInterval(checkProviderBalances, WATCHDOG_INTERVAL_MS).unref();
 }, 60_000).unref();
 
+// ── Health Watchdog Dashboard ──
+// GET /api/admin/health — live health report from permanent watchdog
+router.get('/health', async (req, res) => {
+  if (req.user?.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin only' });
+  }
+  try {
+    const { getHealthReport } = require('../services/healthWatchdog');
+    res.json(getHealthReport());
+  } catch (err) {
+    res.status(500).json({ error: 'Health watchdog not available: ' + err.message });
+  }
+});
+
 module.exports = router;

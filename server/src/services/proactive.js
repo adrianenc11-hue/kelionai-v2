@@ -8,8 +8,7 @@
 // Decision policy (rule-based v1; pluggable for LLM-based v2):
 //   1. User must have at least one memory_item (else we have nothing to say).
 //   2. At most ONE proactive ping per user per 18h.
-//   3. Current hour must be inside a quiet-hours window (default 09:00–21:00 UTC;
-//      TODO: per-user timezone once we store it).
+//   3. Current hour must be inside a quiet-hours window (estimated via user's last known longitude).
 //   4. Pick a relevant memory_item (goal > routine > relationship > preference).
 //   5. Craft a 1-line message template in EN ("A small nudge on your <goal>: …").
 
