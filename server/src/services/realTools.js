@@ -2927,15 +2927,17 @@ async function toolAskExpertCoder(args) {
 
   const prompt = `You are an expert coder. Answer the question precisely.\n\nContext:\n${context}\n\nQuestion:\n${question}`;
 
-  const MODELS = [
-    args?.model || 'anthropic/claude-3-haiku',
-    'anthropic/claude-3-haiku',
-  ];
-  // Deduplicate in case args.model matches one of the fallbacks
-  const uniqueModels = [...new Set(MODELS)];
+  const { getModel, getFallbackChain } = require('./modelRouter');
+  const primaryCoder = getModel('coder');
+  console.log(`[ask_expert_coder] Smart Router → ${primaryCoder}`);
+
+  const MODELS = getFallbackChain('coder');
+  // If user specified a model, put it first
+  if (args?.model) MODELS.unshift(args.model);
+
   const errors = [];
 
-  for (const model of uniqueModels) {
+  for (const model of MODELS) {
     try {
       const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
