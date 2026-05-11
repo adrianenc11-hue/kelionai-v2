@@ -92,25 +92,70 @@ router.post('/', async (req, res) => {
     }
 
     // Smart Model Router — unified stable routing
-    const { smartFetch } = require('../services/modelRouter');
+    const { smartFetch, isCodingTask } = require('../services/modelRouter');
+    const swarmExpert = require('../services/swarmExpert');
     
+    // ── Task Detection: Basic Chat vs Complex Coding ──────────────────
+    const taskType = isCodingTask(message) ? 'coder' : 'chat';
+    const isHeavy = (creditsBalance > 0) && isCodingTask(message);
+    const isSoftGreu = isHeavy && (message.length > 200 || message.toLowerCase().includes('soft') || message.toLowerCase().includes('proiect'));
+
+
     // ── Demand-driven tool activation ─────────────────────────────────
     const openRouterTools = buildKelionToolsChatCompletions();
 
+    // ── Persona & Identity ────────────────────────────────────────────
+    // Build the unified Kelion persona (same as voice) for text chat.
+    // This ensures identity consistency and follows the "Extra Credits" rule.
+    const { buildKelionPersona, resolveLockedLangTag } = require('./realtime');
+    const { listMemoryItems, getCreditsBalance } = require('../db');
+    
+    let memoryItems = [];
+    let creditsBalance = null;
+    if (adminUser && adminUser.id) {
+      try {
+        [memoryItems, creditsBalance] = await Promise.all([
+          listMemoryItems(adminUser.id, 60),
+          getCreditsBalance(adminUser.id)
+        ]);
+      } catch (_) { }
+    }
+
+    const browserLang = (req.query.lang || 'en-US').toString().slice(0, 16);
+    const forcedLang = (process.env.KELION_FORCE_LANG || browserLang).toString().slice(0, 16);
+    const ipGeoData = await ipGeo.lookup(ipGeo.clientIp(req));
+    
+    const systemPrompt = buildKelionPersona({
+      user: adminUser,
+      creditsBalance,
+      memoryItems,
+      geo: ipGeoData,
+      lockedLangTag: await resolveLockedLangTag({ req, user: adminUser, forcedLang }),
+      clientTz: clientTimezone,
+      clientLocalTime: clientLocalTime
+    });
+
     // Convert history to OpenAI format
-    const sanitizedMessages = session.history.map(h => {
+    const sanitizedMessages = [
+      { role: 'system', content: systemPrompt }
+    ];
+    
+    session.history.forEach(h => {
       if (h.role === 'function') {
-        return {
+        sanitizedMessages.push({
           role: 'tool',
           tool_call_id: h.parts[0].functionResponse.id,
           name: h.parts[0].functionResponse.name,
           content: JSON.stringify(h.parts[0].functionResponse.response.result)
-        };
+        });
+      } else {
+        let text = '';
+        h.parts.forEach(p => { if (p.text) text += p.text; });
+        sanitizedMessages.push({ role: h.role, content: text });
       }
-      let text = '';
-      h.parts.forEach(p => { if (p.text) text += p.text; });
-      return { role: h.role, content: text };
     });
+
+
 
     const body = {
       messages: sanitizedMessages,
@@ -121,9 +166,18 @@ router.post('/', async (req, res) => {
     };
 
     let result;
+    let activeModel = 'Swarm (Multi-Agent)';
+    
     try {
-      const { response, model: activeModel } = await smartFetch('chat', body);
-      result = await response.json();
+      if (isSoftGreu) {
+        console.log('[chat] Triggering Swarm Expert for Soft Greu task...');
+        const swarmResult = await swarmExpert.runSwarmTask(message, { history: session.history.slice(-5) }, creditsBalance);
+        result = { choices: [{ message: { content: swarmResult.reply } }] };
+      } else {
+        const fetchRes = await smartFetch(taskType, body, isHeavy);
+        activeModel = fetchRes.model;
+        result = await fetchRes.response.json();
+      }
       
       const choice = result.choices?.[0];
       const reply = choice?.message?.content || '';
