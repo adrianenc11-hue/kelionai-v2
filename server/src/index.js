@@ -33,6 +33,7 @@ const voiceCloneRouter = require('./routes/voiceClone');
 const demoRouter       = require('./routes/demo');
 const chatRouter       = require('./routes/chat');
 const proxyRouter      = require('./routes/proxy');
+const whatsappRouter   = require('./routes/whatsapp');
 const { attachVertexLiveProxy } = require('./routes/vertexLiveProxy');
 const proactive        = require('./services/proactive');
 const { bootstrapAdmin, healAdminCredits } = require('./services/adminBootstrap');
@@ -356,6 +357,9 @@ app.use('/api/demo', chatLimiter, demoRouter);
 // can be embedded in the monitor iframe without a white/blocked screen.
 // Rate-limited internally (30 req/min per IP). Public endpoint.
 app.use('/api/proxy', proxyRouter);
+// WhatsApp bridge — admin-only endpoints for connecting Kelion to WhatsApp.
+// QR scan auth, no Business API needed. Kelion responds when mentioned.
+app.use('/api/whatsapp', requireAuth, chatLimiter, whatsappRouter);
 
 
 if (process.env.NODE_ENV !== 'test' && process.env.PROACTIVE_DISABLED !== '1') {

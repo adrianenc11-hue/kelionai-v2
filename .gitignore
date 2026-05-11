@@ -75,3 +75,6 @@ test-results/
 
 # MCP auto-discovery catalog (runtime state)
 .mcp-catalog/
+
+# WhatsApp Web.js session data
+.wwebjs_auth/
