@@ -29,6 +29,7 @@ class WhatsAppBridge extends EventEmitter {
     this.status = 'disconnected'; // disconnected | qr_pending | ready | error
     this.stats = { messagesReceived: 0, responseSent: 0, errors: 0, startedAt: null };
     this._rateLimitMap = new Map(); // chatId → lastResponseTs
+    this._greetedContacts = new Set(); // contactId → boolean
     this._chatHandler = null; // Reference to the chat/AI handler
   }
 
@@ -163,6 +164,15 @@ class WhatsAppBridge extends EventEmitter {
     // ── Get sender info ──
     const contact = await msg.getContact();
     const senderName = contact.pushname || contact.name || contact.number || 'Unknown';
+    const contactId = contact.id._serialized;
+
+    // ── Auto-Greeting for New DMs ──
+    if (!isGroup && !this._greetedContacts.has(contactId)) {
+      this._greetedContacts.add(contactId);
+      const greeting = "🤖 Hello! I am Kelion, an AI assistant. Please tell me your preferred language (e.g., English, Romanian, Spanish) so I can assist you better.\n\nSalut! Sunt Kelion, un asistent AI. Te rog spune-mi limba ta preferată pentru a te putea ajuta mai bine.";
+      await msg.reply(greeting);
+      // We continue processing their message normally after greeting
+    }
 
     console.log(`[WhatsApp] ${isGroup ? `[${chatName}]` : '[DM]'} ${senderName}: ${question.slice(0, 100)}`);
 
