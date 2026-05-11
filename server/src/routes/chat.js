@@ -94,11 +94,6 @@ router.post('/', async (req, res) => {
     // Smart Model Router — unified stable routing
     const { smartFetch, isCodingTask } = require('../services/modelRouter');
     const swarmExpert = require('../services/swarmExpert');
-    
-    // ── Task Detection: Basic Chat vs Complex Coding ──────────────────
-    const taskType = isCodingTask(message) ? 'coder' : 'chat';
-    const isHeavy = (creditsBalance > 0) && isCodingTask(message);
-    const isSoftGreu = isHeavy && (message.length > 200 || message.toLowerCase().includes('soft') || message.toLowerCase().includes('proiect'));
 
 
     // ── Demand-driven tool activation ─────────────────────────────────
@@ -120,6 +115,11 @@ router.post('/', async (req, res) => {
         ]);
       } catch (_) { }
     }
+
+    // ── Task Detection: Basic Chat vs Complex Coding ──────────────────
+    const taskType = isCodingTask(message) ? 'coder' : 'chat';
+    const isHeavy = (creditsBalance > 0) && isCodingTask(message);
+    const isSoftGreu = isHeavy && (message.length > 200 || message.toLowerCase().includes('soft') || message.toLowerCase().includes('proiect'));
 
     const browserLang = (req.query.lang || 'en-US').toString().slice(0, 16);
     const forcedLang = (process.env.KELION_FORCE_LANG || browserLang).toString().slice(0, 16);
