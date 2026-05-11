@@ -2068,6 +2068,7 @@ module.exports.buildKelionToolsGoogle = buildKelionToolsGoogle;
 module.exports.buildKelionToolsChatCompletions = buildKelionToolsChatCompletions;
 module.exports.buildKelionToolsChatCompletionsForMessage = buildKelionToolsChatCompletionsForMessage;
 module.exports.buildKelionPersona = buildKelionPersona;
+module.exports.resolveLockedLangTag = resolveLockedLangTag;
 // Audit M9 — exported so chat.js renders memory with the same
 // self/other partitioning as the voice persona. Keeping a single
 // formatter prevents drift between text and voice when new subject
