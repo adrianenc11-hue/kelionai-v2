@@ -93,11 +93,13 @@ router.post('/', async (req, res) => {
 
     // Smart Model Router — unified stable routing
     const { smartFetch, isCodingTask } = require('../services/modelRouter');
+    const swarmExpert = require('../services/swarmExpert');
     
     // ── Task Detection: Basic Chat vs Complex Coding ──────────────────
-    // If the message is simple/conversational, use the 'chat' model (cheap).
-    // If it contains technical keywords, use the 'coder' model (smart).
     const taskType = isCodingTask(message) ? 'coder' : 'chat';
+    const isHeavy = (creditsBalance > 0) && isCodingTask(message);
+    const isSoftGreu = isHeavy && (message.length > 200 || message.toLowerCase().includes('soft') || message.toLowerCase().includes('proiect'));
+
 
     // ── Demand-driven tool activation ─────────────────────────────────
     const openRouterTools = buildKelionToolsChatCompletions();
@@ -153,11 +155,7 @@ router.post('/', async (req, res) => {
       }
     });
 
-    const { isCodingTask, smartFetch } = require('../services/modelRouter');
-    const swarmExpert = require('../services/swarmExpert');
-    const taskType = isCodingTask(message) ? 'coder' : 'chat';
-    const isHeavy = (creditsBalance > 0) && isCodingTask(message);
-    const isSoftGreu = isHeavy && (message.length > 200 || message.toLowerCase().includes('soft') || message.toLowerCase().includes('proiect'));
+
 
     const body = {
       messages: sanitizedMessages,
