@@ -117,7 +117,39 @@ export default function ClonedVoiceLibrary({ onClose }) {
       }} onClick={e => e.stopPropagation()}>
         <div style={{ padding: '24px 32px', borderBottom: '1px solid rgba(167, 139, 250, 0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2 style={{ margin: 0, color: '#ede9fe', fontSize: 20 }}>Bibliotecă Voci Clonate</h2>
-          <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 24 }}>×</button>
+          <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+            <button
+              onClick={async () => {
+                setLoading(true)
+                try {
+                  const r = await fetch('/api/voice/clone/library/sync', {
+                    method: 'POST',
+                    headers: { 'X-CSRF-Token': getCsrfToken() },
+                    credentials: 'include'
+                  })
+                  if (r.ok) {
+                    const j = await r.json()
+                    setClones(j.clones || [])
+                  }
+                } finally {
+                  setLoading(false)
+                }
+              }}
+              style={{
+                background: 'rgba(124, 58, 237, 0.1)',
+                border: '1px solid rgba(124, 58, 237, 0.4)',
+                color: '#c4b5fd',
+                padding: '6px 12px',
+                borderRadius: 8,
+                cursor: 'pointer',
+                fontSize: 13,
+                fontWeight: 500,
+              }}
+            >
+              🔄 Sync din ElevenLabs
+            </button>
+            <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 24 }}>×</button>
+          </div>
         </div>
 
         <div style={{ padding: '24px 32px', maxHeight: '60vh', overflowY: 'auto' }}>

@@ -831,6 +831,37 @@ router.get('/library', async (req, res) => {
   }
 });
 
+// POST /api/voice/clone/library/sync — pull cloned voices from ElevenLabs API
+router.post('/library/sync', async (req, res) => {
+  const userId = uidOf(req);
+  if (!userId) return res.status(401).json({ error: 'Not authenticated.' });
+  const apiKey = process.env.ELEVENLABS_API_KEY;
+  if (!apiKey) return res.status(503).json({ error: 'ElevenLabs not configured.' });
+  try {
+    const r = await fetch('https://api.elevenlabs.io/v1/voices', {
+      headers: { 'xi-api-key': apiKey },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!r.ok) throw new Error(`ElevenLabs returned ${r.status}`);
+    const data = await r.json();
+    const cloned = (data.voices || []).filter(v => v.category === 'cloned');
+    
+    for (const v of cloned) {
+      await addVoiceClone(userId, {
+        voiceId: v.voice_id,
+        displayName: v.name || 'Synced Voice',
+        language: 'auto',
+        consentVersion: CONSENT_VERSION,
+      });
+    }
+    const clones = await listVoiceClones(userId);
+    res.json({ ok: true, clones });
+  } catch (err) {
+    console.error('[voice/library sync]', err?.message);
+    res.status(500).json({ error: 'Failed to sync voices from ElevenLabs.' });
+  }
+});
+
 // POST /api/voice/clone/library — add an existing ElevenLabs voiceId
 // Body: { voiceId, displayName, language? }
 router.post('/library', async (req, res) => {

@@ -59,7 +59,13 @@ router.get('/google/start', (req, res) => {
 
   // State, verifier, and mode stored in httpOnly cookies — no server-side
   // Map needed, so horizontal scaling works without Redis.
-  const cookieOpts = { httpOnly: true, sameSite: 'lax', maxAge: 10 * 60 * 1000, path: '/' };
+  const cookieOpts = {
+    httpOnly: true,
+    sameSite: 'lax',
+    maxAge: 10 * 60 * 1000,
+    path: '/',
+    secure: process.env.NODE_ENV === 'production',
+  };
   res.cookie('oauth_state', state, cookieOpts);
   res.cookie('oauth_verifier', codeVerifier, cookieOpts);
   res.cookie('oauth_mode', mode, cookieOpts);
