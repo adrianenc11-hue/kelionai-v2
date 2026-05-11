@@ -41,26 +41,26 @@ module.exports = {
   isProduction: optional('NODE_ENV', 'development') === 'production',
 
   google: {
-    clientId:     optional('GOOGLE_CLIENT_ID'),
+    clientId: optional('GOOGLE_CLIENT_ID'),
     clientSecret: optional('GOOGLE_CLIENT_SECRET'),
-    redirectUri:  optional('GOOGLE_REDIRECT_URI', ''),
-    apiKey:       optional('GOOGLE_API_KEY'),
-    chatModel:    optional('GOOGLE_CHAT_MODEL', 'anthropic/claude-3-haiku'),
-    liveModel:    optional('GOOGLE_LIVE_MODEL', 'anthropic/claude-3-haiku'),
-    ttsModel:     optional('GOOGLE_TTS_MODEL', 'anthropic/claude-3-haiku'),
+    redirectUri: optional('GOOGLE_REDIRECT_URI', ''),
+    apiKey: optional('GOOGLE_API_KEY'),
+    chatModel: optional('GOOGLE_CHAT_MODEL', 'inclusionai/ring-2.6-1t:free'),
+    liveModel: optional('GOOGLE_LIVE_MODEL', 'inclusionai/ring-2.6-1t:free'),
+    ttsModel: optional('GOOGLE_TTS_MODEL', 'google/gemma-4-31b-it:free'),
     ttsVoiceKelion: optional('GOOGLE_TTS_VOICE_KELION', 'Kore'),
-    // Set FREE_MODE=true to disable all credit consumption
-    freeMode: process.env.FREE_MODE === 'true' || (process.env.GOOGLE_CHAT_MODEL || 'anthropic/claude-3-haiku').includes(':free'),
+    // All models are :free — always free mode
+    freeMode: true,
   },
 
   session: {
-    secret:   secret('SESSION_SECRET'),
-    name:     'kelion.sid',
+    secret: secret('SESSION_SECRET'),
+    name: 'kelion.sid',
     maxAgeMs: 7 * 24 * 60 * 60 * 1000,
   },
 
   jwt: {
-    secret:    secret('JWT_SECRET'),
+    secret: secret('JWT_SECRET'),
     expiresIn: optional('JWT_EXPIRES_IN', '7d'),
   },
 
@@ -75,8 +75,8 @@ module.exports = {
     .split(',').map(o => o.trim()).filter(Boolean),
 
   cookie: {
-    domain:   optional('COOKIE_DOMAIN', ''),
-    secure:   optional('NODE_ENV', 'development') === 'production',
+    domain: optional('COOKIE_DOMAIN', ''),
+    secure: optional('NODE_ENV', 'development') === 'production',
     sameSite: isProd ? 'lax' : 'lax',
   },
 
@@ -85,7 +85,7 @@ module.exports = {
 
 
   stripe: {
-    secretKey:     optional('STRIPE_SECRET_KEY'),
+    secretKey: optional('STRIPE_SECRET_KEY'),
     publishableKey: optional('STRIPE_PUBLISHABLE_KEY'),
     webhookSecret: optional('STRIPE_WEBHOOK_SECRET'),
   },

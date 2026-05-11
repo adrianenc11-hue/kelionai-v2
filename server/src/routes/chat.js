@@ -92,14 +92,16 @@ router.post('/', async (req, res) => {
     }
 
     // Model: via OpenRouter — explicitly supports tool_calls.
-    const model = process.env.CHAT_MODEL || process.env.OPENROUTER_MODEL || 'anthropic/claude-3-haiku';
+    const { getModel, getFallbackChain } = require('../services/modelRouter');
+    const model = getModel('chat');
+    console.log(`[chat] Smart Router → ${model}`);
     const url = 'https://openrouter.ai/api/v1/chat/completions';
 
     // ── Demand-driven tool activation ─────────────────────────────────
     // Default: all tools OFF. Activate only tools relevant to this
     // specific message. After the request completes, tools go back to OFF.
     const openRouterTools = buildKelionToolsChatCompletions();
-    
+
     // Convert history to OpenAI format for OpenRouter
     const sanitizedMessages = session.history.map(h => {
       if (h.role === 'function') {
@@ -168,10 +170,10 @@ router.post('/', async (req, res) => {
             }
           }))
         });
-        
+
         // Return tool_calls to client for execution
-        return res.json({ 
-          reply: 'Calling tools...', 
+        return res.json({
+          reply: 'Calling tools...',
           toolCalls: choice.message.tool_calls.map(tc => ({
             id: tc.id,
             name: tc.function.name,
@@ -188,35 +190,37 @@ router.post('/', async (req, res) => {
     } else {
       const errText = await r.text();
       console.error('[chat] OpenAI-compatible request failed:', r.status, errText);
-      
-      // Fallback model if rate limited or insufficient quota
+
+      // Smart Model Router fallback chain
       if (r.status === 429 || errText.toLowerCase().includes('insufficient_quota') || errText.toLowerCase().includes('rate-limited')) {
-        console.log('[chat] Attempting fallback to gemini-1.5-flash due to rate limit...');
-        const fallbackBody = { ...body, model: 'gemini-1.5-flash' };
-        try {
-          const r2 = await fetch(url, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${orKey}`,
-              'HTTP-Referer': 'https://kelion.ai',
-              'X-Title': 'Kelion AI'
-            },
-            body: JSON.stringify(fallbackBody),
-          });
-          if (r2.ok) {
-            const data2 = await r2.json();
-            const reply2 = data2.choices?.[0]?.message?.content || '';
-            if (reply2) {
-              session.history.push({ role: 'assistant', parts: [{ text: reply2 }] });
+        const fallbackChain = getFallbackChain('chat');
+        for (const fbModel of fallbackChain.slice(1)) { // skip first (already tried)
+          console.log(`[chat] Rate limited → trying fallback: ${fbModel}`);
+          try {
+            const r2 = await fetch(url, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${orKey}`,
+                'HTTP-Referer': 'https://kelion.ai',
+                'X-Title': 'Kelion AI'
+              },
+              body: JSON.stringify({ ...body, model: fbModel }),
+            });
+            if (r2.ok) {
+              const data2 = await r2.json();
+              const reply2 = data2.choices?.[0]?.message?.content || '';
+              if (reply2) {
+                session.history.push({ role: 'assistant', parts: [{ text: reply2 }] });
+              }
+              return res.json({ reply: reply2, model: fbModel });
             }
-            return res.json({ reply: reply2, model: 'google/gemini-flash-1.5' });
+          } catch (fErr) {
+            console.error(`[chat] Fallback ${fbModel} failed:`, fErr.message);
           }
-        } catch (fErr) {
-          console.error('[chat] Fallback failed:', fErr.message);
         }
       }
-      
+
       return res.status(r.status).json({ error: `AI generation failed. Status: ${r.status}, Details: ${errText}` });
     }
   } catch (error) {

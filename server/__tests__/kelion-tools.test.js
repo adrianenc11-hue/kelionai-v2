@@ -148,7 +148,7 @@ const EXPECTED_TOOL_NAMES = [
   // delivered without an explicit user click.
   'compose_email_draft',
   // ElevenLabs cloned voice toggle — switches Kelion's TTS between
-  // Claude Opus built-in voice and the user's ElevenLabs cloned voice.
+  // Smart Model Router auto-selected voice and the user's ElevenLabs cloned voice.
   'switch_voice',
   'list_voice_clones',
   'activate_voice_clone',
@@ -156,8 +156,8 @@ const EXPECTED_TOOL_NAMES = [
   'identify_song',
   // Agentic loop — multi-step plan execution
   'execute_plan',
-  // Position 0 — Super LLM capabilities (Claude Opus 4.7 / GPT-5.5 /
-  // Gemini 3.1 / Grok 3 / DeepSeek V4 inspired).
+  // Position 0 — Super LLM capabilities (Ring-2.6-1T / Qwen3 Coder /
+  // Gemma 4 powered via Smart Model Router).
   'query_database',
   'check_updates',
   'conversation_summary',

@@ -426,43 +426,43 @@ function formatMemoryBlocks(memoryItems) {
 // If you add a new tool, add it to KELION_TOOLS only; the adapters
 // pick it up automatically.
 const KELION_TOOLS = [
-    {
-      name: 'run_command',
-      description: 'Run a shell command on the host. Use for OS interaction, starting servers, running build scripts, etc.',
-      properties: {
-        command: { type: 'string', description: 'The shell command to execute.' },
-        cwd: { type: 'string', description: 'Working directory for the command.' }
-      },
-      required: ['command']
+  {
+    name: 'run_command',
+    description: 'Run a shell command on the host. Use for OS interaction, starting servers, running build scripts, etc.',
+    properties: {
+      command: { type: 'string', description: 'The shell command to execute.' },
+      cwd: { type: 'string', description: 'Working directory for the command.' }
     },
-    {
-      name: 'write_to_file',
-      description: 'Create or overwrite a file with given content. WARNING: Replaces entire file.',
-      properties: {
-        path: { type: 'string', description: 'Absolute or relative path.' },
-        content: { type: 'string', description: 'Complete file content.' }
-      },
-      required: ['path', 'content']
+    required: ['command']
+  },
+  {
+    name: 'write_to_file',
+    description: 'Create or overwrite a file with given content. WARNING: Replaces entire file.',
+    properties: {
+      path: { type: 'string', description: 'Absolute or relative path.' },
+      content: { type: 'string', description: 'Complete file content.' }
     },
-    {
-      name: 'replace_file_content',
-      description: 'Replace a specific block of text in a file.',
-      properties: {
-        path: { type: 'string', description: 'Path to file.' },
-        target_content: { type: 'string', description: 'Exact text to replace.' },
-        replacement_content: { type: 'string', description: 'New text.' }
-      },
-      required: ['path', 'target_content', 'replacement_content']
+    required: ['path', 'content']
+  },
+  {
+    name: 'replace_file_content',
+    description: 'Replace a specific block of text in a file.',
+    properties: {
+      path: { type: 'string', description: 'Path to file.' },
+      target_content: { type: 'string', description: 'Exact text to replace.' },
+      replacement_content: { type: 'string', description: 'New text.' }
     },
-    {
-      name: 'multi_replace_file_content',
-      description: 'Apply multiple replacements to a file.',
-      properties: {
-        path: { type: 'string', description: 'Path to file.' },
-        replacements: { type: 'string', description: 'JSON string of array of replacements [{target_content, replacement_content}].' }
-      },
-      required: ['path', 'replacements']
+    required: ['path', 'target_content', 'replacement_content']
+  },
+  {
+    name: 'multi_replace_file_content',
+    description: 'Apply multiple replacements to a file.',
+    properties: {
+      path: { type: 'string', description: 'Path to file.' },
+      replacements: { type: 'string', description: 'JSON string of array of replacements [{target_content, replacement_content}].' }
     },
+    required: ['path', 'replacements']
+  },
   {
     name: 'browse_web',
     description: 'Run an autonomous web-browsing agent in a real browser. Use when the user asks Kelion to open a site, fill a form, extract info from a page behind JS, compare products, book/reserve, etc. Returns a short summary + optional URL.',
@@ -765,11 +765,11 @@ const KELION_TOOLS = [
   },
   {
     name: 'ask_expert_coder',
-    description: "Consult an expert coding model on OpenRouter to solve complex programming problems or do deep reasoning. Uses Gemini 2.0 Flash for speed and intelligence.",
+    description: "Consult an expert coding model (Qwen3 Coder) to solve complex programming problems or do deep reasoning. Uses the #1 free coding model via Smart Model Router.",
     properties: {
       question: { type: 'string', description: "The exact problem or question for the expert." },
       context: { type: 'string', description: "Relevant code snippets, error messages, or file contents." },
-      model: { type: 'string', enum: ['anthropic/claude-3-haiku'], description: "Which model to use. Default is anthropic/claude-3-haiku." },
+      model: { type: 'string', description: "Optional: override model ID. Default is auto-selected by Smart Model Router (Qwen3 Coder)." },
     },
     required: ['question', 'context'],
   },
@@ -1501,7 +1501,7 @@ const { selectTools } = require('../services/toolRouter');
 
 function buildKelionToolsChatCompletionsForMessage(userMessage) {
   const { tools: selectedTools, categories, selectedCount } = selectTools(userMessage, KELION_TOOLS);
-  
+
   if (selectedCount === 0) {
     // Pure greeting / simple chat — no tools needed at all
     console.log('[toolRouter] No tools activated (simple chat)');
@@ -1509,7 +1509,7 @@ function buildKelionToolsChatCompletionsForMessage(userMessage) {
   }
 
   console.log(`[toolRouter] Activated ${selectedCount}/${KELION_TOOLS.length} tools for categories: [${categories.join(', ')}]`);
-  
+
   const formatted = selectedTools.map(t => ({
     type: 'function',
     function: {
@@ -1522,7 +1522,7 @@ function buildKelionToolsChatCompletionsForMessage(userMessage) {
       },
     },
   }));
-  
+
   return { tools: formatted, categories };
 }
 
@@ -1596,7 +1596,7 @@ const voiceTokenHandler = async (req, res) => {
   // The Vertex backend and AI Studio legacy paths are no longer relevant 
   // since we migrated to OpenRouter/Claude Opus natively. We removed the
   // GOOGLE_API_KEY block requirement here.
-  
+
   const adminUser = await peekSignedInUser(req);
   const isAdmin = await isAdminUser(adminUser);
   // Gating matrix:
@@ -1669,8 +1669,10 @@ const voiceTokenHandler = async (req, res) => {
     //   Browser SpeechRecognition → /api/realtime/pipeline (Claude Opus via
     //   OpenRouter) → /api/voice/clone/tts (ElevenLabs TTS).
     // We still build the full persona + tools so /pipeline can use them.
-    const chatModel = process.env.OPENROUTER_MODEL || 'google/gemma-4-31b-it:free';
-    
+    const { getModel } = require('../services/modelRouter');
+    const chatModel = getModel('chat');
+    console.log(`[voice-token] Smart Router → ${chatModel}`);
+
     // Restore variables needed for JSON payload
     const user = adminUser;
     const voice = req.query.voice || process.env.GOOGLE_TTS_VOICE_KELION || 'Kore';
@@ -1763,15 +1765,17 @@ router.post('/vision', visionLimiter, async (req, res) => {
     }
 
     const url = 'https://openrouter.ai/api/v1/chat/completions';
-    
+
     // Convert base64 data to OpenAI image_url format
     const base64Data = `data:${mimeType || 'image/jpeg'};base64,${image}`;
 
+    const { getModel: getVisionModel } = require('../services/modelRouter');
     const googleKey = process.env.GOOGLE_API_KEY;
-    const modelName = 'anthropic/claude-3-haiku';
+    const modelName = getVisionModel('vision');
+    console.log(`[vision] Smart Router → ${modelName}`);
     let apiUrl = url;
     let authHeader = `Bearer ${openRouterKey}`;
-    
+
     if (googleKey) {
       apiUrl = `https://generativelanguage.googleapis.com/v1beta/openai/chat/completions`;
       authHeader = `Bearer ${googleKey}`;
@@ -1779,7 +1783,7 @@ router.post('/vision', visionLimiter, async (req, res) => {
 
     const r = await fetch(apiUrl, {
       method: 'POST',
-      headers: { 
+      headers: {
         'Content-Type': 'application/json',
         'Authorization': authHeader,
         'HTTP-Referer': 'https://kelion.ai',
@@ -1943,7 +1947,9 @@ router.post('/pipeline', async (req, res) => {
       console.log('[resourceGov] All resources OFF (simple chat)');
     }
 
-    const chatModel = process.env.OPENROUTER_MODEL || 'anthropic/claude-3-haiku';
+    const { getModel: getModelForPipeline } = require('../services/modelRouter');
+    const chatModel = getModelForPipeline('chat');
+    console.log(`[pipeline] Smart Router → ${chatModel}`);
     const url = 'https://openrouter.ai/api/v1/chat/completions';
 
     const body = {
@@ -1983,9 +1989,12 @@ router.post('/pipeline', async (req, res) => {
       if (!r.ok && r.status === 402 && !fallbackTriggered) {
         console.warn('[pipeline] OpenRouter 402 Payment Required. Falling back to free model.');
         fallbackTriggered = true;
-        currentModel = 'anthropic/claude-3-haiku';
+        const { getFallbackChain: getPipelineFallback } = require('../services/modelRouter');
+        const pipelineFallbacks = getPipelineFallback('chat');
+        currentModel = pipelineFallbacks[1] || pipelineFallbacks[0]; // Use second in chain as fallback
+        console.log(`[pipeline] Rate limited → fallback: ${currentModel}`);
         reqBody.model = currentModel;
-        
+
         // Retry with free model
         r = await fetch(url, {
           method: 'POST',
@@ -2016,10 +2025,10 @@ router.post('/pipeline', async (req, res) => {
     while (rounds < 3) {
       const message = result.choices?.[0]?.message;
       if (!message) break;
-      
+
       const fnCalls = message.tool_calls;
       if (!fnCalls || fnCalls.length === 0) break;
-      
+
       rounds++;
 
       // Add assistant message with tool calls to history
@@ -2030,7 +2039,7 @@ router.post('/pipeline', async (req, res) => {
         if (fc.type !== 'function') continue;
         const name = fc.function.name;
         let args = {};
-        try { args = JSON.parse(fc.function.arguments || '{}'); } catch(e){}
+        try { args = JSON.parse(fc.function.arguments || '{}'); } catch (e) { }
         toolCalls.push({ name, args });
 
         let toolResult = { status: 'tool_not_found' };

@@ -60,8 +60,13 @@ async function extractFacts(turns, options = {}) {
 
   const url = 'https://openrouter.ai/api/v1/chat/completions';
 
+  // Smart Model Router — use vision model (Gemma 4) for structured extraction
+  const { getModel, getFallbackChain } = require('./modelRouter');
+  const extractionModel = getModel('vision'); // Gemma 4 is excellent at structured JSON
+  console.log(`[factExtractor] Smart Router → ${extractionModel}`);
+
   const body = {
-    model: options.model || 'anthropic/claude-3-haiku', // Claude 3 Haiku — ultra-fast premium default
+    model: options.model || extractionModel,
     messages: [
       { role: 'system', content: EXTRACTION_SYSTEM },
       { role: 'user', content: `Transcript:\n${transcript}` }
@@ -85,7 +90,9 @@ async function extractFacts(turns, options = {}) {
     
     // Fallback if Claude is rate-limited
     if (!r.ok && r.status === 429) {
-      console.warn('[factExtractor] OpenRouter HTTP 429. Falling back to Gemini Flash...');
+      console.warn('[factExtractor] Primary model 429. Trying fallback...');
+      const fallbacks = getFallbackChain('vision');
+      const fbModel = fallbacks[1] || fallbacks[0];
       r = await fetch(url, {
         method: 'POST',
         headers: {
@@ -93,7 +100,7 @@ async function extractFacts(turns, options = {}) {
           'Authorization': `Bearer ${openRouterKey}`,
           'X-Title': 'Kelion AI'
         },
-        body: JSON.stringify({ ...body, model: 'google/gemini-flash-1.5' }),
+        body: JSON.stringify({ ...body, model: fbModel }),
       });
     }
 
