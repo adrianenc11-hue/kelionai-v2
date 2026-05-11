@@ -16,22 +16,21 @@
 const GOOGLE_AI_STUDIO = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
 
 const MODELS = {
-  // Primary: Nemotron 3 Super (fastest, most reliable on OpenRouter free)
-  // Falls back to: Ring-2.6-1T → Qwen3 Coder
-  chat: process.env.MODEL_CHAT || 'nvidia/nemotron-3-super-120b-a12b:free',
+  // Primary: GLM 4.5 Air (Fastest for natural conversation)
+  chat: process.env.MODEL_CHAT || 'z-ai/glm-4.5-air:free',
 
-  // Coding specialist
-  coder: process.env.MODEL_CODER || 'qwen/qwen3-coder:free',
+  // Coding & Tool specialist: Ring 2.6
+  coder: process.env.MODEL_CODER || 'incluziuneai/ring-2.6-1t:free',
 
-  // Vision: camera frames, image analysis
-  vision: process.env.MODEL_VISION || 'google/gemma-4-31b-it:free',
+  // Vision / Extraction: Nemotron Nano (High context & Stability)
+  vision: process.env.MODEL_VISION || 'nvidia/nemotron-3-nano-30b-a3b:free',
 };
 
-// OpenRouter fallback models (used when Google AI Studio is unavailable)
+// OpenRouter fallback models (audited for high uptime)
 const OPENROUTER_FALLBACK = {
-  chat:   ['nvidia/nemotron-3-super-120b-a12b:free', 'inclusionai/ring-2.6-1t:free', 'qwen/qwen3-coder:free'],
-  coder:  ['qwen/qwen3-coder:free', 'nvidia/nemotron-3-super-120b-a12b:free', 'inclusionai/ring-2.6-1t:free'],
-  vision: ['google/gemma-4-31b-it:free', 'google/gemma-4-26b-a4b-it:free'],
+  chat:   ['z-ai/glm-4.5-air:free', 'nvidia/nemotron-3-super-120b-a12b:free', 'openai/gpt-oss-120b:free'],
+  coder:  ['incluziuneai/ring-2.6-1t:free', 'openai/gpt-oss-120b:free', 'qwen/qwen-2.5-coder-32b-instruct:free'],
+  vision: ['nvidia/nemotron-3-nano-30b-a3b:free', 'google/gemma-2-9b-it:free'],
 };
 
 /**

@@ -30,6 +30,7 @@ import EmailComposerModal from '../components/EmailComposerModal'
 import { getCsrfToken } from '../lib/api'
 import { getVoiceMode } from '../lib/voiceModeStore'
 import VoicePicker from '../components/stage/VoicePicker'
+import ClonedVoiceLibrary from '../components/stage/ClonedVoiceLibrary'
 import {
   supportsPasskey,
   registerPasskey,
@@ -164,6 +165,7 @@ export default function KelionStage() {
   const [voiceLevel, setVoiceLevel] = useState(0)
   const [transcriptOpen, setTranscriptOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [voiceLibraryOpen, setVoiceLibraryOpen] = useState(false)
 
   // Stage 3 — auth + memory state
   const [authState, setAuthState] = useState({ signedIn: false, user: null })
@@ -2104,6 +2106,10 @@ export default function KelionStage() {
             <VoicePicker style={{ width: '100%' }} />
           </div>
 
+          <MenuItem onClick={() => { setVoiceLibraryOpen(true); setMenuOpen(false) }}>
+            👤 Bibliotecă Voci Clonate
+          </MenuItem>
+
           <div
             style={{
               height: 1,
@@ -2223,6 +2229,10 @@ export default function KelionStage() {
           />
           {/* Contact duplicated in the Tools section above. */}
         </div>
+      )}
+
+      {voiceLibraryOpen && (
+        <ClonedVoiceLibrary onClose={() => setVoiceLibraryOpen(false)} />
       )}
 
       {/* Contact moved to the top-bar as an icon (??) per Adrian's
