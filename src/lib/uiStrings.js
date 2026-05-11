@@ -9,8 +9,6 @@ const STRINGS = {
   tools:              { en: 'Tools',                 ro: 'Instrumente',           fr: 'Outils',              de: 'Werkzeuge',            es: 'Herramientas' },
   cameraOn:           { en: '📹 Turn camera on',     ro: '📹 Pornește camera',    fr: '📹 Activer la caméra', de: '📹 Kamera einschalten', es: '📹 Encender cámara' },
   cameraOff:          { en: '📹 Turn camera off',    ro: '📹 Oprește camera',     fr: '📹 Désactiver caméra', de: '📹 Kamera ausschalten', es: '📹 Apagar cámara' },
-  visionEco:          { en: '🌱 Eco (1fps — low cost)',       ro: '🌱 Eco (1fps — cost mic)',       fr: '🌱 Éco (1fps — coût bas)',      de: '🌱 Öko (1fps — günstig)',       es: '🌱 Eco (1fps — bajo costo)' },
-  visionPremium:      { en: '⚡ Premium (4fps — best quality)',ro: '⚡ Premium (4fps — cea mai bună)', fr: '⚡ Premium (4fps — meilleure)',  de: '⚡ Premium (4fps — beste)',      es: '⚡ Premium (4fps — mejor calidad)' },
   shareScreen:        { en: '🖥️ Share screen',       ro: '🖥️ Partajează ecranul', fr: '🖥️ Partager l\'écran',  de: '🖥️ Bildschirm teilen', es: '🖥️ Compartir pantalla' },
   stopScreen:         { en: '🖥️ Stop sharing screen',ro: '🖥️ Oprește partajarea', fr: '🖥️ Arrêter le partage',de: '🖥️ Teilen beenden',    es: '🖥️ Dejar de compartir' },
   showTranscript:     { en: '📝 Show transcript',    ro: '📝 Afișează transcrierea',fr: '📝 Afficher transcription',de: '📝 Transkript anzeigen',es: '📝 Mostrar transcripción' },

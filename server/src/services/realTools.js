@@ -453,80 +453,11 @@ async function toolWebSearch({ query, limit }) {
   if (!q) return { ok: false, error: 'missing query' };
   const n = Math.max(1, Math.min(10, Number.parseInt(limit, 10) || 5));
 
-  // Priority 0: Google Custom Search API (requires GOOGLE_API_KEY + GOOGLE_CSE_ID)
-  const googleSearchKey = process.env.GOOGLE_API_KEY;
-  const googleCseId = process.env.GOOGLE_CSE_ID;
-  if (googleSearchKey && googleCseId) {
-    try {
-      const url = `https://www.googleapis.com/customsearch/v1?key=${googleSearchKey}&cx=${googleCseId}&q=${encodeURIComponent(q)}&num=${n}`;
-      const r = await fetchWithTimeout(url);
-      if (r.ok) {
-        const data = await r.json();
-        const items = Array.isArray(data.items) ? data.items.slice(0, n) : [];
-        return {
-          ok: true,
-          query: q,
-          results: items.map((o) => ({ title: o.title, url: o.link, snippet: o.snippet })),
-          totalResults: data.searchInformation?.totalResults || null,
-          source: 'google-custom-search',
-        };
-      }
-    } catch (_) { /* fall through to Tavily */ }
-  }
+  // ── Strategy: Free First (Easy to Hard) ──────────────────────────
+  // Per Adrian's directive: Start with free, non-key tools to save costs.
+  // Fall back to evolved/paid instruments only if free ones fail or return nothing.
 
-  // Priority 1: Tavily — AI-optimized search with summarization + URLs.
-  const tavilyKey = process.env.TAVILY_API_KEY;
-  if (tavilyKey) {
-    try {
-      const r = await fetchWithTimeout('https://api.tavily.com/search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          api_key: tavilyKey,
-          query: q,
-          max_results: n,
-          search_depth: 'basic',
-          include_answer: true,
-        }),
-      });
-      if (r.ok) {
-        const data = await r.json();
-        const results = Array.isArray(data.results) ? data.results.slice(0, n) : [];
-        return {
-          ok: true,
-          query: q,
-          results: results.map((o) => ({ title: o.title, url: o.url, snippet: o.content })),
-          answer: data.answer || null,
-          source: 'tavily.com',
-        };
-      }
-    } catch (_) { /* fall through to Serper */ }
-  }
-
-  // Serper.dev preferred next if key present — richer results with URLs.
-  // Falls back to DuckDuckGo Instant Answer (free, no key) otherwise.
-  const serperKey = process.env.SERPER_API_KEY;
-  if (serperKey) {
-    try {
-      const r = await fetchWithTimeout('https://google.serper.dev/search', {
-        method: 'POST',
-        headers: { 'X-API-KEY': serperKey, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ q, num: n }),
-      });
-      if (r.ok) {
-        const data = await r.json();
-        const organic = Array.isArray(data.organic) ? data.organic.slice(0, n) : [];
-        return {
-          ok: true,
-          query: q,
-          results: organic.map((o) => ({ title: o.title, url: o.link, snippet: o.snippet })),
-          answerBox: data.answerBox || null,
-          source: 'serper.dev',
-        };
-      }
-    } catch (_) { /* fall through to DuckDuckGo */ }
-  }
-  // DuckDuckGo Instant Answer — good for quick factual lookups
+  // Step 1: DuckDuckGo Instant Answer (Free, no key) — Fast factual lookups
   try {
     const url = `https://api.duckduckgo.com/?q=${encodeURIComponent(q)}&format=json&no_html=1&skip_disambig=1`;
     const r = await fetchWithTimeout(url);
@@ -541,13 +472,6 @@ async function toolWebSearch({ query, limit }) {
           if (results.length >= n) break;
           if (t.Text && t.FirstURL) {
             results.push({ title: t.Text.split(' - ')[0] || t.Text, url: t.FirstURL, snippet: t.Text });
-          } else if (Array.isArray(t.Topics)) {
-            for (const inner of t.Topics) {
-              if (results.length >= n) break;
-              if (inner.Text && inner.FirstURL) {
-                results.push({ title: inner.Text.split(' - ')[0] || inner.Text, url: inner.FirstURL, snippet: inner.Text });
-              }
-            }
           }
         }
       }
@@ -555,80 +479,119 @@ async function toolWebSearch({ query, limit }) {
         return { ok: true, query: q, results, answer: data.Answer || null, source: 'duckduckgo.com' };
       }
     }
-  } catch (_) { /* fall through to DDG HTML */ }
+  } catch (_) { /* continue to HTML scraper */ }
 
-  // DuckDuckGo HTML search — real web results. The IA API above is just
-  // a dictionary lookup. This scrapes the actual search page.
-  // Tested 2026-04-29: returns 5+ organic results for diverse queries.
+  // Step 2: DuckDuckGo HTML scraper (Free, no key) — Real web results
   try {
     const ddgUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(q)}`;
     const r = await fetchWithTimeout(ddgUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml',
       },
     }, 10000);
     if (r.ok) {
       const html = await r.text();
       const results = [];
-      const re = /class="result\s+results_links\s+results_links_deep\s+web-result\s*">([\s\S]*?)(?=<div\s+class="result\s|<\/div>\s*<\/div>\s*<\/div>\s*$)/g;
+      const re = /class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g;
       let match;
       while ((match = re.exec(html)) !== null && results.length < n) {
-        const block = match[1];
-        if (block.includes('result--ad')) continue;
-        const hrefMatch = block.match(/href="(\/\/duckduckgo\.com\/l\/\?uddg=[^"]+)"/);
-        if (!hrefMatch) continue;
-        const uddgMatch = hrefMatch[1].match(/uddg=([^&]+)/);
-        if (!uddgMatch) continue;
-        const resultUrl = decodeURIComponent(uddgMatch[1]);
-        if (resultUrl.includes('duckduckgo.com')) continue;
-        const titleMatch = block.match(/class="result__a"[^>]*>\s*([\s\S]*?)\s*<\/a>/);
-        const title = titleMatch ? titleMatch[1].replace(/<[^>]*>/g, '').replace(/&#x27;/g, "'").replace(/&amp;/g, '&').trim() : '';
-        const snippetMatch = block.match(/class="result__snippet"[^>]*>([\s\S]*?)<\/a>/);
-        const snippet = snippetMatch ? snippetMatch[1].replace(/<[^>]*>/g, '').replace(/&#x27;/g, "'").replace(/&amp;/g, '&').trim() : '';
-        if (title) results.push({ title, url: resultUrl, snippet: snippet.slice(0, 300) });
+        let url = match[1];
+        if (url.startsWith('//duckduckgo.com/l/?uddg=')) {
+          url = decodeURIComponent(url.split('uddg=')[1].split('&')[0]);
+        }
+        const title = match[2].replace(/<[^>]*>/g, '').trim();
+        if (title && !url.includes('duckduckgo.com')) {
+          results.push({ title, url, snippet: 'Web result' });
+        }
       }
-      if (results.length > 0) {
-        return { ok: true, query: q, results, source: 'duckduckgo.com (html)' };
-      }
+      if (results.length > 0) return { ok: true, query: q, results, source: 'duckduckgo.com (html)' };
     }
-  } catch (_) { /* fall through to Bing */ }
+  } catch (_) { /* continue to Bing fallback */ }
 
-  // Bing web search scraping — final fallback. DDG rate-limits servers
-  // (returns 202 + captcha). Bing is more tolerant and consistently
-  // returns organic results. Tested 2026-04-29: 5/5 for all test queries.
+  // Step 3: Bing Scraper (Free, no key) — Highly reliable fallback
   try {
-    const bingUrl = `https://www.bing.com/search?q=${encodeURIComponent(q)}&count=${Math.min(n, 10)}`;
+    const bingUrl = `https://www.bing.com/search?q=${encodeURIComponent(q)}&count=${n}`;
     const r = await fetchWithTimeout(bingUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml',
-        'Accept-Language': 'en-US,en;q=0.9',
-      },
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
     }, 10000);
     if (r.ok) {
       const html = await r.text();
       const results = [];
-      const blocks = html.split('class="b_algo"');
-      for (let i = 1; i < blocks.length && results.length < n; i++) {
-        const block = blocks[i];
+      const blocks = html.split('class="b_algo"').slice(1);
+      for (const block of blocks) {
+        if (results.length >= n) break;
         const titleMatch = block.match(/<a[^>]*href="(https?:\/\/[^"]+)"[^>]*>([\s\S]*?)<\/a>/);
-        if (!titleMatch) continue;
-        const resultUrl = titleMatch[1];
-        const title = titleMatch[2].replace(/<[^>]*>/g, '').trim();
-        const snippetMatch = block.match(/<p[^>]*>([\s\S]*?)<\/p>/);
-        const snippet = snippetMatch ? snippetMatch[1].replace(/<[^>]*>/g, '').trim() : '';
-        if (title && resultUrl) {
-          results.push({ title, url: resultUrl, snippet: snippet.slice(0, 300) });
+        if (titleMatch) {
+          results.push({ title: titleMatch[2].replace(/<[^>]*>/g, '').trim(), url: titleMatch[1], snippet: 'Web result' });
         }
       }
-      if (results.length > 0) {
-        return { ok: true, query: q, results, source: 'bing.com' };
-      }
+      if (results.length > 0) return { ok: true, query: q, results, source: 'bing.com' };
     }
-  } catch (_) { /* give up */ }
+  } catch (_) { /* continue to Premium tools */ }
 
-  return { ok: false, query: q, error: 'No search results found.', suggestion: 'Try browse_web.' };
+  // ── Step 4: Premium Fallbacks (Google, Tavily, Serper) ────────────
+  
+  // Google Custom Search (Key required)
+  const googleKey = process.env.GOOGLE_API_KEY, googleCseId = process.env.GOOGLE_CSE_ID;
+  if (googleKey && googleCseId) {
+    try {
+      const url = `https://www.googleapis.com/customsearch/v1?key=${googleKey}&cx=${googleCseId}&q=${encodeURIComponent(q)}&num=${n}`;
+      const r = await fetchWithTimeout(url);
+      if (r.ok) {
+        const data = await r.json();
+        return {
+          ok: true,
+          query: q,
+          results: (data.items || []).map(o => ({ title: o.title, url: o.link, snippet: o.snippet })),
+          source: 'google-custom-search',
+        };
+      }
+    } catch (_) {}
+  }
+
+  // Tavily (Key required)
+  const tavilyKey = process.env.TAVILY_API_KEY;
+  if (tavilyKey) {
+    try {
+      const r = await fetchWithTimeout('https://api.tavily.com/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ api_key: tavilyKey, query: q, max_results: n }),
+      });
+      if (r.ok) {
+        const data = await r.json();
+        return {
+          ok: true,
+          query: q,
+          results: (data.results || []).map(o => ({ title: o.title, url: o.url, snippet: o.content })),
+          source: 'tavily.com',
+        };
+      }
+    } catch (_) {}
+  }
+
+  // Serper.dev (Key required)
+  const serperKey = process.env.SERPER_API_KEY;
+  if (serperKey) {
+    try {
+      const r = await fetchWithTimeout('https://google.serper.dev/search', {
+        method: 'POST',
+        headers: { 'X-API-KEY': serperKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ q, num: n }),
+      });
+      if (r.ok) {
+        const data = await r.json();
+        return {
+          ok: true,
+          query: q,
+          results: (data.organic || []).map(o => ({ title: o.title, url: o.link, snippet: o.snippet })),
+          source: 'serper.dev',
+        };
+      }
+    } catch (_) {}
+  }
+
+  return { ok: false, query: q, error: 'No search results found after trying all providers.' };
 }
 
 // ──────────────────────────────────────────────────────────────────
@@ -641,68 +604,9 @@ async function toolTranslate({ text, to, from }) {
   const target = (to || '').toString().toLowerCase().slice(0, 5) || 'en';
   const source = (from || 'auto').toString().toLowerCase().slice(0, 5) || 'auto';
 
-  // Priority 1: Google Cloud Translation API (professional, 500K chars/mo free)
-  const googleApiKey = process.env.GOOGLE_API_KEY;
-  if (googleApiKey) {
-    try {
-      const r = await fetchWithTimeout('https://translation.googleapis.com/language/translate/v2', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          q: src,
-          target,
-          source: source === 'auto' ? undefined : source,
-          key: googleApiKey,
-          format: 'text',
-        }),
-      });
-      if (r.ok) {
-        const data = await r.json();
-        const t0 = data?.data?.translations?.[0];
-        if (t0) {
-          return {
-            ok: true,
-            translated: t0.translatedText,
-            detectedSource: (t0.detectedSourceLanguage || source).toLowerCase(),
-            target,
-            source: 'google-translate',
-          };
-        }
-      }
-    } catch (_) { /* fall through to DeepL */ }
-  }
+  // ── Strategy: Free First (Easy to Hard) ──────────────────────────
 
-  // Priority 2: DeepL — higher quality for EU languages.
-  const deeplKey = process.env.DEEPL_API_KEY;
-  if (deeplKey) {
-    try {
-      const host = deeplKey.endsWith(':fx') ? 'api-free.deepl.com' : 'api.deepl.com';
-      const body = new URLSearchParams();
-      body.append('auth_key', deeplKey);
-      body.append('text', src);
-      body.append('target_lang', target.toUpperCase());
-      if (source !== 'auto') body.append('source_lang', source.toUpperCase());
-      const r = await fetchWithTimeout(`https://${host}/v2/translate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: body.toString(),
-      });
-      if (r.ok) {
-        const data = await r.json();
-        const first = data && Array.isArray(data.translations) && data.translations[0];
-        if (first) {
-          return {
-            ok: true,
-            translated: first.text,
-            detectedSource: (first.detected_source_language || source).toLowerCase(),
-            target,
-            source: 'deepl',
-          };
-        }
-      }
-    } catch (_) { /* fall through to LibreTranslate */ }
-  }
-
+  // Step 1: LibreTranslate (Public instances, no key)
   const endpoints = [
     process.env.LIBRETRANSLATE_URL,
     'https://translate.terraprint.co/translate',
@@ -730,9 +634,7 @@ async function toolTranslate({ text, to, from }) {
     } catch (_) { continue; }
   }
 
-  // Priority 4: MyMemory — free, no key, 5000 words/day
-  // MyMemory requires explicit 2-letter codes. 'autodetect' as source
-  // triggers their auto-detection. Empty source causes INVALID LANGUAGE error.
+  // Step 2: MyMemory (Free, no key)
   try {
     const mmSource = source === 'auto' ? 'autodetect' : source;
     const langPair = `${mmSource}|${target}`;
@@ -741,7 +643,6 @@ async function toolTranslate({ text, to, from }) {
     if (r.ok) {
       const data = await r.json();
       const txt = data?.responseData?.translatedText;
-      // Guard against error messages returned as "translations"
       if (txt && !txt.startsWith('INVALID') && !txt.startsWith('MYMEMORY')) {
         return {
           ok: true,
@@ -752,9 +653,73 @@ async function toolTranslate({ text, to, from }) {
         };
       }
     }
-  } catch (_) { /* give up */ }
+  } catch (_) {}
 
-  return { ok: false, error: 'no translation provider available' };
+  // ── Step 3: Premium Fallbacks (Google, DeepL) ────────────────────
+
+  // Google Cloud Translation (Key required)
+  const googleApiKey = process.env.GOOGLE_API_KEY;
+  if (googleApiKey) {
+    try {
+      const r = await fetchWithTimeout('https://translation.googleapis.com/language/translate/v2', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          q: src,
+          target,
+          source: source === 'auto' ? undefined : source,
+          key: googleApiKey,
+          format: 'text',
+        }),
+      });
+      if (r.ok) {
+        const data = await r.json();
+        const t0 = data?.data?.translations?.[0];
+        if (t0) {
+          return {
+            ok: true,
+            translated: t0.translatedText,
+            detectedSource: (t0.detectedSourceLanguage || source).toLowerCase(),
+            target,
+            source: 'google-translate',
+          };
+        }
+      }
+    } catch (_) {}
+  }
+
+  // DeepL (Key required)
+  const deeplKey = process.env.DEEPL_API_KEY;
+  if (deeplKey) {
+    try {
+      const host = deeplKey.endsWith(':fx') ? 'api-free.deepl.com' : 'api.deepl.com';
+      const body = new URLSearchParams();
+      body.append('auth_key', deeplKey);
+      body.append('text', src);
+      body.append('target_lang', target.toUpperCase());
+      if (source !== 'auto') body.append('source_lang', source.toUpperCase());
+      const r = await fetchWithTimeout(`https://${host}/v2/translate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body.toString(),
+      });
+      if (r.ok) {
+        const data = await r.json();
+        const first = data?.translations?.[0];
+        if (first) {
+          return {
+            ok: true,
+            translated: first.text,
+            detectedSource: (first.detected_source_language || source).toLowerCase(),
+            target,
+            source: 'deepl',
+          };
+        }
+      }
+    } catch (_) {}
+  }
+
+  return { ok: false, error: 'No translation provider available after trying all options.' };
 }
 
 // ──────────────────────────────────────────────────────────────────

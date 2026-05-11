@@ -18,28 +18,36 @@ const GOOGLE_AI_STUDIO = 'https://generativelanguage.googleapis.com/v1beta/opena
 const MODELS = {
   // Primary: GLM 4.5 Air (Fastest for natural conversation)
   chat: process.env.MODEL_CHAT || 'z-ai/glm-4.5-air:free',
+  chat_heavy: process.env.MODEL_CHAT_HEAVY || 'openai/gpt-4o',
 
   // Coding & Tool specialist: Ring 2.6
   coder: process.env.MODEL_CODER || 'incluziuneai/ring-2.6-1t:free',
+  coder_heavy: process.env.MODEL_CODER_HEAVY || 'anthropic/claude-3.5-sonnet',
 
   // Vision / Extraction: Nemotron Nano (High context & Stability)
   vision: process.env.MODEL_VISION || 'nvidia/nemotron-3-nano-30b-a3b:free',
+  vision_heavy: process.env.MODEL_VISION_HEAVY || 'openai/gpt-4o-mini',
 };
 
 // OpenRouter fallback models (audited for high uptime)
 const OPENROUTER_FALLBACK = {
   chat:   ['z-ai/glm-4.5-air:free', 'nvidia/nemotron-3-super-120b-a12b:free', 'openai/gpt-oss-120b:free'],
+  chat_heavy: ['openai/gpt-4o', 'anthropic/claude-3.5-sonnet', 'google/gemini-pro-1.5'],
   coder:  ['incluziuneai/ring-2.6-1t:free', 'openai/gpt-oss-120b:free', 'qwen/qwen-2.5-coder-32b-instruct:free'],
+  coder_heavy: ['anthropic/claude-3.5-sonnet', 'openai/gpt-4o', 'deepseek/deepseek-coder'],
   vision: ['nvidia/nemotron-3-nano-30b-a3b:free', 'google/gemma-2-9b-it:free'],
+  vision_heavy: ['openai/gpt-4o-mini', 'google/gemini-flash-1.5'],
 };
 
 /**
  * Get the optimal model for a task type.
  * @param {'chat'|'coder'|'vision'} taskType
+ * @param {boolean} useHeavy - Whether to use the premium/heavy model
  * @returns {string} Model ID
  */
-function getModel(taskType) {
-  return MODELS[taskType] || MODELS.chat;
+function getModel(taskType, useHeavy = false) {
+  const key = useHeavy ? `${taskType}_heavy` : taskType;
+  return MODELS[key] || MODELS[taskType] || MODELS.chat;
 }
 
 /**
@@ -94,13 +102,14 @@ function isCodingTask(msg) {
  *
  * @param {'chat'|'coder'|'vision'} taskType
  * @param {object} body - Request body (messages, tools, etc.)
+ * @param {boolean} useHeavy - Whether to use the premium/heavy model
  * @returns {Promise<{response: Response, model: string, provider: string}>}
  */
-async function smartFetch(taskType, body) {
-  const model = getModel(taskType);
+async function smartFetch(taskType, body, useHeavy = false) {
+  const model = getModel(taskType, useHeavy);
   const endpoint = getEndpoint(model);
 
-  console.log(`[modelRouter] ${taskType} → ${model} via ${endpoint.provider}`);
+  console.log(`[modelRouter] ${taskType} (heavy=${useHeavy}) → ${model} via ${endpoint.provider}`);
 
   // Try primary provider
   try {
@@ -125,7 +134,8 @@ async function smartFetch(taskType, body) {
   }
 
   // Fallback to OpenRouter chain
-  const chain = getFallbackChain(taskType);
+  const chainKey = useHeavy ? `${taskType}_heavy` : taskType;
+  const chain = OPENROUTER_FALLBACK[chainKey] || OPENROUTER_FALLBACK[taskType] || OPENROUTER_FALLBACK.chat;
   const orKey = process.env.OPENROUTER_API_KEY;
   if (!orKey) throw new Error('No OPENROUTER_API_KEY for fallback');
 
@@ -159,7 +169,7 @@ async function smartFetch(taskType, body) {
     }
   }
 
-  throw new Error(`All models exhausted for ${taskType}`);
+  throw new Error(`All models exhausted for ${taskType} (heavy=${useHeavy})`);
 }
 
 module.exports = {
