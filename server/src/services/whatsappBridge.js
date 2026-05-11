@@ -50,6 +50,7 @@ class WhatsAppBridge extends EventEmitter {
       this.client = new Client({
         authStrategy: new LocalAuth({ dataPath: SESSION_DIR }),
         puppeteer: {
+          executablePath: process.env.NODE_ENV === 'production' ? 'chromium' : undefined,
           headless: true,
           args: [
             '--no-sandbox',
