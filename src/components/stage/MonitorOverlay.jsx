@@ -93,7 +93,16 @@ function MonitorOverlay() {
   // emit `onError` for network-level blocks).
   const [iframeBlocked, setIframeBlocked] = useState(false)
 
-  useEffect(() => subscribeMonitor((s) => setM({ ...s })), [])
+  // Prevent infinite recursive iframes (Droste effect) gracefully
+  // If this window was spawned with ?kelion_nested=1, it means we are already
+  // inside the monitor. We must NEVER render another monitor inside ourselves.
+  const isNested = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('kelion_nested')
+
+  useEffect(() => {
+    if (!isNested) {
+      subscribeMonitor((s) => setM({ ...s }))
+    }
+  }, [isNested])
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined
@@ -105,7 +114,21 @@ function MonitorOverlay() {
   // Reset the "blocked" flag every time the monitor payload changes.
   useEffect(() => { setIframeBlocked(false) }, [m.src, m.updatedAt])
 
-  if (!m.src) return null
+  if (!m.src || isNested) return null
+
+  let finalSrc = m.src
+  try {
+    // If the AI tries to load kelionai.app, append a flag so the nested app knows it's a child
+    const urlObj = new URL(m.src)
+    const targetHost = urlObj.hostname.replace(/^www\./, '').toLowerCase()
+    const currentHost = window.location.hostname.replace(/^www\./, '').toLowerCase()
+    if (targetHost === currentHost || targetHost === 'localhost') {
+      urlObj.searchParams.set('kelion_nested', '1')
+      finalSrc = urlObj.toString()
+    }
+  } catch (e) {
+    // Ignore invalid URLs
+  }
 
   const isImage = m.embedType === 'image'
   const isExternal = m.embedType === 'external'
@@ -277,22 +300,22 @@ function MonitorOverlay() {
             background: '#000',
           }}>
             <video
-              src={m.src}
+              src={finalSrc}
               controls
               autoPlay
               playsInline
               style={{ width: '100%', height: '100%', maxHeight: '100%', outline: 'none', background: '#000' }}
               onError={() => {
-                try { console.warn('[monitor] video failed to load', m.src) } catch (_) {}
+                try { console.warn('[monitor] video failed to load', finalSrc) } catch (_) {}
               }}
             >
-              <source src={m.src} />
+              <source src={finalSrc} />
               Your browser does not support video playback.
             </video>
           </div>
         ) : isImage ? (
           <img
-            src={m.src}
+            src={finalSrc}
             alt={m.title || 'Monitor content'}
             referrerPolicy="no-referrer"
             style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', background: '#0d0b1d' }}
@@ -334,7 +357,7 @@ function MonitorOverlay() {
               {m.title || 'Live audio'}
             </div>
             <audio
-              src={m.src}
+              src={finalSrc}
               controls
               autoPlay
               preload="auto"
@@ -344,13 +367,13 @@ function MonitorOverlay() {
                 outline: 'none',
               }}
               onError={() => {
-                try { console.warn('[monitor] audio element failed to play', m.src) } catch (_) {}
+                try { console.warn('[monitor] audio element failed to play', finalSrc) } catch (_) {}
               }}
             >
               Your browser does not support the audio element.
             </audio>
             <a
-              href={m.src}
+              href={finalSrc}
               target="_blank"
               rel="noopener noreferrer"
               style={{
@@ -453,10 +476,10 @@ function MonitorOverlay() {
           </div>
         ) : (
           <IframeWithFallback
-            src={m.src}
+            src={finalSrc}
             title={m.title || 'Kelion monitor'}
             onBlocked={() => {
-              try { console.warn('[monitor] iframe never loaded — likely CSP/XFO block', m.src) } catch (_) {}
+              try { console.warn('[monitor] iframe never loaded — likely CSP/XFO block', finalSrc) } catch (_) {}
               setIframeBlocked(true)
             }}
           />
