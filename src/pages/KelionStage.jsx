@@ -1859,8 +1859,27 @@ export default function KelionStage() {
                 <textarea value={chatInput} onChange={(e) => { setChatInput(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 150) + 'px'; }} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendTextMessage(); } }} onPaste={(e) => { try { const cd = e.clipboardData || window.clipboardData; if (!cd) return; const items = cd.items ? Array.from(cd.items) : []; const imgItem = items.find((it) => it && it.kind === 'file' && typeof it.type === 'string' && it.type.startsWith('image/')); if (imgItem) { const blob = imgItem.getAsFile(); if (blob) { e.preventDefault(); const ext = (blob.type.split('/')[1] || 'png').split(';')[0]; const stamp = new Date().toISOString().replace(/[:.]/g, '-'); setAttachedFile((typeof File !== 'undefined') ? new File([blob], `pasted-${stamp}.${ext}`, { type: blob.type }) : blob); return; } } } catch (_) {} }} placeholder="Ask anything" disabled={status === 'thinking'} rows={1} style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', color: '#1a1a1a', fontSize: 16, fontFamily: 'system-ui, -apple-system, sans-serif', resize: 'none', maxHeight: 150, overflowY: 'auto', minHeight: 24, padding: '4px 0', lineHeight: 1.5 }} />
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                <button type="button" onClick={() => { if (status === 'idle' || status === 'error') { startVoiceWithPriorTurns(); setMicOff(false); setIntendedVoiceActive(true) } else if (status === 'listening' || status === 'speaking' || status === 'thinking') { if (typeof stop === 'function') stop(); setIntendedVoiceActive(false) } }} style={{ width: 34, height: 34, borderRadius: '50%', background: 'transparent', border: 'none', color: status === 'listening' ? '#ef4444' : '#888', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }} title="Voice">
-                  {(status === 'listening' || status === 'speaking') ? (
+                <button 
+                  type="button" 
+                  onClick={() => { 
+                    if (status === 'idle' || status === 'error') { 
+                      startVoiceWithPriorTurns(); 
+                      setMicOff(false); 
+                      setIntendedVoiceActive(true);
+                    } else { 
+                      if (typeof stop === 'function') stop(); 
+                      setIntendedVoiceActive(false);
+                    } 
+                  }} 
+                  style={{ 
+                    width: 34, height: 34, borderRadius: '50%', 
+                    background: 'transparent', border: 'none', 
+                    color: (status !== 'idle' && status !== 'error') ? '#ef4444' : '#888', 
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 
+                  }} 
+                  title="Voice"
+                >
+                  {(status !== 'idle' && status !== 'error') ? (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 2, height: 16 }}>
                       <div style={{ width: 3, borderRadius: 2, background: '#ef4444', height: `${20 + userLevel * 80}%`, transition: 'height 0.1s' }} />
                       <div style={{ width: 3, borderRadius: 2, background: '#ef4444', height: `${20 + userLevel * 50}%`, transition: 'height 0.1s' }} />
@@ -1872,7 +1891,35 @@ export default function KelionStage() {
                 {chatInput.trim().length > 0 || attachedFile ? (
                   <button type="submit" disabled={status === 'thinking'} title="Send" style={{ width: 36, height: 36, borderRadius: '50%', background: '#1a1a1a', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 700 }}>↑</button>
                 ) : (
-                  <button type="button" onClick={() => { if (status === 'idle' || status === 'error') { startVoiceWithPriorTurns(); setMicOff(false); setIntendedVoiceActive(true) } }} title="Voice mode" style={{ width: 36, height: 36, borderRadius: '50%', background: (status === 'listening' || status === 'speaking') ? '#ef4444' : '#f0f0f0', border: 'none', color: (status === 'listening' || status === 'speaking') ? '#fff' : '#888', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>{(status === 'listening' || status === 'speaking') ? '■' : (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="4" y="6" width="3" height="12" rx="1.5" /><rect x="10.5" y="3" width="3" height="18" rx="1.5" /><rect x="17" y="8" width="3" height="8" rx="1.5" /></svg>)}</button>
+                  <button 
+                    type="button" 
+                    onClick={() => { 
+                      if (status === 'idle' || status === 'error') { 
+                        startVoiceWithPriorTurns(); 
+                        setMicOff(false); 
+                        setIntendedVoiceActive(true);
+                      } else {
+                        if (typeof stop === 'function') stop();
+                        setIntendedVoiceActive(false);
+                      }
+                    }} 
+                    title="Voice mode" 
+                    style={{ 
+                      width: 36, height: 36, borderRadius: '50%', 
+                      background: (status !== 'idle' && status !== 'error') ? '#ef4444' : '#f0f0f0', 
+                      border: 'none', 
+                      color: (status !== 'idle' && status !== 'error') ? '#fff' : '#888', 
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 
+                    }}
+                  >
+                    {(status !== 'idle' && status !== 'error') ? '■' : (
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                        <rect x="4" y="6" width="3" height="12" rx="1.5" />
+                        <rect x="10.5" y="3" width="3" height="18" rx="1.5" />
+                        <rect x="17" y="8" width="3" height="8" rx="1.5" />
+                      </svg>
+                    )}
+                  </button>
                 )}
               </div>
             </form>

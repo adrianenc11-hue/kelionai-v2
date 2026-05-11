@@ -180,7 +180,28 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
   const visionLastBoostAtRef = useRef(0)
   const visionLastMotionDataRef = useRef(null)
   const motionCanvasRef = useRef(null)
+  const voiceBufferRef = useRef([]) // Array of Float32Arrays for Auto-Vox
   const toolExecutingRef = useRef(false)
+
+  // Auto-Vox Flush: when we return to 'listening', pour the buffer.
+  useEffect(() => {
+    if (status === 'listening' && voiceBufferRef.current.length > 0 && wsRef.current?.readyState === WebSocket.OPEN) {
+      console.log(`[autovox] pouring buffer: ${voiceBufferRef.current.length} chunks`);
+      voiceBufferRef.current.forEach(float => {
+        const pcm16 = floatTo16BitPCM(float)
+        const bytes = new Uint8Array(pcm16.buffer, pcm16.byteOffset, pcm16.byteLength)
+        const b64 = base64FromBytes(bytes)
+        try {
+          wsRef.current.send(JSON.stringify({
+            realtimeInput: {
+              audio: { data: b64, mimeType: `audio/pcm;rate=${SAMPLE_RATE_IN}` },
+            },
+          }))
+        } catch (_) {}
+      });
+      voiceBufferRef.current = [];
+    }
+  }, [status]);
 
   // Tool-call loop guard — detects when the model repeatedly calls the same
   // tool with the same args (infinite loop). After MAX_REPEATS identical
@@ -1214,6 +1235,15 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
         node.port.onmessage = (e) => {
           if (ws.readyState !== WebSocket.OPEN) return
           const float = e.data
+          
+          // Auto-Vox: if thinking or working, buffer it instead of sending.
+          // Allows user to keep talking while tools run/model thinks.
+          const currentStatus = statusRef.current;
+          if (currentStatus === 'thinking' || currentStatus === 'working') {
+            voiceBufferRef.current.push(float);
+            return;
+          }
+
           const pcm16 = floatTo16BitPCM(float)
           const bytes = new Uint8Array(pcm16.buffer, pcm16.byteOffset, pcm16.byteLength)
           const b64 = base64FromBytes(bytes)
