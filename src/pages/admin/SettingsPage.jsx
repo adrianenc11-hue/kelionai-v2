@@ -115,20 +115,20 @@ function WhatsAppBridgeCard({ toast }) {
       const r = await fetch('/api/whatsapp/connect', { method: 'POST', credentials: 'include' })
       const data = await r.json()
       if (r.ok) {
-        toast(`WhatsApp: ${data.message}`)
+        toast.info(`WhatsApp: ${data.message}`)
         fetchStatus()
       } else {
-        toast(`Eroare: ${data.error}`, 'error')
+        toast.error(`Eroare: ${data.error}`)
       }
     } catch (e) {
-      toast('Eroare rețea', 'error')
+      toast.error('Eroare rețea')
     }
   }
 
   const handleDisconnect = async () => {
     try {
       await fetch('/api/whatsapp/logout', { method: 'POST', credentials: 'include' })
-      toast('Sesiune WhatsApp ștearsă')
+      toast.info('Sesiune WhatsApp ștearsă')
       fetchStatus()
     } catch (_) {}
   }
