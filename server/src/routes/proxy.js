@@ -49,6 +49,9 @@ const BLOCKED_HEADERS = new Set([
   'cross-origin-opener-policy',
   'cross-origin-embedder-policy',
   'cross-origin-resource-policy',
+  'x-content-type-options',
+  'report-to',
+  'nel',
   // Don't forward these — let Express set its own
   'transfer-encoding',
   'connection',
@@ -166,13 +169,12 @@ router.get('/', async (req, res) => {
     }
 
     // Add permissive headers so the iframe works.
-    // CRITICAL: We must explicitly set Content-Security-Policy here because
-    // Helmet's global middleware adds `frame-ancestors 'self'` to ALL routes,
-    // which would block the proxied content from rendering inside the monitor
-    // iframe. This override runs after Helmet and takes final precedence.
     res.setHeader('X-Frame-Options', 'ALLOWALL');
     res.setHeader('Content-Security-Policy', "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; frame-ancestors *;");
     res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', '*');
+    res.setHeader('X-Content-Type-Options', 'none');
 
     const contentType = (upstream.headers.get('content-type') || '').toLowerCase();
 
@@ -188,9 +190,11 @@ router.get('/', async (req, res) => {
         html = baseTag + html;
       }
 
-      // Remove any <meta http-equiv="Content-Security-Policy"> tags
+      // Remove any <meta http-equiv="Content-Security-Policy"> tags and other frame-busters
       html = html.replace(/<meta[^>]+http-equiv=["']?Content-Security-Policy["']?[^>]*>/gi, '');
       html = html.replace(/<meta[^>]+http-equiv=["']?X-Frame-Options["']?[^>]*>/gi, '');
+      html = html.replace(/<meta[^>]+http-equiv=["']?refresh["']?[^>]*>/gi, ''); // Prevent auto-redirects out of proxy
+      html = html.replace(/<meta[^>]+name=["']?viewport["']?[^>]*>/gi, ''); // Let our CSS handle scaling if needed
 
       // Neutralize JavaScript frame-busting code.
       // Many sites (Google, Facebook, etc.) have JS that checks:

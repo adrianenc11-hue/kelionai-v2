@@ -58,15 +58,10 @@ async function extractFacts(turns, options = {}) {
 
   if (!transcript) return [];
 
-  const url = 'https://openrouter.ai/api/v1/chat/completions';
-
-  // Smart Model Router — use vision model (Gemma 4) for structured extraction
-  const { getModel, getFallbackChain } = require('./modelRouter');
-  const extractionModel = getModel('vision'); // Gemma 4 is excellent at structured JSON
-  console.log(`[factExtractor] Smart Router → ${extractionModel}`);
-
+  // Smart Model Router — use audited stable models
+  const { smartFetch } = require('./modelRouter');
+  
   const body = {
-    model: options.model || extractionModel,
     messages: [
       { role: 'system', content: EXTRACTION_SYSTEM },
       { role: 'user', content: `Transcript:\n${transcript}` }
@@ -77,40 +72,10 @@ async function extractFacts(turns, options = {}) {
 
   let raw;
   try {
-    let r = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${openRouterKey}`,
-        'HTTP-Referer': 'https://kelion.ai',
-        'X-Title': 'Kelion AI Memory'
-      },
-      body: JSON.stringify(body),
-    });
-    
-    // Fallback if Claude is rate-limited
-    if (!r.ok && r.status === 429) {
-      console.warn('[factExtractor] Primary model 429. Trying fallback...');
-      const fallbacks = getFallbackChain('vision');
-      const fbModel = fallbacks[1] || fallbacks[0];
-      r = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${openRouterKey}`,
-          'X-Title': 'Kelion AI'
-        },
-        body: JSON.stringify({ ...body, model: fbModel }),
-      });
-    }
-
-    if (!r.ok) {
-      console.warn('[factExtractor] OpenRouter HTTP', r.status, await r.text());
-      return [];
-    }
-    raw = await r.json();
+    const { response } = await smartFetch('vision', body);
+    raw = await response.json();
   } catch (err) {
-    console.warn('[factExtractor] fetch failed', err.message);
+    console.warn('[factExtractor] extraction failed:', err.message);
     return [];
   }
 
