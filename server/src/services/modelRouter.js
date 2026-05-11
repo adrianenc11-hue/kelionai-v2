@@ -31,7 +31,7 @@ const MODELS = {
 const OPENROUTER_FALLBACK = {
   chat:   ['nvidia/nemotron-3-super-120b-a12b:free', 'inclusionai/ring-2.6-1t:free', 'qwen/qwen3-coder:free'],
   coder:  ['qwen/qwen3-coder:free', 'nvidia/nemotron-3-super-120b-a12b:free', 'inclusionai/ring-2.6-1t:free'],
-  vision: ['google/gemma-4-31b-it:free', 'google/gemma-4-27b-it:free'],
+  vision: ['google/gemma-4-31b-it:free', 'google/gemma-4-26b-a4b-it:free'],
 };
 
 /**
