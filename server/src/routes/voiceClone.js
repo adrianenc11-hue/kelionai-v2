@@ -696,7 +696,7 @@ router.post('/tts', async (req, res) => {
         },
         body: JSON.stringify({
           text: text.trim().slice(0, 5000),
-          model_id: 'eleven_multilingual_v2',
+          model_id: 'eleven_turbo_v2_5',
           // Explicit language_code ensures correct pronunciation rules.
           // Without this, ElevenLabs defaults to English pronunciation
           // even when the text is in Romanian — Adrian: "termenii tehnici
