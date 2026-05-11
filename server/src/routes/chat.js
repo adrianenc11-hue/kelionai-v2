@@ -91,35 +91,9 @@ router.post('/', async (req, res) => {
       session.history = session.history.slice(-MAX_HISTORY * 2);
     }
 
-    // Model: via OpenRouter — explicitly supports tool_calls.
-    const { getModel, getFallbackChain } = require('../services/modelRouter');
-    const model = getModel('chat');
-    console.log(`[chat] Smart Router → ${model}`);
-    const url = 'https://openrouter.ai/api/v1/chat/completions';
-
-    // ── Demand-driven tool activation ─────────────────────────────────
-    // Default: all tools OFF. Activate only tools relevant to this
-    // specific message. After the request completes, tools go back to OFF.
-    const openRouterTools = buildKelionToolsChatCompletions();
-
-    // Convert history to OpenAI format for OpenRouter
-    const sanitizedMessages = session.history.map(h => {
-      if (h.role === 'function') {
-        return {
-          role: 'tool',
-          tool_call_id: h.parts[0].functionResponse.id,
-          name: h.parts[0].functionResponse.name,
-          content: JSON.stringify(h.parts[0].functionResponse.response.result)
-        };
-      }
-      // Handle user/assistant text
-      let text = '';
-      h.parts.forEach(p => { if (p.text) text += p.text; });
-      return { role: h.role, content: text };
-    });
-
+    // Smart Model Router — unified stable routing
+    const { smartFetch } = require('../services/modelRouter');
     const body = {
-      model,
       messages: sanitizedMessages,
       tools: openRouterTools.length > 0 ? openRouterTools : undefined,
       tool_choice: openRouterTools.length > 0 ? 'auto' : undefined,
@@ -127,39 +101,16 @@ router.post('/', async (req, res) => {
       max_tokens: 1024,
     };
 
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 30_000);
-    const googleKey = process.env.GOOGLE_API_KEY;
-    const isGoogleModel = model.startsWith('google/');
-    let apiUrl = url;
-    let authHeader = `Bearer ${orKey}`;
-    // Always use OpenRouter to ensure stability and avoid Google's strict shim requirements
-
-    let r;
+    let result;
     try {
-      r = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': authHeader,
-          'HTTP-Referer': 'https://kelion.ai',
-          'X-Title': 'Kelion AI'
-        },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
-    } finally {
-      clearTimeout(timer);
-    }
-
-    if (r.ok) {
-      const data = await r.json();
-      const choice = data.choices?.[0];
+      const { response, model: activeModel } = await smartFetch('chat', body);
+      result = await response.json();
+      
+      const choice = result.choices?.[0];
       const reply = choice?.message?.content || '';
 
       if (choice?.message?.tool_calls) {
         // Model wants to call tools. 
-        // We add the tool_calls to history so the next turn can refer to them.
         session.history.push({
           role: 'assistant',
           parts: choice.message.tool_calls.map(tc => ({
@@ -171,7 +122,6 @@ router.post('/', async (req, res) => {
           }))
         });
 
-        // Return tool_calls to client for execution
         return res.json({
           reply: 'Calling tools...',
           toolCalls: choice.message.tool_calls.map(tc => ({
@@ -186,42 +136,10 @@ router.post('/', async (req, res) => {
       if (reply) {
         session.history.push({ role: 'assistant', parts: [{ text: reply }] });
       }
-      return res.json({ reply, model });
-    } else {
-      const errText = await r.text();
-      console.error('[chat] OpenAI-compatible request failed:', r.status, errText);
-
-      // Smart Model Router fallback chain
-      if (r.status === 429 || errText.toLowerCase().includes('insufficient_quota') || errText.toLowerCase().includes('rate-limited')) {
-        const fallbackChain = getFallbackChain('chat');
-        for (const fbModel of fallbackChain.slice(1)) { // skip first (already tried)
-          console.log(`[chat] Rate limited → trying fallback: ${fbModel}`);
-          try {
-            const r2 = await fetch(url, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${orKey}`,
-                'HTTP-Referer': 'https://kelion.ai',
-                'X-Title': 'Kelion AI'
-              },
-              body: JSON.stringify({ ...body, model: fbModel }),
-            });
-            if (r2.ok) {
-              const data2 = await r2.json();
-              const reply2 = data2.choices?.[0]?.message?.content || '';
-              if (reply2) {
-                session.history.push({ role: 'assistant', parts: [{ text: reply2 }] });
-              }
-              return res.json({ reply: reply2, model: fbModel });
-            }
-          } catch (fErr) {
-            console.error(`[chat] Fallback ${fbModel} failed:`, fErr.message);
-          }
-        }
-      }
-
-      return res.status(r.status).json({ error: `AI generation failed. Status: ${r.status}, Details: ${errText}` });
+      return res.json({ reply, model: activeModel });
+    } catch (err) {
+      console.error('[chat] AI generation failed:', err.message);
+      return res.status(502).json({ error: 'AI is temporarily unavailable. Please try again.' });
     }
   } catch (error) {
     console.error('[chat] Error:', error.message);

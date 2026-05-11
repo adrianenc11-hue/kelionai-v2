@@ -1947,97 +1947,21 @@ router.post('/pipeline', async (req, res) => {
       console.log('[resourceGov] All resources OFF (simple chat)');
     }
 
-    const { getModel: getModelForPipeline } = require('../services/modelRouter');
-    const chatModel = getModelForPipeline('chat');
-    console.log(`[pipeline] Smart Router → ${chatModel}`);
-    const url = 'https://openrouter.ai/api/v1/chat/completions';
-
+    const { smartFetch } = require('../services/modelRouter');
     const body = {
-      model: chatModel,
       messages,
       temperature: 0.6,
       max_tokens: 4000,
+      tools: openRouterTools.length > 0 ? openRouterTools : undefined,
     };
-    // Only include tools field when tools are actually needed
-    if (openRouterTools.length > 0) {
-      body.tools = openRouterTools;
+
+    let result;
+    try {
+      const { response } = await smartFetch('chat', body);
+      result = await response.json();
+    } catch (err) {
+      throw new Error(`Realtime AI pipeline failed: ${err.message}`);
     }
-
-    let currentModel = chatModel;
-    let fallbackTriggered = false;
-
-    async function fetchOpenRouter(reqBody) {
-      const googleKey = process.env.GOOGLE_API_KEY;
-      const isGoogleModel = currentModel.startsWith('google/');
-      let apiUrl = url;
-      let authHeader = `Bearer ${openRouterKey}`;
-      reqBody.model = currentModel;
-      // Always use OpenRouter to ensure stability and avoid Google's strict shim requirements
-
-      let r = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': authHeader,
-          'HTTP-Referer': 'https://kelion.ai',
-          'X-Title': 'Kelion AI'
-        },
-        body: JSON.stringify(reqBody),
-      });
-
-      // If out of credits (402) or rate-limited (429), try fallback chain
-      if (!r.ok && (r.status === 402 || r.status === 429) && !fallbackTriggered) {
-        const errBody = await r.text().catch(() => '');
-        console.warn(`[pipeline] OpenRouter ${r.status}. Trying fallback chain... Error: ${errBody.slice(0, 200)}`);
-        fallbackTriggered = true;
-
-        const { getFallbackChain: getPipelineFallback } = require('../services/modelRouter');
-        const pipelineFallbacks = getPipelineFallback('chat');
-
-        // Try each model in the fallback chain
-        for (let i = 0; i < pipelineFallbacks.length; i++) {
-          const fbModel = pipelineFallbacks[i];
-          if (fbModel === currentModel && i === 0) continue; // Skip the one that just failed
-
-          // Wait before retry (exponential backoff: 1s, 2s, 4s)
-          const waitMs = Math.min(1000 * Math.pow(2, i), 4000);
-          console.log(`[pipeline] Fallback ${i + 1}/${pipelineFallbacks.length}: ${fbModel} (wait ${waitMs}ms)`);
-          await new Promise(resolve => setTimeout(resolve, waitMs));
-
-          currentModel = fbModel;
-          reqBody.model = currentModel;
-
-          try {
-            r = await fetch(url, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${openRouterKey}`,
-                'HTTP-Referer': 'https://kelion.ai',
-                'X-Title': 'Kelion AI'
-              },
-              body: JSON.stringify(reqBody),
-            });
-            if (r.ok) {
-              console.log(`[pipeline] Fallback ${fbModel} succeeded!`);
-              break;
-            }
-            console.warn(`[pipeline] Fallback ${fbModel} also failed: ${r.status}`);
-          } catch (fbErr) {
-            console.error(`[pipeline] Fallback ${fbModel} error:`, fbErr.message);
-          }
-        }
-      }
-
-      if (!r.ok) {
-        const errText = await r.text();
-        throw new Error(`OpenRouter HTTP ${r.status}: ${errText.slice(0, 300)}`);
-      }
-
-      return await r.json();
-    }
-
-    let result = await fetchOpenRouter(body);
 
     const toolCalls = [];
     let rounds = 0;
