@@ -1,5 +1,5 @@
 [phases.setup]
-nixPkgs = ["nodejs_22", "python3", "gcc", "gnumake", "poppler_utils", "tesseract", "ffmpeg", "jq"]
+nixPkgs = ["nodejs_22", "python3", "gcc", "gnumake", "poppler_utils", "tesseract", "ffmpeg", "jq", "chromium", "nss"]
 
 [phases.install]
 cmds = [
