@@ -1036,7 +1036,7 @@ router.get('/health', async (req, res) => {
       nodeVersion: process.version,
       uptimeSeconds: Math.floor((Date.now() - (watchdogReport.uptime || Date.now())) / 1000),
       memoryMB: watchdogReport.memory?.rssMB || 0,
-      dbConnected: typeof db.pool !== 'undefined',
+      dbConnected: typeof db.getDb === 'function' && db.getDb() != null,
       keys: {
         openrouter: process.env.OPENROUTER_API_KEY ? 'set' : 'missing',
         google: config.google.clientId ? 'set' : 'missing',
