@@ -1025,7 +1025,25 @@ router.get('/health', async (req, res) => {
   }
   try {
     const { getHealthReport } = require('../services/healthWatchdog');
-    res.json(getHealthReport());
+    const db = require('../db');
+    const config = require('../config');
+    const watchdogReport = getHealthReport();
+    
+    // Supplement with specific fields expected by SettingsPage.jsx
+    res.json({
+      ...watchdogReport,
+      env: process.env.NODE_ENV || 'development',
+      nodeVersion: process.version,
+      uptimeSeconds: Math.floor((Date.now() - (watchdogReport.uptime || Date.now())) / 1000),
+      memoryMB: watchdogReport.memory?.rssMB || 0,
+      dbConnected: typeof db.pool !== 'undefined',
+      keys: {
+        openrouter: process.env.OPENROUTER_API_KEY ? 'set' : 'missing',
+        google: config.google.clientId ? 'set' : 'missing',
+        stripe: config.stripe.secretKey ? 'set' : 'missing',
+        elevenlabs: process.env.ELEVENLABS_API_KEY ? 'set' : 'missing',
+      }
+    });
   } catch (err) {
     res.status(500).json({ error: 'Health watchdog not available: ' + err.message });
   }
