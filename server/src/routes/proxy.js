@@ -198,25 +198,6 @@ router.get('/', async (req, res) => {
       html = html.replace(/<meta[^>]+http-equiv=["']?refresh["']?[^>]*>/gi, ''); // Prevent auto-redirects out of proxy
       html = html.replace(/<meta[^>]+name=["']?viewport["']?[^>]*>/gi, ''); // Let our CSS handle scaling if needed
 
-      // Neutralize JavaScript frame-busting code.
-      // Many sites (Google, Facebook, etc.) have JS that checks:
-      //   if (top !== self) top.location = self.location;
-      // We inject a script BEFORE everything else that overrides `top`
-      // to point to `self`, so the check passes silently.
-      const frameBustNeutralizer = `<script>
-try {
-  // Override top/parent references so frame-busting JS thinks it's the top window
-  Object.defineProperty(window, 'top', { get: function() { return window.self; }, configurable: false });
-  Object.defineProperty(window, 'parent', { get: function() { return window.self; }, configurable: false });
-} catch(e) {}
-</script>`;
-      // Inject neutralizer as early as possible (before <head> content)
-      if (html.includes('<head')) {
-        html = html.replace(/(<head[^>]*>)/i, `$1${frameBustNeutralizer}`);
-      } else {
-        html = frameBustNeutralizer + html;
-      }
-
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       res.send(html);
     } else {
