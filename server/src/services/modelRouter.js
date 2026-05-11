@@ -1,107 +1,174 @@
 'use strict';
 
 // ─────────────────────────────────────────────────────────────────
-// Smart Model Router — TOP 3 free models only.
+// Smart Model Router v2 — Dual-provider for rate-limit resilience.
 //
-// Each model is the undisputed #1 at its job. Zero cost.
+// PRIMARY: Google AI Studio direct (30 RPM free, no OpenRouter)
+// BACKUP:  OpenRouter free models (16 RPM combined limit)
 //
-// ┌──────────────────────┬──────────────────────────────────────────┐
-// │ Task                 │ Model                                    │
-// ├──────────────────────┼──────────────────────────────────────────┤
-// │ Chat + Tools + Voice │ Ring-2.6-1T  (63B active, #1 agentic)   │
-// │ Coding               │ Qwen3 Coder  (35B active, #1 coding)    │
-// │ Vision / Camera      │ Gemma 4 31B  (only free with vision)    │
-// └──────────────────────┴──────────────────────────────────────────┘
+// Why dual-provider: OpenRouter free tier is capped at 16 req/min
+// for ALL free models combined. An agentic system with tool loops
+// blows through that in seconds. Google AI Studio's free tier is
+// much more generous (30 RPM for Flash, 1500 RPD).
 // ─────────────────────────────────────────────────────────────────
 
-const MODELS = {
-  // #1 — Main brain: chat, tools, reasoning, voice pipeline
-  // 1T params, 63B active, 262K context, 66K output, adaptive thinking
-  chat: process.env.MODEL_CHAT || 'inclusionai/ring-2.6-1t:free',
+// Google AI Studio endpoint (direct, no OpenRouter middleman)
+const GOOGLE_AI_STUDIO = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
 
-  // #2 — Coding specialist: ask_expert_coder, thinking_mode, deep_search code
-  // 480B params, 35B active, 262K context, SWE-bench top performer
+const MODELS = {
+  // Primary: Nemotron 3 Super (fastest, most reliable on OpenRouter free)
+  // Falls back to: Ring-2.6-1T → Qwen3 Coder
+  chat: process.env.MODEL_CHAT || 'nvidia/nemotron-3-super-120b-a12b:free',
+
+  // Coding specialist
   coder: process.env.MODEL_CODER || 'qwen/qwen3-coder:free',
 
-  // #3 — Vision: camera frames, image analysis
-  // 31B dense, native multimodal, structured output
+  // Vision: camera frames, image analysis
   vision: process.env.MODEL_VISION || 'google/gemma-4-31b-it:free',
 };
 
-// Fallback: if primary model is rate-limited, try the next best
-const FALLBACK = {
-  chat:   ['inclusionai/ring-2.6-1t:free', 'qwen/qwen3-coder:free'],
-  coder:  ['qwen/qwen3-coder:free', 'inclusionai/ring-2.6-1t:free'],
+// OpenRouter fallback models (used when Google AI Studio is unavailable)
+const OPENROUTER_FALLBACK = {
+  chat:   ['nvidia/nemotron-3-super-120b-a12b:free', 'inclusionai/ring-2.6-1t:free', 'qwen/qwen3-coder:free'],
+  coder:  ['qwen/qwen3-coder:free', 'nvidia/nemotron-3-super-120b-a12b:free', 'inclusionai/ring-2.6-1t:free'],
   vision: ['google/gemma-4-31b-it:free', 'google/gemma-4-27b-it:free'],
 };
 
 /**
  * Get the optimal model for a task type.
  * @param {'chat'|'coder'|'vision'} taskType
- * @returns {string} OpenRouter model ID
+ * @returns {string} Model ID
  */
 function getModel(taskType) {
   return MODELS[taskType] || MODELS.chat;
 }
 
 /**
+ * Get the API endpoint and auth for a model.
+ * If GOOGLE_API_KEY is set and model is a Gemini model, use AI Studio directly.
+ * Otherwise, use OpenRouter.
+ *
+ * @param {string} model - Model ID
+ * @returns {{ url: string, authHeader: string, provider: string }}
+ */
+function getEndpoint(model) {
+  const googleKey = process.env.GOOGLE_API_KEY;
+  const isGeminiModel = model.startsWith('gemini');
+
+  if (googleKey && isGeminiModel) {
+    return {
+      url: GOOGLE_AI_STUDIO,
+      authHeader: `Bearer ${googleKey}`,
+      provider: 'google-ai-studio',
+    };
+  }
+
+  // Fall back to OpenRouter
+  return {
+    url: 'https://openrouter.ai/api/v1/chat/completions',
+    authHeader: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+    provider: 'openrouter',
+  };
+}
+
+/**
  * Get fallback chain for rate-limit resilience.
  * @param {'chat'|'coder'|'vision'} taskType
- * @returns {string[]}
+ * @returns {string[]} OpenRouter model IDs to try
  */
 function getFallbackChain(taskType) {
-  return FALLBACK[taskType] || FALLBACK.chat;
+  return OPENROUTER_FALLBACK[taskType] || OPENROUTER_FALLBACK.chat;
 }
 
 /**
  * Auto-detect: is this message a coding task?
- * Used by ask_expert_coder and thinking_mode to pick coder model.
  */
 function isCodingTask(msg) {
   if (!msg) return false;
-  const m = msg.toLowerCase();
-  return /\b(cod[e]?|script|funcți[ei]|debug|refactor|implement|api|endpoint|bug|error|class|component|python|javascript|typescript|react|node|sql|html|css|java|rust|algorithm)\b/i.test(m);
+  return /\b(cod[e]?|script|funcți[ei]|debug|refactor|implement|api|endpoint|bug|error|class|component|python|javascript|typescript|react|node|sql|html|css|java|rust|algorithm)\b/i.test(msg.toLowerCase());
 }
 
 /**
- * Fetch with automatic fallback through the chain.
- * On 429/5xx, retries with next model in chain.
+ * Make an API call with automatic provider selection + fallback.
+ * 1. Try Google AI Studio (if GOOGLE_API_KEY set)
+ * 2. If rate limited or error, try OpenRouter fallback chain
  *
- * @param {string} taskType - 'chat', 'coder', or 'vision'
- * @param {function(model: string): Promise<Response>} fetchFn - function that takes model ID and returns fetch promise
- * @returns {Promise<{response: Response, model: string}>}
+ * @param {'chat'|'coder'|'vision'} taskType
+ * @param {object} body - Request body (messages, tools, etc.)
+ * @returns {Promise<{response: Response, model: string, provider: string}>}
  */
-async function fetchWithFallback(taskType, fetchFn) {
-  const chain = getFallbackChain(taskType);
-  const errors = [];
+async function smartFetch(taskType, body) {
+  const model = getModel(taskType);
+  const endpoint = getEndpoint(model);
 
-  for (const model of chain) {
+  console.log(`[modelRouter] ${taskType} → ${model} via ${endpoint.provider}`);
+
+  // Try primary provider
+  try {
+    const response = await fetch(endpoint.url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': endpoint.authHeader,
+        'HTTP-Referer': 'https://kelion.ai',
+        'X-Title': 'Kelion AI',
+      },
+      body: JSON.stringify({ ...body, model }),
+    });
+
+    if (response.ok) {
+      return { response, model, provider: endpoint.provider };
+    }
+
+    console.warn(`[modelRouter] ${model} via ${endpoint.provider} failed: ${response.status}`);
+  } catch (err) {
+    console.warn(`[modelRouter] ${model} via ${endpoint.provider} error: ${err.message}`);
+  }
+
+  // Fallback to OpenRouter chain
+  const chain = getFallbackChain(taskType);
+  const orKey = process.env.OPENROUTER_API_KEY;
+  if (!orKey) throw new Error('No OPENROUTER_API_KEY for fallback');
+
+  for (let i = 0; i < chain.length; i++) {
+    const fbModel = chain[i];
+
+    // Wait before retry (1s, 2s, 3s)
+    const waitMs = Math.min(1000 * (i + 1), 3000);
+    console.log(`[modelRouter] Fallback ${i + 1}/${chain.length}: ${fbModel} (wait ${waitMs}ms)`);
+    await new Promise(resolve => setTimeout(resolve, waitMs));
+
     try {
-      const response = await fetchFn(model);
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${orKey}`,
+          'HTTP-Referer': 'https://kelion.ai',
+          'X-Title': 'Kelion AI',
+        },
+        body: JSON.stringify({ ...body, model: fbModel }),
+      });
+
       if (response.ok) {
-        return { response, model };
+        console.log(`[modelRouter] Fallback ${fbModel} succeeded!`);
+        return { response, model: fbModel, provider: 'openrouter' };
       }
-      if (response.status === 429 || response.status >= 500) {
-        errors.push(`${model}: HTTP ${response.status}`);
-        console.warn(`[modelRouter] ${model} returned ${response.status}, trying next...`);
-        continue;
-      }
-      // 4xx (not 429) — model-specific error, return as-is
-      return { response, model };
+      console.warn(`[modelRouter] Fallback ${fbModel} failed: ${response.status}`);
     } catch (err) {
-      errors.push(`${model}: ${err.message}`);
-      console.warn(`[modelRouter] ${model} failed: ${err.message}, trying next...`);
+      console.warn(`[modelRouter] Fallback ${fbModel} error: ${err.message}`);
     }
   }
 
-  throw new Error(`All models failed: ${errors.join(' | ')}`);
+  throw new Error(`All models exhausted for ${taskType}`);
 }
 
 module.exports = {
   MODELS,
-  FALLBACK,
+  OPENROUTER_FALLBACK,
   getModel,
+  getEndpoint,
   getFallbackChain,
-  fetchWithFallback,
+  smartFetch,
   isCodingTask,
 };

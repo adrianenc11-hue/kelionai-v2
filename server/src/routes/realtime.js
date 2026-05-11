@@ -1985,27 +1985,48 @@ router.post('/pipeline', async (req, res) => {
         body: JSON.stringify(reqBody),
       });
 
-      // If out of credits, fallback to free model
-      if (!r.ok && r.status === 402 && !fallbackTriggered) {
-        console.warn('[pipeline] OpenRouter 402 Payment Required. Falling back to free model.');
+      // If out of credits (402) or rate-limited (429), try fallback chain
+      if (!r.ok && (r.status === 402 || r.status === 429) && !fallbackTriggered) {
+        const errBody = await r.text().catch(() => '');
+        console.warn(`[pipeline] OpenRouter ${r.status}. Trying fallback chain... Error: ${errBody.slice(0, 200)}`);
         fallbackTriggered = true;
+
         const { getFallbackChain: getPipelineFallback } = require('../services/modelRouter');
         const pipelineFallbacks = getPipelineFallback('chat');
-        currentModel = pipelineFallbacks[1] || pipelineFallbacks[0]; // Use second in chain as fallback
-        console.log(`[pipeline] Rate limited → fallback: ${currentModel}`);
-        reqBody.model = currentModel;
 
-        // Retry with free model
-        r = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${openRouterKey}`,
-            'HTTP-Referer': 'https://kelion.ai',
-            'X-Title': 'Kelion AI'
-          },
-          body: JSON.stringify(reqBody),
-        });
+        // Try each model in the fallback chain
+        for (let i = 0; i < pipelineFallbacks.length; i++) {
+          const fbModel = pipelineFallbacks[i];
+          if (fbModel === currentModel && i === 0) continue; // Skip the one that just failed
+
+          // Wait before retry (exponential backoff: 1s, 2s, 4s)
+          const waitMs = Math.min(1000 * Math.pow(2, i), 4000);
+          console.log(`[pipeline] Fallback ${i + 1}/${pipelineFallbacks.length}: ${fbModel} (wait ${waitMs}ms)`);
+          await new Promise(resolve => setTimeout(resolve, waitMs));
+
+          currentModel = fbModel;
+          reqBody.model = currentModel;
+
+          try {
+            r = await fetch(url, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${openRouterKey}`,
+                'HTTP-Referer': 'https://kelion.ai',
+                'X-Title': 'Kelion AI'
+              },
+              body: JSON.stringify(reqBody),
+            });
+            if (r.ok) {
+              console.log(`[pipeline] Fallback ${fbModel} succeeded!`);
+              break;
+            }
+            console.warn(`[pipeline] Fallback ${fbModel} also failed: ${r.status}`);
+          } catch (fbErr) {
+            console.error(`[pipeline] Fallback ${fbModel} error:`, fbErr.message);
+          }
+        }
       }
 
       if (!r.ok) {

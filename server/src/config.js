@@ -45,8 +45,8 @@ module.exports = {
     clientSecret: optional('GOOGLE_CLIENT_SECRET'),
     redirectUri: optional('GOOGLE_REDIRECT_URI', ''),
     apiKey: optional('GOOGLE_API_KEY'),
-    chatModel: optional('GOOGLE_CHAT_MODEL', 'inclusionai/ring-2.6-1t:free'),
-    liveModel: optional('GOOGLE_LIVE_MODEL', 'inclusionai/ring-2.6-1t:free'),
+    chatModel: optional('GOOGLE_CHAT_MODEL', 'nvidia/nemotron-3-super-120b-a12b:free'),
+    liveModel: optional('GOOGLE_LIVE_MODEL', 'nvidia/nemotron-3-super-120b-a12b:free'),
     ttsModel: optional('GOOGLE_TTS_MODEL', 'google/gemma-4-31b-it:free'),
     ttsVoiceKelion: optional('GOOGLE_TTS_VOICE_KELION', 'Kore'),
     // All models are :free — always free mode
