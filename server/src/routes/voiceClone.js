@@ -670,6 +670,19 @@ router.post('/tts', async (req, res) => {
     return res.status(500).json({ error: 'Nu s-a găsit nicio voce masculină disponibilă în ElevenLabs.' });
   }
 
+  // Map detected language to ElevenLabs language_code format.
+  // Without this, eleven_multilingual_v2 defaults to English pronunciation
+  // rules even for Romanian text, causing mangled technical terms.
+  const ELEVENLABS_LANG_CODES = {
+    ro: 'ro', en: 'en', es: 'es', fr: 'fr', de: 'de', it: 'it',
+    pt: 'pt', nl: 'nl', pl: 'pl', sv: 'sv', da: 'da', no: 'no',
+    fi: 'fi', cs: 'cs', hu: 'hu', el: 'el', tr: 'tr', ru: 'ru',
+    uk: 'uk', ar: 'ar', hi: 'hi', ja: 'ja', ko: 'ko', zh: 'zh',
+    bg: 'bg', hr: 'hr', sk: 'sk', sl: 'sl',
+  };
+  const detectedLang = (lang || 'en').toLowerCase().split('-')[0];
+  const elLangCode = ELEVENLABS_LANG_CODES[detectedLang] || detectedLang;
+
   // Helper to call TTS with a given voiceId
   async function callTTS(vid) {
     return fetch(
@@ -684,6 +697,11 @@ router.post('/tts', async (req, res) => {
         body: JSON.stringify({
           text: text.trim().slice(0, 5000),
           model_id: 'eleven_multilingual_v2',
+          // Explicit language_code ensures correct pronunciation rules.
+          // Without this, ElevenLabs defaults to English pronunciation
+          // even when the text is in Romanian — Adrian: "termenii tehnici
+          // trebuiesc pronunțați corect".
+          language_code: elLangCode,
           voice_settings: {
             stability: 0.4,
             similarity_boost: 0.85,
