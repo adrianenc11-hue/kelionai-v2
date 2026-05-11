@@ -3708,7 +3708,7 @@ async function toolReadCalendar(args, ctx) {
   if (!process.env.MCP_ENABLED) return { ok: false, unavailable: true, error: 'MCP integrations are not enabled on this server.' };
   const connected = await googleMcp.hasGoogleConnection(ctx.user.id);
   if (!connected) {
-    const url = googleMcp.getConnectUrl(ctx.user.id);
+    const { url } = googleMcp.getConnectUrl(ctx.user.id);
     return { ok: false, error: `Google account not connected. Connect at: ${url}`, connectUrl: url };
   }
   try {
@@ -3743,7 +3743,7 @@ async function toolReadEmail(args, ctx) {
   if (!process.env.MCP_ENABLED) return { ok: false, unavailable: true, error: 'MCP integrations are not enabled on this server.' };
   const connected = await googleMcp.hasGoogleConnection(ctx.user.id);
   if (!connected) {
-    const url = googleMcp.getConnectUrl(ctx.user.id);
+    const { url } = googleMcp.getConnectUrl(ctx.user.id);
     return { ok: false, error: `Google account not connected. Connect at: ${url}`, connectUrl: url };
   }
   try {
@@ -3760,7 +3760,7 @@ async function toolSearchFiles(args, ctx) {
   if (!process.env.MCP_ENABLED) return { ok: false, unavailable: true, error: 'MCP integrations are not enabled on this server.' };
   const connected = await googleMcp.hasGoogleConnection(ctx.user.id);
   if (!connected) {
-    const url = googleMcp.getConnectUrl(ctx.user.id);
+    const { url } = googleMcp.getConnectUrl(ctx.user.id);
     return { ok: false, error: `Google account not connected. Connect at: ${url}`, connectUrl: url };
   }
   try {
@@ -4880,7 +4880,7 @@ async function toolMcpProtocol(args, ctx) {
     }
 
     case 'connect': {
-      const url = googleMcpMod.getConnectUrl(userId);
+      const { url } = googleMcpMod.getConnectUrl(userId);
       return { ok: true, connect_url: url, instruction: 'Open this URL to connect your Google account.' };
     }
 

@@ -173,7 +173,17 @@ const googleMcp = require('../services/googleMcp');
 router.get('/mcp/connect', async (req, res) => {
   const user = await peekUser(req);
   if (!user) return res.status(401).send('Not signed in');
-  const url = googleMcp.getConnectUrl(user.id);
+  const { url, nonce } = googleMcp.getConnectUrl(user.id);
+  // Security audit 2026-05-11 (C2): store the CSRF nonce in an httpOnly
+  // cookie so the callback can validate that the OAuth redirect came from
+  // the same browser session that initiated it.
+  res.cookie('kelion.mcp_state', nonce, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 10 * 60 * 1000, // 10 min — plenty for the OAuth round-trip
+    path: '/',
+  });
   res.redirect(url);
 });
 
@@ -186,7 +196,7 @@ router.post('/mcp/calendar', async (req, res) => {
   
   const connected = await googleMcp.hasGoogleConnection(user.id);
   if (!connected) {
-    const url = googleMcp.getConnectUrl(user.id);
+    const { url } = googleMcp.getConnectUrl(user.id);
     return res.status(200).json({ ok: false, error: `Your Google account is not connected yet. Visit this link to connect: ${url}`, connectUrl: url });
   }
   
@@ -209,7 +219,7 @@ router.post('/mcp/email', async (req, res) => {
   
   const connected = await googleMcp.hasGoogleConnection(user.id);
   if (!connected) {
-    const url = googleMcp.getConnectUrl(user.id);
+    const { url } = googleMcp.getConnectUrl(user.id);
     return res.status(200).json({ ok: false, error: `Your Google account is not connected yet. Visit this link to connect: ${url}`, connectUrl: url });
   }
   
@@ -232,7 +242,7 @@ router.post('/mcp/files', async (req, res) => {
   
   const connected = await googleMcp.hasGoogleConnection(user.id);
   if (!connected) {
-    const url = googleMcp.getConnectUrl(user.id);
+    const { url } = googleMcp.getConnectUrl(user.id);
     return res.status(200).json({ ok: false, error: `Your Google account is not connected yet. Visit this link to connect: ${url}`, connectUrl: url });
   }
   

@@ -1978,7 +1978,7 @@ export default function KelionStage() {
             metrics overlay, same as the overflow menu entry. */}
         {authState.signedIn && isAdmin && (
           <button
-            onClick={() => switchAdminTab('business')}
+            onClick={() => window.location.assign('/admin')}
             style={{
               height: 36, padding: '0 12px', borderRadius: 999,
               background: 'linear-gradient(135deg, rgba(250, 204, 21, 0.18), rgba(167, 139, 250, 0.18))',
@@ -1992,7 +1992,7 @@ export default function KelionStage() {
             aria-label="Open admin dashboard"
           >
             <span style={{ fontSize: 14 }}>🛡️</span>
-            <span>Admin · 8</span>
+            <span>Admin Dashboard</span>
           </button>
         )}
         <button

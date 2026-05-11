@@ -4,6 +4,7 @@
 // Uses Google REST APIs directly (no googleapis dependency).
 // Per-user OAuth tokens stored in DB (google_tokens table).
 
+const crypto = require('crypto');
 const config = require('../config');
 
 // DB access — db/index.js exports `getDb` which is the module-level
@@ -206,12 +207,19 @@ async function listDriveFiles(userId, { maxResults = 10, query = '' } = {}) {
 
 // ── OAuth Connect URL ───────────────────────────────────────────
 
+// Security audit 2026-05-11 (C2): getConnectUrl now returns { url, nonce }
+// so the caller can set the nonce as an httpOnly cookie. The callback route
+// validates the cookie against the returned state to prevent CSRF.
 function getConnectUrl(userId) {
   const scopes = [
     'https://www.googleapis.com/auth/calendar.readonly',
     'https://www.googleapis.com/auth/gmail.readonly',
     'https://www.googleapis.com/auth/drive.readonly',
   ].join(' ');
+
+  // State = "userId:random" — the callback splits on `:` to extract userId
+  // and validates the full string against the httpOnly cookie.
+  const nonce = `${userId}:${crypto.randomBytes(16).toString('hex')}`;
 
   const params = new URLSearchParams({
     client_id: config.google.clientId,
@@ -220,10 +228,10 @@ function getConnectUrl(userId) {
     scope: scopes,
     access_type: 'offline',
     prompt: 'consent',
-    state: String(userId),
+    state: nonce,
   });
 
-  return `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
+  return { url: `https://accounts.google.com/o/oauth2/v2/auth?${params}`, nonce };
 }
 
 async function exchangeCode(code, userId) {

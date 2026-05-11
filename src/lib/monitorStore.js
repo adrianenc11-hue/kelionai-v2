@@ -79,6 +79,23 @@ function isNonEmbeddableHost(host) {
   );
 }
 
+// Detect whether a URL points to kelionai.app itself (any path).
+// Loading ourselves on the monitor creates an infinite Droste loop
+// (the embedded page renders another monitor which loads itself…).
+// This must be blocked at the store level so it never reaches the
+// iframe / proxy path at all.
+function isSelfUrl(url) {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, '').toLowerCase();
+    if (typeof window !== 'undefined') {
+      const currentHost = window.location.hostname.replace(/^www\./, '').toLowerCase();
+      return host === currentHost;
+    }
+    // Server-side fallback: match the known production hostname
+    return host === 'kelionai.app';
+  } catch { return false; }
+}
+
 function requiresExternalTab(url) {
   try {
     const host = new URL(url).hostname.toLowerCase();
@@ -113,6 +130,12 @@ function loadPersisted() {
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== 'object') return;
     if (!parsed.src || !parsed.kind) return;
+    // Never restore a self-referencing URL from persistence —
+    // it would re-create the Droste loop on every page load.
+    if (isSelfUrl(parsed.src)) {
+      window.localStorage.removeItem(STORAGE_KEY);
+      return;
+    }
     const updatedAt = Number(parsed.updatedAt) || 0;
     if (!updatedAt || Date.now() - updatedAt > MAX_AGE_MS) {
       window.localStorage.removeItem(STORAGE_KEY);
@@ -678,6 +701,8 @@ L.marker([${lat},${lon}]).addTo(map).bindPopup(${JSON.stringify(name)}).openPopu
     case 'web': {
       const src = safeUrl(q);
       if (!src) return null;
+      // CRITICAL: never embed ourselves — causes infinite Droste loop
+      if (isSelfUrl(src)) return null;
       let label = src;
       try { label = new URL(src).hostname.replace(/^www\./, ''); } catch { /* ignore */ }
       // Only truly cross-origin-isolated sites need a real tab;
