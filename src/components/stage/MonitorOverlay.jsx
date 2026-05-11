@@ -328,11 +328,7 @@ function MonitorOverlay() {
               playsInline
               style={{ width: '100%', height: '100%', maxHeight: '100%', outline: 'none', background: '#000' }}
               onError={() => {
-<<<<<<< HEAD
-                try { console.warn('[monitor] video failed to load', finalSrc) } catch (_) { }
-=======
                 try { console.warn('[monitor] video failed to load', finalSrc) } catch (_) {}
->>>>>>> 895f20ae8c0f89e1ad4cf58ed3a4649e8c280b80
               }}
             >
               <source src={finalSrc} />
@@ -393,11 +389,7 @@ function MonitorOverlay() {
                 outline: 'none',
               }}
               onError={() => {
-<<<<<<< HEAD
-                try { console.warn('[monitor] audio element failed to play', finalSrc) } catch (_) { }
-=======
                 try { console.warn('[monitor] audio element failed to play', finalSrc) } catch (_) {}
->>>>>>> 895f20ae8c0f89e1ad4cf58ed3a4649e8c280b80
               }}
             >
               Your browser does not support the audio element.
@@ -509,11 +501,7 @@ function MonitorOverlay() {
             src={finalSrc}
             title={m.title || 'Kelion monitor'}
             onBlocked={() => {
-<<<<<<< HEAD
-              try { console.warn('[monitor] iframe never loaded — likely CSP/XFO block', finalSrc) } catch (_) { }
-=======
               try { console.warn('[monitor] iframe never loaded — likely CSP/XFO block', finalSrc) } catch (_) {}
->>>>>>> 895f20ae8c0f89e1ad4cf58ed3a4649e8c280b80
               setIframeBlocked(true)
             }}
           />
