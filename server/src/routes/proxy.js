@@ -24,7 +24,7 @@ const STREAM_HEADER_TIMEOUT_MS = 15_000;
 const ratemap = new Map();
 function rateLimit(ip) {
   const now = Date.now();
-  const max = 30;
+  const max = 300; // Increased to 300 to allow complex pages with many subresources
   let entry = ratemap.get(ip);
   if (!entry || now - entry.start > WINDOW_MS) {
     entry = { start: now, count: 0 };
@@ -121,6 +121,11 @@ async function assertPublicUrl(targetUrl) {
 }
 
 router.get('/', async (req, res) => {
+  // Always set permissive CORS early so even errors (429, 400) don't trigger browser CORS warnings
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', '*');
+
   const ip = (req.headers['x-forwarded-for'] || req.ip || '').toString().split(',')[0].trim();
 
   if (!rateLimit(ip)) {
@@ -171,9 +176,6 @@ router.get('/', async (req, res) => {
     // Add permissive headers so the iframe works.
     res.setHeader('X-Frame-Options', 'ALLOWALL');
     res.setHeader('Content-Security-Policy', "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; frame-ancestors *;");
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', '*');
     res.setHeader('X-Content-Type-Options', 'none');
 
     const contentType = (upstream.headers.get('content-type') || '').toLowerCase();
