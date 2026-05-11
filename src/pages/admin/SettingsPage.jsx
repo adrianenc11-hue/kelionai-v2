@@ -70,12 +70,107 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      <WhatsAppBridgeCard toast={toast} />
+
       <div className="admin-card">
         <div className="admin-card-title" style={{ marginBottom: 16 }}>📥 Export Date</div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <ExportBtn label="Export Utilizatori CSV" path="/api/admin/export/users.csv" />
           <ExportBtn label="Export Tranzacții CSV" path="/api/admin/export/transactions.csv" />
         </div>
+      </div>
+    </div>
+  )
+}
+
+function WhatsAppBridgeCard({ toast }) {
+  const [waStatus, setWaStatus] = useState('checking')
+  const [qrCode, setQrCode] = useState(null)
+  const [stats, setStats] = useState(null)
+
+  const fetchStatus = async () => {
+    try {
+      const r = await fetch('/api/whatsapp/status', { credentials: 'include' })
+      if (r.ok) {
+        const data = await r.json()
+        setWaStatus(data.status)
+        setQrCode(data.qrCode)
+        setStats(data.stats)
+      }
+    } catch (_) {}
+  }
+
+  useEffect(() => {
+    fetchStatus()
+    // Poll status if pending QR
+    const iv = setInterval(() => {
+      fetchStatus()
+    }, 3000)
+    return () => clearInterval(iv)
+  }, [])
+
+  const handleConnect = async () => {
+    setWaStatus('connecting...')
+    try {
+      const r = await fetch('/api/whatsapp/connect', { method: 'POST', credentials: 'include' })
+      const data = await r.json()
+      if (r.ok) {
+        toast(`WhatsApp: ${data.message}`)
+        fetchStatus()
+      } else {
+        toast(`Eroare: ${data.error}`, 'error')
+      }
+    } catch (e) {
+      toast('Eroare rețea', 'error')
+    }
+  }
+
+  const handleDisconnect = async () => {
+    try {
+      await fetch('/api/whatsapp/logout', { method: 'POST', credentials: 'include' })
+      toast('Sesiune WhatsApp ștearsă')
+      fetchStatus()
+    } catch (_) {}
+  }
+
+  return (
+    <div className="admin-card">
+      <div className="admin-card-title" style={{ marginBottom: 16 }}>📱 WhatsApp Bridge</div>
+      <div style={{ fontSize: 13, marginBottom: 16, color: 'var(--admin-text-dim)' }}>
+        Conectează Kelion la WhatsApp prin scanarea codului QR. Kelion va răspunde în chat-uri private și grupuri atunci când este menționat și va funcționa ca translator automat.
+      </div>
+      
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+        <span className={`admin-badge ${waStatus === 'ready' ? 'green' : waStatus === 'error' ? 'red' : 'amber'}`}>
+          Status: {waStatus}
+        </span>
+        {waStatus === 'ready' && stats && (
+          <span style={{ fontSize: 12, color: 'var(--admin-text-dim)' }}>
+            Mesaje: {stats.messagesReceived} | Răspunsuri: {stats.responseSent}
+          </span>
+        )}
+      </div>
+
+      {qrCode && waStatus === 'qr_pending' && (
+        <div style={{ marginBottom: 16, background: 'white', padding: 12, borderRadius: 8, display: 'inline-block' }}>
+          <img src={qrCode} alt="WhatsApp QR Code" style={{ width: 250, height: 250 }} />
+          <div style={{ color: '#000', fontSize: 12, textAlign: 'center', marginTop: 8, fontWeight: 500 }}>
+            Scanează din WhatsApp → Linked Devices
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: 8 }}>
+        {waStatus !== 'ready' && waStatus !== 'qr_pending' && (
+          <button className="admin-btn" style={{ background: 'var(--admin-green)', color: 'white', border: 'none' }} onClick={handleConnect}>
+            🔗 Generează QR / Conectează
+          </button>
+        )}
+        {(waStatus === 'ready' || waStatus === 'qr_pending') && (
+          <button className="admin-btn" style={{ background: 'var(--admin-red)', color: 'white', border: 'none' }} onClick={handleDisconnect}>
+            🛑 Deconectează
+          </button>
+        )}
       </div>
     </div>
   )
