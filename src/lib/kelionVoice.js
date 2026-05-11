@@ -903,8 +903,8 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
         setTrial(null)
       }
 
-      if (tokenBody?.model?.includes('gemini') || tokenBody?.model?.includes('google')) {
-        // OpenRouter REST Voice Mode
+      if (resolvedBackend === 'openrouter' || (!token && !setupPayload)) {
+        // REST Voice Mode — server returned no ephemeral token (OpenRouter, Claude, etc.)
         console.log('[kelionVoice] OpenRouter model detected, switching to REST Voice Mode');
         // We MUST NOT stop micStreamRef.current here because if the soundbars are flat,
         // the user thinks the app is dead and clicks the button again!
