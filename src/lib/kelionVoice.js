@@ -174,6 +174,14 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
   const hiddenVideoCameraRef = useRef(null)
   const hiddenVideoScreenRef = useRef(null)
   const frameCanvasRef = useRef(null)
+  // Smart Vision (M9 adaptive FPS): dynamic target 2..10 FPS based on
+  // motion detection + conversational context.
+  const visionFPSRef = useRef(2)
+  const visionLastBoostAtRef = useRef(0)
+  const visionLastMotionDataRef = useRef(null)
+  const motionCanvasRef = useRef(null)
+  const toolExecutingRef = useRef(false)
+
   // Tool-call loop guard — detects when the model repeatedly calls the same
   // tool with the same args (infinite loop). After MAX_REPEATS identical
   // calls within WINDOW_MS, we return an error telling the model to stop.
@@ -600,6 +608,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
     // /api/tools/* backend endpoint, then send back a toolResponse with the
     // matching id so the model can continue the turn with the result.
     if (msg.toolCall?.functionCalls?.length) {
+      toolExecutingRef.current = true
       setStatus('working')
       const fcs = msg.toolCall.functionCalls
       // Suppress narration during tool execution — the cooldown prevents
@@ -640,6 +649,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
         }))
         if (ws && ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({ toolResponse: { functionResponses: responses } }))
+          toolExecutingRef.current = false
         }
       } catch (err) {
         console.error('[kelionVoice] tool execution failed', err)
@@ -653,6 +663,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
               })),
             },
           }))
+          toolExecutingRef.current = false
         }
       }
     }
@@ -1256,17 +1267,10 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
     video.srcObject = stream
     video.play().catch(() => {})
 
-    // Performance-optimised frame rate (2026-05-06). 4fps camera is
-    // sufficient for the AI to track motion; the model processes one
-    // frame at a time. When frames ARE sent, they go at FULL QUALITY
-    // (1024px, JPEG 0.78) so the model has maximum capability.
-    // Screen share at 2fps (mostly static content).
-    const TARGET_FPS = kind === 'screen' ? 2 : 4
-    const MIN_INTERVAL_MS = Math.floor(1000 / TARGET_FPS)
-    // Full quality — when vision is active, give the model the best
-    // data possible for accurate analysis.
-    const MAX_W = kind === 'screen' ? 1280 : 1024
-    const JPEG_Q = kind === 'screen' ? 0.75 : 0.78
+    // Smart Vision (M9 adaptive FPS): dynamic target 2..8 FPS based on
+    // motion detection + conversational context. Screen share stays at 2 FPS.
+    const MAX_W = 1280
+    const JPEG_Q = kind === 'screen' ? 0.75 : 0.85
     const BACKPRESSURE_BYTES = 2_000_000
 
     let busy = false
@@ -1281,12 +1285,37 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
         const scale = Math.min(1, MAX_W / video.videoWidth)
         canvas.width = Math.floor(video.videoWidth * scale)
         canvas.height = Math.floor(video.videoHeight * scale)
-        const ctx = canvas.getContext('2d')
+        const ctx = canvas.getContext('2d', { alpha: false }) // Optimisation
         try {
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
         } catch {
           return
         }
+
+        // --- Motion Detection (Lightweight 16x16 thumbnail) ---
+        if (kind === 'camera') {
+          if (!motionCanvasRef.current) motionCanvasRef.current = document.createElement('canvas')
+          const mc = motionCanvasRef.current
+          mc.width = 16; mc.height = 16
+          const mctx = mc.getContext('2d', { willReadFrequently: true })
+          mctx.drawImage(video, 0, 0, 16, 16)
+          const currentData = mctx.getImageData(0, 0, 16, 16).data
+          
+          if (visionLastMotionDataRef.current) {
+            let diff = 0
+            const prevData = visionLastMotionDataRef.current
+            // Sample red channel every pixel for speed
+            for (let i = 0; i < currentData.length; i += 4) {
+              diff += Math.abs(currentData[i] - prevData[i])
+            }
+            // If significant change (> 5% avg pixel diff), boost vision
+            if (diff > 800) { 
+               visionLastBoostAtRef.current = Date.now()
+            }
+          }
+          visionLastMotionDataRef.current = currentData
+        }
+
         const blob = await new Promise((res) => canvas.toBlob(res, 'image/jpeg', JPEG_Q))
         if (!blob) return
         const buf = await blob.arrayBuffer()
@@ -1294,29 +1323,46 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
         const b64 = base64FromBytes(bytes)
         ws.send(JSON.stringify({
           realtimeInput: {
-            // `video` is the live-video channel (continuous). Previously we
-            // used `mediaChunks` which the Live API treats as discrete image
-            // attachments (snapshots), which is exactly what broke the
-            // "live" feel Adrian reported.
             video: { data: b64, mimeType: 'image/jpeg' },
           },
         }))
       } catch (e) {
         console.warn('[kelionVoice] frame send failed', e)
       } finally {
+        busy = true // Wait for small delay before next frame
         busy = false
       }
     }
 
-    const timerId = setInterval(send, MIN_INTERVAL_MS)
-    if (kind === 'camera') cameraFrameTimerRef.current = timerId
-    else screenFrameTimerRef.current = timerId
+    const loop = async () => {
+      // Decide FPS
+      let fps = 2
+      const now = Date.now()
+      if (kind === 'camera') {
+        // If the AI is busy executing a tool (writing code, running commands),
+        // we don't need a high-FPS video feed. Slow down to 1 frame every 2s
+        // to maximize cost savings while keeping the session alive.
+        if (toolExecutingRef.current) fps = 0.5
+        // Boost if recently moved (Smart Vision)
+        else if (now < visionLastBoostAtRef.current + 4000) fps = 8
+        // Boost if AI is active/talking (Attention Mode)
+        else if (statusRef.current === 'speaking' || statusRef.current === 'thinking') fps = 4
+      }
+
+      await send()
+
+      const delay = Math.max(50, 1000 / fps)
+      const timerId = setTimeout(loop, delay)
+      if (kind === 'camera') cameraFrameTimerRef.current = timerId
+      else screenFrameTimerRef.current = timerId
+    }
+    loop()
   }, [])
 
   const stopFrameSender = useCallback((kind) => {
     const ref = kind === 'camera' ? cameraFrameTimerRef : screenFrameTimerRef
     if (ref.current) {
-      clearInterval(ref.current)
+      clearTimeout(ref.current)
       ref.current = null
     }
     const hiddenRef = kind === 'camera' ? hiddenVideoCameraRef : hiddenVideoScreenRef

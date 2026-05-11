@@ -394,13 +394,15 @@ export default function KelionStage() {
   const [buyError, setBuyError] = useState(null)
   const [packages, setPackages] = useState([])
   const [balance, setBalance] = useState(null)
+  const [transactions, setTransactions] = useState([])
   const refreshBalance = useCallback(async () => {
-    if (!authState.signedIn) { setBalance(null); return }
+    if (!authState.signedIn) { setBalance(null); setTransactions([]); return }
     try {
       const r = await fetch('/api/credits/balance', { credentials: 'include' })
       if (!r.ok) return
       const j = await r.json()
       if (typeof j.balance_minutes === 'number') setBalance(j.balance_minutes)
+      if (Array.isArray(j.transactions)) setTransactions(j.transactions)
     } catch (_) { /* ignore */ }
   }, [authState.signedIn])
   useEffect(() => { refreshBalance() }, [refreshBalance])
@@ -2069,20 +2071,12 @@ export default function KelionStage() {
               {t('cameraOff')}
             </MenuItem>
           ) : (
-            <>
-              <MenuItem onClick={() => {
-                startCamera({ visionMode: 'eco' }).catch(() => {})
-                setMenuOpen(false)
-              }}>
-                {t('visionEco')}
-              </MenuItem>
-              <MenuItem onClick={() => {
-                startCamera({ visionMode: 'premium' }).catch(() => {})
-                setMenuOpen(false)
-              }}>
-                {t('visionPremium')}
-              </MenuItem>
-            </>
+            <MenuItem onClick={() => {
+              startCamera().catch(() => {})
+              setMenuOpen(false)
+            }}>
+              {t('cameraOn')}
+            </MenuItem>
           )}
 
           {/* ISOLATED: screen share hidden — AI will trigger automatically or hidden from menu */}
@@ -2812,6 +2806,36 @@ export default function KelionStage() {
                 <div style={{ opacity: 0.55, fontSize: 13 }}>Loading packages…</div>
               )}
             </div>
+
+            {transactions.length > 0 && (
+              <div style={{ marginTop: 24 }}>
+                <div style={{ fontSize: 11, opacity: 0.55, letterSpacing: '0.15em', marginBottom: 10 }}>
+                  RECENT ACTIVITY
+                </div>
+                <div style={{ display: 'grid', gap: 8, maxHeight: 180, overflowY: 'auto', paddingRight: 4 }}>
+                  {transactions.map((tx) => {
+                    const isPositive = tx.delta_minutes > 0
+                    const date = new Date(tx.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+                    return (
+                      <div key={tx.id} style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '8px 10px', borderRadius: 10,
+                        background: 'rgba(167, 139, 250, 0.04)',
+                        fontSize: 12
+                      }}>
+                        <div>
+                          <div style={{ fontWeight: 600 }}>{tx.kind === 'consume' ? 'Conversation' : (tx.kind === 'topup' ? 'Top-up' : tx.kind)}</div>
+                          <div style={{ fontSize: 10, opacity: 0.5 }}>{date} · {tx.note || 'Kelion Live'}</div>
+                        </div>
+                        <div style={{ fontWeight: 700, color: isPositive ? '#34d399' : '#ede9fe' }}>
+                          {isPositive ? '+' : ''}{tx.delta_minutes} min
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             <div style={{
               fontSize: 11, opacity: 0.5, marginTop: 16, lineHeight: 1.5,

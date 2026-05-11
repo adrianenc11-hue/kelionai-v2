@@ -142,6 +142,7 @@ const buildPriorTurnsBlock = buildSanitizedPriorTurnsBlock;
 function buildKelionPersona(opts = {}) {
   const {
     user = null,
+    creditsBalance = null,
     memoryItems = [],
     voiceStyle = VOICE_STYLES.warm,
     geo = null,
@@ -213,6 +214,7 @@ AUTONOMOUS SOFTWARE ENGINEERING & AGENTIC LOOP:
   1. After editing ANY file, immediately call 'self_verify' with action="check_file" and the target file. The system will run deep syntax checks (e.g. node -c) automatically.
   2. If you are unsure about complex logic, use 'ask_expert_coder' to have Claude 4.7 Opus review the code logic before finalizing.
   3. If 'self_verify' returns any errors, you MUST fix them using 'replace_in_file' or 'run_terminal_command' before telling the user you are done.
+- **COST TRANSPARENCY & EXTRA CREDITS**: If a task is complex and requires advanced tools (like 'ask_expert_coder', 'browse_web' for deep research, or 'generate_image') or if you decide to route a request to a "Heavy" model, you MUST notify the user: "Această sarcină necesită un model avansat sau un instrument premium și poate consuma credite suplimentare. Dorești să continui?" (This task requires an advanced model or a premium tool and may consume extra credits. Do you want to continue?). Only proceed if the user agrees. If the user is low on credits, suggest they purchase more from the dashboard.
 - You can build ANY software, app, or script autonomously.
 - When the user asks you to build software, immediately use 'run_terminal_command' to initialize the project, then use 'edit_local_file' to write the code. DO NOT just explain how to do it; ACTUALLY do it.
 - **KELION SELF-REPAIR (SILENT)**: If the user asks you to fix or modify Kelion's own code, YOU MUST do this ENTIRELY IN THE BACKGROUND. 1. Call 'ask_expert_coder' to get the solution (which routes to Claude 4.7 Opus). 2. Call 'replace_file_content' or 'run_terminal_command' to apply the fix. 3. NEVER output the raw code, thought process, or debug logs into the text or voice chat. When done, reply with extreme brevity and modesty: "Problema a fost rezolvată." (The problem has been resolved).
@@ -371,7 +373,7 @@ Context:
 - Local: ${localTime} (${weekday}, ${tz}).${locationLine ? `
 - GPS: ${locationLine}.` : ''}${coordLine ? `
 - ${coordLine}` : ''}${noGpsLine ? `
-- ${noGpsLine}` : ''}${user ? `\n\nUser: ${user.name || 'friend'}${user.id != null ? ` (id ${user.id})` : ''}.` : ''}${formatMemoryBlocks(memoryItems)}${buildPriorTurnsBlock(priorTurns)}`;
+- ${noGpsLine}` : ''}${user ? `\n\nUser: ${user.name || 'friend'}${user.id != null ? ` (id ${user.id})` : ''}.` : ''}${creditsBalance !== null ? `\n- Current Balance: ${creditsBalance} minutes.` : ''}${formatMemoryBlocks(memoryItems)}${buildPriorTurnsBlock(priorTurns)}`;
 }
 
 // Audit M9 — partition memory items by subject before rendering them into
@@ -1906,8 +1908,13 @@ router.post('/pipeline', async (req, res) => {
     // Use client timezone as highest priority (real device time)
     const clientTz = (typeof clientTimezone === 'string' && clientTimezone.length < 64) ? clientTimezone : null;
     const clientLT = (typeof clientLocalTimeRaw === 'string' && clientLocalTimeRaw.length < 100) ? clientLocalTimeRaw : null;
+    let creditsBalance = null;
+    if (user && user.id) {
+      try { creditsBalance = await getCreditsBalance(user.id); }
+      catch (_) { }
+    }
     const systemPrompt = buildKelionPersona({
-      user, memoryItems, voiceStyle, geo: ipGeoData, priorTurns: [],
+      user, creditsBalance, memoryItems, voiceStyle, geo: ipGeoData, priorTurns: [],
       lockedLangTag: await resolveLockedLangTag({ req, user, forcedLang }),
       clientTz,
       clientLocalTime: clientLT,
