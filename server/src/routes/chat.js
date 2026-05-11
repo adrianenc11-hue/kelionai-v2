@@ -93,6 +93,25 @@ router.post('/', async (req, res) => {
 
     // Smart Model Router — unified stable routing
     const { smartFetch } = require('../services/modelRouter');
+    
+    // ── Demand-driven tool activation ─────────────────────────────────
+    const openRouterTools = buildKelionToolsChatCompletions();
+
+    // Convert history to OpenAI format
+    const sanitizedMessages = session.history.map(h => {
+      if (h.role === 'function') {
+        return {
+          role: 'tool',
+          tool_call_id: h.parts[0].functionResponse.id,
+          name: h.parts[0].functionResponse.name,
+          content: JSON.stringify(h.parts[0].functionResponse.response.result)
+        };
+      }
+      let text = '';
+      h.parts.forEach(p => { if (p.text) text += p.text; });
+      return { role: h.role, content: text };
+    });
+
     const body = {
       messages: sanitizedMessages,
       tools: openRouterTools.length > 0 ? openRouterTools : undefined,
