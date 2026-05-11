@@ -61,7 +61,7 @@ function IframeWithFallback({ src, title, onBlocked }) {
     loadedRef.current = false
     const timer = setTimeout(() => {
       if (!loadedRef.current) {
-        try { onBlocked && onBlocked() } catch (_) {}
+        try { onBlocked && onBlocked() } catch (_) { }
       }
     }, MONITOR_LOAD_TIMEOUT_MS)
     return () => clearTimeout(timer)
@@ -74,7 +74,7 @@ function IframeWithFallback({ src, title, onBlocked }) {
       sandbox="allow-scripts allow-same-origin allow-forms allow-presentation allow-top-navigation-by-user-activation"
       allow="fullscreen; geolocation; autoplay; encrypted-media"
       onLoad={() => { loadedRef.current = true }}
-      onError={() => { try { onBlocked && onBlocked() } catch (_) {} }}
+      onError={() => { try { onBlocked && onBlocked() } catch (_) { } }}
       style={{ width: '100%', height: '100%', border: 'none', background: '#0d0b1d', display: 'block' }}
     />
   )
@@ -118,13 +118,35 @@ function MonitorOverlay() {
 
   let finalSrc = m.src
   try {
-    // If the AI tries to load kelionai.app, append a flag so the nested app knows it's a child
-    const urlObj = new URL(m.src)
+    // If the AI tries to load kelionai.app (directly or via proxy), append a flag
+    // so the nested app knows it's a child and doesn't render another monitor.
+    let targetUrlStr = m.src
+    // Handle relative proxy URLs
+    if (m.src.startsWith('/api/proxy')) {
+      const searchParams = new URLSearchParams(m.src.split('?')[1])
+      if (searchParams.has('url')) {
+        targetUrlStr = searchParams.get('url')
+      }
+    }
+
+    const urlObj = new URL(targetUrlStr, window.location.href)
     const targetHost = urlObj.hostname.replace(/^www\./, '').toLowerCase()
     const currentHost = window.location.hostname.replace(/^www\./, '').toLowerCase()
+    
     if (targetHost === currentHost || targetHost === 'localhost') {
+      // Append kelion_nested=1 to the actual URL
       urlObj.searchParams.set('kelion_nested', '1')
-      finalSrc = urlObj.toString()
+      
+      if (m.src.startsWith('/api/proxy')) {
+        // Reconstruct the proxy URL and add kelion_nested=1 to the top-level
+        // so that `window.location.search` inside the iframe detects it
+        const proxyUrl = new URL(m.src, window.location.href)
+        proxyUrl.searchParams.set('url', urlObj.toString())
+        proxyUrl.searchParams.set('kelion_nested', '1')
+        finalSrc = proxyUrl.pathname + proxyUrl.search
+      } else {
+        finalSrc = urlObj.toString()
+      }
     }
   } catch (e) {
     // Ignore invalid URLs
@@ -306,7 +328,7 @@ function MonitorOverlay() {
               playsInline
               style={{ width: '100%', height: '100%', maxHeight: '100%', outline: 'none', background: '#000' }}
               onError={() => {
-                try { console.warn('[monitor] video failed to load', finalSrc) } catch (_) {}
+                try { console.warn('[monitor] video failed to load', finalSrc) } catch (_) { }
               }}
             >
               <source src={finalSrc} />
@@ -367,7 +389,7 @@ function MonitorOverlay() {
                 outline: 'none',
               }}
               onError={() => {
-                try { console.warn('[monitor] audio element failed to play', finalSrc) } catch (_) {}
+                try { console.warn('[monitor] audio element failed to play', finalSrc) } catch (_) { }
               }}
             >
               Your browser does not support the audio element.
@@ -479,7 +501,7 @@ function MonitorOverlay() {
             src={finalSrc}
             title={m.title || 'Kelion monitor'}
             onBlocked={() => {
-              try { console.warn('[monitor] iframe never loaded — likely CSP/XFO block', finalSrc) } catch (_) {}
+              try { console.warn('[monitor] iframe never loaded — likely CSP/XFO block', finalSrc) } catch (_) { }
               setIframeBlocked(true)
             }}
           />
