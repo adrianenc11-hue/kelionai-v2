@@ -153,6 +153,12 @@ router.post('/', async (req, res) => {
       }
     });
 
+    const { isCodingTask, smartFetch } = require('../services/modelRouter');
+    const swarmExpert = require('../services/swarmExpert');
+    const taskType = isCodingTask(message) ? 'coder' : 'chat';
+    const isHeavy = (creditsBalance > 0) && isCodingTask(message);
+    const isSoftGreu = isHeavy && (message.length > 200 || message.toLowerCase().includes('soft') || message.toLowerCase().includes('proiect'));
+
     const body = {
       messages: sanitizedMessages,
       tools: openRouterTools.length > 0 ? openRouterTools : undefined,
@@ -162,9 +168,18 @@ router.post('/', async (req, res) => {
     };
 
     let result;
+    let activeModel = 'Swarm (Multi-Agent)';
+    
     try {
-      const { response, model: activeModel } = await smartFetch(taskType, body);
-      result = await response.json();
+      if (isSoftGreu) {
+        console.log('[chat] Triggering Swarm Expert for Soft Greu task...');
+        const swarmResult = await swarmExpert.runSwarmTask(message, { history: session.history.slice(-5) }, creditsBalance);
+        result = { choices: [{ message: { content: swarmResult.reply } }] };
+      } else {
+        const fetchRes = await smartFetch(taskType, body, isHeavy);
+        activeModel = fetchRes.model;
+        result = await fetchRes.response.json();
+      }
       
       const choice = result.choices?.[0];
       const reply = choice?.message?.content || '';
