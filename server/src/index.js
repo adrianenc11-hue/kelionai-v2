@@ -211,8 +211,27 @@ app.use((req, res, next) => {
 // middleware/visitorLog.js for filtering rules.
 app.use(visitorLog);
 
+// Security audit 2026-05-11 (H2): strict rate-limiter on auth login/register
+// to prevent brute-force attacks. 5 attempts/min/IP is tight enough to block
+// credential stuffing while still allowing a real user who fat-fingers their
+// password a few times. The global limiter (120 req/min) was too generous.
+const authLimiter = process.env.NODE_ENV === 'test'
+  ? (req, res, next) => next()
+  : rateLimit({
+      windowMs: 60 * 1000,
+      max: 5,
+      standardHeaders: true,
+      legacyHeaders: false,
+      message: { error: 'Too many login attempts. Please wait a minute.' },
+      // Only rate-limit the actual credential endpoints, not /me or /google/*
+      skip: (req) => {
+        const p = req.path.toLowerCase();
+        return !(p.includes('/local/login') || p.includes('/local/register'));
+      },
+    });
+
 // Auth routes (no auth required)
-app.use('/auth', authRouter);
+app.use('/auth', authLimiter, authRouter);
 
 // Subscription plans (no auth required)
 app.get('/api/subscription/plans', (req, res) => {

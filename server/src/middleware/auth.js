@@ -77,38 +77,13 @@ async function requireAuth(req, res, next) {
                 migrationTrace.googleErr = e && e.message;
               }
             }
-            if (!migratedUser && decoded.email) {
-              // Last resort: the JWT signature is valid (verified above
-              // with our secret), so we trust its email+name claims.
-              // This user DID have a DB row once; it was wiped by a
-              // purge or schema reset. Re-create a shell row so the
-              // request can proceed — without this path, a legitimately
-              // signed-in user whose row was purged is permanently
-              // locked out even though their JWT is cryptographically
-              // valid and not expired.
-              migrationTrace.autoCreate = { email: String(decoded.email).toLowerCase() };
-              try {
-                const created = await createUser({
-                  google_id: String(rawSub),
-                  email: String(decoded.email).toLowerCase(),
-                  name: decoded.name || String(decoded.email).split('@')[0],
-                  picture: null,
-                });
-                if (created && created.id) {
-                  migratedUser = created;
-                  migrationTrace.autoCreate.id = created.id;
-                }
-              } catch (e) {
-                migrationTrace.autoCreateErr = e && e.message;
-                // Unique-email race: another concurrent request may have
-                // just created the row. Re-read and reuse.
-                if (/UNIQUE|duplicate/i.test(e && e.message || '')) {
-                  try {
-                    migratedUser = await findByEmail(String(decoded.email).toLowerCase());
-                  } catch (_) {}
-                }
-              }
-            }
+            // Security audit 2026-05-11 (M2): removed auto-create user from
+            // stale JWT claims. Previously, a valid JWT whose user row was
+            // deleted would silently create a new account from the JWT
+            // email/name claims — a privilege escalation vector if the JWT
+            // secret is ever compromised. Users whose rows were purged must
+            // re-register through the normal flow.
+            // The admin bootstrap at server boot handles admin recovery.
             if (!migratedUser || !migratedUser.id) {
               // Log ONCE per failure so Railway logs expose WHY migration
               // failed for this session. Zero PII beyond the email claim
@@ -166,6 +141,9 @@ async function requireAuth(req, res, next) {
         // PR E5 — banned users get a 403 from every authed route. The
         // ban bit is resolved through an in-process 60s cache so this
         // stays cheap on the hot path.
+        // Security audit 2026-05-11 (M1): changed from fail-open to fail-closed.
+        // If the ban check throws (DB down, cache corrupt), we return 503
+        // instead of silently allowing the request through.
         try {
           const ban = await resolveBanStatus(effectiveSub);
           if (ban.banned) {
@@ -174,7 +152,10 @@ async function requireAuth(req, res, next) {
               reason: ban.reason || null,
             });
           }
-        } catch (_) { /* fail open */ }
+        } catch (banErr) {
+          console.error('[auth] ban check failed — blocking request (fail-closed):', banErr && banErr.message);
+          return res.status(503).json({ error: 'Service temporarily unavailable — please retry.' });
+        }
         return next();
       } catch (err) {
         if (err.name === 'TokenExpiredError') {

@@ -237,33 +237,16 @@ router.post('/local/register', async (req, res) => {
     const emailLc = String(email).toLowerCase();
     const isAdminEmail = allAdmins.includes(emailLc);
 
-    // Check if email already exists.
-    //
-    // Normal flow: 409 so two people can't race on the same address.
-    //
-    // Exception: when the caller is registering *an admin email* we let
-    // them overwrite the existing row with the new password and force
-    // role='admin'. This is the "claim my admin account from the Create
-    // account modal" flow Adrian asked for — without it, the bootstrap
-    // row (seeded at server boot from ADMIN_BOOTSTRAP_PASSWORD) would
-    // permanently reject any Create-account attempt for adrianenc11@...
-    // Non-admin emails still 409 as before.
+    // Security audit 2026-05-11: removed the admin-email overwrite path.
+    // Previously, registering with an admin email would overwrite the
+    // existing row's password — meaning anyone who knows the admin email
+    // (hardcoded in config.js) could reset the admin password remotely.
+    // Admin credentials are now managed exclusively via ADMIN_BOOTSTRAP_PASSWORD
+    // env var at server boot (see services/adminBootstrap.js).
     const existing = await findByEmail(email);
     let user;
     if (existing) {
-      if (!isAdminEmail) {
-        return res.status(409).json({ error: 'Email already registered' });
-      }
-      // Admin email: overwrite password + name + role. We use upsertUser
-      // via the direct DB update helpers rather than a dedicated endpoint
-      // so the rest of the insert/validation path is reused.
-      const { updateUser } = require('../db');
-      await updateUser(existing.id, {
-        password_hash,
-        name: String(name).trim(),
-        role: 'admin',
-      });
-      user = { ...existing, password_hash, name: String(name).trim(), role: 'admin' };
+      return res.status(409).json({ error: 'Email already registered' });
     } else {
       user = await insertUser({
         email,
@@ -314,10 +297,11 @@ router.post('/local/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
-    // Verify password
+    // Verify password — timing-safe comparison to prevent timing attacks
     const [hash, salt] = user.password_hash.split(':');
     const checkHash = crypto.scryptSync(password, salt, 64).toString('hex');
-    if (hash !== checkHash) {
+    if (!hash || !checkHash || hash.length !== checkHash.length ||
+        !crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(checkHash, 'hex'))) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
@@ -350,7 +334,7 @@ router.post('/local/login', async (req, res) => {
  * Destroys session
  */
 router.post('/logout', (req, res) => {
-  res.clearCookie('kelion.token');
+  res.clearCookie('kelion.token', { path: '/' });
   res.json({ message: 'Logged out successfully' });
 });
 
@@ -410,10 +394,26 @@ router.get('/google/mcp-callback', async (req, res) => {
     if (!code || !state) {
       return res.redirect(`${config.appBaseUrl}?mcp_error=missing_code`);
     }
-    const userId = parseInt(state, 10);
+    // Security audit 2026-05-11 (C2): validate the state parameter against
+    // the CSRF nonce cookie set during /mcp/connect. Previously state was
+    // the raw userId which allowed an attacker to bind their Google account
+    // to a victim's userId.
+    const mcpNonce = req.cookies?.['kelion.mcp_state'];
+    if (!mcpNonce || mcpNonce !== state) {
+      console.warn('[mcp] OAuth state mismatch — possible CSRF', { state, cookie: mcpNonce ? 'present' : 'missing' });
+      return res.redirect(`${config.appBaseUrl}?mcp_error=state_mismatch`);
+    }
+    // The nonce is formatted as `<userId>:<random>` — extract userId.
+    const sepIdx = state.indexOf(':');
+    if (sepIdx < 1) {
+      return res.redirect(`${config.appBaseUrl}?mcp_error=invalid_state`);
+    }
+    const userId = parseInt(state.slice(0, sepIdx), 10);
     if (!Number.isFinite(userId)) {
       return res.redirect(`${config.appBaseUrl}?mcp_error=invalid_state`);
     }
+    // Clear the one-time nonce cookie.
+    res.clearCookie('kelion.mcp_state', { path: '/' });
     const googleMcp = require('../services/googleMcp');
     await googleMcp.exchangeCode(code, userId);
     console.log(`[mcp] Google connected for user ${userId}`);

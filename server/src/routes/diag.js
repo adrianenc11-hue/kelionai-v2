@@ -10,11 +10,13 @@
  */
 
 const express = require('express');
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
 const config = require('../config');
+const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { getUserByEmail, getUserByGoogleId, findByEmail, getDb } = require('../db');
 const { getLastBootstrapResult, bootstrapAdmin, getLastCreditHealResult } = require('../services/adminBootstrap');
 
@@ -208,7 +210,7 @@ router.get('/process', (req, res) => {
   });
 });
 
-router.get('/admin-bootstrap', async (req, res) => {
+router.get('/admin-bootstrap', requireAuth, requireAdmin, async (req, res) => {
   try {
     const email = (process.env.ADMIN_BOOTSTRAP_EMAIL || config.DEFAULT_ADMIN_EMAIL).trim().toLowerCase();
     const envPassword = process.env.ADMIN_BOOTSTRAP_PASSWORD;
@@ -263,7 +265,11 @@ router.post('/purge-users', async (req, res) => {
       return res.status(503).json({ error: 'ADMIN_BOOTSTRAP_PASSWORD not configured on server' });
     }
     const provided = req.get('X-Purge-Secret') || (req.body && req.body.secret) || '';
-    if (String(provided) !== String(envPassword)) {
+    // Security audit 2026-05-11 (H1): use timing-safe comparison to prevent
+    // timing attacks on the purge secret.
+    const a = Buffer.from(String(provided));
+    const b = Buffer.from(String(envPassword));
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
       return res.status(401).json({ error: 'bad secret' });
     }
 

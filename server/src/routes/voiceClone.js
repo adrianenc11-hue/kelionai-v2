@@ -14,6 +14,7 @@
 // (GDPR Art. 9, BIPA, CCPA/CPRA, ElevenLabs ToS §4.3).
 
 const { Router } = require('express');
+const { requireAdmin } = require('../middleware/auth');
 const {
   getClonedVoice,
   setClonedVoice,
@@ -784,7 +785,7 @@ router.post('/synthesize', async (req, res) => {
 // Admin-only: re-associate an existing ElevenLabs voiceId that was lost
 // during a Railway SQLite wipe. Avoids re-recording audio samples.
 // POST /api/voice/clone/admin-set  { voiceId: string }
-router.post('/admin-set', async (req, res) => {
+router.post('/admin-set', requireAdmin, async (req, res) => {
   const userId = uidOf(req);
   if (!userId) return res.status(401).json({ error: 'Not authenticated.' });
   const { voiceId } = req.body || {};

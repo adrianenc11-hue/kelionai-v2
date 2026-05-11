@@ -44,6 +44,17 @@ const ContactPage = lazy(() => import('./pages/ContactPage'))
 const KelionStudio = lazy(() => import('./pages/KelionStudio'))
 const LandingPage = lazy(() => import('./pages/LandingPage'))
 
+// Admin dashboard — full-page admin panel replacing the old side-drawer.
+// Lazy-loaded so the admin bundle (~35 KB) never ships to normal users.
+const AdminLayout   = lazy(() => import('./pages/admin/AdminLayout'))
+const DashboardPage = lazy(() => import('./pages/admin/DashboardPage'))
+const UsersPage     = lazy(() => import('./pages/admin/UsersPage'))
+const RevenuePage   = lazy(() => import('./pages/admin/RevenuePage'))
+const AiCreditsPage = lazy(() => import('./pages/admin/AiCreditsPage'))
+const VisitorsPage  = lazy(() => import('./pages/admin/VisitorsPage'))
+const PayoutsPage   = lazy(() => import('./pages/admin/PayoutsPage'))
+const SettingsPage  = lazy(() => import('./pages/admin/SettingsPage'))
+
 function Loader() {
   return (
     <div style={{
@@ -81,6 +92,17 @@ createRoot(document.getElementById('root')).render(
                 KelionStudio will surface the auth error inline if
                 the user isn't signed in. */}
             <Route path="/studio" element={<KelionStudio />} />
+            {/* Admin dashboard — full-page panel with sidebar navigation.
+                Auth-guarded inside AdminLayout (redirects non-admins). */}
+            <Route path="/admin" element={<AdminLayout />}>
+              <Route index element={<DashboardPage />} />
+              <Route path="users" element={<UsersPage />} />
+              <Route path="revenue" element={<RevenuePage />} />
+              <Route path="ai" element={<AiCreditsPage />} />
+              <Route path="visitors" element={<VisitorsPage />} />
+              <Route path="payouts" element={<PayoutsPage />} />
+              <Route path="settings" element={<SettingsPage />} />
+            </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>
@@ -88,3 +110,4 @@ createRoot(document.getElementById('root')).render(
     </ErrorBoundary>
   </StrictMode>,
 )
+
