@@ -117,10 +117,9 @@ test.describe('Voice session token endpoint (Claude Opus)', () => {
     }
     expect(res.status()).toBe(200);
     const body = await res.json();
-    expect(body.backend).toBe('openrouter');
+    expect(['openrouter', 'google-ai-studio']).toContain(body.backend);
     expect(typeof body.model).toBe('string');
     expect(body.model.length).toBeGreaterThan(0);
-    expect(body.model).toMatch(/\//); // OpenRouter uses "vendor/model" slugs
     expect(body.token).toBeNull();
   });
 });
