@@ -21,26 +21,7 @@ const router = Router();
 // Kelion (name mentioned or translate mode).
 async function kelionChatHandler(message, senderName, chatName, isGroup, options = {}) {
   const { smartFetch } = require('../services/modelRouter');
-  const { buildKelionPersona } = require('./realtime');
-
-  // Build a contextual system prompt
-  const platform = isGroup ? `WhatsApp group "${chatName}"` : 'WhatsApp DM';
-  const systemPrompt = buildKelionPersona({
-    user: { display_name: 'Admin' },
-    creditsBalance: null,
-    memoryItems: [],
-    geo: null,
-    lockedLangTag: null,
-    clientTz: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    clientLocalTime: new Date().toLocaleString(),
-  });
-
-  // Add WhatsApp context to the system prompt
-  let whatsappContext = `\n\n[WHATSAPP CONTEXT]
-You are responding on ${platform}.
-The person talking is "${senderName}".
-Keep responses concise (max 500 chars) — this is a chat app, not an essay.
-Use short paragraphs. No markdown formatting (WhatsApp doesn't render it well).`;
+  let messages = [];
 
   if (options.isTranslateMode || options.isExplicitTranslate) {
     let targetLangText = 'the language of the other participant(s)';
@@ -52,35 +33,43 @@ Use short paragraphs. No markdown formatting (WhatsApp doesn't render it well).`
       if (adminLang !== 'auto') adminLangText = adminLang;
     }
 
-    if (options.isFromAdmin) {
-      whatsappContext += `\n\n[TRANSLATOR MODE - ADMIN MESSAGE]
-The owner of this WhatsApp account (Admin) just sent this message.
-Your task: Translate this message into ${targetLangText}.
-Output ONLY the direct translation. Do not add quotes, greetings, or explanations.`;
-    } else {
-      whatsappContext += `\n\n[TRANSLATOR MODE - INCOMING MESSAGE]
-The other person sent this message.
-Your task: Translate this message into ${adminLangText} for the Admin.
-Output ONLY the direct translation. Do not add quotes, greetings, or explanations.`;
-    }
+    const directionInstruction = options.isFromAdmin
+      ? `Translate the following message into ${targetLangText}.`
+      : `Translate the following message into ${adminLangText}.`;
+
+    messages = [
+      { 
+        role: 'system', 
+        content: `You are an expert, highly accurate translator. ${directionInstruction}\nCRITICAL INSTRUCTION: Output ONLY the direct translation text. Do not add quotes, greetings, conversational filler, notes, or explanations. Just the translated string.` 
+      },
+      { role: 'user', content: message }
+    ];
   } else {
-    whatsappContext += `\n\nIf someone speaks a different language, respond in THEIR language.
+    const { buildKelionPersona } = require('./realtime');
+    const systemPrompt = buildKelionPersona({
+      user: { display_name: 'Admin' },
+      creditsBalance: null,
+      memoryItems: [],
+      geo: null,
+      lockedLangTag: null,
+      clientTz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      clientLocalTime: new Date().toLocaleString(),
+    });
 
-[TRANSLATOR MODE]
-If a message starts with "traduci:" or "translate:" or "翻译:", act as a
-real-time translator. Translate the text that follows into the language
-specified, or auto-detect the target language from context.
-Example: "traduci: Bună ziua, cum ești?" in a chat with a Chinese speaker
-→ translate to Chinese: "你好，你好吗？"
+    const platform = isGroup ? `WhatsApp group "${chatName}"` : 'WhatsApp DM';
+    const whatsappContext = `\n\n[WHATSAPP CONTEXT]
+You are responding on ${platform}.
+The person talking is "${senderName}".
+Keep responses concise (max 500 chars) — this is a chat app, not an essay.
+Use short paragraphs. No markdown formatting (WhatsApp doesn't render it well).
 
-When two people speak different languages in a group, automatically translate
-each message to the OTHER person's language. Detect languages automatically.`;
+If someone speaks a different language, respond in THEIR language.`;
+
+    messages = [
+      { role: 'system', content: systemPrompt + whatsappContext },
+      { role: 'user', content: options.isFromAdmin ? `[Admin]: ${message}` : `[${senderName}]: ${message}` },
+    ];
   }
-
-  const messages = [
-    { role: 'system', content: systemPrompt + whatsappContext },
-    { role: 'user', content: options.isFromAdmin ? `[Admin]: ${message}` : `[${senderName}]: ${message}` },
-  ];
 
   try {
     const result = await smartFetch('chat', {
