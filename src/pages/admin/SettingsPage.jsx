@@ -2,10 +2,12 @@
 // Shows environment info, API key status (masked), and admin actions.
 
 import { useState, useEffect } from 'react'
+import { useOutletContext } from 'react-router-dom'
 import { useToast } from './AdminComponents'
 
 export default function SettingsPage() {
   const toast = useToast()
+  const { getCsrfToken } = useOutletContext()
   const [info, setInfo] = useState(null)
 
   useEffect(() => {
@@ -70,7 +72,7 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      <WhatsAppBridgeCard toast={toast} />
+      <WhatsAppBridgeCard toast={toast} getCsrfToken={getCsrfToken} />
 
       <div className="admin-card">
         <div className="admin-card-title" style={{ marginBottom: 16 }}>📥 Export Date</div>
@@ -83,7 +85,7 @@ export default function SettingsPage() {
   )
 }
 
-function WhatsAppBridgeCard({ toast }) {
+function WhatsAppBridgeCard({ toast, getCsrfToken }) {
   const [waStatus, setWaStatus] = useState('checking')
   const [qrCode, setQrCode] = useState(null)
   const [stats, setStats] = useState(null)
@@ -112,7 +114,11 @@ function WhatsAppBridgeCard({ toast }) {
   const handleConnect = async () => {
     setWaStatus('connecting...')
     try {
-      const r = await fetch('/api/whatsapp/connect', { method: 'POST', credentials: 'include' })
+      const r = await fetch('/api/whatsapp/connect', { 
+        method: 'POST', 
+        credentials: 'include',
+        headers: { 'X-CSRF-Token': getCsrfToken() }
+      })
       const data = await r.json()
       if (r.ok) {
         toast.info(`WhatsApp: ${data.message}`)
@@ -127,7 +133,11 @@ function WhatsAppBridgeCard({ toast }) {
 
   const handleDisconnect = async () => {
     try {
-      await fetch('/api/whatsapp/logout', { method: 'POST', credentials: 'include' })
+      await fetch('/api/whatsapp/logout', { 
+        method: 'POST', 
+        credentials: 'include',
+        headers: { 'X-CSRF-Token': getCsrfToken() }
+      })
       toast.info('Sesiune WhatsApp ștearsă')
       fetchStatus()
     } catch (_) {}
