@@ -31,6 +31,7 @@ class WhatsAppBridge extends EventEmitter {
     this.stats = { messagesReceived: 0, responseSent: 0, errors: 0, startedAt: null };
     this._rateLimitMap = new Map(); // chatId → lastResponseTs
     this._greetedContacts = new Set(); // contactId → boolean
+    this._activeTranslators = new Map(); // chatId → { adminLang, otherLang }
     this._chatHandler = null; // Reference to the chat/AI handler
   }
 
@@ -48,22 +49,39 @@ class WhatsAppBridge extends EventEmitter {
     this.status = 'disconnected';
 
     try {
-      // Resolve Chromium path on production (nixpacks / Railway)
+      // Resolve Chromium absolute path on production (nixpacks / Railway).
+      // Puppeteer requires a real filesystem path, not a command name.
       let execPath = undefined;
       if (process.env.NODE_ENV === 'production') {
-        execPath = process.env.CHROMIUM_PATH || null;
+        execPath = process.env.CHROMIUM_PATH || process.env.PUPPETEER_EXECUTABLE_PATH || null;
         if (!execPath) {
-          // Try common locations on Railway / nixpacks / Docker
           const { execSync } = require('child_process');
-          try {
-            execPath = execSync('which chromium || which chromium-browser || which google-chrome', {
-              encoding: 'utf8', timeout: 3000,
-            }).trim();
-          } catch (_) {
-            execPath = 'chromium'; // Fallback — hope it's on PATH
+          const fs = require('fs');
+          // 1. Try resolving via shell (command -v is POSIX, always available)
+          for (const cmd of ['chromium', 'chromium-browser', 'google-chrome']) {
+            try {
+              // readlink -f resolves symlinks to the actual binary
+              const resolved = execSync(`readlink -f "$(command -v ${cmd})" 2>/dev/null`, {
+                encoding: 'utf8', timeout: 3000,
+              }).trim();
+              if (resolved && fs.existsSync(resolved)) {
+                execPath = resolved;
+                break;
+              }
+            } catch (_) {}
           }
+          // 2. Scan known nix store paths
+          if (!execPath) {
+            try {
+              const found = execSync('find /nix/store -maxdepth 3 -name chromium -type f 2>/dev/null | head -1', {
+                encoding: 'utf8', timeout: 5000,
+              }).trim();
+              if (found && fs.existsSync(found)) execPath = found;
+            } catch (_) {}
+          }
+          // 3. If nothing found, don't set executablePath — let Puppeteer use its bundled browser
         }
-        console.log(`[WhatsApp] Using Chromium at: ${execPath}`);
+        console.log(`[WhatsApp] Chromium path: ${execPath || '(puppeteer default)'}`);
       }
 
       this.client = new Client({
@@ -80,7 +98,6 @@ class WhatsAppBridge extends EventEmitter {
             '--disable-software-rasterizer',
             '--no-first-run',
             '--no-zygote',
-            '--single-process',
           ],
         },
       });
@@ -108,13 +125,27 @@ class WhatsAppBridge extends EventEmitter {
         this.emit('ready');
       });
 
-      // ── Message event ──
+      // Listen to incoming messages from others
       this.client.on('message', async (msg) => {
         try {
+          // 'message' event only fires for messages sent by others, so msg.fromMe is always false here.
           await this._handleMessage(msg);
         } catch (err) {
           this.stats.errors++;
           console.error('[WhatsApp] Message handling error:', err.message);
+        }
+      });
+
+      // Listen to our own messages (from the phone) to capture commands and translations
+      this.client.on('message_create', async (msg) => {
+        try {
+          // 'message_create' fires for ALL messages. We only care about our own here to prevent double-processing.
+          if (msg.fromMe) {
+            await this._handleMessage(msg);
+          }
+        } catch (err) {
+          this.stats.errors++;
+          console.error('[WhatsApp] Message create handling error:', err.message);
         }
       });
 
@@ -150,29 +181,111 @@ class WhatsAppBridge extends EventEmitter {
    * Responds ONLY when Kelion's name is mentioned.
    */
   async _handleMessage(msg) {
-    // Ignore status updates, own messages, media-only
-    if (msg.isStatus || msg.fromMe) return;
+    // Ignore status updates
+    if (msg.isStatus) return;
 
-    this.stats.messagesReceived++;
     const body = (msg.body || '').trim();
     if (!body) return;
 
     const chat = await msg.getChat();
     const isGroup = chat.isGroup;
     const chatName = chat.name || 'DM';
+    const chatId = chat.id._serialized;
+
+    // ── Command: Toggle Translator Mode ──
+    const bodyLower = body.toLowerCase();
+    
+    // Interactive setup
+    if (bodyLower === '!traduci' || bodyLower === '!translate') {
+      this._activeTranslators.set(chatId, { setupMode: true });
+      await msg.reply('În ce limbă dorești traducerea? Scrie limbile sub forma: limba_mea limba_lui (ex: ro jp)');
+      return;
+    }
+
+    const translateContext = this._activeTranslators.get(chatId);
+
+    // Setup mode response processing
+    if (translateContext && translateContext.setupMode) {
+      if (msg.fromMe) {
+        const langs = bodyLower.split(/\s+/).filter(Boolean);
+        if (langs.length >= 2) {
+          const adminLang = langs[0];
+          const otherLang = langs[1];
+          this._activeTranslators.set(chatId, { adminLang, otherLang });
+          await msg.reply(`✅ Translator automat activat.\n- Limba ta: ${adminLang}\n- Limba interlocutorului: ${otherLang}`);
+          
+          // Auto-greeting to the interlocutor via AI
+          if (this._chatHandler) {
+            try {
+              const greetingRo = `Salut! Pentru această conversație se folosește un translator AI. Limba mea este ${adminLang}, iar a ta este ${otherLang}. Orice scrii va fi tradus automat.`;
+              const translatedGreeting = await this._chatHandler(
+                greetingRo, 'Admin', chatName, isGroup, 
+                { isTranslateMode: true, isFromAdmin: true, isExplicitTranslate: false, translateContext: { adminLang, otherLang } }
+              );
+              if (translatedGreeting) {
+                await chat.sendMessage(translatedGreeting);
+              }
+            } catch (err) {
+              console.error('[WhatsApp] Auto-greeting failed:', err);
+            }
+          }
+          return;
+        } else if (bodyLower === '!cancel') {
+          this._activeTranslators.delete(chatId);
+          await msg.reply('❌ Configurare anulată.');
+          return;
+        } else {
+          await msg.reply('Te rog să specifici ambele limbi (ex: ro jp), sau scrie !cancel pentru a anula.');
+          return;
+        }
+      } else {
+        return; // Ignore other person's messages while waiting for Admin to finish setup
+      }
+    }
+    
+    // Direct command (fast way)
+    const translateMatch = bodyLower.match(/^!(?:traduci|translate)\s+on(?:\s+([a-zA-Z]+)\s+([a-zA-Z]+))?/);
+    if (translateMatch) {
+      const adminLang = translateMatch[1] || 'auto';
+      const otherLang = translateMatch[2] || 'auto';
+      this._activeTranslators.set(chatId, { adminLang, otherLang });
+      
+      let msgText = `✅ Translator automat activat.`;
+      if (adminLang !== 'auto') {
+        msgText += `\n- Limba ta: ${adminLang}\n- Limba interlocutorului: ${otherLang}`;
+      } else {
+        msgText += `\n- Limba ta: auto (Română)\n- Limba interlocutorului: auto`;
+      }
+      await msg.reply(msgText);
+      return;
+    }
+    
+    if (bodyLower === '!traduci off' || bodyLower === '!translate off') {
+      this._activeTranslators.delete(chatId);
+      await msg.reply('❌ Translator automat dezactivat.');
+      return;
+    }
+
+    const isTranslateMode = !!translateContext && !translateContext.setupMode;
+    const isExplicitTranslate = bodyLower.startsWith('traduci:') || bodyLower.startsWith('translate:');
+
+    // Ignore our own messages UNLESS translate mode is on, or we used an explicit trigger
+    if (msg.fromMe && !isTranslateMode && !isExplicitTranslate) {
+      return;
+    }
+
+    this.stats.messagesReceived++;
 
     // ── Trigger detection ──
-    // In groups: respond ONLY when Kelion's name is mentioned
+    // In groups: respond ONLY when Kelion's name is mentioned (or translate mode on)
     // In private chats: always respond (it's a direct message)
-    const bodyLower = body.toLowerCase();
     const isMentioned = TRIGGER_NAMES.some(name => bodyLower.includes(name));
 
-    if (isGroup && !isMentioned) {
-      return; // Ignore group messages that don't mention Kelion
+    if (isGroup && !isMentioned && !isTranslateMode && !isExplicitTranslate) {
+      return; // Ignore group messages that don't trigger Kelion
     }
 
     // ── Rate limiting ──
-    const chatId = chat.id._serialized;
     const now = Date.now();
     const lastResponse = this._rateLimitMap.get(chatId) || 0;
     if (now - lastResponse < RATE_LIMIT_MS) {
@@ -213,7 +326,13 @@ class WhatsAppBridge extends EventEmitter {
     await chat.sendStateTyping();
 
     try {
-      const response = await this._chatHandler(question, senderName, chatName, isGroup);
+      const response = await this._chatHandler(
+        question, 
+        senderName, 
+        chatName, 
+        isGroup, 
+        { isTranslateMode, isFromAdmin: msg.fromMe, isExplicitTranslate, translateContext }
+      );
 
       if (response && typeof response === 'string') {
         // Truncate if too long

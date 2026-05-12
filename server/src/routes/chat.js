@@ -118,7 +118,8 @@ router.post('/', async (req, res) => {
 
     // ── Task Detection: Basic Chat vs Complex Coding ──────────────────
     const taskType = isCodingTask(message) ? 'coder' : 'chat';
-    const isHeavy = (creditsBalance > 0) && isCodingTask(message);
+    // Admin ALWAYS gets the heavy model for coding/software tasks. Normal users need credits.
+    const isHeavy = (isAdmin && taskType === 'coder') || ((creditsBalance > 0) && taskType === 'coder');
     const isSoftGreu = isHeavy && (message.length > 200 || message.toLowerCase().includes('soft') || message.toLowerCase().includes('proiect'));
 
     const browserLang = (req.query.lang || 'en-US').toString().slice(0, 16);
