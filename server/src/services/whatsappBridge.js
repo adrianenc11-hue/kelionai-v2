@@ -33,6 +33,7 @@ class WhatsAppBridge extends EventEmitter {
     this._greetedContacts = new Set(); // contactId → boolean
     this._activeTranslators = new Map(); // chatId → { adminLang, otherLang }
     this._chatHandler = null; // Reference to the chat/AI handler
+    this._ignoreMsgIds = new Set(); // To prevent infinite loops on our own AI responses
   }
 
   /**
@@ -187,6 +188,7 @@ class WhatsAppBridge extends EventEmitter {
     let body = (msg.body || '').trim();
 
     // ── Prevent Infinite Loops ──
+    if (this._ignoreMsgIds.has(msg.id._serialized)) return;
     if (body.startsWith('⚠️') || body.startsWith('✅') || body.startsWith('⛔') || body.startsWith('🤖')) return;
 
     // ── AUDIO TRANSCRIBER (STT) ──
@@ -249,7 +251,8 @@ class WhatsAppBridge extends EventEmitter {
                 { isTranslateMode: true, isFromAdmin: true, isExplicitTranslate: false, translateContext: { adminLang, otherLang } }
               );
               if (translatedGreeting) {
-                await chat.sendMessage(translatedGreeting);
+                const sentMsg = await chat.sendMessage(translatedGreeting);
+                if (sentMsg) this._ignoreMsgIds.add(sentMsg.id._serialized);
               }
             } catch (err) {
               console.error('[WhatsApp] Auto-greeting failed:', err);
@@ -362,7 +365,8 @@ class WhatsAppBridge extends EventEmitter {
           ? response.slice(0, MAX_RESPONSE_LENGTH - 20) + '\n\n... (truncated)'
           : response;
 
-        await this.client.sendMessage(chatId, finalResponse);
+        const sentMsg = await this.client.sendMessage(chatId, finalResponse);
+        if (sentMsg) this._ignoreMsgIds.add(sentMsg.id._serialized);
         
         // ── Audio Generation (TTS) ──
         try {
@@ -384,7 +388,8 @@ class WhatsAppBridge extends EventEmitter {
 
           if (audioBuffer) {
             const media = new MessageMedia('audio/ogg; codecs=opus', audioBuffer.toString('base64'), 'voice.ogg');
-            await this.client.sendMessage(chatId, media, { sendAudioAsVoice: true });
+            const audioSentMsg = await this.client.sendMessage(chatId, media, { sendAudioAsVoice: true });
+            if (audioSentMsg) this._ignoreMsgIds.add(audioSentMsg.id._serialized);
           }
         } catch (ttsErr) {
           console.error('[WhatsApp] TTS Audio generation failed:', ttsErr.message);
