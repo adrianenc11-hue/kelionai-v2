@@ -18,8 +18,8 @@ const router = Router();
 
 // ── AI Chat Handler ──────────────────────────────────────────────
 // This function is called for every WhatsApp message that triggers
-// Kelion (name mentioned). It uses the same chat pipeline as the web.
-async function kelionChatHandler(message, senderName, chatName, isGroup) {
+// Kelion (name mentioned or translate mode).
+async function kelionChatHandler(message, senderName, chatName, isGroup, options = {}) {
   const { smartFetch } = require('../services/modelRouter');
   const { buildKelionPersona } = require('./realtime');
 
@@ -36,12 +36,26 @@ async function kelionChatHandler(message, senderName, chatName, isGroup) {
   });
 
   // Add WhatsApp context to the system prompt
-  const whatsappContext = `\n\n[WHATSAPP CONTEXT]
+  let whatsappContext = `\n\n[WHATSAPP CONTEXT]
 You are responding on ${platform}.
-The person talking to you is "${senderName}".
+The person talking is "${senderName}".
 Keep responses concise (max 500 chars) — this is a chat app, not an essay.
-Use short paragraphs. No markdown formatting (WhatsApp doesn't render it well).
-If someone speaks a different language, respond in THEIR language.
+Use short paragraphs. No markdown formatting (WhatsApp doesn't render it well).`;
+
+  if (options.isTranslateMode || options.isExplicitTranslate) {
+    if (options.isFromAdmin) {
+      whatsappContext += `\n\n[TRANSLATOR MODE - ADMIN MESSAGE]
+The owner of this WhatsApp account (Admin) just sent this message.
+Your task: Translate this message into the language of the other participant(s).
+Output ONLY the direct translation. Do not add quotes, greetings, or explanations.`;
+    } else {
+      whatsappContext += `\n\n[TRANSLATOR MODE - INCOMING MESSAGE]
+The other person sent this message.
+Your task: Translate this message into Romanian for the Admin.
+Output ONLY the direct translation. Do not add quotes, greetings, or explanations.`;
+    }
+  } else {
+    whatsappContext += `\n\nIf someone speaks a different language, respond in THEIR language.
 
 [TRANSLATOR MODE]
 If a message starts with "traduci:" or "translate:" or "翻译:", act as a
@@ -52,10 +66,11 @@ Example: "traduci: Bună ziua, cum ești?" in a chat with a Chinese speaker
 
 When two people speak different languages in a group, automatically translate
 each message to the OTHER person's language. Detect languages automatically.`;
+  }
 
   const messages = [
     { role: 'system', content: systemPrompt + whatsappContext },
-    { role: 'user', content: `[${senderName}]: ${message}` },
+    { role: 'user', content: options.isFromAdmin ? `[Admin]: ${message}` : `[${senderName}]: ${message}` },
   ];
 
   try {

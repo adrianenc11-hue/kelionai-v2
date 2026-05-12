@@ -31,6 +31,7 @@ class WhatsAppBridge extends EventEmitter {
     this.stats = { messagesReceived: 0, responseSent: 0, errors: 0, startedAt: null };
     this._rateLimitMap = new Map(); // chatId → lastResponseTs
     this._greetedContacts = new Set(); // contactId → boolean
+    this._activeTranslators = new Set(); // chatId → true (translate all messages)
     this._chatHandler = null; // Reference to the chat/AI handler
   }
 
@@ -167,25 +168,47 @@ class WhatsAppBridge extends EventEmitter {
    * Responds ONLY when Kelion's name is mentioned.
    */
   async _handleMessage(msg) {
-    // Ignore status updates, own messages, media-only
-    if (msg.isStatus || msg.fromMe) return;
+    // Ignore status updates
+    if (msg.isStatus) return;
 
-    this.stats.messagesReceived++;
     const body = (msg.body || '').trim();
     if (!body) return;
 
     const chat = await msg.getChat();
     const isGroup = chat.isGroup;
     const chatName = chat.name || 'DM';
+    const chatId = chat.id._serialized;
+
+    // ── Command: Toggle Translator Mode ──
+    const bodyLower = body.toLowerCase();
+    if (bodyLower === '!traduci on' || bodyLower === '!translate on') {
+      this._activeTranslators.add(chatId);
+      await msg.reply('✅ Translator automat activat. Voi traduce automat mesajele primite în română, și mesajele tale în limba interlocutorului.');
+      return;
+    }
+    if (bodyLower === '!traduci off' || bodyLower === '!translate off') {
+      this._activeTranslators.delete(chatId);
+      await msg.reply('❌ Translator automat dezactivat.');
+      return;
+    }
+
+    const isTranslateMode = this._activeTranslators.has(chatId);
+    const isExplicitTranslate = bodyLower.startsWith('traduci:') || bodyLower.startsWith('translate:');
+
+    // Ignore our own messages UNLESS translate mode is on, or we used an explicit trigger
+    if (msg.fromMe && !isTranslateMode && !isExplicitTranslate) {
+      return;
+    }
+
+    this.stats.messagesReceived++;
 
     // ── Trigger detection ──
-    // In groups: respond ONLY when Kelion's name is mentioned
+    // In groups: respond ONLY when Kelion's name is mentioned (or translate mode on)
     // In private chats: always respond (it's a direct message)
-    const bodyLower = body.toLowerCase();
     const isMentioned = TRIGGER_NAMES.some(name => bodyLower.includes(name));
 
-    if (isGroup && !isMentioned) {
-      return; // Ignore group messages that don't mention Kelion
+    if (isGroup && !isMentioned && !isTranslateMode && !isExplicitTranslate) {
+      return; // Ignore group messages that don't trigger Kelion
     }
 
     // ── Rate limiting ──
@@ -230,7 +253,13 @@ class WhatsAppBridge extends EventEmitter {
     await chat.sendStateTyping();
 
     try {
-      const response = await this._chatHandler(question, senderName, chatName, isGroup);
+      const response = await this._chatHandler(
+        question, 
+        senderName, 
+        chatName, 
+        isGroup, 
+        { isTranslateMode, isFromAdmin: msg.fromMe, isExplicitTranslate }
+      );
 
       if (response && typeof response === 'string') {
         // Truncate if too long
