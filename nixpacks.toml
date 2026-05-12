@@ -4,7 +4,7 @@ nixPkgs = ["nodejs_22", "python3", "gcc", "gnumake", "poppler_utils", "tesseract
 [phases.install]
 cmds = [
   "npm install",
-  "PUPPETEER_SKIP_DOWNLOAD=1 npm install --prefix server --omit=dev"
+  "npm install --prefix server --omit=dev"
 ]
 
 [phases.build]
