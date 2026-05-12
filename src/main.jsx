@@ -71,10 +71,33 @@ function Loader() {
   )
 }
 
+const PermanentLogo = () => (
+  <div style={{
+    position: 'fixed',
+    bottom: '20px',
+    right: '20px',
+    zIndex: 9999,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    pointerEvents: 'none',
+    opacity: 0.9,
+    background: 'rgba(0,0,0,0.4)',
+    padding: '8px 12px',
+    borderRadius: '12px',
+    backdropFilter: 'blur(4px)',
+    border: '1px solid rgba(167, 139, 250, 0.2)'
+  }}>
+    <img src="/ae_studio_logo.png" alt="AE Studio" style={{ height: '24px', filter: 'drop-shadow(0 0 8px rgba(167, 139, 250, 0.6))' }} />
+    <span style={{ color: '#a78bfa', fontFamily: 'system-ui, sans-serif', fontSize: '13px', fontWeight: '600', letterSpacing: '0.05em' }}>AE Studio</span>
+  </div>
+);
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <ErrorBoundary>
       <BrowserRouter>
+        <PermanentLogo />
         <Suspense fallback={<Loader />}>
           <Routes>
             <Route path="/" element={<KelionStage />} />
