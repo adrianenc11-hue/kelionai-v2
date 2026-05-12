@@ -93,7 +93,9 @@ function getFallbackChain(taskType) {
  */
 function isCodingTask(msg) {
   if (!msg) return false;
-  return /\b(cod[e]?|script|funcți[ei]|debug|refactor|implement|api|endpoint|bug|error|class|component|python|javascript|typescript|react|node|sql|html|css|java|rust|algorithm)\b/i.test(msg.toLowerCase());
+  // Adrian: "trebuie sa detecteze orice task de software/cod". 
+  // Added Romanian keywords: soft, program, aplicație, crea, dezvolt, proiect, sistem.
+  return /\b(cod[e]?|script|funcți[ei]|debug|refactor|implement|api|endpoint|bug|error|class|component|python|javascript|typescript|react|node|sql|html|css|java|rust|algorithm|soft|program|aplicați|creează|dezvolt|proiect|arhitectur|sistem)\b/i.test(msg.toLowerCase());
 }
 
 /**

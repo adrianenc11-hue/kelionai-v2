@@ -9,7 +9,7 @@ const { smartFetch } = require('./modelRouter');
  * Flow: ARCHITECT → EXECUTORS → REVIEWER
  */
 
-async function runSwarmTask(task, context = {}, creditsBalance = 0) {
+async function runSwarmTask(task, context = {}, creditsBalance = 0, tools = undefined) {
   console.log(`[swarm] Initiating swarm for task: "${task.slice(0, 50)}..."`);
   
   // 1. The ARCHITECT — Planning the execution
@@ -47,7 +47,11 @@ async function runSwarmTask(task, context = {}, creditsBalance = 0) {
       temperature: 0.5
     }, creditsBalance > 100); // Use HEAVY for executors only if balance is high
     const json = await result.response.json();
-    return json.choices[0].message.content;
+    const choice = json.choices[0];
+    if (choice.message.tool_calls) {
+      return `[Agent called tools: ${choice.message.tool_calls.map(tc => tc.function.name).join(', ')}]`;
+    }
+    return choice.message.content || '[No output]';
   }));
 
   // 3. The REVIEWER — Synthesis and Verification
@@ -65,13 +69,18 @@ async function runSwarmTask(task, context = {}, creditsBalance = 0) {
 
   const finalResult = await smartFetch('coder', {
     messages: [{ role: 'system', content: reviewerPrompt }],
+    tools: tools,
+    tool_choice: tools ? 'auto' : undefined,
     temperature: 0.3
   }, true); // Always HEAVY for Reviewer
 
   const finalJson = await finalResult.response.json();
+  const choice = finalJson.choices?.[0];
+  
   return {
     ok: true,
-    reply: finalJson.choices[0].message.content,
+    reply: choice?.message?.content || '',
+    toolCalls: choice?.message?.tool_calls,
     agentsUsed: subTasks.length + 2,
     plan: subTasks
   };

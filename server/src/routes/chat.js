@@ -120,7 +120,9 @@ router.post('/', async (req, res) => {
     const taskType = isCodingTask(message) ? 'coder' : 'chat';
     // Admin ALWAYS gets the heavy model for coding/software tasks. Normal users need credits.
     const isHeavy = (isAdmin && taskType === 'coder') || ((creditsBalance > 0) && taskType === 'coder');
-    const isSoftGreu = isHeavy && message.length > 500 && /\b(proiect|arhitectur[aă]|sistem|refactor|migr[aă]|redesign)\b/i.test(message);
+    // Adrian: "Să lucreze cu agenți la orice task mai complex".
+    // Lowering threshold to 200 chars and adding more keywords (soft, program, app, crea, dezvolt).
+    const isSoftGreu = isHeavy && message.length > 200 && /\b(proiect|arhitectur[aă]|sistem|refactor|migr[aă]|redesign|soft|program|aplicați|creează|dezvolt)\b/i.test(message);
 
     const browserLang = (req.query.lang || 'en-US').toString().slice(0, 16);
     const forcedLang = (process.env.KELION_FORCE_LANG || browserLang).toString().slice(0, 16);
@@ -213,8 +215,15 @@ router.post('/', async (req, res) => {
     try {
       if (isSoftGreu) {
         console.log('[chat] Triggering Swarm Expert for Soft Greu task...');
-        const swarmResult = await swarmExpert.runSwarmTask(message, { history: session.history.slice(-5) }, creditsBalance);
-        result = { choices: [{ message: { content: swarmResult.reply } }] };
+        const swarmResult = await swarmExpert.runSwarmTask(message, { history: session.history.slice(-5) }, creditsBalance, openRouterTools);
+        result = { 
+          choices: [{ 
+            message: { 
+              content: swarmResult.reply,
+              tool_calls: swarmResult.toolCalls
+            } 
+          }] 
+        };
       } else {
         const fetchRes = await smartFetch(taskType, body, isHeavy);
         activeModel = fetchRes.model;
