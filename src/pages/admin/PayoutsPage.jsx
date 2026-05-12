@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { KpiCard, Skeleton, useToast, ConfirmModal } from './AdminComponents'
+import { ensureCsrfToken } from '../../lib/api'
 
 function fmtSchedule(s) {
   if (!s?.interval) return '—'
@@ -36,9 +37,10 @@ export default function PayoutsPage() {
   const handleInstant = useCallback(async () => {
     setBusy(true)
     try {
+      const csrf = await ensureCsrfToken()
       const r = await fetch('/api/admin/payouts/instant', {
         method: 'POST', credentials: 'include',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf || getCsrfToken() },
         body: JSON.stringify({}),
       })
       const body = await r.json().catch(() => ({}))

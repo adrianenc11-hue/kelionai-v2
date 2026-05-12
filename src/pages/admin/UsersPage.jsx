@@ -8,6 +8,7 @@ import {
   DataTable, UserAvatar, KpiCard, Skeleton, useToast,
   ConfirmModal, InputModal
 } from './AdminComponents'
+import { ensureCsrfToken } from '../../lib/api'
 
 export default function UsersPage() {
   const { getCsrfToken } = useOutletContext()
@@ -89,10 +90,11 @@ export default function UsersPage() {
     if (!selected?.user?.id) return
     setActionBusy(true)
     try {
+      const csrf = await ensureCsrfToken()
       const r = await fetch(`/api/admin/users/${encodeURIComponent(selected.user.id)}/ban`, {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf || getCsrfToken() },
         body: JSON.stringify({ banned: banModal.ban, reason: banModal.reason || '' }),
       })
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `HTTP ${r.status}`)
@@ -116,10 +118,11 @@ export default function UsersPage() {
     }
     setActionBusy(true)
     try {
+      const csrf = await ensureCsrfToken()
       const r = await fetch(`/api/admin/users/${encodeURIComponent(selected.user.id)}/credits/grant`, {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf || getCsrfToken() },
         body: JSON.stringify({ minutes: Math.trunc(minutes), note: values.note || '' }),
       })
       const body = await r.json().catch(() => ({}))
@@ -139,10 +142,11 @@ export default function UsersPage() {
     if (!selected?.user?.id) return
     setActionBusy(true)
     try {
+      const csrf = await ensureCsrfToken()
       const r = await fetch(`/api/admin/users/${encodeURIComponent(selected.user.id)}/reset-password`, {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf || getCsrfToken() },
       })
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `HTTP ${r.status}`)
       toast?.success?.('Parolă și passkey șterse')

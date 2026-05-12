@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { KpiCard, Skeleton, useToast, InputModal } from './AdminComponents'
+import { ensureCsrfToken } from '../../lib/api'
 
 function friendlyStatus(card) {
   if (!card) return { headline: '—', tone: 'muted' }
@@ -62,12 +63,13 @@ export default function AiCreditsPage() {
     try {
       const rand = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`
       const idempotencyKey = `admin:${email}:${minutes}:${rand}`
+      const csrf = await ensureCsrfToken()
       const r = await fetch('/api/admin/credits/grant', {
         method: 'POST',
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          'X-CSRF-Token': getCsrfToken(),
+          'X-CSRF-Token': csrf || getCsrfToken(),
           'Idempotency-Key': idempotencyKey,
         },
         body: JSON.stringify({ email, minutes: Math.trunc(minutes), note: values.note || '', idempotencyKey }),
