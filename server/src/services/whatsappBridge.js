@@ -364,6 +364,33 @@ class WhatsAppBridge extends EventEmitter {
           : response;
 
         await this.client.sendMessage(chatId, finalResponse);
+        
+        // ── Audio Generation (TTS) ──
+        try {
+          const { MessageMedia } = require('whatsapp-web.js');
+          const { generateTTS } = require('./elevenLabsTTS');
+          
+          // Basic gender heuristic based on first name (ends in 'a' generally female in Latin langs, ignoring exceptions like Luca, Toma)
+          const firstName = senderName.split(' ')[0].toLowerCase();
+          const isFemale = firstName.endsWith('a') && !['luca', 'toma', 'sasha', 'minea'].includes(firstName);
+
+          let audioBuffer;
+          if (msg.fromMe) {
+            // If it's the Admin speaking, we use his cloned voice "Adrian Enciulescu"
+            audioBuffer = await generateTTS(finalResponse, false, 'Adrian Enciulescu');
+          } else {
+            // If it's the interlocutor, use default voices based on name heuristic
+            audioBuffer = await generateTTS(finalResponse, isFemale);
+          }
+
+          if (audioBuffer) {
+            const media = new MessageMedia('audio/ogg; codecs=opus', audioBuffer.toString('base64'), 'voice.ogg');
+            await this.client.sendMessage(chatId, media, { sendAudioAsVoice: true });
+          }
+        } catch (ttsErr) {
+          console.error('[WhatsApp] TTS Audio generation failed:', ttsErr.message);
+        }
+
         this._rateLimitMap.set(chatId, Date.now());
         this.stats.responseSent++;
         console.log(`[WhatsApp] Replied to ${senderName} (${finalResponse.length} chars)`);
