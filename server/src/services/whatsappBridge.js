@@ -219,7 +219,7 @@ class WhatsAppBridge extends EventEmitter {
     // Interactive setup
     if (bodyLower === '!traduci' || bodyLower === '!translate') {
       this._activeTranslators.set(chatId, { setupMode: true });
-      await msg.reply('În ce limbă dorești traducerea? Scrie limbile sub forma: limba_mea limba_lui (ex: ro jp)');
+      await this.client.sendMessage(chatId, 'În ce limbă dorești traducerea? Scrie limbile sub forma: limba_mea limba_lui (ex: ro jp)');
       return;
     }
 
@@ -233,7 +233,7 @@ class WhatsAppBridge extends EventEmitter {
           const adminLang = langs[0];
           const otherLang = langs[1];
           this._activeTranslators.set(chatId, { adminLang, otherLang });
-          await msg.reply(`✅ Translator automat activat.\n- Limba ta: ${adminLang}\n- Limba interlocutorului: ${otherLang}`);
+          await this.client.sendMessage(chatId, `✅ Translator automat activat.\n- Limba ta: ${adminLang}\n- Limba interlocutorului: ${otherLang}`);
           
           // Auto-greeting to the interlocutor via AI
           if (this._chatHandler) {
@@ -253,10 +253,10 @@ class WhatsAppBridge extends EventEmitter {
           return;
         } else if (bodyLower === '!cancel') {
           this._activeTranslators.delete(chatId);
-          await msg.reply('❌ Configurare anulată.');
+          await this.client.sendMessage(chatId, '❌ Configurare anulată.');
           return;
         } else {
-          await msg.reply('Te rog să specifici ambele limbi (ex: ro jp), sau scrie !cancel pentru a anula.');
+          await this.client.sendMessage(chatId, 'Te rog să specifici ambele limbi (ex: ro jp), sau scrie !cancel pentru a anula.');
           return;
         }
       } else {
@@ -277,13 +277,13 @@ class WhatsAppBridge extends EventEmitter {
       } else {
         msgText += `\n- Limba ta: auto (Română)\n- Limba interlocutorului: auto`;
       }
-      await msg.reply(msgText);
+      await this.client.sendMessage(chatId, msgText);
       return;
     }
     
     if (bodyLower === '!traduci off' || bodyLower === '!translate off') {
       this._activeTranslators.delete(chatId);
-      await msg.reply('❌ Translator automat dezactivat.');
+      await this.client.sendMessage(chatId, '❌ Translator automat dezactivat.');
       return;
     }
 
@@ -331,7 +331,7 @@ class WhatsAppBridge extends EventEmitter {
     if (!isGroup && !this._greetedContacts.has(contactId)) {
       this._greetedContacts.add(contactId);
       const greeting = "🤖 Hello! I am Kelion, an AI assistant. Please tell me your preferred language (e.g., English, Romanian, Spanish) so I can assist you better.\n\nSalut! Sunt Kelion, un asistent AI. Te rog spune-mi limba ta preferată pentru a te putea ajuta mai bine.";
-      await msg.reply(greeting);
+      await this.client.sendMessage(chatId, greeting);
       // We continue processing their message normally after greeting
     }
 
@@ -361,7 +361,7 @@ class WhatsAppBridge extends EventEmitter {
           ? response.slice(0, MAX_RESPONSE_LENGTH - 20) + '\n\n... (truncated)'
           : response;
 
-        await msg.reply(finalResponse);
+        await this.client.sendMessage(chatId, finalResponse);
         this._rateLimitMap.set(chatId, Date.now());
         this.stats.responseSent++;
         console.log(`[WhatsApp] Replied to ${senderName} (${finalResponse.length} chars)`);
@@ -369,7 +369,7 @@ class WhatsAppBridge extends EventEmitter {
     } catch (err) {
       this.stats.errors++;
       console.error(`[WhatsApp] AI response error:`, err.message);
-      await msg.reply('⚠️ Scuze, am întâmpinat o eroare. Încearcă din nou.');
+      await this.client.sendMessage(chatId, '⚠️ Scuze, am întâmpinat o eroare. Încearcă din nou.');
     } finally {
       await chat.clearState();
     }
