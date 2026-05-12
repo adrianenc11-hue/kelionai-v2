@@ -53,7 +53,7 @@ class WhatsAppBridge extends EventEmitter {
       // Puppeteer requires a real filesystem path, not a command name.
       let execPath = undefined;
       if (process.env.NODE_ENV === 'production') {
-        execPath = process.env.CHROMIUM_PATH || process.env.PUPPETEER_EXECUTABLE_PATH || null;
+        execPath = process.env.CHROMIUM_PATH || process.env.PUPPETEER_EXECUTABLE_PATH;
         if (!execPath) {
           const { execSync } = require('child_process');
           const fs = require('fs');
