@@ -16,27 +16,27 @@
 const GOOGLE_AI_STUDIO = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
 
 const MODELS = {
-  // Primary: Gemini 1.5 Flash via direct Google API Studio (Fastest for tools, 15 RPM free)
-  chat: process.env.MODEL_CHAT || 'gemini-1.5-flash',
-  chat_heavy: process.env.MODEL_CHAT_HEAVY || 'openai/gpt-4o',
+  // Primary: Gemini 3.1 Flash via direct Google API Studio (Ultra-fast, 2026 standard)
+  chat: process.env.MODEL_CHAT || 'gemini-3.1-flash-lite',
+  chat_heavy: process.env.MODEL_CHAT_HEAVY || 'openai/gpt-5.5',
 
-  // Coding specialist: Gemini 1.5 Flash is much faster than free OpenRouter models
-  coder: process.env.MODEL_CODER || 'gemini-1.5-flash',
-  coder_heavy: process.env.MODEL_CODER_HEAVY || 'anthropic/claude-3.5-sonnet',
+  // Coding specialist: Gemini 3.1 is the 2026 benchmark leader
+  coder: process.env.MODEL_CODER || 'gemini-3.1-flash',
+  coder_heavy: process.env.MODEL_CODER_HEAVY || 'anthropic/claude-4.7-opus',
 
-  // Vision / Extraction: Nemotron Nano (High context & Stability)
-  vision: process.env.MODEL_VISION || 'nvidia/nemotron-3-nano-30b-a3b:free',
-  vision_heavy: process.env.MODEL_VISION_HEAVY || 'openai/gpt-4o-mini',
+  // Vision / Extraction: 2026 Vision models
+  vision: process.env.MODEL_VISION || 'google/gemini-3.1-flash-lite',
+  vision_heavy: process.env.MODEL_VISION_HEAVY || 'openai/gpt-5.5',
 };
 
-// OpenRouter fallback models (audited for high uptime)
+// OpenRouter fallback models (May 2026 updated list)
 const OPENROUTER_FALLBACK = {
-  chat:   ['z-ai/glm-4.5-air:free', 'nvidia/nemotron-3-super-120b-a12b:free', 'openai/gpt-oss-120b:free'],
-  chat_heavy: ['openai/gpt-4o', 'anthropic/claude-3.5-sonnet', 'google/gemini-pro-1.5'],
-  coder:  ['incluziuneai/ring-2.6-1t:free', 'openai/gpt-oss-120b:free', 'qwen/qwen-2.5-coder-32b-instruct:free'],
-  coder_heavy: ['anthropic/claude-3.5-sonnet', 'openai/gpt-4o', 'deepseek/deepseek-coder'],
-  vision: ['nvidia/nemotron-3-nano-30b-a3b:free', 'google/gemma-2-9b-it:free'],
-  vision_heavy: ['openai/gpt-4o-mini', 'google/gemini-flash-1.5'],
+  chat:   ['openai/gpt-5.5-mini', 'anthropic/claude-4.7-sonnet', 'google/gemini-3.1-flash'],
+  chat_heavy: ['openai/gpt-5.5', 'anthropic/claude-4.7-opus', 'google/gemini-3.1-pro'],
+  coder:  ['qwen/qwen-3-coder-max', 'openai/gpt-5.5-mini', 'anthropic/claude-4.7-sonnet'],
+  coder_heavy: ['anthropic/claude-4.7-opus', 'openai/gpt-5.5', 'google/gemini-3.1-pro'],
+  vision: ['google/gemini-3.1-flash-lite', 'openai/gpt-5.5-mini'],
+  vision_heavy: ['openai/gpt-5.5', 'google/gemini-3.1-pro'],
 };
 
 /**
@@ -60,7 +60,7 @@ function getModel(taskType, useHeavy = false) {
  */
 function getEndpoint(model) {
   const googleKey = process.env.GOOGLE_API_KEY;
-  const isGeminiModel = model.startsWith('gemini');
+  const isGeminiModel = model.startsWith('gemini-3') || model.startsWith('gemini-1.5');
 
   if (googleKey && isGeminiModel) {
     return {
