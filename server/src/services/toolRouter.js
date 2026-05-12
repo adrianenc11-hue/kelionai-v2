@@ -357,6 +357,14 @@ const CATEGORY_TRIGGERS = {
   },
 };
 
+// Pre-compiled keyword regexes for better performance
+const COMPILED_KW_REGEX = {};
+for (const [cat, triggers] of Object.entries(CATEGORY_TRIGGERS)) {
+  COMPILED_KW_REGEX[cat] = triggers.keywords.map(kw => 
+    new RegExp('\\b' + kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i')
+  );
+}
+
 /**
  * Analyze a user message and return the set of relevant tool categories.
  * @param {string} message - The user's message text
@@ -370,24 +378,16 @@ function detectCategories(message) {
 
   for (const [category, triggers] of Object.entries(CATEGORY_TRIGGERS)) {
     // Check patterns (regex)
-    for (const pattern of triggers.patterns) {
-      if (pattern.test(lower)) {
-        matched.add(category);
-        break; // One match per category is enough
-      }
+    const hasPatternMatch = triggers.patterns.some(p => p.test(lower));
+    if (hasPatternMatch) {
+      matched.add(category);
+      continue;
     }
 
-    // Use word-boundary matching to avoid substring false positives
-    // e.g. 'pr' matching inside 'despre' or 'spre'
-    if (!matched.has(category)) {
-      for (const kw of triggers.keywords) {
-        // Build a word-boundary regex for the keyword
-        const kwRegex = new RegExp('\\b' + kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
-        if (kwRegex.test(lower)) {
-          matched.add(category);
-          break;
-        }
-      }
+    // Check keywords (pre-compiled)
+    const hasKwMatch = COMPILED_KW_REGEX[category].some(re => re.test(lower));
+    if (hasKwMatch) {
+      matched.add(category);
     }
   }
 

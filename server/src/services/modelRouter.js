@@ -17,12 +17,11 @@ const GOOGLE_AI_STUDIO = 'https://generativelanguage.googleapis.com/v1beta/opena
 
 const MODELS = {
   // Primary: Gemini 1.5 Flash via direct Google API Studio (Fastest for tools, 15 RPM free)
-  // [ROLLBACK NOTE]: To revert to the previous stable state, change 'gemini-1.5-flash' back to 'z-ai/glm-4.5-air:free'
   chat: process.env.MODEL_CHAT || 'gemini-1.5-flash',
   chat_heavy: process.env.MODEL_CHAT_HEAVY || 'openai/gpt-4o',
 
-  // Coding & Tool specialist: Ring 2.6
-  coder: process.env.MODEL_CODER || 'incluziuneai/ring-2.6-1t:free',
+  // Coding specialist: Gemini 1.5 Flash is much faster than free OpenRouter models
+  coder: process.env.MODEL_CODER || 'gemini-1.5-flash',
   coder_heavy: process.env.MODEL_CODER_HEAVY || 'anthropic/claude-3.5-sonnet',
 
   // Vision / Extraction: Nemotron Nano (High context & Stability)
@@ -114,7 +113,9 @@ async function smartFetch(taskType, body, useHeavy = false) {
 
   console.log(`[modelRouter] ${taskType} (heavy=${useHeavy}) → ${model} via ${endpoint.provider}`);
 
-  // Try primary provider
+  // Try primary provider with a hard 15s timeout
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 15000);
   try {
     const response = await fetch(endpoint.url, {
       method: 'POST',
@@ -125,7 +126,9 @@ async function smartFetch(taskType, body, useHeavy = false) {
         'X-Title': 'Kelion AI',
       },
       body: JSON.stringify({ ...body, model }),
+      signal: ctrl.signal,
     });
+    clearTimeout(timer);
 
     if (response.ok) {
       return { response, model, provider: endpoint.provider };
@@ -133,6 +136,7 @@ async function smartFetch(taskType, body, useHeavy = false) {
 
     console.warn(`[modelRouter] ${model} via ${endpoint.provider} failed: ${response.status}`);
   } catch (err) {
+    clearTimeout(timer);
     console.warn(`[modelRouter] ${model} via ${endpoint.provider} error: ${err.message}`);
   }
 
@@ -146,6 +150,8 @@ async function smartFetch(taskType, body, useHeavy = false) {
     const fbModel = chain[i];
     console.log(`[modelRouter] fallback ${i + 1}/${chain.length}: ${fbModel}`);
 
+    const fCtrl = new AbortController();
+    const fTimer = setTimeout(() => fCtrl.abort(), 12000);
     try {
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
@@ -156,7 +162,9 @@ async function smartFetch(taskType, body, useHeavy = false) {
           'X-Title': 'Kelion AI',
         },
         body: JSON.stringify({ ...body, model: fbModel }),
+        signal: fCtrl.signal,
       });
+      clearTimeout(fTimer);
 
       if (response.ok) {
         console.log(`[modelRouter] Fallback ${fbModel} succeeded!`);
@@ -164,6 +172,7 @@ async function smartFetch(taskType, body, useHeavy = false) {
       }
       console.warn(`[modelRouter] Fallback ${fbModel} failed: ${response.status}`);
     } catch (err) {
+      clearTimeout(fTimer);
       console.warn(`[modelRouter] Fallback ${fbModel} error: ${err.message}`);
     }
   }

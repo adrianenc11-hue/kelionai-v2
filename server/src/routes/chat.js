@@ -8,6 +8,7 @@
 const { Router } = require('express');
 const { trialStatus, stampTrialIfFresh } = require('../services/trialQuota');
 const { peekSignedInUser, isAdminUser } = require('../middleware/optionalAuth');
+const { executeRealTool } = require('../services/realTools');
 const ipGeo = require('../services/ipGeo');
 const { buildKelionToolsChatCompletions } = require('./realtime');
 
@@ -119,10 +120,10 @@ router.post('/', async (req, res) => {
     // ── Task Detection: Basic Chat vs Complex Coding ──────────────────
     const taskType = isCodingTask(message) ? 'coder' : 'chat';
     // Admin ALWAYS gets the heavy model for coding/software tasks. Normal users need credits.
-    const isHeavy = (isAdmin && taskType === 'coder') || ((creditsBalance > 0) && taskType === 'coder');
+    const isHeavy = isAdmin || (creditsBalance > 0);
     // Adrian: "Să lucreze cu agenți la orice task mai complex".
-    // Lowering threshold to 200 chars and adding more keywords (soft, program, app, crea, dezvolt).
-    const isSoftGreu = isHeavy && message.length > 200 && /\b(proiect|arhitectur[aă]|sistem|refactor|migr[aă]|redesign|soft|program|aplicați|creează|dezvolt)\b/i.test(message);
+    // Lowering threshold to 150 chars and adding more keywords.
+    const isSoftGreu = isHeavy && message.length > 150 && /\b(proiect|arhitectur[aă]|sistem|refactor|migr[aă]|redesign|soft|program|aplicați|creează|dezvolt|implement|workflow|arhitect)\b/i.test(message);
 
     const browserLang = (req.query.lang || 'en-US').toString().slice(0, 16);
     const forcedLang = (process.env.KELION_FORCE_LANG || browserLang).toString().slice(0, 16);
@@ -231,32 +232,42 @@ router.post('/', async (req, res) => {
       }
       
       const choice = result.choices?.[0];
-      const reply = choice?.message?.content || '';
-
+      
       if (choice?.message?.tool_calls) {
-        // Model wants to call tools. 
-        session.history.push({
-          role: 'assistant',
-          parts: choice.message.tool_calls.map(tc => ({
-            functionCall: {
-              name: tc.function.name,
-              args: JSON.parse(tc.function.arguments),
-              id: tc.id
-            }
-          }))
-        });
+        console.log(`[chat] Executing ${choice.message.tool_calls.length} tools on server...`);
+        const toolResponses = await Promise.all(choice.message.tool_calls.map(async (tc) => {
+          const name = tc.function.name;
+          const args = JSON.parse(tc.function.arguments || '{}');
+          const result = await executeRealTool(name, args, { user: adminUser });
+          return {
+            tool_call_id: tc.id,
+            role: 'tool',
+            name: name,
+            content: JSON.stringify(result)
+          };
+        }));
 
+        // Recursive call to get the final answer with tool results
+        body.messages.push(choice.message);
+        body.messages.push(...toolResponses);
+        
+        const finalRes = await smartFetch(taskType, body, isHeavy);
+        const finalJson = await finalRes.response.json();
+        const finalChoice = finalJson.choices[0];
+        
+        const reply = finalChoice.message.content;
+        session.history.push({ role: 'assistant', parts: [{ text: reply }] });
+        
         return res.json({
-          reply: 'Calling tools...',
-          toolCalls: choice.message.tool_calls.map(tc => ({
-            id: tc.id,
-            name: tc.function.name,
-            args: JSON.parse(tc.function.arguments)
-          }))
+          reply: reply,
+          model: finalRes.model,
+          usage: finalJson.usage,
+          agentsUsed: isSoftGreu ? 5 : 1
         });
       }
 
       // Standard text reply
+      const reply = choice?.message?.content || '';
       if (reply) {
         session.history.push({ role: 'assistant', parts: [{ text: reply }] });
       }
