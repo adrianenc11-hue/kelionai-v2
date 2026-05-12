@@ -1755,28 +1755,47 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
           }
 
           httpAbortRef.current = new AbortController()
-          const r = await fetch('/api/chat', {
-            method: 'POST',
-            signal: httpAbortRef.current.signal,
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
-            credentials: 'include',
-            body: JSON.stringify({ 
-              message: currentMessage, 
-              toolResponses, 
-              image: currentImage,
-              sessionId: sessionIdRef.current,
-              lat: coords?.lat,
-              lon: coords?.lon,
-              clientTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone || '',
-              clientLocalTime: new Date().toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' })
-            }),
-          })
-          if (!r.ok) {
-            const err = await r.json().catch(() => ({ error: 'Chat failed' }))
-            finalReply = err.error || 'Sorry, something went wrong.';
-            break;
+          let data;
+
+          try {
+             // 🤖 HACK: bypass backend and use Opus 4.7 directly in browser via Puter.js
+             const { puter } = await import('@heyputer/puter.js');
+             if (puter && puter.ai) {
+                const sysPrompt = "You are KelionAI, a genius expert coder and architect. Do your best to help the user immediately. Since you are running via Puter, you cannot use native backend tools. Output the response in raw text.";
+                // Only send to puter if we don't have tool responses pending
+                if (!toolResponses || toolResponses.length === 0) {
+                   const puterResp = await puter.ai.chat([{role: 'system', content: sysPrompt}, {role: 'user', content: currentMessage}], { model: 'claude-opus-4-7' });
+                   data = { reply: puterResp?.message?.content?.[0]?.text || '', model: 'claude-opus-4-7 (Puter)' };
+                }
+             }
+          } catch (e) {
+             console.log('[kelionVoice] Puter bypass failed or unavailable:', e);
           }
-          const data = await r.json()
+
+          if (!data) {
+            const r = await fetch('/api/chat', {
+              method: 'POST',
+              signal: httpAbortRef.current.signal,
+              headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+              credentials: 'include',
+              body: JSON.stringify({ 
+                message: currentMessage, 
+                toolResponses, 
+                image: currentImage,
+                sessionId: sessionIdRef.current,
+                lat: coords?.lat,
+                lon: coords?.lon,
+                clientTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone || '',
+                clientLocalTime: new Date().toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' })
+              }),
+            })
+            if (!r.ok) {
+              const err = await r.json().catch(() => ({ error: 'Chat failed' }))
+              finalReply = err.error || 'Sorry, something went wrong.';
+              break;
+            }
+            data = await r.json()
+          }
           
           if (data.toolCalls && data.toolCalls.length > 0) {
             setStatus('working')
