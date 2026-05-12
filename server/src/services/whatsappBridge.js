@@ -31,6 +31,7 @@ class WhatsAppBridge extends EventEmitter {
     this.stats = { messagesReceived: 0, responseSent: 0, errors: 0, startedAt: null };
     this._rateLimitMap = new Map(); // chatId → lastResponseTs
     this._greetedContacts = new Set(); // contactId → boolean
+    this._activeTranslators = new Map(); // chatId → { adminLang, otherLang }
     this._chatHandler = null; // Reference to the chat/AI handler
   }
 
@@ -167,29 +168,63 @@ class WhatsAppBridge extends EventEmitter {
    * Responds ONLY when Kelion's name is mentioned.
    */
   async _handleMessage(msg) {
-    // Ignore status updates, own messages, media-only
-    if (msg.isStatus || msg.fromMe) return;
+    // Ignore status updates
+    if (msg.isStatus) return;
 
-    this.stats.messagesReceived++;
     const body = (msg.body || '').trim();
     if (!body) return;
 
     const chat = await msg.getChat();
     const isGroup = chat.isGroup;
     const chatName = chat.name || 'DM';
+    const chatId = chat.id._serialized;
+
+    // ── Command: Toggle Translator Mode ──
+    const bodyLower = body.toLowerCase();
+    
+    const translateMatch = bodyLower.match(/^!(?:traduci|translate)\s+on(?:\s+([a-z]+)\s+([a-z]+))?/);
+    if (translateMatch) {
+      const adminLang = translateMatch[1] || 'auto';
+      const otherLang = translateMatch[2] || 'auto';
+      this._activeTranslators.set(chatId, { adminLang, otherLang });
+      
+      let msgText = `✅ Translator automat activat.`;
+      if (adminLang !== 'auto') {
+        msgText += `\n- Limba ta: ${adminLang}\n- Limba interlocutorului: ${otherLang}`;
+      } else {
+        msgText += `\n- Limba ta: auto (Română)\n- Limba interlocutorului: auto`;
+      }
+      await msg.reply(msgText);
+      return;
+    }
+    
+    if (bodyLower === '!traduci off' || bodyLower === '!translate off') {
+      this._activeTranslators.delete(chatId);
+      await msg.reply('❌ Translator automat dezactivat.');
+      return;
+    }
+
+    const translateContext = this._activeTranslators.get(chatId);
+    const isTranslateMode = !!translateContext;
+    const isExplicitTranslate = bodyLower.startsWith('traduci:') || bodyLower.startsWith('translate:');
+
+    // Ignore our own messages UNLESS translate mode is on, or we used an explicit trigger
+    if (msg.fromMe && !isTranslateMode && !isExplicitTranslate) {
+      return;
+    }
+
+    this.stats.messagesReceived++;
 
     // ── Trigger detection ──
-    // In groups: respond ONLY when Kelion's name is mentioned
+    // In groups: respond ONLY when Kelion's name is mentioned (or translate mode on)
     // In private chats: always respond (it's a direct message)
-    const bodyLower = body.toLowerCase();
     const isMentioned = TRIGGER_NAMES.some(name => bodyLower.includes(name));
 
-    if (isGroup && !isMentioned) {
-      return; // Ignore group messages that don't mention Kelion
+    if (isGroup && !isMentioned && !isTranslateMode && !isExplicitTranslate) {
+      return; // Ignore group messages that don't trigger Kelion
     }
 
     // ── Rate limiting ──
-    const chatId = chat.id._serialized;
     const now = Date.now();
     const lastResponse = this._rateLimitMap.get(chatId) || 0;
     if (now - lastResponse < RATE_LIMIT_MS) {
@@ -230,7 +265,13 @@ class WhatsAppBridge extends EventEmitter {
     await chat.sendStateTyping();
 
     try {
-      const response = await this._chatHandler(question, senderName, chatName, isGroup);
+      const response = await this._chatHandler(
+        question, 
+        senderName, 
+        chatName, 
+        isGroup, 
+        { isTranslateMode, isFromAdmin: msg.fromMe, isExplicitTranslate, translateContext }
+      );
 
       if (response && typeof response === 'string') {
         // Truncate if too long
