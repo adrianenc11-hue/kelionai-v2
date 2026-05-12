@@ -196,6 +196,12 @@ class WhatsAppBridge extends EventEmitter {
     }
     if (body.startsWith('⚠️') || body.startsWith('✅') || body.startsWith('⛔') || body.startsWith('🤖')) return;
 
+    // ── GET CHAT CONTEXT EARLY ──
+    const chat = await msg.getChat();
+    const isGroup = chat.isGroup;
+    const chatName = chat.name || 'DM';
+    const chatId = chat.id._serialized;
+
     // ── AUDIO TRANSCRIBER (STT) ──
     if (msg.hasMedia && (msg.type === 'ptt' || msg.type === 'audio')) {
       try {
@@ -224,11 +230,6 @@ class WhatsAppBridge extends EventEmitter {
     }
 
     if (!body) return;
-
-    const chat = await msg.getChat();
-    const isGroup = chat.isGroup;
-    const chatName = chat.name || 'DM';
-    const chatId = chat.id._serialized;
 
     // ── Command: Toggle Translator Mode ──
     const bodyLower = body.toLowerCase();
