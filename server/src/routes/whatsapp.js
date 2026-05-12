@@ -72,11 +72,13 @@ If someone speaks a different language, respond in THEIR language.`;
   }
 
   try {
-    const result = await smartFetch('chat', {
+    const fetchRes = await smartFetch('chat', {
       messages,
       temperature: 0.7,
       max_tokens: 600,
     });
+
+    const result = await fetchRes.response.json();
 
     if (result?.choices?.[0]?.message?.content) {
       return result.choices[0].message.content.trim();
