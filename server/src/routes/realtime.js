@@ -1672,8 +1672,9 @@ const voiceTokenHandler = async (req, res) => {
     //   Browser SpeechRecognition → /api/realtime/pipeline (Claude Opus via
     //   OpenRouter) → /api/voice/clone/tts (ElevenLabs TTS).
     // We still build the full persona + tools so /pipeline can use them.
-    const { getModel } = require('../services/modelRouter');
+    const { getModel, getEndpoint } = require('../services/modelRouter');
     const chatModel = getModel('chat');
+      const endpoint = getEndpoint(chatModel);
     console.log(`[voice-token] Smart Router → ${chatModel}`);
 
     // Restore variables needed for JSON payload
@@ -1693,8 +1694,8 @@ const voiceTokenHandler = async (req, res) => {
       expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
       model: chatModel,
       voice,
-      provider: 'openrouter',
-      backend: 'openrouter',
+      provider: endpoint.provider,
+      backend: endpoint.provider,
       signedIn: !!user,
       userName: user?.name || null,
       memoryCount: memoryItems.length,

@@ -1,16 +1,11 @@
-﻿with open('server/src/services/realTools.js', 'r', encoding='utf-8') as f:
-    lines = f.readlines()
+import sys
+with open('server/src/routes/realtime.js', 'r', encoding='utf-8') as f:
+    content = f.read()
 
-new_lines = []
-skip = False
-for i, line in enumerate(lines):
-    if line.startswith('async function toolAskExpertCoder(args) {') and i > 3000:
-        skip = True
-    if skip and line.startswith('async function executeRealTool(name, args, ctx) {'):
-        skip = False
-    
-    if not skip:
-        new_lines.append(line)
+content = content.replace("const { getModel } = require('../services/modelRouter');", "const { getModel, getEndpoint } = require('../services/modelRouter');")
+content = content.replace("const chatModel = getModel('chat');", "const chatModel = getModel('chat');\n      const endpoint = getEndpoint(chatModel);")
+content = content.replace("provider: 'openrouter',", "provider: endpoint.provider,")
+content = content.replace("backend: 'openrouter',", "backend: endpoint.provider,")
 
-with open('server/src/services/realTools.js', 'w', encoding='utf-8') as f:
-    f.writelines(new_lines)
+with open('server/src/routes/realtime.js', 'w', encoding='utf-8') as f:
+    f.write(content)

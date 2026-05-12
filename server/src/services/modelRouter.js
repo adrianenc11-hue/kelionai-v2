@@ -16,8 +16,9 @@
 const GOOGLE_AI_STUDIO = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
 
 const MODELS = {
-  // Primary: GLM 4.5 Air (Fastest for natural conversation)
-  chat: process.env.MODEL_CHAT || 'z-ai/glm-4.5-air:free',
+  // Primary: Gemini 2.5 Flash via direct Google API Studio (Fastest for tools, 15 RPM free)
+  // [ROLLBACK NOTE]: To revert to the previous stable state, change 'gemini-2.5-flash' back to 'z-ai/glm-4.5-air:free'
+  chat: process.env.MODEL_CHAT || 'gemini-2.5-flash',
   chat_heavy: process.env.MODEL_CHAT_HEAVY || 'openai/gpt-4o',
 
   // Coding & Tool specialist: Ring 2.6

@@ -104,10 +104,10 @@ test.describe('Kelion Studio API (DS-1 / DS-3) wiring', () => {
   });
 });
 
-test.describe('Voice session token endpoint (Claude Opus)', () => {
-  test('Returns Claude Opus model with openrouter backend', async ({ request }) => {
+test.describe('Voice session token endpoint (Configured Model)', () => {
+  test('Returns configured model and backend information', async ({ request }) => {
     // The voice token endpoint returns the configured chat model info for
-    // REST Voice Mode (SpeechRecognition → OpenRouter → TTS).
+    // REST Voice Mode (SpeechRecognition → REST → TTS).
     // No ephemeral token is minted — the client uses REST mode.
     const res = await request.get(`${BASE}/api/realtime/voice-token?lang=en-US`);
     if ([401, 402, 403, 503].includes(res.status())) {
@@ -117,10 +117,13 @@ test.describe('Voice session token endpoint (Claude Opus)', () => {
     }
     expect(res.status()).toBe(200);
     const body = await res.json();
-    expect(body.backend).toBe('openrouter');
+    expect(['openrouter', 'google-ai-studio']).toContain(body.backend);
     expect(typeof body.model).toBe('string');
     expect(body.model.length).toBeGreaterThan(0);
-    expect(body.model).toMatch(/\//); // OpenRouter uses "vendor/model" slugs
+    // OpenRouter models have a slash, Google ones do not necessarily
+    if (body.backend === 'openrouter') {
+      expect(body.model).toMatch(/\//); // OpenRouter uses "vendor/model" slugs
+    }
     expect(body.token).toBeNull();
   });
 });
