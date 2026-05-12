@@ -287,6 +287,14 @@ CREATE TABLE IF NOT EXISTS voice_clones (
   consent_at      TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   created_at      TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS whatsapp_contact_voices (
+  id              BIGSERIAL PRIMARY KEY,
+  contact_id      TEXT UNIQUE NOT NULL,
+  voice_id        TEXT NOT NULL,
+  last_used_at    TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  created_at      TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
 CREATE INDEX IF NOT EXISTS idx_voice_clones_user ON voice_clones(user_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_voice_clones_voice ON voice_clones(user_id, voice_id);
 
