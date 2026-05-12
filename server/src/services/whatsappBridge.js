@@ -47,16 +47,38 @@ class WhatsAppBridge extends EventEmitter {
     this.status = 'disconnected';
 
     try {
+      // Resolve Chromium path on production (nixpacks / Railway)
+      let execPath = undefined;
+      if (process.env.NODE_ENV === 'production') {
+        execPath = process.env.CHROMIUM_PATH || null;
+        if (!execPath) {
+          // Try common locations on Railway / nixpacks / Docker
+          const { execSync } = require('child_process');
+          try {
+            execPath = execSync('which chromium || which chromium-browser || which google-chrome', {
+              encoding: 'utf8', timeout: 3000,
+            }).trim();
+          } catch (_) {
+            execPath = 'chromium'; // Fallback — hope it's on PATH
+          }
+        }
+        console.log(`[WhatsApp] Using Chromium at: ${execPath}`);
+      }
+
       this.client = new Client({
         authStrategy: new LocalAuth({ dataPath: SESSION_DIR }),
         puppeteer: {
-          executablePath: process.env.NODE_ENV === 'production' ? 'chromium' : undefined,
+          executablePath: execPath,
           headless: true,
           args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
             '--disable-gpu',
+            '--disable-extensions',
+            '--disable-software-rasterizer',
+            '--no-first-run',
+            '--no-zygote',
             '--single-process',
           ],
         },
