@@ -36,35 +36,39 @@ const {
 const router = Router();
 
 router.get('/status', async (req, res) => {
-  // Anyone with a valid JWT — admin OR regular — is not subject to the
-  // guest trial, so we don't need the admin DB lookup here (Copilot
-  // review pr-74): `applicable: false` is identical for both.
-  const user = peekSignedInUser(req);
-  if (user) {
+  try {
+    // Anyone with a valid JWT — admin OR regular — is not subject to the
+    // guest trial, so we don't need the admin DB lookup here (Copilot
+    // review pr-74): `applicable: false` is identical for both.
+    const user = peekSignedInUser(req);
+    if (user) {
+      return res.json({
+        applicable:          false,
+        allowed:             true,
+        remainingMs:         TRIAL_WINDOW_MS,
+        windowMs:            TRIAL_WINDOW_MS,
+        lifetimeMs:          TRIAL_LIFETIME_MS,
+        lifetimeRemainingMs: TRIAL_LIFETIME_MS,
+        stamped:             false,
+      });
+    }
+    const ip = ipGeo.clientIp(req) || req.ip || '';
+    // Guest trial: 15 min/day, 7-day lifetime per IP.
+    const status = await trialStatus(ip);
     return res.json({
-      applicable:          false,
-      allowed:             true,
-      remainingMs:         TRIAL_WINDOW_MS,
+      applicable:          true,
+      allowed:             status.allowed,
+      reason:              status.reason || undefined,
+      remainingMs:         status.remainingMs,
       windowMs:            TRIAL_WINDOW_MS,
       lifetimeMs:          TRIAL_LIFETIME_MS,
-      lifetimeRemainingMs: TRIAL_LIFETIME_MS,
-      stamped:             false,
+      lifetimeRemainingMs: status.lifetimeRemainingMs ?? TRIAL_LIFETIME_MS,
+      stamped:             !status.fresh,
+      nextWindowMs:        status.nextWindowMs || undefined,
     });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
-  const ip = ipGeo.clientIp(req) || req.ip || '';
-  // Guest trial: 15 min/day, 7-day lifetime per IP.
-  const status = await trialStatus(ip);
-  return res.json({
-    applicable:          true,
-    allowed:             status.allowed,
-    reason:              status.reason || undefined,
-    remainingMs:         status.remainingMs,
-    windowMs:            TRIAL_WINDOW_MS,
-    lifetimeMs:          TRIAL_LIFETIME_MS,
-    lifetimeRemainingMs: status.lifetimeRemainingMs ?? TRIAL_LIFETIME_MS,
-    stamped:             !status.fresh,
-    nextWindowMs:        status.nextWindowMs || undefined,
-  });
 });
 
 module.exports = router;
