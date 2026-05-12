@@ -4,8 +4,8 @@ async function transcribeAudioPtt(base64Data, mimeType) {
   const googleKey = process.env.GOOGLE_API_KEY;
   if (!googleKey) throw new Error('GOOGLE_API_KEY not configured.');
 
-  // We use gemini-1.5-flash for fast transcription
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${googleKey}`;
+  // We use gemini-1.5-flash-latest (since base gemini-1.5-flash is sometimes not found)
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${googleKey}`;
   
   const payload = {
     contents: [
