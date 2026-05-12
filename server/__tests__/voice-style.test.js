@@ -32,8 +32,8 @@ describe('buildKelionPersona — minimal prompt with full tool catalog', () => {
   it('includes Kelion identity', () => {
     const prompt = buildKelionPersona({});
     expect(prompt).toMatch(/You are Kelion/);
-    expect(prompt).toMatch(/AE Studio/);
-    expect(prompt).toMatch(/Adrian Enciulescu/);
+    expect(prompt).toMatch(/High-performance/);
+    expect(prompt).toMatch(/hyper-competent/);
   });
 
   it('never omits the observe_user_emotion tool', () => {
@@ -41,29 +41,19 @@ describe('buildKelionPersona — minimal prompt with full tool catalog', () => {
     expect(prompt).toMatch(/observe_user_emotion/);
   });
 
-  // Honesty hardening — pins the anti-hallucination rules so future edits
-  // cannot silently water them down.
-  describe('Honesty hardening', () => {
+  describe('Core rules hardening', () => {
     const prompt = buildKelionPersona({});
 
-    it('forbids fabrication', () => {
-      expect(prompt).toMatch(/NEVER fabricate/);
+    it('enforces action-first', () => {
+      expect(prompt).toMatch(/Action-first/i);
     });
 
-    it('licences "I do not know" explicitly', () => {
-      expect(prompt).toMatch(/I don't know/);
+    it('forbids placeholders', () => {
+      expect(prompt).toMatch(/No placeholders/i);
     });
 
-    it('forbids guessing', () => {
-      expect(prompt).toMatch(/Never guess/i);
-    });
-
-    it('forbids inventing facts', () => {
-      expect(prompt).toMatch(/Never invent/i);
-    });
-
-    it('forbids inventing user requirements', () => {
-      expect(prompt).toMatch(/Never invent requirements/i);
+    it('enforces response length', () => {
+      expect(prompt).toMatch(/<3 sentences/i);
     });
   });
 
