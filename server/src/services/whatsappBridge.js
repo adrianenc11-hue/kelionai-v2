@@ -27,6 +27,7 @@ class WhatsAppBridge extends EventEmitter {
     this.client = null;
     this.qrCode = null;       // Current QR as data URL
     this.status = 'disconnected'; // disconnected | qr_pending | ready | error
+    this.lastError = null;    // Last error message for admin visibility
     this.stats = { messagesReceived: 0, responseSent: 0, errors: 0, startedAt: null };
     this._rateLimitMap = new Map(); // chatId → lastResponseTs
     this._greetedContacts = new Set(); // contactId → boolean
@@ -101,6 +102,7 @@ class WhatsAppBridge extends EventEmitter {
       this.client.on('ready', () => {
         this.status = 'ready';
         this.qrCode = null; // No longer needed
+        this.lastError = null;
         this.stats.startedAt = new Date().toISOString();
         console.log('[WhatsApp] ✅ Connected and ready!');
         this.emit('ready');
@@ -127,6 +129,7 @@ class WhatsAppBridge extends EventEmitter {
       // ── Auth failure ──
       this.client.on('auth_failure', (msg) => {
         this.status = 'error';
+        this.lastError = `Auth failure: ${msg}`;
         console.error('[WhatsApp] Auth failure:', msg);
         this.emit('error', msg);
       });
@@ -136,6 +139,7 @@ class WhatsAppBridge extends EventEmitter {
 
     } catch (err) {
       this.status = 'error';
+      this.lastError = `Init failed: ${err.message}`;
       console.error('[WhatsApp] Init failed:', err.message);
       this.emit('error', err.message);
     }
@@ -238,6 +242,7 @@ class WhatsAppBridge extends EventEmitter {
     return {
       status: this.status,
       qrCode: this.qrCode,
+      lastError: this.lastError,
       stats: this.stats,
       isReady: this.status === 'ready',
     };

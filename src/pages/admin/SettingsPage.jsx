@@ -90,6 +90,7 @@ function WhatsAppBridgeCard({ toast, getCsrfToken }) {
   const [waStatus, setWaStatus] = useState('checking')
   const [qrCode, setQrCode] = useState(null)
   const [stats, setStats] = useState(null)
+  const [lastError, setLastError] = useState(null)
 
   const fetchStatus = async () => {
     try {
@@ -99,6 +100,7 @@ function WhatsAppBridgeCard({ toast, getCsrfToken }) {
         setWaStatus(data.status)
         setQrCode(data.qrCode)
         setStats(data.stats)
+        setLastError(data.lastError || null)
       }
     } catch (_) {}
   }
@@ -163,6 +165,11 @@ function WhatsAppBridgeCard({ toast, getCsrfToken }) {
           </span>
         )}
       </div>
+      {waStatus === 'error' && lastError && (
+        <div style={{ fontSize: 12, color: 'var(--admin-red)', background: 'rgba(239,68,68,0.08)', padding: '10px 14px', borderRadius: 8, marginBottom: 16, fontFamily: 'monospace', wordBreak: 'break-all' }}>
+          ⚠️ {lastError}
+        </div>
+      )}
 
       {qrCode && waStatus === 'qr_pending' && (
         <div style={{ marginBottom: 16, background: 'white', padding: 12, borderRadius: 8, display: 'inline-block' }}>
