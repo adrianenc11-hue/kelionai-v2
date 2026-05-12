@@ -10,17 +10,40 @@ export function getCsrfToken() {
   return match ? match[1] : ''
 }
 
+/**
+ * Ensure the CSRF cookie exists. If it's missing (first visit, cleared
+ * cookies, mobile browser quirks) we fire a lightweight GET so the
+ * server's csrfSeed middleware sets it. Returns the token string.
+ */
+export async function ensureCsrfToken() {
+  let token = getCsrfToken()
+  if (token) return token
+  // Cookie missing — hit a cheap GET endpoint to trigger csrfSeed
+  try {
+    await fetch(`${API_BASE}/health`, { credentials: 'include' })
+  } catch (_) {}
+  token = getCsrfToken()
+  return token
+}
+
 async function apiFetch(path, options = {}) {
   const url = `${API_BASE}${path}`
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), 10000)
+
+  // For state-changing methods, ensure the CSRF cookie exists before sending
+  const method = (options.method || 'GET').toUpperCase()
+  let csrfToken = getCsrfToken()
+  if (!csrfToken && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
+    csrfToken = await ensureCsrfToken()
+  }
 
   try {
     const res = await fetch(url, {
       credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
-        'X-CSRF-Token': getCsrfToken(),
+        'X-CSRF-Token': csrfToken,
         ...options.headers,
       },
       signal: controller.signal,

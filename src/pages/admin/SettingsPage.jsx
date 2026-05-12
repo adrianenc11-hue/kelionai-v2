@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { useToast } from './AdminComponents'
+import { ensureCsrfToken } from '../../lib/api'
 
 export default function SettingsPage() {
   const toast = useToast()
@@ -114,10 +115,11 @@ function WhatsAppBridgeCard({ toast, getCsrfToken }) {
   const handleConnect = async () => {
     setWaStatus('connecting...')
     try {
+      const csrf = await ensureCsrfToken()
       const r = await fetch('/api/whatsapp/connect', { 
         method: 'POST', 
         credentials: 'include',
-        headers: { 'X-CSRF-Token': getCsrfToken() }
+        headers: { 'X-CSRF-Token': csrf || getCsrfToken() }
       })
       const data = await r.json()
       if (r.ok) {
@@ -133,10 +135,11 @@ function WhatsAppBridgeCard({ toast, getCsrfToken }) {
 
   const handleDisconnect = async () => {
     try {
+      const csrf = await ensureCsrfToken()
       await fetch('/api/whatsapp/logout', { 
         method: 'POST', 
         credentials: 'include',
-        headers: { 'X-CSRF-Token': getCsrfToken() }
+        headers: { 'X-CSRF-Token': csrf || getCsrfToken() }
       })
       toast.info('Sesiune WhatsApp ștearsă')
       fetchStatus()
