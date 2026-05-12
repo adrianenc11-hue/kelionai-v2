@@ -41,15 +41,31 @@ async function runSwarmTask(task, context = {}, creditsBalance = 0, tools = unde
   // 2. The EXECUTORS — Parallel execution
   console.log(`[swarm] Dispatching ${subTasks.length} sub-tasks to executors...`);
   const executorResults = await Promise.all(subTasks.map(async (st, i) => {
-    const executorPrompt = `Specialized Agent ${i+1}. Perform sub-task: ${st}. Context: ${task}`;
+    const executorPrompt = `Specialized Agent ${i+1}. Perform sub-task: ${st}. Context: ${task}.
+    If you need to use tools, call them. You have full workspace access.`;
+    
+    // Admin always gets the heaviest models for all agents. 
+    // Otherwise, depends on credits.
+    const useHeavyExecutor = (creditsBalance > 500); 
+
     const result = await smartFetch('coder', {
       messages: [{ role: 'system', content: executorPrompt }],
+      tools: tools,
       temperature: 0.5
-    }, creditsBalance > 100); // Use HEAVY for executors only if balance is high
+    }, useHeavyExecutor);
     const json = await result.response.json();
     const choice = json.choices[0];
+    
     if (choice.message.tool_calls) {
-      return `[Agent called tools: ${choice.message.tool_calls.map(tc => tc.function.name).join(', ')}]`;
+      const { executeRealTool } = require('./realTools');
+      console.log(`[swarm] Executor ${i+1} calling ${choice.message.tool_calls.length} tools...`);
+      
+      const toolResults = await Promise.all(choice.message.tool_calls.map(async (tc) => {
+        const r = await executeRealTool(tc.function.name, JSON.parse(tc.function.arguments || '{}'), context);
+        return `Tool ${tc.function.name} output: ${JSON.stringify(r)}`;
+      }));
+      
+      return `Agent ${i+1} executed tools and got: ${toolResults.join('\n')}\nContent: ${choice.message.content || ''}`;
     }
     return choice.message.content || '[No output]';
   }));
