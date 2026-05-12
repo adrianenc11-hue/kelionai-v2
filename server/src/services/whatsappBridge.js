@@ -48,22 +48,39 @@ class WhatsAppBridge extends EventEmitter {
     this.status = 'disconnected';
 
     try {
-      // Resolve Chromium path on production (nixpacks / Railway)
+      // Resolve Chromium absolute path on production (nixpacks / Railway).
+      // Puppeteer requires a real filesystem path, not a command name.
       let execPath = undefined;
       if (process.env.NODE_ENV === 'production') {
-        execPath = process.env.CHROMIUM_PATH || null;
+        execPath = process.env.CHROMIUM_PATH || process.env.PUPPETEER_EXECUTABLE_PATH || null;
         if (!execPath) {
-          // Try common locations on Railway / nixpacks / Docker
           const { execSync } = require('child_process');
-          try {
-            execPath = execSync('which chromium || which chromium-browser || which google-chrome', {
-              encoding: 'utf8', timeout: 3000,
-            }).trim();
-          } catch (_) {
-            execPath = 'chromium'; // Fallback — hope it's on PATH
+          const fs = require('fs');
+          // 1. Try resolving via shell (command -v is POSIX, always available)
+          for (const cmd of ['chromium', 'chromium-browser', 'google-chrome']) {
+            try {
+              // readlink -f resolves symlinks to the actual binary
+              const resolved = execSync(`readlink -f "$(command -v ${cmd})" 2>/dev/null`, {
+                encoding: 'utf8', timeout: 3000,
+              }).trim();
+              if (resolved && fs.existsSync(resolved)) {
+                execPath = resolved;
+                break;
+              }
+            } catch (_) {}
           }
+          // 2. Scan known nix store paths
+          if (!execPath) {
+            try {
+              const found = execSync('find /nix/store -maxdepth 3 -name chromium -type f 2>/dev/null | head -1', {
+                encoding: 'utf8', timeout: 5000,
+              }).trim();
+              if (found && fs.existsSync(found)) execPath = found;
+            } catch (_) {}
+          }
+          // 3. If nothing found, don't set executablePath — let Puppeteer use its bundled browser
         }
-        console.log(`[WhatsApp] Using Chromium at: ${execPath}`);
+        console.log(`[WhatsApp] Chromium path: ${execPath || '(puppeteer default)'}`);
       }
 
       this.client = new Client({
