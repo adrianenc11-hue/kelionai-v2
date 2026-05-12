@@ -203,7 +203,9 @@ class WhatsAppBridge extends EventEmitter {
     const chatId = chat.id._serialized;
 
     // ── AUDIO TRANSCRIBER (STT) ──
+    let inputWasAudio = false;
     if (msg.hasMedia && (msg.type === 'ptt' || msg.type === 'audio')) {
+      inputWasAudio = true;
       try {
         const media = await msg.downloadMedia();
         if (media && media.data) {
@@ -382,9 +384,16 @@ class WhatsAppBridge extends EventEmitter {
           ? response.slice(0, MAX_RESPONSE_LENGTH - 20) + '\n\n... (truncated)'
           : response;
 
-        this._expectedOutgoingText.add(finalResponse);
-        const sentMsg = await this.client.sendMessage(chatId, finalResponse);
-        if (sentMsg) this._ignoreMsgIds.add(sentMsg.id._serialized);
+        let textAlreadySent = false;
+        
+        // If the user sent TEXT, we reply with TEXT + AUDIO.
+        // If the user sent AUDIO, we reply ONLY with AUDIO (unless it fails, then we fallback to text).
+        if (!inputWasAudio) {
+          this._expectedOutgoingText.add(finalResponse);
+          const sentMsg = await this.client.sendMessage(chatId, finalResponse);
+          if (sentMsg) this._ignoreMsgIds.add(sentMsg.id._serialized);
+          textAlreadySent = true;
+        }
         
         // ── Audio Generation (TTS) ──
         try {
@@ -401,6 +410,7 @@ class WhatsAppBridge extends EventEmitter {
             audioBuffer = await generateTTS(finalResponse, false, 'Adrian Enciulescu');
           } else {
             // If it's the interlocutor, use default voices based on name heuristic
+            // ElevenLabs Multilingual v2 automatically uses native accents!
             audioBuffer = await generateTTS(finalResponse, isFemale);
           }
 
@@ -408,9 +418,20 @@ class WhatsAppBridge extends EventEmitter {
             const media = new MessageMedia('audio/ogg; codecs=opus', audioBuffer.toString('base64'), 'voice.ogg');
             const audioSentMsg = await this.client.sendMessage(chatId, media, { sendAudioAsVoice: true });
             if (audioSentMsg) this._ignoreMsgIds.add(audioSentMsg.id._serialized);
+          } else if (!textAlreadySent) {
+            // Fallback: If no audio buffer was generated, send the text translation so it isn't lost
+            this._expectedOutgoingText.add(finalResponse);
+            const sentMsg = await this.client.sendMessage(chatId, finalResponse);
+            if (sentMsg) this._ignoreMsgIds.add(sentMsg.id._serialized);
+            textAlreadySent = true;
           }
         } catch (ttsErr) {
           console.error('[WhatsApp] TTS Audio generation failed:', ttsErr.message);
+          if (!textAlreadySent) {
+            this._expectedOutgoingText.add(finalResponse);
+            const sentMsg = await this.client.sendMessage(chatId, finalResponse);
+            if (sentMsg) this._ignoreMsgIds.add(sentMsg.id._serialized);
+          }
         }
 
         this._rateLimitMap.set(chatId, Date.now());
