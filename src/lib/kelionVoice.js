@@ -158,7 +158,12 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
   // turn (still in flight over the wire) from resuming playback after
   // we've already called `.stop()` on the active sources.
   const playbackGenerationRef = useRef(0)
-  const mediaStreamDestRef = useRef(null)
+
+  // ───── Chunked TTS Queue ─────
+  const ttsBlobQueueRef = useRef([])
+  const ttsIsPlayingRef = useRef(false)
+  const ttsAbortControllerRef = useRef(null)
+
   // VOICE UNIQUENESS: central ref for ANY audio element currently
   // playing TTS (audioRef blob, standalone new Audio(), etc.).
   // clearAudioQueue stops it so only ONE voice speaks at a time.
@@ -229,6 +234,67 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
       return next
     })
   }, [])
+
+  const playNextTtsBlob = useCallback(() => {
+    if (ttsIsPlayingRef.current || ttsBlobQueueRef.current.length === 0) return;
+    ttsIsPlayingRef.current = true;
+    
+    const blobUrl = ttsBlobQueueRef.current.shift();
+    const audioEl = audioRef?.current || new window.Audio();
+    if (audioEl === audioRef?.current) {
+      audioEl.srcObject = null;
+      audioEl.muted = false;
+    }
+    audioEl.src = blobUrl;
+    audioEl.volume = 1.0;
+    activeAudioElRef.current = audioEl;
+    
+    const onComplete = () => {
+      URL.revokeObjectURL(blobUrl);
+      activeAudioElRef.current = null;
+      ttsIsPlayingRef.current = false;
+      playNextTtsBlob();
+      
+      // If queue is empty and we are speaking, flip to listening
+      if (ttsBlobQueueRef.current.length === 0 && statusRef.current === 'speaking') {
+         setStatus(window.__restRecRef ? 'listening' : 'idle');
+      }
+    };
+    audioEl.onended = onComplete;
+    audioEl.onerror = onComplete;
+    audioEl.play().catch(onComplete);
+  }, [audioRef]);
+
+  const processTtsChunk = useCallback(async (textChunk) => {
+    if (!textChunk.trim()) return;
+    const isNative = !isClonedVoiceActive();
+    const ttsUrl = isNative ? '/api/voice/clone/tts?native=true' : '/api/voice/clone/tts';
+    
+    if (!ttsAbortControllerRef.current) {
+      ttsAbortControllerRef.current = new AbortController();
+    }
+    
+    setStatus('speaking');
+    try {
+      const r = await fetch(ttsUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+        credentials: 'include',
+        body: JSON.stringify({ text: textChunk, lang: getDetectedLang(), voiceId: getSelectedVoice()?.voiceId || undefined }),
+        signal: ttsAbortControllerRef.current.signal
+      });
+      if (r.ok) {
+        const audioData = await r.arrayBuffer();
+        if (audioData.byteLength > 100) {
+          const blob = new Blob([audioData], { type: 'audio/mpeg' });
+          ttsBlobQueueRef.current.push(URL.createObjectURL(blob));
+          playNextTtsBlob();
+        }
+      }
+    } catch (e) {
+      if (e.name !== 'AbortError') console.error('[kelionVoice] Chunked TTS fetch failed:', e);
+    }
+  }, [playNextTtsBlob]);
 
   // ───── Mic level meter (drives halo voice-reactive glow) ─────
   // IMPORTANT: uses a SEPARATE AudioContext from the 16kHz capture context.
@@ -453,9 +519,18 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
         } else {
           appendTurn('assistant', sc.outputTranscription.text, false, '🔊 AI Voice')
           logAiEvent('transcript_out', { text: sc.outputTranscription.text, source: 'voice-live' })
-          // Accumulate for TTS flush on turnComplete (cloned and native REST)
-          cloneTranscriptBufRef.current += sc.outputTranscription.text
-          console.log('[tts] buffered outputTranscription:', sc.outputTranscription.text.slice(0, 80))
+          
+          // Chunked TTS: Accumulate and flush on sentence boundaries
+          cloneTranscriptBufRef.current += sc.outputTranscription.text;
+          const match = cloneTranscriptBufRef.current.match(/([.!?\n]\s*)/);
+          if (match) {
+             const splitIndex = match.index + match[0].length;
+             const sentence = cloneTranscriptBufRef.current.substring(0, splitIndex).trim();
+             cloneTranscriptBufRef.current = cloneTranscriptBufRef.current.substring(splitIndex);
+             if (sentence) {
+                processTtsChunk(sentence);
+             }
+          }
         }
         // ALWAYS mark that we received a transcript for this turn —
         // even for suppressed turns. This prevents the partText fallback
@@ -505,119 +580,10 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
          if (cloneTranscriptBufRef.current.trim()) {
           const textToSpeak = cloneTranscriptBufRef.current.trim()
           cloneTranscriptBufRef.current = ''
-          ;(async () => {
-            try {
-              // VOICE UNIQUENESS: stop any previous audio before starting new TTS
-              clearAudioQueue()
-              setStatus('speaking')
-              logAiEvent('tts_req', { text: textToSpeak })
-              const ttsStart = Date.now()
-              const isNative = !isClonedVoiceActive();
-              const ttsUrl = isNative ? '/api/voice/clone/tts?native=true' : '/api/voice/clone/tts';
-              const r = await fetch(ttsUrl, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'X-CSRF-Token': getCsrfToken(),
-                },
-                credentials: 'include',
-                body: JSON.stringify({ text: textToSpeak, lang: getDetectedLang(), voiceId: getSelectedVoice()?.voiceId || undefined }),
-              })
-              if (!r.ok) {
-                const errText = await r.text().catch(() => '')
-                logAiEvent('tts_err', { error: `HTTP ${r.status}: ${errText}` })
-                console.error('[kelionVoice] TTS error', r.status, errText)
-                // Show error visibly so user knows why voice failed
-                let reason = errText
-                try { reason = JSON.parse(errText)?.error || errText } catch {}
-                appendTurn('assistant', `⚠️ Eroare audio: ${reason || 'eroare necunoscută (HTTP ' + r.status + ')'}`, true, '⚙️ System')
-                setStatus('listening')
-                return
-              }
-              const audioData = await r.arrayBuffer()
-              logAiEvent('clone_tts_ok', { durationMs: Date.now() - ttsStart, bytes: audioData.byteLength })
-              console.log(`[clonedTTS] received ${audioData.byteLength} bytes in ${Date.now() - ttsStart}ms`)
-
-              if (audioData.byteLength < 100) {
-                console.warn('[clonedTTS] audio response too small, likely empty')
-                appendTurn('assistant', `⚠️ Voce clonată: răspuns audio gol (${audioData.byteLength} bytes)`, true, '⚙️ System')
-                setStatus('listening')
-                return
-              }
-
-              // Play through the avatar's <audio> element so lip-sync works.
-              // The audio element is connected to the lip-sync analyser via
-              // audioRef in KelionStage → useLipSync. Using a blob URL ensures
-              // the browser treats it as a normal media source.
-              const blob = new Blob([audioData], { type: 'audio/mpeg' })
-              const blobUrl = URL.createObjectURL(blob)
-
-              // Try to use the main audioRef element first (enables lip-sync)
-              const audioEl = audioRef?.current
-              if (audioEl) {
-                // Temporarily detach the MediaStream so the <audio> element
-                // plays the blob instead of the (now-silent) voice stream.
-                const prevSrcObject = audioEl.srcObject
-                const prevMuted = audioEl.muted
-                audioEl.srcObject = null
-                audioEl.src = blobUrl
-                // CRITICAL: enqueueAudio() sets audioEl.muted = true because
-                // Native audio is routed through AudioContext.destination
-                // and the <audio> element only carries the stream for lip-sync.
-                // For cloned voice the blob IS the primary audio source, so we
-                // MUST unmute it or the user hears nothing.
-                audioEl.muted = false
-                audioEl.volume = 1.0
-                activeAudioElRef.current = audioEl
-                console.log(`[clonedTTS] playing via main audioEl, muted=${audioEl.muted}, volume=${audioEl.volume}`)
-                audioEl.onended = () => {
-                  URL.revokeObjectURL(blobUrl)
-                  audioEl.src = ''
-                  audioEl.srcObject = prevSrcObject // restore voice stream
-                  audioEl.muted = prevMuted         // restore muted state
-                  activeAudioElRef.current = null
-                  setStatus('listening')
-                }
-                audioEl.onerror = (e) => {
-                  console.error('[clonedTTS] audioEl error:', e)
-                  appendTurn('assistant', `⚠️ Voce clonată: eroare la redare audio`, true, '⚙️ System')
-                  URL.revokeObjectURL(blobUrl)
-                  audioEl.src = ''
-                  audioEl.srcObject = prevSrcObject
-                  audioEl.muted = prevMuted
-                  setStatus('listening')
-                }
-                await audioEl.play().catch((playErr) => {
-                  // Fallback: play via a new Audio() if the main element fails
-                  console.warn('[clonedTTS] main audioEl play failed:', playErr?.message, 'using fallback')
-                  audioEl.srcObject = prevSrcObject
-                  audioEl.muted = prevMuted
-                  const fallback = new Audio(blobUrl)
-                  fallback.volume = 1.0
-                  activeAudioElRef.current = fallback
-                  fallback.onended = () => { URL.revokeObjectURL(blobUrl); activeAudioElRef.current = null; setStatus('listening') }
-                  fallback.play().catch((e2) => {
-                    console.error('[clonedTTS] fallback play also failed:', e2?.message)
-                    appendTurn('assistant', `⚠️ Voce clonată: browser blochează redarea (${e2?.message})`, true, '⚙️ System')
-                    setStatus('listening')
-                  })
-                })
-              } else {
-                // No audioRef — fallback to standalone Audio element
-                const fallback = new Audio(blobUrl)
-                activeAudioElRef.current = fallback
-                fallback.onended = () => { URL.revokeObjectURL(blobUrl); activeAudioElRef.current = null; setStatus('listening') }
-                fallback.play().catch(() => setStatus('listening'))
-              }
-            } catch (err) {
-              console.error('[kelionVoice] cloned TTS failed', err)
-              appendTurn('assistant', `⚠️ Voce clonată: ${err?.message || 'eroare de rețea'}`, true, '⚙️ System')
-              setStatus('listening')
-            }
-          })()
+          processTtsChunk(textToSpeak)
         } else {
           cloneTranscriptBufRef.current = ''
-          if (!playbackPlayingRef.current) setStatus('listening')
+          if (!playbackPlayingRef.current && !ttsIsPlayingRef.current) setStatus('listening')
         }
       } else if (sc.generationComplete) {
         setStatus('speaking')
@@ -766,6 +732,19 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
     // stops all active sources and bumps the generation counter so
     // any late-arriving chunks from the old ws are dropped on arrival.
     clearAudioQueue()
+    
+    // Clear Chunked TTS Queue
+    ttsBlobQueueRef.current = []
+    ttsIsPlayingRef.current = false
+    if (activeAudioElRef.current) {
+      try { activeAudioElRef.current.pause(); activeAudioElRef.current.src = ''; } catch (_) {}
+      activeAudioElRef.current = null;
+    }
+    if (ttsAbortControllerRef.current) {
+      ttsAbortControllerRef.current.abort();
+      ttsAbortControllerRef.current = null;
+    }
+    
     if (wsRef.current && wsRef.current.readyState !== WebSocket.CLOSED) {
       try { wsRef.current.close(1000, 'restart') } catch (_) { /* ignore */ }
       wsRef.current = null
@@ -1823,80 +1802,18 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
         }
         
 
-        // Skip TTS if there is actually nothing to say (fixes Point 9: ElevenLabs text required error & playback crash)
+        // Skip TTS if there is actually nothing to say
         if (playAudio && finalReply.trim() !== '') {
-          // VOICE UNIQUENESS: stop any previous audio before starting new TTS
           clearAudioQueue()
           setStatus('speaking')
-          const isNative = !isClonedVoiceActive();
-          const ttsUrl = isNative ? '/api/voice/clone/tts?native=true' : '/api/voice/clone/tts';
-
           
-          try {
-            const r = await fetch(ttsUrl, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
-              credentials: 'include',
-              body: JSON.stringify({ text: finalReply, lang: getDetectedLang(), voiceId: getSelectedVoice()?.voiceId || undefined }),
-            })
-
-            if (r.ok) {
-              const audioData = await r.arrayBuffer()
-
-              if (audioData.byteLength < 100) {
-                appendTurn('assistant', `⚠️ Eroare audio: Răspunsul vocal a fost gol. Verificați cota ElevenLabs.`, true, '⚙️ System')
-                setStatus(window.__restRecRef ? 'listening' : 'idle')
-                return
-              }
-              const blob = new Blob([audioData], { type: 'audio/mpeg' })
-              const blobUrl = URL.createObjectURL(blob)
-              
-              // Use the shared audioRef so the avatar's lip-sync analyser picks it up.
-              // We MUST clear srcObject and set muted=false because the Live API
-              // path leaves it muted with a MediaStream attached.
-              const audioEl = audioRef?.current || new window.Audio();
-              if (audioEl === audioRef?.current) {
-                audioEl.srcObject = null;
-                audioEl.muted = false;
-              }
-              audioEl.src = blobUrl;
-              audioEl.volume = 1;
-              activeAudioElRef.current = audioEl
-              let playbackStarted = false
-              audioEl.onended = () => {
-                URL.revokeObjectURL(blobUrl)
-                activeAudioElRef.current = null
-                setStatus(window.__restRecRef ? 'listening' : 'idle')
-              }
-              audioEl.onerror = (e) => {
-                // Ignore spurious error events that fire AFTER playback
-                // already started successfully (common with blob URL revocation)
-                if (playbackStarted) return
-                console.error('[kelionVoice] Audio playback error:', e)
-                appendTurn('assistant', `⚠️ Eroare la redarea audio în browser.`, true, '⚙️ System')
-                URL.revokeObjectURL(blobUrl)
-                setStatus(window.__restRecRef ? 'listening' : 'idle')
-              }
-              
-
-              audioEl.play().then(() => {
-                playbackStarted = true
-
-              }).catch((e) => {
-                console.error('[kelionVoice] Audio play() blocked:', e)
-                appendTurn('assistant', `⚠️ Browserul a blocat redarea audio automată.`, true, '⚙️ System')
-                setStatus(window.__restRecRef ? 'listening' : 'idle')
-              })
-            } else {
-              const errText = await r.text().catch(() => '')
-              console.error('[kelionVoice] TTS network error:', r.status, errText)
-              appendTurn('assistant', `⚠️ Eroare rețea voce (${r.status}): ${errText.slice(0, 100)}`, true, '⚙️ System')
-              setStatus(window.__restRecRef ? 'listening' : 'idle')
-            }
-          } catch(e) {
-            console.error('[kelionVoice] TTS catch error:', e)
-            appendTurn('assistant', `⚠️ Eroare internă voce: ${e.message}`, true, '⚙️ System')
-            setStatus(window.__restRecRef ? 'listening' : 'idle')
+          // Split full reply into sentences and enqueue them sequentially
+          // This eliminates the 15-20s wait for ElevenLabs to process massive blocks of text.
+          const sentences = finalReply.match(/[^.!?\n]+[.!?\n]+/g) || [finalReply];
+          for (const s of sentences) {
+             if (s.trim()) {
+                await processTtsChunk(s.trim());
+             }
           }
         } else {
           setStatus(window.__restRecRef ? 'listening' : 'idle')
@@ -1912,11 +1829,8 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
       } finally {
         httpBusyRef.current = false
         // Drain any messages that were buffered while we were busy.
-        // Without this, voice messages arriving during a request are
-        // silently lost — the user speaks, Kelion hears, but never responds.
         if (httpMsgBufferRef.current.length > 0) {
           const next = httpMsgBufferRef.current.shift()
-          // Use setTimeout to avoid recursive stack overflow
           setTimeout(() => sendText(next.clean, next.image, true), 50)
         }
       }
