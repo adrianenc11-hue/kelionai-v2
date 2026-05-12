@@ -84,24 +84,26 @@ async function pickMemoryForUser(userId) {
 function composeMessage(memoryItem) {
   const { kind, fact } = memoryItem;
   const truncated = fact.length > 140 ? fact.slice(0, 137) + '…' : fact;
+  
+  // Use Romanian for Romanian users (default for Kelion)
   switch (kind) {
     case 'goal':
-      return { title: 'Kelion', body: `A small nudge on your goal — ${truncated}. Want to pick it back up?`, reason: `goal:${memoryItem.id}` };
+      return { title: 'Kelion', body: `Un mic impuls pentru obiectivul tău: ${truncated}. Vrei să continuăm?`, reason: `goal:${memoryItem.id}` };
     case 'routine':
-      return { title: 'Kelion', body: `Thinking about your routine — ${truncated}. How's it going?`, reason: `routine:${memoryItem.id}` };
+      return { title: 'Kelion', body: `Mă gândeam la rutina ta: ${truncated}. Cum merge?`, reason: `routine:${memoryItem.id}` };
     case 'relationship':
-      return { title: 'Kelion', body: `A little reminder: ${truncated}. Worth a check-in?`, reason: `relationship:${memoryItem.id}` };
+      return { title: 'Kelion', body: `Amintire: ${truncated}. Merită un check-in?`, reason: `relationship:${memoryItem.id}` };
     case 'preference':
-      return { title: 'Kelion', body: `I remember — ${truncated}. Want to talk?`, reason: `preference:${memoryItem.id}` };
+      return { title: 'Kelion', body: `Îmi amintesc: ${truncated}. Vrei să vorbim?`, reason: `preference:${memoryItem.id}` };
     default:
-      return { title: 'Kelion', body: 'I was thinking about you. Want to talk?', reason: `other:${memoryItem.id}` };
+      return { title: 'Kelion', body: 'Mă gândeam la tine. Vrei să vorbim?', reason: `other:${memoryItem.id}` };
   }
 }
 
 // Global flag to ensure we only alert once per server lifecycle
-let _claude_opusAlertSent = false;
-async function checkClaude4Availability() {
-  if (_claude_opusAlertSent) return null;
+let _nextGenAlertSent = false;
+async function checkNextGenAvailability() {
+  if (_nextGenAlertSent) return null;
   const apiKey = process.env.GOOGLE_API_KEY;
   if (!apiKey) return null;
   try {
@@ -110,18 +112,18 @@ async function checkClaude4Availability() {
     if (!res.ok) return null;
     const data = await res.json();
     const models = data.models || [];
-    // We check if any Claude Opus model supports BidiGenerateContent (Live WebSocket)
-    const claudeLive = models.find(m => 
-      m.name.toLowerCase().includes('gemini-2.0') && 
+    // Checking for Gemini 4.0 or Claude 5 early access (hypothetical 2026/2027 edge)
+    const nextGen = models.find(m => 
+      (m.name.toLowerCase().includes('gemini-4') || m.name.toLowerCase().includes('claude-5')) && 
       (m.supportedGenerationMethods || []).includes('bidiGenerateContent')
     );
-    if (claudeLive) {
-      _claude_opusAlertSent = true;
-      console.log('🚨 [PROACTIVE] GEMINI 2.0 FLASH IS AVAILABLE! 🚨', claudeLive.name);
-      return { title: 'Kelion AI Update', body: `Gemini 2.0 Flash is ready! Model: ${claudeLive.displayName || claudeLive.name}`, reason: 'system_alert:gemini_flash' };
+    if (nextGen) {
+      _nextGenAlertSent = true;
+      console.log('🚨 [PROACTIVE] NEXT-GEN MODEL DETECTED! 🚨', nextGen.name);
+      return { title: 'Kelion AI Update', body: `O nouă frontieră: ${nextGen.displayName || nextGen.name} este acum disponibil!`, reason: 'system_alert:next_gen' };
     }
   } catch (err) {
-    // Ignore fetch errors to not pollute logs
+    // Ignore fetch errors
   }
   return null;
 }
@@ -142,8 +144,8 @@ async function runOnce({ webpush, now = new Date() } = {}) {
 
   const report = { users_considered: byUser.size, sent: 0, skipped_gap: 0, no_memory: 0, failed: 0 };
   
-  // 1. Check for systemic alerts (like Claude Opus Availability)
-  const systemAlertMsg = await checkClaude4Availability();
+  // 1. Check for systemic alerts (like Next-Gen Availability)
+  const systemAlertMsg = await checkNextGenAvailability();
 
   for (const [userId, userSubs] of byUser) {
       let msg = systemAlertMsg;

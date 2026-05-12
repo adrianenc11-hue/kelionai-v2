@@ -83,7 +83,7 @@ describe('composeMessage', () => {
   const { composeMessage } = require('../src/services/proactive');
   it('uses goal template for goals', () => {
     const m = composeMessage({ id: 7, kind: 'goal', fact: 'learn spanish' });
-    expect(m.body).toMatch(/nudge on your goal/i);
+    expect(m.body).toMatch(/impuls pentru obiectivul/i);
     expect(m.body).toMatch(/learn spanish/);
     expect(m.reason).toBe('goal:7');
   });
