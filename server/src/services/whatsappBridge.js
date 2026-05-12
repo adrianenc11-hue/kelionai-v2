@@ -321,9 +321,13 @@ class WhatsAppBridge extends EventEmitter {
     if (!question) question = body; // If nothing left, use original
 
     // ── Get sender info ──
-    const contact = await msg.getContact();
-    const senderName = contact.pushname || contact.name || contact.number || 'Unknown';
-    const contactId = contact.id._serialized;
+    let senderName = 'Admin';
+    let contactId = 'admin_id';
+    if (!msg.fromMe) {
+      const contact = await msg.getContact();
+      senderName = contact.pushname || contact.name || contact.number || 'Unknown';
+      contactId = contact.id._serialized;
+    }
 
     // ── Auto-Greeting for New DMs ──
     if (!isGroup && !this._greetedContacts.has(contactId)) {
