@@ -31,7 +31,7 @@ class WhatsAppBridge extends EventEmitter {
     this.stats = { messagesReceived: 0, responseSent: 0, errors: 0, startedAt: null };
     this._rateLimitMap = new Map(); // chatId → lastResponseTs
     this._greetedContacts = new Set(); // contactId → boolean
-    this._activeTranslators = new Set(); // chatId → true (translate all messages)
+    this._activeTranslators = new Map(); // chatId → { adminLang, otherLang }
     this._chatHandler = null; // Reference to the chat/AI handler
   }
 
@@ -181,18 +181,31 @@ class WhatsAppBridge extends EventEmitter {
 
     // ── Command: Toggle Translator Mode ──
     const bodyLower = body.toLowerCase();
-    if (bodyLower === '!traduci on' || bodyLower === '!translate on') {
-      this._activeTranslators.add(chatId);
-      await msg.reply('✅ Translator automat activat. Voi traduce automat mesajele primite în română, și mesajele tale în limba interlocutorului.');
+    
+    const translateMatch = bodyLower.match(/^!(?:traduci|translate)\s+on(?:\s+([a-z]+)\s+([a-z]+))?/);
+    if (translateMatch) {
+      const adminLang = translateMatch[1] || 'auto';
+      const otherLang = translateMatch[2] || 'auto';
+      this._activeTranslators.set(chatId, { adminLang, otherLang });
+      
+      let msgText = `✅ Translator automat activat.`;
+      if (adminLang !== 'auto') {
+        msgText += `\n- Limba ta: ${adminLang}\n- Limba interlocutorului: ${otherLang}`;
+      } else {
+        msgText += `\n- Limba ta: auto (Română)\n- Limba interlocutorului: auto`;
+      }
+      await msg.reply(msgText);
       return;
     }
+    
     if (bodyLower === '!traduci off' || bodyLower === '!translate off') {
       this._activeTranslators.delete(chatId);
       await msg.reply('❌ Translator automat dezactivat.');
       return;
     }
 
-    const isTranslateMode = this._activeTranslators.has(chatId);
+    const translateContext = this._activeTranslators.get(chatId);
+    const isTranslateMode = !!translateContext;
     const isExplicitTranslate = bodyLower.startsWith('traduci:') || bodyLower.startsWith('translate:');
 
     // Ignore our own messages UNLESS translate mode is on, or we used an explicit trigger
@@ -212,7 +225,6 @@ class WhatsAppBridge extends EventEmitter {
     }
 
     // ── Rate limiting ──
-    const chatId = chat.id._serialized;
     const now = Date.now();
     const lastResponse = this._rateLimitMap.get(chatId) || 0;
     if (now - lastResponse < RATE_LIMIT_MS) {
@@ -258,7 +270,7 @@ class WhatsAppBridge extends EventEmitter {
         senderName, 
         chatName, 
         isGroup, 
-        { isTranslateMode, isFromAdmin: msg.fromMe, isExplicitTranslate }
+        { isTranslateMode, isFromAdmin: msg.fromMe, isExplicitTranslate, translateContext }
       );
 
       if (response && typeof response === 'string') {

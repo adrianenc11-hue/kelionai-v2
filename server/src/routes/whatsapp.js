@@ -43,15 +43,24 @@ Keep responses concise (max 500 chars) — this is a chat app, not an essay.
 Use short paragraphs. No markdown formatting (WhatsApp doesn't render it well).`;
 
   if (options.isTranslateMode || options.isExplicitTranslate) {
+    let targetLangText = 'the language of the other participant(s)';
+    let adminLangText = 'Romanian';
+    
+    if (options.translateContext) {
+      const { adminLang, otherLang } = options.translateContext;
+      if (otherLang !== 'auto') targetLangText = otherLang;
+      if (adminLang !== 'auto') adminLangText = adminLang;
+    }
+
     if (options.isFromAdmin) {
       whatsappContext += `\n\n[TRANSLATOR MODE - ADMIN MESSAGE]
 The owner of this WhatsApp account (Admin) just sent this message.
-Your task: Translate this message into the language of the other participant(s).
+Your task: Translate this message into ${targetLangText}.
 Output ONLY the direct translation. Do not add quotes, greetings, or explanations.`;
     } else {
       whatsappContext += `\n\n[TRANSLATOR MODE - INCOMING MESSAGE]
 The other person sent this message.
-Your task: Translate this message into Romanian for the Admin.
+Your task: Translate this message into ${adminLangText} for the Admin.
 Output ONLY the direct translation. Do not add quotes, greetings, or explanations.`;
     }
   } else {
