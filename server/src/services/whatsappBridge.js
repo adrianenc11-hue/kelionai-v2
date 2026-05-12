@@ -126,13 +126,27 @@ class WhatsAppBridge extends EventEmitter {
         this.emit('ready');
       });
 
-      // ── Message event ──
+      // Listen to incoming messages from others
       this.client.on('message', async (msg) => {
         try {
+          // 'message' event only fires for messages sent by others, so msg.fromMe is always false here.
           await this._handleMessage(msg);
         } catch (err) {
           this.stats.errors++;
           console.error('[WhatsApp] Message handling error:', err.message);
+        }
+      });
+
+      // Listen to our own messages (from the phone) to capture commands and translations
+      this.client.on('message_create', async (msg) => {
+        try {
+          // 'message_create' fires for ALL messages. We only care about our own here to prevent double-processing.
+          if (msg.fromMe) {
+            await this._handleMessage(msg);
+          }
+        } catch (err) {
+          this.stats.errors++;
+          console.error('[WhatsApp] Message create handling error:', err.message);
         }
       });
 
