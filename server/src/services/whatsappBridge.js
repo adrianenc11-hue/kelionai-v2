@@ -187,7 +187,8 @@ class WhatsAppBridge extends EventEmitter {
     let body = (msg.body || '').trim();
 
     // ── Prevent Infinite Loops ──
-    if (body.startsWith('⚠️') || body.startsWith('✅') || body.startsWith('⛔')) return;
+    // ── Prevent Infinite Loops ──
+    if (body.startsWith('⚠️') || body.startsWith('✅') || body.startsWith('⛔') || body.startsWith('🤖')) return;
 
     // ── AUDIO TRANSCRIBER (STT) ──
     if (msg.hasMedia && (msg.type === 'ptt' || msg.type === 'audio')) {
@@ -219,7 +220,7 @@ class WhatsAppBridge extends EventEmitter {
     // Interactive setup
     if (bodyLower === '!traduci' || bodyLower === '!translate') {
       this._activeTranslators.set(chatId, { setupMode: true });
-      await this.client.sendMessage(chatId, 'În ce limbă dorești traducerea? Scrie limbile sub forma: limba_mea limba_lui (ex: ro jp)');
+      await this.client.sendMessage(chatId, '🤖 Ce limbă vorbește interlocutorul? (ex: engleza, japoneza, chineza, etc)');
       return;
     }
 
@@ -228,12 +229,17 @@ class WhatsAppBridge extends EventEmitter {
     // Setup mode response processing
     if (translateContext && translateContext.setupMode) {
       if (msg.fromMe) {
-        const langs = bodyLower.split(/\s+/).filter(Boolean);
-        if (langs.length >= 2) {
-          const adminLang = langs[0];
-          const otherLang = langs[1];
-          this._activeTranslators.set(chatId, { adminLang, otherLang });
-          await this.client.sendMessage(chatId, `✅ Translator automat activat.\n- Limba ta: ${adminLang}\n- Limba interlocutorului: ${otherLang}`);
+        if (bodyLower === '!cancel') {
+          this._activeTranslators.delete(chatId);
+          await this.client.sendMessage(chatId, '⛔ Configurare anulată.');
+          return;
+        }
+
+        const adminLang = 'romana';
+        const otherLang = bodyLower.trim(); // Just use the word they typed
+        
+        this._activeTranslators.set(chatId, { adminLang, otherLang });
+        await this.client.sendMessage(chatId, `✅ Translator automat activat.\n- Limba ta: ${adminLang}\n- Limba interlocutorului: ${otherLang}`);
           
           // Auto-greeting to the interlocutor via AI
           if (this._chatHandler) {
@@ -251,17 +257,9 @@ class WhatsAppBridge extends EventEmitter {
             }
           }
           return;
-        } else if (bodyLower === '!cancel') {
-          this._activeTranslators.delete(chatId);
-          await this.client.sendMessage(chatId, '❌ Configurare anulată.');
-          return;
         } else {
-          await this.client.sendMessage(chatId, 'Te rog să specifici ambele limbi (ex: ro jp), sau scrie !cancel pentru a anula.');
-          return;
+          return; // Ignore other person's messages while waiting for Admin to finish setup
         }
-      } else {
-        return; // Ignore other person's messages while waiting for Admin to finish setup
-      }
     }
     
     // Direct command (fast way)
