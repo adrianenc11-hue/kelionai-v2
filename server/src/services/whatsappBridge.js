@@ -184,7 +184,25 @@ class WhatsAppBridge extends EventEmitter {
     // Ignore status updates
     if (msg.isStatus) return;
 
-    const body = (msg.body || '').trim();
+    let body = (msg.body || '').trim();
+
+    // ── AUDIO TRANSCRIBER (STT) ──
+    if (msg.hasMedia && (msg.type === 'ptt' || msg.type === 'audio')) {
+      try {
+        const media = await msg.downloadMedia();
+        if (media && media.data) {
+          const { transcribeAudioPtt } = require('./geminiAudioTranscriber');
+          const transcription = await transcribeAudioPtt(media.data, media.mimetype);
+          if (transcription) {
+            body = transcription;
+            console.log(`[WhatsApp] Transcribed audio: "${body}"`);
+          }
+        }
+      } catch (err) {
+        console.error('[WhatsApp] Audio transcription failed:', err.message);
+      }
+    }
+
     if (!body) return;
 
     const chat = await msg.getChat();
