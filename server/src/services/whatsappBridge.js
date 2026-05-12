@@ -206,6 +206,16 @@ class WhatsAppBridge extends EventEmitter {
           if (transcription) {
             body = transcription;
             console.log(`[WhatsApp] Transcribed audio: "${body}"`);
+            
+            // Auto-Dictation Feature: If not in translate mode and Admin sent audio, just write it as text
+            const isTranslating = !!this._activeTranslators.get(chatId) || body.toLowerCase().startsWith('traduci:') || body.toLowerCase().startsWith('translate:');
+            if (msg.fromMe && !isTranslating) {
+              const dictationText = `🎙️ Text dictat:\n${body}`;
+              this._expectedOutgoingText.add(dictationText);
+              const sentMsg = await this.client.sendMessage(chatId, dictationText);
+              if (sentMsg) this._ignoreMsgIds.add(sentMsg.id._serialized);
+              return; // Stop here, no AI processing needed
+            }
           }
         }
       } catch (err) {

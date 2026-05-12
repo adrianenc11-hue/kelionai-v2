@@ -1,7 +1,6 @@
 'use strict';
 
-const fetch = require('node-fetch');
-
+// Use native fetch available in Node 18+
 // Some reliable default premium voices from ElevenLabs
 const DEFAULT_MALE_VOICE = '2EiwWnXFnvU5JabPnv8n'; // Clyde
 const DEFAULT_FEMALE_VOICE = '21m00Tcm4TlvDq8ikWAM'; // Rachel
