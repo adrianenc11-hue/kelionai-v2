@@ -98,7 +98,6 @@ class WhatsAppBridge extends EventEmitter {
             '--disable-software-rasterizer',
             '--no-first-run',
             '--no-zygote',
-            '--single-process',
           ],
         },
       });
