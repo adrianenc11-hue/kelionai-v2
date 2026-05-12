@@ -34,6 +34,7 @@ class WhatsAppBridge extends EventEmitter {
     this._activeTranslators = new Map(); // chatId → { adminLang, otherLang }
     this._chatHandler = null; // Reference to the chat/AI handler
     this._ignoreMsgIds = new Set(); // To prevent infinite loops on our own AI responses
+    this._expectedOutgoingText = new Set(); // To prevent infinite loops when message_create fires before sendMessage resolves
   }
 
   /**
@@ -189,6 +190,10 @@ class WhatsAppBridge extends EventEmitter {
 
     // ── Prevent Infinite Loops ──
     if (this._ignoreMsgIds.has(msg.id._serialized)) return;
+    if (msg.fromMe && this._expectedOutgoingText.has(body)) {
+      this._expectedOutgoingText.delete(body);
+      return;
+    }
     if (body.startsWith('⚠️') || body.startsWith('✅') || body.startsWith('⛔') || body.startsWith('🤖')) return;
 
     // ── AUDIO TRANSCRIBER (STT) ──
@@ -251,6 +256,7 @@ class WhatsAppBridge extends EventEmitter {
                 { isTranslateMode: true, isFromAdmin: true, isExplicitTranslate: false, translateContext: { adminLang, otherLang } }
               );
               if (translatedGreeting) {
+                this._expectedOutgoingText.add(translatedGreeting);
                 const sentMsg = await chat.sendMessage(translatedGreeting);
                 if (sentMsg) this._ignoreMsgIds.add(sentMsg.id._serialized);
               }
@@ -365,6 +371,7 @@ class WhatsAppBridge extends EventEmitter {
           ? response.slice(0, MAX_RESPONSE_LENGTH - 20) + '\n\n... (truncated)'
           : response;
 
+        this._expectedOutgoingText.add(finalResponse);
         const sentMsg = await this.client.sendMessage(chatId, finalResponse);
         if (sentMsg) this._ignoreMsgIds.add(sentMsg.id._serialized);
         
