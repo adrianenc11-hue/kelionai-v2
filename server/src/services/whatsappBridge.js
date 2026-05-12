@@ -29,6 +29,7 @@ class WhatsAppBridge extends EventEmitter {
     this.status = 'disconnected'; // disconnected | qr_pending | ready | error
     this.stats = { messagesReceived: 0, responseSent: 0, errors: 0, startedAt: null };
     this._rateLimitMap = new Map(); // chatId → lastResponseTs
+    this._greetedContacts = new Set(); // contactId → boolean
     this._chatHandler = null; // Reference to the chat/AI handler
   }
 
@@ -46,15 +47,38 @@ class WhatsAppBridge extends EventEmitter {
     this.status = 'disconnected';
 
     try {
+      // Resolve Chromium path on production (nixpacks / Railway)
+      let execPath = undefined;
+      if (process.env.NODE_ENV === 'production') {
+        execPath = process.env.CHROMIUM_PATH || null;
+        if (!execPath) {
+          // Try common locations on Railway / nixpacks / Docker
+          const { execSync } = require('child_process');
+          try {
+            execPath = execSync('which chromium || which chromium-browser || which google-chrome', {
+              encoding: 'utf8', timeout: 3000,
+            }).trim();
+          } catch (_) {
+            execPath = 'chromium'; // Fallback — hope it's on PATH
+          }
+        }
+        console.log(`[WhatsApp] Using Chromium at: ${execPath}`);
+      }
+
       this.client = new Client({
         authStrategy: new LocalAuth({ dataPath: SESSION_DIR }),
         puppeteer: {
+          executablePath: execPath,
           headless: true,
           args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
             '--disable-gpu',
+            '--disable-extensions',
+            '--disable-software-rasterizer',
+            '--no-first-run',
+            '--no-zygote',
             '--single-process',
           ],
         },
@@ -163,6 +187,15 @@ class WhatsAppBridge extends EventEmitter {
     // ── Get sender info ──
     const contact = await msg.getContact();
     const senderName = contact.pushname || contact.name || contact.number || 'Unknown';
+    const contactId = contact.id._serialized;
+
+    // ── Auto-Greeting for New DMs ──
+    if (!isGroup && !this._greetedContacts.has(contactId)) {
+      this._greetedContacts.add(contactId);
+      const greeting = "🤖 Hello! I am Kelion, an AI assistant. Please tell me your preferred language (e.g., English, Romanian, Spanish) so I can assist you better.\n\nSalut! Sunt Kelion, un asistent AI. Te rog spune-mi limba ta preferată pentru a te putea ajuta mai bine.";
+      await msg.reply(greeting);
+      // We continue processing their message normally after greeting
+    }
 
     console.log(`[WhatsApp] ${isGroup ? `[${chatName}]` : '[DM]'} ${senderName}: ${question.slice(0, 100)}`);
 

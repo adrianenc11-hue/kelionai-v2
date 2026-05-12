@@ -50,7 +50,7 @@ async function enableAllGoogleApis() {
     || process.env.GCP_PROJECT_ID;
 
   if (!projectId) {
-    console.warn('[googleApiEnabler] No GCP project ID found. Set GOOGLE_CLOUD_PROJECT to auto-enable APIs.');
+    console.log('[googleApiEnabler] No GCP project ID found. Set GOOGLE_CLOUD_PROJECT to auto-enable APIs.');
     return;
   }
 
@@ -59,12 +59,12 @@ async function enableAllGoogleApis() {
   try {
     accessToken = await getServiceAccountToken();
   } catch (err) {
-    console.warn('[googleApiEnabler] Could not obtain service account token:', err.message);
+    console.log('[googleApiEnabler] Could not obtain service account token:', err.message);
     return;
   }
 
   if (!accessToken) {
-    console.warn('[googleApiEnabler] No access token available. Skipping auto-enable.');
+    console.log('[googleApiEnabler] No access token available. Skipping auto-enable.');
     return;
   }
 

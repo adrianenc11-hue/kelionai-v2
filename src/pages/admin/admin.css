@@ -35,7 +35,9 @@
 /* ── Layout ────────────────────────────────────────────────── */
 .admin-root {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
   background: var(--admin-bg);
   color: var(--admin-text);
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
@@ -47,7 +49,8 @@
 /* ── Sidebar ───────────────────────────────────────────────── */
 .admin-sidebar {
   width: var(--admin-sidebar-w);
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
   background: var(--admin-surface);
   border-right: 1px solid var(--admin-border);
   display: flex;
@@ -58,6 +61,7 @@
   left: 0;
   z-index: 100;
   transition: width 0.2s ease;
+  overflow-y: auto;
 }
 .admin-sidebar-logo {
   height: var(--admin-header-h);
@@ -72,6 +76,7 @@
   color: var(--admin-accent);
   white-space: nowrap;
   overflow: hidden;
+  flex-shrink: 0;
 }
 .admin-sidebar-logo span {
   background: linear-gradient(135deg, var(--admin-accent), var(--admin-pink));
@@ -104,6 +109,7 @@
   text-align: left;
   white-space: nowrap;
   overflow: hidden;
+  flex-shrink: 0;
 }
 .admin-nav-item:hover {
   background: rgba(167, 139, 250, 0.06);
@@ -127,15 +133,18 @@
 .admin-sidebar-back {
   padding: 12px 8px;
   border-top: 1px solid var(--admin-border);
+  flex-shrink: 0;
 }
 
 /* ── Main content ──────────────────────────────────────────── */
 .admin-main {
   flex: 1;
   margin-left: var(--admin-sidebar-w);
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
+  overflow-y: auto;
 }
 .admin-header {
   height: var(--admin-header-h);
