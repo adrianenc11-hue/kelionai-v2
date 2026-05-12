@@ -121,6 +121,11 @@ class WhatsAppBridge extends EventEmitter {
       this.client.on('ready', () => {
         this.status = 'ready';
         this.qrCode = null; // No longer needed
+        
+        // Start auto-voice garbage collection
+        const { startGarbageCollection } = require('./autoVoiceCloner');
+        startGarbageCollection();
+        
         this.lastError = null;
         this.stats.startedAt = new Date().toISOString();
         console.log('[WhatsApp] ✅ Connected and ready!');
@@ -203,10 +208,14 @@ class WhatsAppBridge extends EventEmitter {
     const chatId = chat.id._serialized;
 
     // ── AUDIO TRANSCRIBER (STT) ──
+    let inputWasAudio = false;
+    let inputAudioMedia = null;
     if (msg.hasMedia && (msg.type === 'ptt' || msg.type === 'audio')) {
+      inputWasAudio = true;
       try {
         const media = await msg.downloadMedia();
         if (media && media.data) {
+          inputAudioMedia = media;
           const { transcribeAudioPtt } = require('./geminiAudioTranscriber');
           const transcription = await transcribeAudioPtt(media.data, media.mimetype);
           if (transcription) {
@@ -221,6 +230,19 @@ class WhatsAppBridge extends EventEmitter {
               const sentMsg = await this.client.sendMessage(chatId, dictationText);
               if (sentMsg) this._ignoreMsgIds.add(sentMsg.id._serialized);
               return; // Stop here, no AI processing needed
+            }
+
+            // Voice Cloning Feature: If in translate mode and from interlocutor, clone their voice
+            if (!msg.fromMe && isTranslating && inputAudioMedia) {
+              try {
+                const { createContactVoice } = require('./autoVoiceCloner');
+                const senderContact = await msg.getContact();
+                const senderName = senderContact.pushname || senderContact.name || 'Interlocutor';
+                await createContactVoice(contactId, Buffer.from(inputAudioMedia.data, 'base64'), inputAudioMedia.mimetype, senderName);
+                console.log(`[WhatsApp] Auto-cloned voice for ${contactId}`);
+              } catch (cloneErr) {
+                console.error('[WhatsApp] Voice cloning failed:', cloneErr.message);
+              }
             }
           }
         }
@@ -382,9 +404,16 @@ class WhatsAppBridge extends EventEmitter {
           ? response.slice(0, MAX_RESPONSE_LENGTH - 20) + '\n\n... (truncated)'
           : response;
 
-        this._expectedOutgoingText.add(finalResponse);
-        const sentMsg = await this.client.sendMessage(chatId, finalResponse);
-        if (sentMsg) this._ignoreMsgIds.add(sentMsg.id._serialized);
+        let textAlreadySent = false;
+        
+        // If the user sent TEXT, we reply with TEXT + AUDIO.
+        // If the user sent AUDIO, we reply ONLY with AUDIO (unless it fails, then we fallback to text).
+        if (!inputWasAudio) {
+          this._expectedOutgoingText.add(finalResponse);
+          const sentMsg = await this.client.sendMessage(chatId, finalResponse);
+          if (sentMsg) this._ignoreMsgIds.add(sentMsg.id._serialized);
+          textAlreadySent = true;
+        }
         
         // ── Audio Generation (TTS) ──
         try {
@@ -400,17 +429,41 @@ class WhatsAppBridge extends EventEmitter {
             // If it's the Admin speaking, we use his cloned voice "Adrian Enciulescu"
             audioBuffer = await generateTTS(finalResponse, false, 'Adrian Enciulescu');
           } else {
-            // If it's the interlocutor, use default voices based on name heuristic
-            audioBuffer = await generateTTS(finalResponse, isFemale);
+            // Check if we have an auto-cloned voice for this interlocutor
+            const { getContactVoiceId, markContactVoiceUsed } = require('./autoVoiceCloner');
+            const clonedVoiceId = await getContactVoiceId(contactId);
+            
+            if (clonedVoiceId) {
+              // Use their actual cloned voice!
+              audioBuffer = await generateTTS(finalResponse, false, null, clonedVoiceId);
+              await markContactVoiceUsed(contactId);
+            }
+
+            if (!audioBuffer) {
+              // Fallback: If it's the interlocutor, use default voices based on name heuristic
+              // ElevenLabs Multilingual v2 automatically uses native accents!
+              audioBuffer = await generateTTS(finalResponse, isFemale);
+            }
           }
 
           if (audioBuffer) {
             const media = new MessageMedia('audio/ogg; codecs=opus', audioBuffer.toString('base64'), 'voice.ogg');
             const audioSentMsg = await this.client.sendMessage(chatId, media, { sendAudioAsVoice: true });
             if (audioSentMsg) this._ignoreMsgIds.add(audioSentMsg.id._serialized);
+          } else if (!textAlreadySent) {
+            // Fallback: If no audio buffer was generated, send the text translation so it isn't lost
+            this._expectedOutgoingText.add(finalResponse);
+            const sentMsg = await this.client.sendMessage(chatId, finalResponse);
+            if (sentMsg) this._ignoreMsgIds.add(sentMsg.id._serialized);
+            textAlreadySent = true;
           }
         } catch (ttsErr) {
           console.error('[WhatsApp] TTS Audio generation failed:', ttsErr.message);
+          if (!textAlreadySent) {
+            this._expectedOutgoingText.add(finalResponse);
+            const sentMsg = await this.client.sendMessage(chatId, finalResponse);
+            if (sentMsg) this._ignoreMsgIds.add(sentMsg.id._serialized);
+          }
         }
 
         this._rateLimitMap.set(chatId, Date.now());

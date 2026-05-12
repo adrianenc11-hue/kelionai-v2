@@ -30,13 +30,15 @@ async function findVoiceIdByName(apiKey, voiceName) {
 /**
  * Generates an audio buffer (OGG format) using ElevenLabs.
  */
-async function generateTTS(text, isFemale = false, forceVoiceName = null) {
+async function generateTTS(text, isFemale = false, forceVoiceName = null, forceVoiceId = null) {
   const apiKey = process.env.ELEVENLABS_API_KEY;
   if (!apiKey) throw new Error('ELEVENLABS_API_KEY not configured.');
 
   let voiceId = isFemale ? DEFAULT_FEMALE_VOICE : DEFAULT_MALE_VOICE;
 
-  if (forceVoiceName) {
+  if (forceVoiceId) {
+    voiceId = forceVoiceId;
+  } else if (forceVoiceName) {
     const foundId = await findVoiceIdByName(apiKey, forceVoiceName);
     if (foundId) {
       voiceId = foundId;
@@ -73,4 +75,60 @@ async function generateTTS(text, isFemale = false, forceVoiceName = null) {
   return Buffer.from(arrayBuffer);
 }
 
-module.exports = { generateTTS };
+/**
+ * Creates an instant voice clone in ElevenLabs from a base64 audio sample.
+ */
+async function addVoice(name, audioBase64, mimeType) {
+  const apiKey = process.env.ELEVENLABS_API_KEY;
+  if (!apiKey) throw new Error('ELEVENLABS_API_KEY not configured.');
+
+  const url = 'https://api.elevenlabs.io/v1/voices/add';
+  const formData = new FormData();
+  formData.append('name', name);
+  
+  // Convert base64 to Blob for multipart upload
+  const buffer = Buffer.from(audioBase64, 'base64');
+  const blob = new Blob([buffer], { type: mimeType });
+  formData.append('files', blob, 'sample.ogg');
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'xi-api-key': apiKey },
+    body: formData
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`Failed to add voice: ${response.status} ${err}`);
+  }
+  
+  // Invalidate cache
+  cachedVoices = null;
+  const data = await response.json();
+  return data.voice_id;
+}
+
+/**
+ * Deletes a cloned voice from ElevenLabs.
+ */
+async function deleteVoice(voiceId) {
+  const apiKey = process.env.ELEVENLABS_API_KEY;
+  if (!apiKey) throw new Error('ELEVENLABS_API_KEY not configured.');
+
+  const url = `https://api.elevenlabs.io/v1/voices/${voiceId}`;
+  const response = await fetch(url, {
+    method: 'DELETE',
+    headers: { 'xi-api-key': apiKey }
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`Failed to delete voice ${voiceId}: ${response.status} ${err}`);
+  }
+  
+  // Invalidate cache
+  cachedVoices = null;
+  return true;
+}
+
+module.exports = { generateTTS, addVoice, deleteVoice };
