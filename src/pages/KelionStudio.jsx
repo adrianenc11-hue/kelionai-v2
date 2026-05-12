@@ -28,6 +28,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Editor } from '@monaco-editor/react'
+import { puter } from '@heyputer/puter.js'
 import { t } from '../lib/uiStrings'
 import ensureMonaco from '../lib/monacoSetup'
 import {
@@ -234,6 +235,11 @@ export default function KelionStudio() {
   const [lastRun, setLastRun] = useState(null)
   const [usage, setUsage] = useState(null)
   const [toastMsg, setToastMsg] = useState(null)
+  
+  // Puter AI State
+  const [aiPrompt, setAiPrompt] = useState('')
+  const [aiLoading, setAiLoading] = useState(false)
+  
   const saveTimer = useRef(null)
   const lastSavedContent = useRef('')
   const activeIdRef = useRef(null)
@@ -512,6 +518,37 @@ export default function KelionStudio() {
     }
   }, [activeId, dirty, activePath, content])
 
+  // --- AI Code Generation via Puter (Opus 4.7) ---
+  const handleAskAI = useCallback(async (e) => {
+    e.preventDefault()
+    if (!aiPrompt.trim() || !activePath) return
+    setAiLoading(true)
+    try {
+      const systemPrompt = `You are an expert coder. The user wants to modify the current file: ${activePath}.\n\nCurrent code:\n${content}\n\nUser request: ${aiPrompt}\n\nPlease output ONLY the raw updated code. No markdown formatting, no backticks, no explanations. Just the final file content.`
+      
+      const response = await puter.ai.chat(
+        systemPrompt,
+        { model: 'claude-opus-4-7', stream: true }
+      )
+      
+      let generated = ''
+      setContent('') // Clear before stream
+      
+      for await (const part of response) {
+        if (part?.text) {
+          generated += part.text
+          setContent(generated)
+          setDirty(true)
+        }
+      }
+      setAiPrompt('')
+    } catch (err) {
+      toast(setToastMsg, 'error', err.message || 'AI generation failed')
+    } finally {
+      setAiLoading(false)
+    }
+  }, [aiPrompt, activePath, content])
+
   const monacoLanguage = useMemo(() => languageForPath(activePath), [activePath])
   const savingLabel = saving ? t('savingDots') : dirty ? t('unsaved') : t('saved')
 
@@ -578,6 +615,25 @@ export default function KelionStudio() {
             ) : (
               <div style={styles.editorEmpty}>
                 {loading ? t('loadingStudio') : t('pickOrCreate')}
+              </div>
+            )}
+
+            {activePath && (
+              <div style={styles.aiPanel}>
+                <form onSubmit={handleAskAI} style={styles.aiForm}>
+                  <span style={styles.aiIcon}>🤖</span>
+                  <input
+                    type="text"
+                    value={aiPrompt}
+                    onChange={(e) => setAiPrompt(e.target.value)}
+                    placeholder="Scrie ce vrei să programeze Opus 4.7 (ex: creează o funcție care...)"
+                    style={styles.aiInput}
+                    disabled={aiLoading}
+                  />
+                  <button type="submit" disabled={!aiPrompt.trim() || aiLoading} style={styles.aiButton}>
+                    {aiLoading ? 'Se generează...' : 'Generează cod (Opus 4.7)'}
+                  </button>
+                </form>
               </div>
             )}
           </div>
@@ -760,6 +816,40 @@ const styles = {
     height: '100%',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     color: '#6b7280', fontSize: 14,
+  },
+  aiPanel: {
+    borderTop: '1px solid rgba(167,139,250,0.3)',
+    background: 'rgba(167,139,250,0.05)',
+    padding: '8px 12px',
+  },
+  aiForm: {
+    display: 'flex',
+    gap: '10px',
+    alignItems: 'center',
+  },
+  aiIcon: {
+    fontSize: '18px',
+  },
+  aiInput: {
+    flex: 1,
+    background: '#0f172a',
+    color: '#e5e7eb',
+    border: '1px solid rgba(167,139,250,0.3)',
+    borderRadius: '6px',
+    padding: '8px 12px',
+    fontSize: '13px',
+    outline: 'none',
+  },
+  aiButton: {
+    background: '#a78bfa',
+    color: '#05060a',
+    border: 'none',
+    borderRadius: '6px',
+    padding: '8px 16px',
+    fontSize: '13px',
+    fontWeight: 600,
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
   },
   runPanel: {
     borderTop: '1px solid rgba(255,255,255,0.08)',
