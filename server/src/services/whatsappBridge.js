@@ -328,7 +328,7 @@ class WhatsAppBridge extends EventEmitter {
       contactId = contact.id._serialized;
     }
 
-    // ── Auto-Greeting for New DMs (disabled in translate mode) ──
+    // ── Auto-Greeting for New DMs ──
     if (!isGroup && !this._greetedContacts.has(contactId) && !isTranslateMode) {
       this._greetedContacts.add(contactId);
       const greeting = "🤖 Hello! I am Kelion, an AI assistant. Please tell me your preferred language (e.g., English, Romanian, Spanish) so I can assist you better.\n\nSalut! Sunt Kelion, un asistent AI. Te rog spune-mi limba ta preferată pentru a te putea ajuta mai bine.";
