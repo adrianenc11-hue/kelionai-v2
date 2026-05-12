@@ -342,4 +342,96 @@ router.get('/status', (_req, res) => {
   });
 });
 
+// ─── SSE Streaming Terminal ───────────────────────────────────────
+// Streams terminal output line-by-line via Server-Sent Events so the
+// client monitor shows real-time output as it happens ("viteza luminii").
+// Uses spawn (unbuffered) instead of exec (buffered).
+const { spawn } = require('child_process');
+const _path = require('path');
+const TOOLS_REPO_ROOT = _path.resolve(__dirname, '../../../');
+
+router.post('/terminal-stream', async (req, res) => {
+  const user = await peekUser(req);
+  const ip = req.ip || 'anon';
+  if (!rateOk(`stream:${ip}`, 30, 60_000)) {
+    return res.status(429).json({ ok: false, error: 'Too many streaming commands.' });
+  }
+
+  const cmd = typeof req.body?.command === 'string' ? req.body.command.trim() : '';
+  if (!cmd) return res.status(400).json({ ok: false, error: 'No command' });
+  if (cmd.includes('rm -rf /') || cmd.includes('mkfs')) {
+    return res.status(403).json({ ok: false, error: 'Blocked.' });
+  }
+
+  let cwd = TOOLS_REPO_ROOT;
+  if (req.body?.cwd) {
+    cwd = _path.resolve(TOOLS_REPO_ROOT, req.body.cwd);
+  }
+
+  // SSE headers
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no',
+  });
+  res.flushHeaders();
+
+  const isWin = process.platform === 'win32';
+  const shell = isWin ? 'cmd.exe' : '/bin/sh';
+  const shellArgs = isWin ? ['/c', cmd] : ['-c', cmd];
+
+  const child = spawn(shell, shellArgs, {
+    cwd,
+    env: { ...process.env, FORCE_COLOR: '0' },
+    stdio: ['ignore', 'pipe', 'pipe'],
+    timeout: 120000,
+  });
+
+  let killed = false;
+  const killTimer = setTimeout(() => {
+    killed = true;
+    child.kill('SIGKILL');
+  }, 120000);
+
+  const sendEvent = (type, data) => {
+    try { res.write(`data: ${JSON.stringify({ type, data })}\n\n`); } catch {}
+  };
+
+  sendEvent('start', { cmd, cwd, pid: child.pid });
+
+  child.stdout.on('data', (chunk) => {
+    const lines = chunk.toString('utf8').split('\n');
+    for (const line of lines) {
+      if (line.length > 0) sendEvent('stdout', line);
+    }
+  });
+
+  child.stderr.on('data', (chunk) => {
+    const lines = chunk.toString('utf8').split('\n');
+    for (const line of lines) {
+      if (line.length > 0) sendEvent('stderr', line);
+    }
+  });
+
+  child.on('close', (code) => {
+    clearTimeout(killTimer);
+    sendEvent('exit', { code, killed });
+    res.write('data: [DONE]\n\n');
+    res.end();
+  });
+
+  child.on('error', (err) => {
+    clearTimeout(killTimer);
+    sendEvent('error', err.message);
+    res.write('data: [DONE]\n\n');
+    res.end();
+  });
+
+  req.on('close', () => {
+    clearTimeout(killTimer);
+    if (!child.killed) child.kill();
+  });
+});
+
 module.exports = router;

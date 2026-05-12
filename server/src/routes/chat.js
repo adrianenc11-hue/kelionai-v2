@@ -120,7 +120,7 @@ router.post('/', async (req, res) => {
     const taskType = isCodingTask(message) ? 'coder' : 'chat';
     // Admin ALWAYS gets the heavy model for coding/software tasks. Normal users need credits.
     const isHeavy = (isAdmin && taskType === 'coder') || ((creditsBalance > 0) && taskType === 'coder');
-    const isSoftGreu = isHeavy && (message.length > 200 || message.toLowerCase().includes('soft') || message.toLowerCase().includes('proiect'));
+    const isSoftGreu = isHeavy && message.length > 500 && /\b(proiect|arhitectur[aă]|sistem|refactor|migr[aă]|redesign)\b/i.test(message);
 
     const browserLang = (req.query.lang || 'en-US').toString().slice(0, 16);
     const forcedLang = (process.env.KELION_FORCE_LANG || browserLang).toString().slice(0, 16);
@@ -143,16 +143,57 @@ router.post('/', async (req, res) => {
     
     session.history.forEach(h => {
       if (h.role === 'function') {
-        sanitizedMessages.push({
-          role: 'tool',
-          tool_call_id: h.parts[0].functionResponse.id,
-          name: h.parts[0].functionResponse.name,
-          content: JSON.stringify(h.parts[0].functionResponse.response.result)
+        // OpenAI expects each tool response as a separate message
+        h.parts.forEach(p => {
+          sanitizedMessages.push({
+            role: 'tool',
+            tool_call_id: p.functionResponse.id,
+            name: p.functionResponse.name,
+            content: JSON.stringify(p.functionResponse.response.result)
+          });
         });
       } else {
         let text = '';
-        h.parts.forEach(p => { if (p.text) text += p.text; });
-        sanitizedMessages.push({ role: h.role, content: text });
+        let tool_calls = undefined;
+        let hasImage = false;
+        let contentArr = [];
+        
+        h.parts.forEach(p => { 
+          if (p.text) {
+            text += p.text; 
+            contentArr.push({ type: 'text', text: p.text });
+          }
+          if (p.inlineData) {
+            hasImage = true;
+            contentArr.push({ type: 'image_url', image_url: { url: `data:${p.inlineData.mimeType};base64,${p.inlineData.data}` } });
+          }
+          if (p.functionCall) {
+            if (!tool_calls) tool_calls = [];
+            tool_calls.push({
+              id: p.functionCall.id,
+              type: 'function',
+              function: {
+                name: p.functionCall.name,
+                arguments: typeof p.functionCall.args === 'string' ? p.functionCall.args : JSON.stringify(p.functionCall.args)
+              }
+            });
+          }
+        });
+
+        const msg = { role: h.role };
+        
+        if (hasImage) {
+          msg.content = contentArr;
+        } else {
+          msg.content = text;
+        }
+
+        if (tool_calls) {
+          msg.tool_calls = tool_calls;
+          if (!msg.content) msg.content = ""; // Required by OpenAI if tool_calls are present
+        }
+
+        sanitizedMessages.push(msg);
       }
     });
 

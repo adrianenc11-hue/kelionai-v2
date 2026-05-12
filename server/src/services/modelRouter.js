@@ -142,11 +142,7 @@ async function smartFetch(taskType, body, useHeavy = false) {
 
   for (let i = 0; i < chain.length; i++) {
     const fbModel = chain[i];
-
-    // Wait before retry (1s, 2s, 3s)
-    const waitMs = Math.min(1000 * (i + 1), 3000);
-    console.log(`[modelRouter] Fallback ${i + 1}/${chain.length}: ${fbModel} (wait ${waitMs}ms)`);
-    await new Promise(resolve => setTimeout(resolve, waitMs));
+    console.log(`[modelRouter] fallback ${i + 1}/${chain.length}: ${fbModel}`);
 
     try {
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
