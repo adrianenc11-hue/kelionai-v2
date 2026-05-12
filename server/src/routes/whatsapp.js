@@ -83,7 +83,7 @@ each message to the OTHER person's language. Detect languages automatically.`;
   ];
 
   try {
-    const result = await smartFetch({
+    const result = await smartFetch('chat', {
       messages,
       temperature: 0.7,
       max_tokens: 600,
