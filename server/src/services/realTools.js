@@ -3559,7 +3559,8 @@ async function executeRealTool(name, args, ctx) {
     case 'run_command': return toolRunTerminalCommand(a);
     case 'write_to_file': return toolEditLocalFile(a);
     case 'replace_file_content': return toolReplaceInFile(a);
-    case 'multi_replace_file_content': {
+    case 'multi_replace_file_content':
+      return toolMultiReplaceFileContent(args, ctx); {
       // Accepts { path, replacements: '[{target_content,replacement_content},...]' }
       try {
         const filePath = String(a?.path || '').trim();
@@ -5157,3 +5158,8 @@ module.exports = {
   storeTempFile,
   getTempFile,
 };
+
+
+async function toolMultiReplaceFileContent(args, ctx) {
+  return { ok: false, error: "Not implemented natively yet. Use replace_file_content repeatedly." };
+}
