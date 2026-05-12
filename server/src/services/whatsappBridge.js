@@ -218,7 +218,7 @@ class WhatsAppBridge extends EventEmitter {
     const bodyLower = body.toLowerCase();
     
     // Interactive setup
-    if (bodyLower === '!traduci' || bodyLower === '!translate') {
+    if (bodyLower === '+t') {
       this._activeTranslators.set(chatId, { setupMode: true });
       await this.client.sendMessage(chatId, '🤖 Ce limbă vorbește interlocutorul? (ex: engleza, japoneza, chineza, etc)');
       return;
@@ -279,7 +279,7 @@ class WhatsAppBridge extends EventEmitter {
       return;
     }
     
-    if (bodyLower === '!traduci off' || bodyLower === '!translate off') {
+    if (bodyLower === '-t') {
       this._activeTranslators.delete(chatId);
       await this.client.sendMessage(chatId, '❌ Translator automat dezactivat.');
       return;
