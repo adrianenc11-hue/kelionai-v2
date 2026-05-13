@@ -70,8 +70,19 @@
   </head>
   <body>
     <div id="root">
-      <h1 style="color: white; text-align: center; margin-top: 20%; font-family: sans-serif;">KelionAI Loading...</h1>
+      <h1 id="kelion-loading" style="color: white; text-align: center; margin-top: 20%; font-family: sans-serif;">KelionAI Loading...</h1>
     </div>
+    <script>
+      // Fallback: if React does not mount within 10s, show an error message.
+      setTimeout(function() {
+        var root = document.getElementById('root');
+        var loading = document.getElementById('kelion-loading');
+        if (root && root.children.length <= 1 && loading) {
+          loading.innerText = 'KelionAI — Eroare la încărcare. Reîmprospătează pagina.';
+          loading.style.color = '#ff6b6b';
+        }
+      }, 10000);
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

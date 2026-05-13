@@ -4447,6 +4447,10 @@ export default function KelionStage() {
 // look with the ? overflow button — an accent ring appears when `active`
 // so camera/screen/transcript toggles read as "on".
 
-useGLTF.preload('/kelion-rpm_e27cb94d.glb')
+try {
+  useGLTF.preload('/kelion-rpm_e27cb94d.glb')
+} catch (e) {
+  console.warn('[KelionStage] GLB preload failed (non-critical):', e)
+}
 
 
