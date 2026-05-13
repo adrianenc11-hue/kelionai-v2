@@ -1753,6 +1753,10 @@ export default function KelionStage() {
                 
                 {/* NEW HIGHLY VISIBLE STATUS */}
                 <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
+                  <button onClick={() => setMonitorOpen(true)} style={{ marginRight: 16, background: '#2563eb', color: 'white', border: 'none', borderRadius: 8, padding: '8px 16px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                    Comută Monitor
+                  </button>
                   {(() => {
                     const statusColors = {
                       idle: { color: '#888', bg: '#f5f5f5', border: '#e0e0e0', glow: 'none' },
@@ -1852,6 +1856,12 @@ export default function KelionStage() {
               background: '#0d0b1d', overflow: 'hidden'
             }}>
               <MonitorOverlay />
+              <div style={{ position: 'absolute', top: 16, right: 24, zIndex: 9999 }}>
+                <button onClick={() => setMonitorOpen(false)} style={{ background: 'rgba(37, 99, 235, 0.85)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 16px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, backdropFilter: 'blur(8px)', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                  Comută Chat
+                </button>
+              </div>
               {/* Transcript Overlay for Monitor Mode */}
               {(() => {
                 const lastDisplayMessage = [...turns].reverse().find(m => !m.isThought && (m.text || m.transcript) && typeof (m.text || m.transcript) === 'string' && (m.text || m.transcript).trim().length > 0);

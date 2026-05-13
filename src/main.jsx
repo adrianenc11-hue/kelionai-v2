@@ -74,7 +74,7 @@ function Loader() {
 const PermanentLogo = () => (
   <div style={{
     position: 'fixed',
-    bottom: '20px',
+    bottom: '100px',
     left: '85%',
     transform: 'translateX(-50%)',
     zIndex: 9999,

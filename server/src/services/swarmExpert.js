@@ -10,7 +10,7 @@ const { smartFetch } = require('./modelRouter');
  * Admin always uses heavy model (no credit gating for admin).
  */
 
-const AGENT_TIMEOUT_MS = 30_000; // 30s max per agent call
+const AGENT_TIMEOUT_MS = 120_000; // 120s max per agent call
 
 function withTimeout(promise, ms, label) {
   return Promise.race([
@@ -80,7 +80,7 @@ async function runSwarmTask(task, context = {}, creditsBalance = 0, tools = unde
           try {
             const r = await withTimeout(
               executeRealTool(tc.function.name, JSON.parse(tc.function.arguments || '{}'), context),
-              15_000,
+              60_000,
               `Tool ${tc.function.name}`
             );
             return `Tool ${tc.function.name} output: ${JSON.stringify(r)}`;
