@@ -31,8 +31,4 @@
   "engines": {
     "node": ">=20.0.0"
   }
-  ,
-  "overrides": {
-    "@tootallnate/once": "^3.0.1"
-  }
 }

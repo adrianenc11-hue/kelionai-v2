@@ -1,0 +1,52 @@
+name: acceptance
+
+# Runs the acceptance criteria in e2e/acceptance/ against the live production
+# URL. A feature is considered delivered ONLY when its script exits 0.
+#
+# This workflow is informational on PRs (so broken features do not block
+# unrelated changes) but tracked on master so the real status is always
+# visible.
+#
+# IMPORTANT: this workflow does NOT define the acceptance — the scripts do.
+# It just runs them. Weakening a script to make it pass is forbidden by
+# RULES.md and by CODEOWNERS on e2e/acceptance/.
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  pull_request:
+    branches:
+      - master
+      - main
+  workflow_dispatch:
+
+jobs:
+  acceptance:
+    runs-on: ubuntu-latest
+    env:
+      ACCEPTANCE_BASE: https://kelionai.app
+    strategy:
+      fail-fast: false
+      matrix:
+        capability:
+          - payments
+          - language-mirror
+          - language-switch
+          - trial-timer
+          - logout-media
+          - voice-roundtrip
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run acceptance — ${{ matrix.capability }}
+        run: |
+          echo "Running e2e/acceptance/${{ matrix.capability }}.cjs against $ACCEPTANCE_BASE"
+          node e2e/acceptance/${{ matrix.capability }}.cjs

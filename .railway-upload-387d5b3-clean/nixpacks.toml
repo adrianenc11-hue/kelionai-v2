@@ -1,0 +1,14 @@
+[phases.setup]
+nixPkgs = ["nodejs_22", "python3", "gcc", "gnumake"]
+
+[phases.install]
+cmds = [
+  "npm install",
+  "npm install --prefix server --omit=dev"
+]
+
+[phases.build]
+cmds = ["npm run build"]
+
+[start]
+cmd = "node server/src/index.js"

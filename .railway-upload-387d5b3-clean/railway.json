@@ -5,7 +5,6 @@
   },
   "deploy": {
     "startCommand": "npm run server:start",
-    "healthcheckPath": "/health",
-    "deployOnBranch": "master"
+    "healthcheckPath": "/health"
   }
 }

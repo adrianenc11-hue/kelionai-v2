@@ -1,0 +1,12 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Create Pull Request",
+			"type": "shell",
+			"command": "git checkout -b chore/audit-fix && git add . && git commit -m \"chore: audit & deps fix, npm overrides, full healthcheck\" && git push origin chore/audit-fix",
+			"isBackground": false,
+			"problemMatcher": []
+		}
+	]
+}

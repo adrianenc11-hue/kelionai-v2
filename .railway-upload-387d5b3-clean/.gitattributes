@@ -1,0 +1,21 @@
+# Force LF line endings on enforcement files so the SHA-256 hash of
+# RULES.md is deterministic across OS. Without this, the hash would
+# differ between Windows (CRLF) and Linux CI (LF) and the integrity
+# check would fail spuriously.
+RULES.md                              text eol=lf
+RULES.sha256                          text eol=lf
+.augment/rules.md                     text eol=lf
+CODEOWNERS                            text eol=lf
+DELIVERY_CONTRACT.md                  text eol=lf
+OWNER_SETUP.md                        text eol=lf
+scripts/verify-rules-integrity.cjs    text eol=lf
+scripts/verify-agent-report.cjs       text eol=lf
+scripts/lock-rules.sh                 text eol=lf
+scripts/unlock-rules.sh               text eol=lf
+.github/workflows/*.yml               text eol=lf
+e2e/acceptance/*.cjs                  text eol=lf
+e2e/acceptance/*.md                   text eol=lf
+
+# Keep PowerShell scripts CRLF so Windows parses them correctly.
+scripts/lock-rules.ps1                text eol=crlf
+scripts/unlock-rules.ps1              text eol=crlf

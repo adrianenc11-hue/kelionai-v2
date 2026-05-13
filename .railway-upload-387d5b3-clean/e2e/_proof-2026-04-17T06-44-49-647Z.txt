@@ -1,0 +1,31 @@
+=== KelionAI live verification after Kira removal ===
+Base: https://kelionai.app
+Time: 2026-04-17T06:44:49.761Z
+
+[PASS] Landing 200 + title present  —  title matched
+[PASS] Landing has NO Kira button  —  count=0
+[PASS] Landing has Kelion heading  —  count=1
+[PASS] Landing has NO "AI Vision" feature  —  count=0
+[PASS] Landing has Romanian Pornește chat button  —  count=1
+[PASS] Landing hero is in Romanian  —  count=1
+[PASS] Landing tagline is in Romanian  —  count=1
+[PASS] Landing has NO English hero left  —  count=0
+[PASS] /chat/kira redirects to /chat  —  final=https://kelionai.app/chat
+[PASS] /chat page has Romanian Pornește chat button  —  count=1
+[PASS] /chat page has Romanian Înapoi button  —  count=1
+[PASS] /chat/kelion redirects to /chat  —  final=https://kelionai.app/chat
+
+/health = {"status":"ok","ts":"2026-04-17T06:45:00.038Z","services":{"database":"connected","ai":"configured","ai_provider":"gemini","openai":"configured","gemini":"configured","elevenlabs":"configured"}}
+[PASS] /health returns ok
+[PASS] /health ai_provider=gemini
+[PASS] /health gemini=configured
+[PASS] /health database=connected
+[PASS] /api/realtime/token requires auth  —  status=401
+[PASS] Kira GLB no longer served (content-type != model/gltf-binary)  —  status=200 content-type=text/html; charset=UTF-8
+[PASS] Kelion GLB still served as binary model  —  status=200 content-type=model/gltf-binary
+
+=== SUMMARY ===
+PASS: 19
+FAIL: 0
+Log:  C:\Users\adria\kelionai-v2\kelionai-v2\e2e\_proof-2026-04-17T06-44-49-647Z.txt
+Screenshots: _proof-2026-04-17T06-44-49-647Z-*.png

@@ -1,0 +1,30 @@
+{
+  "_note": "Plan metadata only. Prices and intervals are the source-of-truth in Stripe Dashboard. priceEnv points at the env variable that holds the Stripe Price ID (price_...) for each paid plan. Do not add 'price' or 'interval' fields here.",
+  "free": {
+    "id": "free",
+    "name": "Free",
+    "dailyLimit": 10,
+    "features": ["Basic voice chat", "Standard avatars"]
+  },
+  "basic": {
+    "id": "basic",
+    "name": "Basic",
+    "priceEnv": "STRIPE_PRICE_BASIC",
+    "dailyLimit": 60,
+    "features": ["Extended voice chat", "All avatars", "Priority support"]
+  },
+  "premium": {
+    "id": "premium",
+    "name": "Premium",
+    "priceEnv": "STRIPE_PRICE_PREMIUM",
+    "dailyLimit": 180,
+    "features": ["Unlimited voice chat", "Custom avatars", "Advanced features", "Priority support"]
+  },
+  "enterprise": {
+    "id": "enterprise",
+    "name": "Enterprise",
+    "priceEnv": "STRIPE_PRICE_ENTERPRISE",
+    "dailyLimit": null,
+    "features": ["Everything in Premium", "Custom integrations", "Dedicated support"]
+  }
+}
