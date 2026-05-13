@@ -505,6 +505,14 @@ if (require.main === module) {
     } catch (err) {
       console.warn('[healthWatchdog] Failed to start:', err.message);
     }
+
+    // Start Titan-Mode Auto-Healing Watchdog
+    try {
+      const { startWatchdog } = require('./services/watchdog');
+      startWatchdog();
+    } catch (err) {
+      console.warn('[TitanWatchdog] Failed to start:', err.message);
+    }
   });
 }
 

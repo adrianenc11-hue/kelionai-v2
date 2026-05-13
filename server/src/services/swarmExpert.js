@@ -36,7 +36,7 @@ async function runSwarmTask(task, context = {}, creditsBalance = 0, tools = unde
   let subTasks = [];
   try {
     const architectResult = await withTimeout(
-      smartFetch('coder', {
+      smartFetch('chat_heavy', { // Hermes 3 405B Uncensored
         messages: [{ role: 'system', content: architectPrompt }],
         temperature: 0.2,
         max_tokens: 512,
@@ -60,12 +60,12 @@ async function runSwarmTask(task, context = {}, creditsBalance = 0, tools = unde
     
     try {
       const result = await withTimeout(
-        smartFetch('coder', {
+        smartFetch('coder_heavy', { // Qwen 3 Coder Uncensored
           messages: [{ role: 'system', content: executorPrompt }],
           tools: tools,
           temperature: 0.5,
           max_tokens: 2048,
-        }, true), // Admin always gets heavy model
+        }, true),
         AGENT_TIMEOUT_MS,
         `Executor ${i+1}`
       );
@@ -113,7 +113,7 @@ async function runSwarmTask(task, context = {}, creditsBalance = 0, tools = unde
     `;
 
     const finalResult = await withTimeout(
-      smartFetch('coder', {
+      smartFetch('chat', { // Dolphin Mistral Uncensored
         messages: [{ role: 'system', content: reviewerPrompt }],
         tools: tools,
         tool_choice: tools ? 'auto' : undefined,

@@ -16,28 +16,27 @@
 const GOOGLE_AI_STUDIO = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
 
 const MODELS = {
-  // Primary: Top-tier free models from OpenRouter 2026
-  chat: process.env.MODEL_CHAT || 'google/gemma-4-31b-it:free',
+  // Primary: Top-tier free Uncensored / Hacker models from OpenRouter 2026
+  chat: process.env.MODEL_CHAT || 'cognitivecomputations/dolphin-mistral-24b-venice-edition:free',
   chat_heavy: process.env.MODEL_CHAT_HEAVY || 'nousresearch/hermes-3-llama-3.1-405b:free',
 
-  // Coding specialist: Qwen3 Coder is the absolute free leader
+  // Coding specialist: Qwen Coder
   coder: process.env.MODEL_CODER || 'qwen/qwen3-coder:free',
-  coder_heavy: process.env.MODEL_CODER_HEAVY || 'meta-llama/llama-3.3-70b-instruct:free',
+  coder_heavy: process.env.MODEL_CODER_HEAVY || 'qwen/qwen3-coder:free',
 
-  // Vision / Extraction: LFM 2.5 / Minimax M2.5
+  // Vision / Extraction
   vision: process.env.MODEL_VISION || 'minimax/minimax-m2.5:free',
   vision_heavy: process.env.MODEL_VISION_HEAVY || 'z-ai/glm-4.5-air:free',
 };
 
-// OpenRouter fallback models (May 2026 Free Tier)
-// We ONLY use :free models to guarantee no 402 errors.
+// OpenRouter fallback models
 const OPENROUTER_FALLBACK = {
-  chat:   ['google/gemma-4-31b-it:free', 'meta-llama/llama-3.2-3b-instruct:free', 'google/gemma-4-26b-a4b-it:free'],
-  chat_heavy: ['nousresearch/hermes-3-llama-3.1-405b:free', 'meta-llama/llama-3.3-70b-instruct:free', 'google/gemma-4-31b-it:free'],
-  coder:  ['qwen/qwen3-coder:free', 'google/gemma-4-31b-it:free', 'meta-llama/llama-3.3-70b-instruct:free'],
-  coder_heavy: ['meta-llama/llama-3.3-70b-instruct:free', 'nousresearch/hermes-3-llama-3.1-405b:free', 'qwen/qwen3-coder:free'],
-  vision: ['minimax/minimax-m2.5:free', 'z-ai/glm-4.5-air:free'],
-  vision_heavy: ['z-ai/glm-4.5-air:free', 'minimax/minimax-m2.5:free'],
+  chat:   ['cognitivecomputations/dolphin-mistral-24b-venice-edition:free', 'nousresearch/hermes-3-llama-3.1-405b:free'],
+  chat_heavy: ['nousresearch/hermes-3-llama-3.1-405b:free', 'cognitivecomputations/dolphin-mistral-24b-venice-edition:free'],
+  coder:  ['qwen/qwen3-coder:free', 'nousresearch/hermes-3-llama-3.1-405b:free'],
+  coder_heavy: ['nousresearch/hermes-3-llama-3.1-405b:free', 'qwen/qwen3-coder:free'],
+  vision: ['minimax/minimax-m2.5:free'],
+  vision_heavy: ['z-ai/glm-4.5-air:free'],
 };
 
 /**
