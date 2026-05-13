@@ -1774,20 +1774,31 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
           const currentAbortSignal = httpAbortRef.current.signal;
           let data;
 
-          // ── Puter.js silent attempt ──
+          // ── Puter.js PRIMARY path (Claude Opus 4.7 — free, fast) ──
           try {
-            const puterMod = await import('@heyputer/puter.js');
-            const puter = puterMod.puter || puterMod.default;
-            const isAuthed = puter && puter.auth && (typeof puter.auth.isSignedIn === 'function' ? puter.auth.isSignedIn() : puter.authToken || puter.auth.token);
-            if (puter && puter.ai && isAuthed && (!toolResponses || toolResponses.length === 0)) {
+            // Load Puter.js via CDN if not already loaded (silent, no popup)
+            if (!window.puter) {
+              const existing = document.querySelector('script[src*="puter.com"]');
+              if (!existing) {
+                const s = document.createElement('script');
+                s.src = 'https://js.puter.com/v2/';
+                document.head.appendChild(s);
+                await new Promise(r => setTimeout(r, 2000));
+              }
+            }
+            const puter = window.puter;
+            if (puter && puter.ai && (!toolResponses || toolResponses.length === 0)) {
               _setTaskStatus({ tool: 'puter-opus', progress: 20, label: '🧠 Opus 4.7 (Puter)...', phase: 'thinking' });
-              const sysPrompt = "You are KelionAI, a genius expert coder and architect. Do your best to help the user immediately. Since you are running via Puter, you cannot use native backend tools. Output the response in raw text.";
-              const puterResp = await puter.ai.chat([{ role: 'system', content: sysPrompt }, { role: 'user', content: currentMessage }], { model: 'claude-opus-4-7', signal: currentAbortSignal });
-              data = { reply: puterResp?.message?.content?.[0]?.text || '', model: 'claude-opus-4-7 (Puter)' };
+              const sysPrompt = "You are KelionAI, a genius expert coder and architect. You speak Romanian natively. Do your best to help the user immediately. Output the response in raw text.";
+              const puterResp = await puter.ai.chat([{ role: 'system', content: sysPrompt }, { role: 'user', content: currentMessage }], { model: 'claude-opus-4-7' });
+              const replyText = typeof puterResp === 'string' ? puterResp : (puterResp?.message?.content?.[0]?.text || puterResp?.message?.content || puterResp?.toString() || '');
+              if (replyText) {
+                data = { reply: replyText, model: 'claude-opus-4-7 (Puter)' };
+              }
               _setTaskStatus({ tool: 'puter-opus', progress: 80, label: '✅ Răspuns Opus primit', phase: 'working' });
             }
           } catch (e) {
-            console.log('[kelionVoice] Puter silent fallback:', e?.message || e);
+            console.log('[kelionVoice] Puter fallback to backend:', e?.message || e);
           }
 
           // ── Backend API call ──
