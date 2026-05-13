@@ -27,6 +27,7 @@ const autoTopup = require('../services/autoTopup');
 const payoutsService = require('../services/payouts');
 const banCache = require('../services/banCache');
 const { getVisitorAnalytics } = require('../services/visitorAnalytics');
+const { runEnvAudit } = require('../services/envAudit');
 
 const router = Router();
 
@@ -1046,6 +1047,20 @@ router.get('/health', async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: 'Health watchdog not available: ' + err.message });
+  }
+});
+
+/**
+ * GET /api/admin/env-audit
+ * Live audit of all external API keys and environment variables.
+ * Returns a pass/fail report for each integration.
+ */
+router.get('/env-audit', async (req, res) => {
+  try {
+    const audit = await runEnvAudit();
+    res.json(audit);
+  } catch (err) {
+    res.status(500).json({ error: 'Env audit failed: ' + err.message });
   }
 });
 
