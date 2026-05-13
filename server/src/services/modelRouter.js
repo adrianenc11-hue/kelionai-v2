@@ -16,29 +16,29 @@
 const GOOGLE_AI_STUDIO = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
 
 const MODELS = {
-  // Primary: Gemini 3.1 Flash via direct Google API Studio (Ultra-fast, 2026 standard)
-  chat: process.env.MODEL_CHAT || 'gemini-3.1-flash-lite',
-  chat_heavy: process.env.MODEL_CHAT_HEAVY || 'gemini-3.1-pro',
+  // Primary: Gemini 2.5 Flash via direct Google API Studio (Ultra-fast, 2026 standard)
+  chat: process.env.MODEL_CHAT || 'gemini-2.5-flash-lite',
+  chat_heavy: process.env.MODEL_CHAT_HEAVY || 'gemini-2.5-pro',
 
-  // Coding specialist: Gemini 3.1 is the 2026 benchmark leader
-  coder: process.env.MODEL_CODER || 'gemini-3.1-flash',
-  coder_heavy: process.env.MODEL_CODER_HEAVY || 'gemini-3.1-pro',
+  // Coding specialist: Gemini 2.5 is the 2026 benchmark leader
+  coder: process.env.MODEL_CODER || 'gemini-2.5-flash-lite',
+  coder_heavy: process.env.MODEL_CODER_HEAVY || 'gemini-2.5-pro',
 
   // Vision / Extraction: 2026 Vision models
-  vision: process.env.MODEL_VISION || 'gemini-3.1-flash-lite',
-  vision_heavy: process.env.MODEL_VISION_HEAVY || 'gemini-3.1-pro',
+  vision: process.env.MODEL_VISION || 'gemini-2.5-flash-lite',
+  vision_heavy: process.env.MODEL_VISION_HEAVY || 'gemini-2.5-pro',
 };
 
 // OpenRouter fallback models (May 2026 updated list)
 // We prioritize native Google AI Studio models in the fallback chain 
 // so if OpenRouter fails, it switches to direct Google API.
 const OPENROUTER_FALLBACK = {
-  chat:   ['google/gemini-3.1-flash-lite', 'openai/gpt-5.5-mini', 'anthropic/claude-4.7-sonnet'],
-  chat_heavy: ['google/gemini-3.1-pro', 'openai/gpt-5.5', 'anthropic/claude-4.7-opus'],
-  coder:  ['google/gemini-3.1-flash', 'qwen/qwen-3-coder-max', 'openai/gpt-5.5-mini'],
-  coder_heavy: ['google/gemini-3.1-pro', 'anthropic/claude-4.7-opus', 'openai/gpt-5.5'],
-  vision: ['google/gemini-3.1-flash-lite', 'openai/gpt-5.5-mini'],
-  vision_heavy: ['google/gemini-3.1-pro', 'openai/gpt-5.5'],
+  chat:   ['google/gemini-2.5-flash-lite', 'openai/gpt-4o-mini', 'anthropic/claude-4.7-sonnet'],
+  chat_heavy: ['google/gemini-2.5-pro', 'openai/gpt-4o', 'anthropic/claude-4.7-opus'],
+  coder:  ['google/gemini-2.5-flash-lite', 'qwen/qwen-3-coder-max', 'openai/gpt-4o-mini'],
+  coder_heavy: ['google/gemini-2.5-pro', 'anthropic/claude-4.7-opus', 'openai/gpt-4o'],
+  vision: ['google/gemini-2.5-flash-lite', 'openai/gpt-4o-mini'],
+  vision_heavy: ['google/gemini-2.5-pro', 'openai/gpt-4o'],
 };
 
 /**
