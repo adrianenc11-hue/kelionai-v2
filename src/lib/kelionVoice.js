@@ -13,6 +13,7 @@ import { setCameraController, setCurrentFacingMode } from './cameraControl'
 import { getCsrfToken } from './api'
 import { subscribeNarrationMode, getNarrationMode } from './narrationMode'
 import { logAiEvent } from './aiEventLog'
+import { setTaskStatus as _setTaskStatus, completeTask as _completeTask, failTask as _failTask, clearTaskStatus as _clearTaskStatus } from './taskStatusStore'
 
 const SAMPLE_RATE_IN = 16000   // Mic capture rate for SpeechRecognition
 const SAMPLE_RATE_OUT = 24000  // TTS playback rate (ElevenLabs REST TTS)
@@ -202,7 +203,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
               audio: { data: b64, mimeType: `audio/pcm;rate=${SAMPLE_RATE_IN}` },
             },
           }))
-        } catch (_) {}
+        } catch (_) { }
       });
       voiceBufferRef.current = [];
     }
@@ -218,7 +219,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
   const appendTurn = useCallback((role, delta, finalize = false, source = null) => {
     // When a role speaks, finalize the OTHER role's bubble so they don't merge infinitely.
     turnActiveRef.current[role === 'user' ? 'assistant' : 'user'] = null;
-    
+
     setTurns((prev) => {
       const active = turnActiveRef.current[role]
       if (active !== null && prev[active] && prev[active].role === role) {
@@ -238,7 +239,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
   const playNextTtsBlob = useCallback(() => {
     if (ttsIsPlayingRef.current || ttsBlobQueueRef.current.length === 0) return;
     ttsIsPlayingRef.current = true;
-    
+
     const blobUrl = ttsBlobQueueRef.current.shift();
     const audioEl = audioRef?.current || new window.Audio();
     if (audioEl === audioRef?.current) {
@@ -248,16 +249,16 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
     audioEl.src = blobUrl;
     audioEl.volume = 1.0;
     activeAudioElRef.current = audioEl;
-    
+
     const onComplete = () => {
       URL.revokeObjectURL(blobUrl);
       activeAudioElRef.current = null;
       ttsIsPlayingRef.current = false;
       playNextTtsBlob();
-      
+
       // If queue is empty and we are speaking, flip to listening
       if (ttsBlobQueueRef.current.length === 0 && statusRef.current === 'speaking') {
-         setStatus(window.__restRecRef ? 'listening' : 'idle');
+        setStatus(window.__restRecRef ? 'listening' : 'idle');
       }
     };
     audioEl.onended = onComplete;
@@ -269,11 +270,11 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
     if (!textChunk.trim()) return;
     const isNative = !isClonedVoiceActive();
     const ttsUrl = isNative ? '/api/voice/clone/tts?native=true' : '/api/voice/clone/tts';
-    
+
     if (!ttsAbortControllerRef.current) {
       ttsAbortControllerRef.current = new AbortController();
     }
-    
+
     setStatus('speaking');
     try {
       const r = await fetch(ttsUrl, {
@@ -351,7 +352,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
       if (audioRef.current) {
         audioRef.current.srcObject = dest.stream
         audioRef.current.muted = true // audible through ctx.destination; stream is for lipsync analyser
-        audioRef.current.play().catch(() => {})
+        audioRef.current.play().catch(() => { })
       }
     } else if (audioRef.current) {
       // Subsequent chunks: ensure muted stays true even if cloned TTS
@@ -420,10 +421,10 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
     // audioRef TTS path and standalone new Audio() fallbacks.
     const prevAudio = activeAudioElRef.current
     if (prevAudio) {
-      try { prevAudio.pause() } catch (_) {}
-      try { prevAudio.onended = null } catch (_) {}
-      try { if (prevAudio.src && prevAudio.src.startsWith('blob:')) URL.revokeObjectURL(prevAudio.src) } catch (_) {}
-      try { prevAudio.src = '' } catch (_) {}
+      try { prevAudio.pause() } catch (_) { }
+      try { prevAudio.onended = null } catch (_) { }
+      try { if (prevAudio.src && prevAudio.src.startsWith('blob:')) URL.revokeObjectURL(prevAudio.src) } catch (_) { }
+      try { prevAudio.src = '' } catch (_) { }
       activeAudioElRef.current = null
     }
   }, [])
@@ -519,17 +520,17 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
         } else {
           appendTurn('assistant', sc.outputTranscription.text, false, '🔊 AI Voice')
           logAiEvent('transcript_out', { text: sc.outputTranscription.text, source: 'voice-live' })
-          
+
           // Chunked TTS: Accumulate and flush on sentence boundaries
           cloneTranscriptBufRef.current += sc.outputTranscription.text;
           const match = cloneTranscriptBufRef.current.match(/([.!?\n]\s*)/);
           if (match) {
-             const splitIndex = match.index + match[0].length;
-             const sentence = cloneTranscriptBufRef.current.substring(0, splitIndex).trim();
-             cloneTranscriptBufRef.current = cloneTranscriptBufRef.current.substring(splitIndex);
-             if (sentence) {
-                processTtsChunk(sentence);
-             }
+            const splitIndex = match.index + match[0].length;
+            const sentence = cloneTranscriptBufRef.current.substring(0, splitIndex).trim();
+            cloneTranscriptBufRef.current = cloneTranscriptBufRef.current.substring(splitIndex);
+            if (sentence) {
+              processTtsChunk(sentence);
+            }
           }
         }
         // ALWAYS mark that we received a transcript for this turn —
@@ -577,7 +578,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
         turnHasAudioRef.current = false
         partTextBufRef.current = ''
         // Voice: flush accumulated transcript to REST TTS
-         if (cloneTranscriptBufRef.current.trim()) {
+        if (cloneTranscriptBufRef.current.trim()) {
           const textToSpeak = cloneTranscriptBufRef.current.trim()
           cloneTranscriptBufRef.current = ''
           processTtsChunk(textToSpeak)
@@ -663,7 +664,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
           ws.send(JSON.stringify({ clientContent: { turns: [{ role: 'user', parts: [{ text: initialTextRef.current }] }], turnComplete: true } }))
           setStatus('thinking')
           initialTextRef.current = null
-        } catch (_) {}
+        } catch (_) { }
       }
       // Translator mode kickstart — only fires when the user explicitly
       // selected translator mode from the menu. Normal sessions start
@@ -732,19 +733,19 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
     // stops all active sources and bumps the generation counter so
     // any late-arriving chunks from the old ws are dropped on arrival.
     clearAudioQueue()
-    
+
     // Clear Chunked TTS Queue
     ttsBlobQueueRef.current = []
     ttsIsPlayingRef.current = false
     if (activeAudioElRef.current) {
-      try { activeAudioElRef.current.pause(); activeAudioElRef.current.src = ''; } catch (_) {}
+      try { activeAudioElRef.current.pause(); activeAudioElRef.current.src = ''; } catch (_) { }
       activeAudioElRef.current = null;
     }
     if (ttsAbortControllerRef.current) {
       ttsAbortControllerRef.current.abort();
       ttsAbortControllerRef.current = null;
     }
-    
+
     if (wsRef.current && wsRef.current.readyState !== WebSocket.CLOSED) {
       try { wsRef.current.close(1000, 'restart') } catch (_) { /* ignore */ }
       wsRef.current = null
@@ -765,13 +766,13 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
       let stream = null
       if (!textOnly) {
         stream = await navigator.mediaDevices.getUserMedia({
-          audio: { 
-            channelCount: 1, 
-            echoCancellation: true, 
-            noiseSuppression: true, 
+          audio: {
+            channelCount: 1,
+            echoCancellation: true,
+            noiseSuppression: true,
             autoGainControl: true,
             voiceIsolation: true,
-            sampleRate: SAMPLE_RATE_IN 
+            sampleRate: SAMPLE_RATE_IN
           },
           video: false,
         })
@@ -813,11 +814,11 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
       const tokenUrl = `/api/realtime/voice-token?lang=${encodeURIComponent(langHint)}${geoQuery}${backendQuery}${tzQuery}`
       const tokenRes = priorTurns.length
         ? await fetch(tokenUrl, {
-            method: 'POST',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
-            body: JSON.stringify({ priorTurns, backend: liveBackend }),
-          })
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+          body: JSON.stringify({ priorTurns, backend: liveBackend }),
+        })
         : await fetch(tokenUrl, { credentials: 'include' })
       // Guest trial exhaustion — propagate a clean user-facing error so
       // the HUD can render "Sign in / buy credits" instead of a raw
@@ -848,7 +849,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
       const setupPayload = tokenBody?.setup
       const resolvedBackend = tokenBody?.backend === 'vertex' ? 'vertex'
         : tokenBody?.backend === 'openrouter' ? 'openrouter'
-        : 'aistudio'
+          : 'aistudio'
       // Vertex and OpenRouter paths don't return a token (Vertex auth
       // lives on the server-side proxy; OpenRouter uses REST Voice Mode).
       // Only enforce the token presence for AI Studio.
@@ -898,7 +899,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
         rec.continuous = false;
         rec.interimResults = true; // Use interim results to animate soundbars
         rec.lang = navigator.language || 'ro-RO';
-        
+
         let fakeAnimFrame = null;
         const startFakeAnim = () => {
           if (statusRef.current === 'listening') {
@@ -909,16 +910,16 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
           }
         };
         startFakeAnim();
-        
+
         rec.onresult = async (ev) => {
           setUserLevel(0.6 + Math.random() * 0.4);
-          
+
           if (!ev.results[ev.results.length - 1].isFinal) {
             // Barge-in: immediately stop TTS when user starts speaking
             clearAudioQueue();
             return; // Wait for final transcript
           }
-          
+
           const rawTranscript = ev.results[ev.results.length - 1][0].transcript;
           if (!rawTranscript) return;
           const transcript = correctTranscript(rawTranscript);
@@ -926,7 +927,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
           setStatus('thinking');
           setUserLevel(0);
           if (fakeAnimFrame) cancelAnimationFrame(fakeAnimFrame);
-          
+
           let base64Image = null;
           if (cameraStreamRef.current) {
             try {
@@ -939,13 +940,13 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
               const ctx = canvas.getContext('2d');
               ctx.drawImage(bitmap, 0, 0);
               base64Image = canvas.toDataURL('image/jpeg');
-            } catch(e) { console.error('[kelionVoice] Vision frame error', e); }
+            } catch (e) { console.error('[kelionVoice] Vision frame error', e); }
           }
-          
+
           // Use the enhanced sendText which supports images and audio playback!
           await sendText(transcript, base64Image, true);
         };
-        
+
         rec.onerror = (ev) => {
           if (fakeAnimFrame) cancelAnimationFrame(fakeAnimFrame);
           setUserLevel(0);
@@ -961,26 +962,26 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
           } else {
             // Keep listening permanently unless stopped
             if (statusRef.current !== 'stopped' && statusRef.current !== 'error' && statusRef.current !== 'idle') {
-              try { rec.start(); } catch(e) {}
+              try { rec.start(); } catch (e) { }
               if (statusRef.current === 'listening') startFakeAnim();
             }
           }
         };
-        
+
         rec.onend = () => {
           if (fakeAnimFrame) cancelAnimationFrame(fakeAnimFrame);
           setUserLevel(0);
           // Keep listening permanently unless stopped or returned to idle by user
           if (statusRef.current !== 'stopped' && statusRef.current !== 'error' && statusRef.current !== 'idle') {
-             try { rec.start(); } catch(e) {}
-             // Always transition back to 'listening' when we restart the recognizer
-             // (sendText sets 'idle' after TTS completes; we need to go back to 'listening'
-             // so the status badge shows the correct state and the animation runs)
-             setStatus('listening');
-             startFakeAnim();
+            try { rec.start(); } catch (e) { }
+            // Always transition back to 'listening' when we restart the recognizer
+            // (sendText sets 'idle' after TTS completes; we need to go back to 'listening'
+            // so the status badge shows the correct state and the animation runs)
+            setStatus('listening');
+            startFakeAnim();
           }
         };
-        
+
         setStatus('listening');
         rec.start();
         return;
@@ -1214,7 +1215,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
         node.port.onmessage = (e) => {
           if (ws.readyState !== WebSocket.OPEN) return
           const float = e.data
-          
+
           // Auto-Vox: if thinking or working, buffer it instead of sending.
           // Allows user to keep talking while tools run/model thinks.
           const currentStatus = statusRef.current;
@@ -1274,7 +1275,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
     }
     const video = hiddenRef.current
     video.srcObject = stream
-    video.play().catch(() => {})
+    video.play().catch(() => { })
 
     // Smart Vision (M9 adaptive FPS): dynamic target 2..8 FPS based on
     // motion detection + conversational context. Screen share stays at 2 FPS.
@@ -1309,7 +1310,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
           const mctx = mc.getContext('2d', { willReadFrequently: true })
           mctx.drawImage(video, 0, 0, 16, 16)
           const currentData = mctx.getImageData(0, 0, 16, 16).data
-          
+
           if (visionLastMotionDataRef.current) {
             let diff = 0
             const prevData = visionLastMotionDataRef.current
@@ -1318,8 +1319,8 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
               diff += Math.abs(currentData[i] - prevData[i])
             }
             // If significant change (> 5% avg pixel diff), boost vision
-            if (diff > 800) { 
-               visionLastBoostAtRef.current = Date.now()
+            if (diff > 800) {
+              visionLastBoostAtRef.current = Date.now()
             }
           }
           visionLastMotionDataRef.current = currentData
@@ -1376,7 +1377,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
     }
     const hiddenRef = kind === 'camera' ? hiddenVideoCameraRef : hiddenVideoScreenRef
     if (hiddenRef.current) {
-      try { hiddenRef.current.pause() } catch {}
+      try { hiddenRef.current.pause() } catch { }
       hiddenRef.current.srcObject = null
     }
   }, [])
@@ -1525,11 +1526,11 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
 
   const stop = useCallback(() => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      try { wsRef.current.close(1000, 'user_stopped') } catch {}
+      try { wsRef.current.close(1000, 'user_stopped') } catch { }
     }
     wsRef.current = null
     if (workletNodeRef.current) {
-      try { workletNodeRef.current.disconnect() } catch {}
+      try { workletNodeRef.current.disconnect() } catch { }
       workletNodeRef.current = null
     }
     if (micStreamRef.current) {
@@ -1537,7 +1538,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
       micStreamRef.current = null
     }
     if (window.__restRecRef) {
-      try { window.__restRecRef.stop() } catch {}
+      try { window.__restRecRef.stop() } catch { }
       window.__restRecRef = null
     }
     // Stage 2: also stop camera + screen
@@ -1556,7 +1557,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
     if (micLevelRafRef.current) cancelAnimationFrame(micLevelRafRef.current)
     analyserRef.current = null
     if (meterCtxRef.current) {
-      try { meterCtxRef.current.close() } catch {}
+      try { meterCtxRef.current.close() } catch { }
       meterCtxRef.current = null
     }
     // Cancel any pending trial auto-stop so it doesn't fire after the
@@ -1692,7 +1693,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
   const sendText = useCallback(async (text, image = null, playAudio = false) => {
     const clean = (text || '').trim()
     if (!clean && !image) return
-    
+
     // Immediate STOP intercept
     if (['stop', 'oprește', 'gata', 'oprește-te', 'stop it'].includes(clean.toLowerCase().replace(/[.,!]/g, ''))) {
       clearAudioQueue()
@@ -1704,7 +1705,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
       httpBusyRef.current = false
       return
     }
-    
+
     userHasSpokenRef.current = true
     narrationCooldownRef.current = Date.now()
     if (clean) appendTurn('user', clean, true, playAudio ? '🎤 Voice' : '⌨️ Keyboard')
@@ -1731,9 +1732,10 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
         httpMsgBufferRef.current.push({ clean, image })
         return
       }
-      
+
       httpBusyRef.current = true
       setStatus('thinking')
+      _setTaskStatus({ tool: 'chat', progress: 10, label: 'Gândesc...', phase: 'thinking' });
       try {
         let currentMessage = clean;
         let currentImage = image;
@@ -1741,11 +1743,11 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
         let maxLoops = 5;
         let finalReply = '';
         let finalModel = '';
-        
+
         if (!sessionIdRef.current) {
           sessionIdRef.current = 'ses_' + Math.random().toString(36).substring(2, 10);
         }
-        
+
         while (maxLoops-- > 0) {
           // If buffered messages arrived while tools were running, append them
           while (httpMsgBufferRef.current.length > 0) {
@@ -1758,18 +1760,18 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
           let data;
 
           try {
-             // 🤖 HACK: bypass backend and use Opus 4.7 directly in browser via Puter.js
-             const { puter } = await import('@heyputer/puter.js');
-             if (puter && puter.ai) {
-                const sysPrompt = "You are KelionAI, a genius expert coder and architect. Do your best to help the user immediately. Since you are running via Puter, you cannot use native backend tools. Output the response in raw text.";
-                // Only send to puter if we don't have tool responses pending
-                if (!toolResponses || toolResponses.length === 0) {
-                   const puterResp = await puter.ai.chat([{role: 'system', content: sysPrompt}, {role: 'user', content: currentMessage}], { model: 'claude-opus-4-7' });
-                   data = { reply: puterResp?.message?.content?.[0]?.text || '', model: 'claude-opus-4-7 (Puter)' };
-                }
-             }
+            // Puter.js — use Opus 4.7 ONLY if already authenticated (no popup).
+            // If the user hasn't logged in to Puter yet, skip silently → backend.
+            const puterMod = await import('@heyputer/puter.js');
+            const puter = puterMod.puter || puterMod.default;
+            const isAuthed = puter && puter.auth && (typeof puter.auth.isSignedIn === 'function' ? puter.auth.isSignedIn() : puter.authToken || puter.auth.token);
+            if (puter && puter.ai && isAuthed && (!toolResponses || toolResponses.length === 0)) {
+              const sysPrompt = "You are KelionAI, a genius expert coder and architect. Do your best to help the user immediately. Since you are running via Puter, you cannot use native backend tools. Output the response in raw text.";
+              const puterResp = await puter.ai.chat([{ role: 'system', content: sysPrompt }, { role: 'user', content: currentMessage }], { model: 'claude-opus-4-7' });
+              data = { reply: puterResp?.message?.content?.[0]?.text || '', model: 'claude-opus-4-7 (Puter)' };
+            }
           } catch (e) {
-             console.log('[kelionVoice] Puter bypass failed or unavailable:', e);
+            console.log('[kelionVoice] Puter silent fallback:', e?.message || e);
           }
 
           if (!data) {
@@ -1778,9 +1780,9 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
               signal: httpAbortRef.current.signal,
               headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
               credentials: 'include',
-              body: JSON.stringify({ 
-                message: currentMessage, 
-                toolResponses, 
+              body: JSON.stringify({
+                message: currentMessage,
+                toolResponses,
                 image: currentImage,
                 sessionId: sessionIdRef.current,
                 lat: coords?.lat,
@@ -1796,52 +1798,75 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
             }
             data = await r.json()
           }
-          
+
           if (data.toolCalls && data.toolCalls.length > 0) {
             setStatus('working')
             const results = [];
-            for (const call of data.toolCalls) {
+            const totalTools = data.toolCalls.length;
+            for (let ti = 0; ti < totalTools; ti++) {
+              const call = data.toolCalls[ti];
+              const file = call.args?.path || call.args?.target || call.args?.file || call.args?.command || null;
+              _setTaskStatus({
+                tool: call.name,
+                file,
+                progress: Math.round(((ti) / totalTools) * 100),
+                label: `Rulez ${call.name.replace(/_/g, ' ')}...`,
+                phase: 'working',
+              });
               const res = await runTool(call.name, call.args);
               results.push({ name: call.name, response: res, id: call.id });
+              _setTaskStatus({
+                tool: call.name,
+                file,
+                progress: Math.round(((ti + 1) / totalTools) * 100),
+                label: ti === totalTools - 1 ? 'Finalizez...' : `${call.name.replace(/_/g, ' ')} ✓`,
+                phase: ti === totalTools - 1 ? 'working' : 'working',
+              });
             }
+            _completeTask(`${totalTools} tool${totalTools > 1 ? '-uri' : ''} executat${totalTools > 1 ? 'e' : ''} ✓`);
             toolResponses = results;
             currentMessage = undefined; // Do not send message again
             currentImage = undefined;
             continue; // Loop back to send toolResponses
           }
-          
+
           finalReply = data.reply || '';
           finalModel = data.model;
           break;
         }
-        
+
         // Prevent empty bubbles
         if (finalReply) {
+          _completeTask('Răspuns generat ✓');
           appendTurn('assistant', finalReply, true, finalModel ? `🤖 ${finalModel}` : undefined)
+        } else {
+          _clearTaskStatus();
         }
-        
+
 
         // Skip TTS if there is actually nothing to say
         if (playAudio && finalReply.trim() !== '') {
           clearAudioQueue()
           setStatus('speaking')
-          
+
           // Split full reply into sentences and enqueue them sequentially
           // This eliminates the 15-20s wait for ElevenLabs to process massive blocks of text.
           const sentences = finalReply.match(/[^.!?\n]+[.!?\n]+/g) || [finalReply];
           for (const s of sentences) {
-             if (s.trim()) {
-                await processTtsChunk(s.trim());
-             }
+            if (s.trim()) {
+              await processTtsChunk(s.trim());
+            }
           }
         } else {
           setStatus(window.__restRecRef ? 'listening' : 'idle')
         }
       } catch (err) {
         if (err.name === 'AbortError') {
+          _clearTaskStatus();
           console.log('[kelionVoice] HTTP chat aborted by user stop command')
           return
         }
+        _failTask(err?.message || 'Eroare de conexiune');
         console.error('[kelionVoice] HTTP chat fallback failed', err)
         appendTurn('assistant', 'Connection error. Please try again.', true)
         setStatus(window.__restRecRef ? 'listening' : 'idle')
