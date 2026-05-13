@@ -123,7 +123,7 @@ router.post('/', async (req, res) => {
     const isHeavy = isAdmin || (creditsBalance > 0);
     // Adrian: "Să lucreze cu agenți la orice task mai complex".
     // Lowering threshold to 150 chars and adding more keywords.
-    const isSoftGreu = isHeavy && message.length > 150 && /\b(proiect|arhitectur[aă]|sistem|refactor|migr[aă]|redesign|soft|program|aplicați|creează|dezvolt|implement|workflow|arhitect)\b/i.test(message);
+    const isSoftGreu = false; // Disabled to force frontend tool execution for live progress
 
     const browserLang = (req.query.lang || 'en-US').toString().slice(0, 16);
     const forcedLang = (process.env.KELION_FORCE_LANG || browserLang).toString().slice(0, 16);
@@ -234,35 +234,15 @@ router.post('/', async (req, res) => {
       const choice = result.choices?.[0];
       
       if (choice?.message?.tool_calls) {
-        console.log(`[chat] Executing ${choice.message.tool_calls.length} tools on server...`);
-        const toolResponses = await Promise.all(choice.message.tool_calls.map(async (tc) => {
-          const name = tc.function.name;
-          const args = JSON.parse(tc.function.arguments || '{}');
-          const result = await executeRealTool(name, args, { user: adminUser });
-          return {
-            tool_call_id: tc.id,
-            role: 'tool',
-            name: name,
-            content: JSON.stringify(result)
-          };
-        }));
-
-        // Recursive call to get the final answer with tool results
-        body.messages.push(choice.message);
-        body.messages.push(...toolResponses);
-        
-        const finalRes = await smartFetch(taskType, body, isHeavy);
-        const finalJson = await finalRes.response.json();
-        const finalChoice = finalJson.choices[0];
-        
-        const reply = finalChoice.message.content;
-        session.history.push({ role: 'assistant', parts: [{ text: reply }] });
-        
+        console.log(`[chat] Returning ${choice.message.tool_calls.length} tools to client for execution...`);
         return res.json({
-          reply: reply,
-          model: finalRes.model,
-          usage: finalJson.usage,
-          agentsUsed: isSoftGreu ? 5 : 1
+          reply: '',
+          toolCalls: choice.message.tool_calls.map(tc => ({
+            id: tc.id,
+            name: tc.function.name,
+            args: JSON.parse(tc.function.arguments || '{}')
+          })),
+          model: activeModel
         });
       }
 
