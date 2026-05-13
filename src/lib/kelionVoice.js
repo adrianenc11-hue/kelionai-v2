@@ -1774,9 +1774,9 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
           const currentAbortSignal = httpAbortRef.current.signal;
           let data;
 
-          // ── Puter.js PRIMARY path (Claude Opus 4.7 — free, fast) ──
+          // ── Puter.js PRIMARY path (Claude Opus 4.7 — free, fast, NO POPUP) ──
           try {
-            // Load Puter.js via CDN if not already loaded (silent, no popup)
+            // Load Puter.js via CDN if not already loaded
             if (!window.puter) {
               const existing = document.querySelector('script[src*="puter.com"]');
               if (!existing) {
@@ -1787,7 +1787,9 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
               }
             }
             const puter = window.puter;
-            if (puter && puter.ai && (!toolResponses || toolResponses.length === 0)) {
+            // ONLY proceed if already authenticated (no popup trigger)
+            const isAuthed = puter && puter.authToken;
+            if (puter && puter.ai && isAuthed && (!toolResponses || toolResponses.length === 0)) {
               _setTaskStatus({ tool: 'puter-opus', progress: 20, label: '🧠 Opus 4.7 (Puter)...', phase: 'thinking' });
               const sysPrompt = "You are KelionAI, a genius expert coder and architect. You speak Romanian natively. Do your best to help the user immediately. Output the response in raw text.";
               const puterResp = await puter.ai.chat([{ role: 'system', content: sysPrompt }, { role: 'user', content: currentMessage }], { model: 'claude-opus-4-7' });
