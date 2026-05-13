@@ -441,12 +441,15 @@ if (process.env.NODE_ENV === 'production') {
       const f = filePath.toLowerCase();
       if (f.endsWith('.glb') || f.endsWith('.gltf')) {
         res.setHeader('Cache-Control', 'public, max-age=604800'); // 7d
+      } else if (f.endsWith('.webmanifest')) {
+        // 3a. PWA manifest → correct MIME type + never cache.
+        res.setHeader('Content-Type', 'application/manifest+json');
+        res.setHeader('Cache-Control', 'no-store');
       } else if (
         f.endsWith('sw.js') ||
-        f.endsWith('.webmanifest') ||
         f.endsWith('index.html')
       ) {
-        // 3. HTML shell, service worker, manifest → never cache.
+        // 3b. HTML shell, service worker → never cache.
         //    Browser MUST always get the latest index.html so it loads
         //    the correct hashed JS bundles after every deploy.
         //    Without this, a cached index.html referencing old bundle
