@@ -16,27 +16,30 @@
 const GOOGLE_AI_STUDIO = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
 
 const MODELS = {
-  // Primary: Claude Opus 4.7 via OpenRouter (OPENROUTER_API_KEY on Railway)
-  chat: process.env.MODEL_CHAT || 'anthropic/claude-opus-4.7',
-  chat_heavy: process.env.MODEL_CHAT_HEAVY || 'anthropic/claude-opus-4.7',
+  // Primary: Claude Sonnet 3.5 (stable, verified on OpenRouter)
+  // Override via env for quick A/B without deploy.
+  chat: process.env.MODEL_CHAT || 'anthropic/claude-3.5-sonnet',
+  chat_heavy: process.env.MODEL_CHAT_HEAVY || 'anthropic/claude-3-opus-20240229',
 
-  // Coding: same Opus 4.7
-  coder: process.env.MODEL_CODER || 'anthropic/claude-opus-4.7',
-  coder_heavy: process.env.MODEL_CODER_HEAVY || 'anthropic/claude-opus-4.7',
+  // Coding: same Sonnet, heavy = Opus
+  coder: process.env.MODEL_CODER || 'anthropic/claude-3.5-sonnet',
+  coder_heavy: process.env.MODEL_CODER_HEAVY || 'anthropic/claude-3-opus-20240229',
 
-  // Vision: Opus 4.7 supports vision
-  vision: process.env.MODEL_VISION || 'anthropic/claude-opus-4.7',
-  vision_heavy: process.env.MODEL_VISION_HEAVY || 'anthropic/claude-opus-4.7',
+  // Vision: Sonnet supports vision reliably
+  vision: process.env.MODEL_VISION || 'anthropic/claude-3.5-sonnet',
+  vision_heavy: process.env.MODEL_VISION_HEAVY || 'anthropic/claude-3-opus-20240229',
 };
 
-// Fallback: Gemini 2.5 stable (verified working via Google AI Studio key)
+// Fallback chain — OpenRouter free tier (16 RPM combined).
+// We keep 3–4 models so one rate-limit / outage doesn't exhaust the chain.
+// Google AI Studio direct is tried *first* via getEndpoint() when GOOGLE_API_KEY is set.
 const OPENROUTER_FALLBACK = {
-  chat:   ['google/gemini-2.5-flash-lite', 'google/gemini-2.5-flash'],
-  chat_heavy: ['google/gemini-2.5-pro', 'google/gemini-2.5-flash'],
-  coder:  ['google/gemini-2.5-flash', 'google/gemini-2.5-pro'],
-  coder_heavy: ['google/gemini-2.5-pro', 'google/gemini-2.5-flash'],
-  vision: ['google/gemini-2.5-flash-lite', 'google/gemini-2.5-flash'],
-  vision_heavy: ['google/gemini-2.5-pro', 'google/gemini-2.5-flash'],
+  chat:        ['google/gemini-2.0-flash', 'anthropic/claude-3-haiku', 'meta-llama/llama-3.3-70b-instruct'],
+  chat_heavy:  ['google/gemini-2.0-flash', 'anthropic/claude-3.5-sonnet', 'meta-llama/llama-3.3-70b-instruct'],
+  coder:       ['google/gemini-2.0-flash', 'anthropic/claude-3.5-sonnet', 'meta-llama/llama-3.3-70b-instruct'],
+  coder_heavy: ['google/gemini-2.0-flash', 'anthropic/claude-3-opus-20240229', 'meta-llama/llama-3.3-70b-instruct'],
+  vision:      ['google/gemini-2.0-flash', 'anthropic/claude-3.5-sonnet'],
+  vision_heavy:['google/gemini-2.0-flash', 'anthropic/claude-3-opus-20240229'],
 };
 
 /**

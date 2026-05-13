@@ -163,6 +163,7 @@ async function checkMemoryUsage() {
 async function checkExternalAPIs() {
   const checks = [
     { name: 'elevenlabs', url: 'https://api.elevenlabs.io/v1/voices', header: 'xi-api-key', envKey: 'ELEVENLABS_API_KEY' },
+    { name: 'openrouter', url: 'https://openrouter.ai/api/v1/models', header: 'Authorization', envKey: 'OPENROUTER_API_KEY', prefix: 'Bearer ' },
   ];
 
   for (const check of checks) {
@@ -174,7 +175,7 @@ async function checkExternalAPIs() {
       }
 
       const headers = {};
-      if (check.header) headers[check.header] = apiKey;
+      if (check.header) headers[check.header] = (check.prefix || '') + apiKey;
 
       const r = await fetch(check.url, {
         headers,
