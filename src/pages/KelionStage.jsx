@@ -1713,6 +1713,14 @@ export default function KelionStage() {
     },
   })
 
+  useEffect(() => {
+    const handleFlip = (e) => {
+      setMonitorOpen(e.detail);
+    };
+    window.addEventListener('kelion:flipMonitor', handleFlip);
+    return () => window.removeEventListener('kelion:flipMonitor', handleFlip);
+  }, []);
+
   return (
     <div
       
@@ -1898,6 +1906,10 @@ export default function KelionStage() {
                 <ContactShadows position={[0, -1.25, 0]} opacity={0.55} scale={5} blur={2.6} far={2.5} />
               </Suspense>
             </Canvas>
+          </div>
+          {/* Permanent AE Studio Logo (moves up when chat expands) */}
+          <div style={{ display: 'flex', justifyContent: 'center', paddingBottom: 8, zIndex: 10 }}>
+            <img src="/ae_studio_logo.png" alt="AE Studio" style={{ height: 24, opacity: 0.8 }} />
           </div>
           {/* Chat Input Container */}
           <div style={{ padding: '12px 24px 16px', background: '#ffffff', borderTop: '1px solid #e0e0e0', zIndex: 10, flexShrink: 0 }}>

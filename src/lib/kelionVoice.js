@@ -745,6 +745,10 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
       ttsAbortControllerRef.current.abort();
       ttsAbortControllerRef.current = null;
     }
+    if (httpAbortRef.current) {
+      httpAbortRef.current.abort();
+      httpAbortRef.current = null;
+    }
 
     if (wsRef.current && wsRef.current.readyState !== WebSocket.CLOSED) {
       try { wsRef.current.close(1000, 'restart') } catch (_) { /* ignore */ }
@@ -1740,7 +1744,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
         let currentMessage = clean;
         let currentImage = image;
         let toolResponses = undefined;
-        let maxLoops = 5;
+        let maxLoops = 50; // Increased to allow long autonomous audits
         let finalReply = '';
         let finalModel = '';
 
@@ -1748,8 +1752,8 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
           sessionIdRef.current = 'ses_' + Math.random().toString(36).substring(2, 10);
         }
 
-        // Global timeout: if the entire chat loop takes >90s, bail out
-        const _chatDeadline = Date.now() + 90_000;
+        // Global timeout: if the entire chat loop takes >10m, bail out
+        const _chatDeadline = Date.now() + 600_000;
         const _seenTools = new Map(); // circuit breaker: track repeated tool calls
 
         while (maxLoops-- > 0) {
@@ -1767,6 +1771,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
           }
 
           httpAbortRef.current = new AbortController()
+          const currentAbortSignal = httpAbortRef.current.signal;
           let data;
 
           // ── Puter.js silent attempt ──
@@ -1777,7 +1782,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
             if (puter && puter.ai && isAuthed && (!toolResponses || toolResponses.length === 0)) {
               _setTaskStatus({ tool: 'puter-opus', progress: 20, label: '🧠 Opus 4.7 (Puter)...', phase: 'thinking' });
               const sysPrompt = "You are KelionAI, a genius expert coder and architect. Do your best to help the user immediately. Since you are running via Puter, you cannot use native backend tools. Output the response in raw text.";
-              const puterResp = await puter.ai.chat([{ role: 'system', content: sysPrompt }, { role: 'user', content: currentMessage }], { model: 'claude-opus-4-7' });
+              const puterResp = await puter.ai.chat([{ role: 'system', content: sysPrompt }, { role: 'user', content: currentMessage }], { model: 'claude-opus-4-7', signal: currentAbortSignal });
               data = { reply: puterResp?.message?.content?.[0]?.text || '', model: 'claude-opus-4-7 (Puter)' };
               _setTaskStatus({ tool: 'puter-opus', progress: 80, label: '✅ Răspuns Opus primit', phase: 'working' });
             }
@@ -1790,7 +1795,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
             _setTaskStatus({ tool: 'api-chat', progress: 20, label: '📡 Trimit la server...', phase: 'thinking' });
             const r = await fetch('/api/chat', {
               method: 'POST',
-              signal: httpAbortRef.current.signal,
+              signal: currentAbortSignal,
               headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
               credentials: 'include',
               body: JSON.stringify({
@@ -1814,25 +1819,42 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
             _setTaskStatus({ tool: 'api-chat', progress: 60, label: `📨 Răspuns de la ${data.model || 'server'}`, phase: 'working' });
           }
 
+          if (currentAbortSignal.aborted) break;
+
           // ── Tool execution loop ──
           if (data.toolCalls && data.toolCalls.length > 0) {
             setStatus('working')
             const results = [];
             const totalTools = data.toolCalls.length;
+            
             // Circuit breaker: detect repeated tool calls
+            let loopDetected = false;
             for (const tc of data.toolCalls) {
               const key = tc.name + ':' + (tc.args?.path || tc.args?.command || '').slice(0, 50);
               _seenTools.set(key, (_seenTools.get(key) || 0) + 1);
-              if (_seenTools.get(key) > 3) {
-                _failTask(`🔄 Buclă detectată: ${tc.name} apelat de ${_seenTools.get(key)}× — opresc`);
-                finalReply = `Am detectat o buclă (${tc.name} repetat). Opresc și încerc altceva.`;
-                maxLoops = 0; // break outer loop
+              if (_seenTools.get(key) > 4) {
+                loopDetected = true;
                 break;
               }
             }
-            if (maxLoops <= 0) break;
+            
+            if (loopDetected) {
+              _failTask(`🔄 Buclă detectată. Cer AI-ului să schimbe strategia...`);
+              toolResponses = data.toolCalls.map(tc => ({
+                name: tc.name,
+                response: { ok: false, error: 'SYSTEM ALERT: You are stuck in an infinite loop repeating the exact same tool call! YOU MUST STOP using this tool with these arguments. Read the previous errors carefully. Try a completely different approach, think outside the box, or ask the user for help.' },
+                id: tc.id
+              }));
+              currentMessage = undefined;
+              currentImage = undefined;
+              _setTaskStatus({ tool: 'api-chat', progress: 30, label: '🔄 Retrimit avertizare buclă...', phase: 'thinking' });
+              continue;
+            }
+
             _setTaskStatus({ tool: 'tools', progress: 0, label: `🔧 ${totalTools} tool${totalTools > 1 ? '-uri' : ''} de executat`, phase: 'working' });
             for (let ti = 0; ti < totalTools; ti++) {
+              if (currentAbortSignal.aborted) break;
+              
               const call = data.toolCalls[ti];
               const file = call.args?.path || call.args?.target || call.args?.file || call.args?.command || null;
               _setTaskStatus({
@@ -1852,6 +1874,9 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
                 phase: 'working',
               });
             }
+            
+            if (currentAbortSignal.aborted) break;
+
             _setTaskStatus({ tool: 'tools', progress: 100, label: `✅ ${totalTools} tool-uri executate`, phase: 'working' });
             toolResponses = results;
             currentMessage = undefined;
