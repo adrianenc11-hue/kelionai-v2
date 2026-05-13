@@ -16,27 +16,27 @@
 const GOOGLE_AI_STUDIO = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
 
 const MODELS = {
-  // Primary: Top-tier free Uncensored / Hacker models from OpenRouter 2026
-  chat: process.env.MODEL_CHAT || 'cognitivecomputations/dolphin-mistral-24b-venice-edition:free',
-  chat_heavy: process.env.MODEL_CHAT_HEAVY || 'nousresearch/hermes-3-llama-3.1-405b:free',
+  // Primary: Claude Opus 4.7 via OpenRouter (OPENROUTER_API_KEY on Railway)
+  chat: process.env.MODEL_CHAT || 'anthropic/claude-opus-4.7',
+  chat_heavy: process.env.MODEL_CHAT_HEAVY || 'anthropic/claude-opus-4.7',
 
-  // Coding specialist: Qwen Coder
-  coder: process.env.MODEL_CODER || 'qwen/qwen3-coder:free',
-  coder_heavy: process.env.MODEL_CODER_HEAVY || 'qwen/qwen3-coder:free',
+  // Coding: same Opus 4.7
+  coder: process.env.MODEL_CODER || 'anthropic/claude-opus-4.7',
+  coder_heavy: process.env.MODEL_CODER_HEAVY || 'anthropic/claude-opus-4.7',
 
-  // Vision / Extraction
-  vision: process.env.MODEL_VISION || 'minimax/minimax-m2.5:free',
-  vision_heavy: process.env.MODEL_VISION_HEAVY || 'z-ai/glm-4.5-air:free',
+  // Vision: Opus 4.7 supports vision
+  vision: process.env.MODEL_VISION || 'anthropic/claude-opus-4.7',
+  vision_heavy: process.env.MODEL_VISION_HEAVY || 'anthropic/claude-opus-4.7',
 };
 
-// OpenRouter fallback models
+// Fallback: Gemini 2.5 stable (verified working via Google AI Studio key)
 const OPENROUTER_FALLBACK = {
-  chat:   ['cognitivecomputations/dolphin-mistral-24b-venice-edition:free', 'nousresearch/hermes-3-llama-3.1-405b:free'],
-  chat_heavy: ['nousresearch/hermes-3-llama-3.1-405b:free', 'cognitivecomputations/dolphin-mistral-24b-venice-edition:free'],
-  coder:  ['qwen/qwen3-coder:free', 'nousresearch/hermes-3-llama-3.1-405b:free'],
-  coder_heavy: ['nousresearch/hermes-3-llama-3.1-405b:free', 'qwen/qwen3-coder:free'],
-  vision: ['minimax/minimax-m2.5:free'],
-  vision_heavy: ['z-ai/glm-4.5-air:free'],
+  chat:   ['google/gemini-2.5-flash-lite', 'google/gemini-2.5-flash'],
+  chat_heavy: ['google/gemini-2.5-pro', 'google/gemini-2.5-flash'],
+  coder:  ['google/gemini-2.5-flash', 'google/gemini-2.5-pro'],
+  coder_heavy: ['google/gemini-2.5-pro', 'google/gemini-2.5-flash'],
+  vision: ['google/gemini-2.5-flash-lite', 'google/gemini-2.5-flash'],
+  vision_heavy: ['google/gemini-2.5-pro', 'google/gemini-2.5-flash'],
 };
 
 /**

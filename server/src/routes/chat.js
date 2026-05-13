@@ -120,7 +120,7 @@ router.post('/', async (req, res) => {
     // ── Task Detection: Basic Chat vs Complex Coding ──────────────────
     const taskType = isCodingTask(message) ? 'coder' : 'chat';
     // Admin ALWAYS gets the heavy model for coding/software tasks. Normal users need credits.
-    const isHeavy = isAdmin || (creditsBalance > 0);
+    const isHeavy = taskType === 'coder' && (isAdmin || (creditsBalance > 0));
     // Adrian: "Să lucreze cu agenți la orice task mai complex".
     // Lowering threshold to 150 chars and adding more keywords.
     const isSoftGreu = false; // Disabled to force frontend tool execution for live progress
