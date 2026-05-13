@@ -745,6 +745,10 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
       ttsAbortControllerRef.current.abort();
       ttsAbortControllerRef.current = null;
     }
+    if (httpAbortRef.current) {
+      httpAbortRef.current.abort();
+      httpAbortRef.current = null;
+    }
 
     if (wsRef.current && wsRef.current.readyState !== WebSocket.CLOSED) {
       try { wsRef.current.close(1000, 'restart') } catch (_) { /* ignore */ }
