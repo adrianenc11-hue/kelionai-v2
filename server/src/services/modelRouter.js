@@ -16,29 +16,28 @@
 const GOOGLE_AI_STUDIO = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
 
 const MODELS = {
-  // Primary: Gemini 2.5 Flash via direct Google API Studio (Ultra-fast, 2026 standard)
-  chat: process.env.MODEL_CHAT || 'gemini-2.5-flash-lite',
-  chat_heavy: process.env.MODEL_CHAT_HEAVY || 'gemini-2.5-pro',
+  // Primary: Top-tier free models from OpenRouter 2026
+  chat: process.env.MODEL_CHAT || 'google/gemma-4-31b-it:free',
+  chat_heavy: process.env.MODEL_CHAT_HEAVY || 'nousresearch/hermes-3-llama-3.1-405b:free',
 
-  // Coding specialist: Gemini 2.5 is the 2026 benchmark leader
-  coder: process.env.MODEL_CODER || 'gemini-2.5-flash-lite',
-  coder_heavy: process.env.MODEL_CODER_HEAVY || 'gemini-2.5-pro',
+  // Coding specialist: Qwen3 Coder is the absolute free leader
+  coder: process.env.MODEL_CODER || 'qwen/qwen3-coder:free',
+  coder_heavy: process.env.MODEL_CODER_HEAVY || 'meta-llama/llama-3.3-70b-instruct:free',
 
-  // Vision / Extraction: 2026 Vision models
-  vision: process.env.MODEL_VISION || 'gemini-2.5-flash-lite',
-  vision_heavy: process.env.MODEL_VISION_HEAVY || 'gemini-2.5-pro',
+  // Vision / Extraction: LFM 2.5 / Minimax M2.5
+  vision: process.env.MODEL_VISION || 'minimax/minimax-m2.5:free',
+  vision_heavy: process.env.MODEL_VISION_HEAVY || 'z-ai/glm-4.5-air:free',
 };
 
-// OpenRouter fallback models (May 2026 updated list)
-// We prioritize native Google AI Studio models in the fallback chain 
-// so if OpenRouter fails, it switches to direct Google API.
+// OpenRouter fallback models (May 2026 Free Tier)
+// We ONLY use :free models to guarantee no 402 errors.
 const OPENROUTER_FALLBACK = {
-  chat:   ['google/gemini-2.5-flash-lite', 'openai/gpt-4o-mini', 'anthropic/claude-4.7-sonnet'],
-  chat_heavy: ['google/gemini-2.5-pro', 'openai/gpt-4o', 'anthropic/claude-4.7-opus'],
-  coder:  ['google/gemini-2.5-flash-lite', 'qwen/qwen-3-coder-max', 'openai/gpt-4o-mini'],
-  coder_heavy: ['google/gemini-2.5-pro', 'anthropic/claude-4.7-opus', 'openai/gpt-4o'],
-  vision: ['google/gemini-2.5-flash-lite', 'openai/gpt-4o-mini'],
-  vision_heavy: ['google/gemini-2.5-pro', 'openai/gpt-4o'],
+  chat:   ['google/gemma-4-31b-it:free', 'meta-llama/llama-3.2-3b-instruct:free', 'google/gemma-4-26b-a4b-it:free'],
+  chat_heavy: ['nousresearch/hermes-3-llama-3.1-405b:free', 'meta-llama/llama-3.3-70b-instruct:free', 'google/gemma-4-31b-it:free'],
+  coder:  ['qwen/qwen3-coder:free', 'google/gemma-4-31b-it:free', 'meta-llama/llama-3.3-70b-instruct:free'],
+  coder_heavy: ['meta-llama/llama-3.3-70b-instruct:free', 'nousresearch/hermes-3-llama-3.1-405b:free', 'qwen/qwen3-coder:free'],
+  vision: ['minimax/minimax-m2.5:free', 'z-ai/glm-4.5-air:free'],
+  vision_heavy: ['z-ai/glm-4.5-air:free', 'minimax/minimax-m2.5:free'],
 };
 
 /**
