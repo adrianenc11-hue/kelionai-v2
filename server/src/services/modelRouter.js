@@ -140,7 +140,8 @@ async function smartFetch(taskType, body, useHeavy = false) {
       return { response, model, provider: endpoint.provider };
     }
 
-    console.warn(`[modelRouter] ${model} via ${endpoint.provider} failed: ${response.status}`);
+    const errText = await response.text().catch(() => '');
+    console.warn(`[modelRouter] ${model} via ${endpoint.provider} failed: ${response.status} - ${errText}`);
   } catch (err) {
     clearTimeout(timer);
     console.warn(`[modelRouter] ${model} via ${endpoint.provider} error: ${err.message}`);
@@ -176,7 +177,8 @@ async function smartFetch(taskType, body, useHeavy = false) {
         console.log(`[modelRouter] Fallback ${fbModel} succeeded!`);
         return { response, model: fbModel, provider: 'openrouter' };
       }
-      console.warn(`[modelRouter] Fallback ${fbModel} failed: ${response.status}`);
+      const fErrText = await response.text().catch(() => '');
+      console.warn(`[modelRouter] Fallback ${fbModel} failed: ${response.status} - ${fErrText}`);
     } catch (err) {
       clearTimeout(fTimer);
       console.warn(`[modelRouter] Fallback ${fbModel} error: ${err.message}`);
