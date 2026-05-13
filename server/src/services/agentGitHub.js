@@ -36,7 +36,7 @@ function githubRequest(path, method = 'GET', body = null) {
             resolve({ ok: false, status: res.statusCode, error: json.message || data });
           }
         } catch {
-          resolve({ ok: true, data });
+          resolve({ ok: false, status: res.statusCode, error: 'Invalid JSON response from GitHub API', body: data });
         }
       });
     });

@@ -19,7 +19,9 @@ async function screenshot(url, options = {}) {
     const page = await context.newPage();
     await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
     if (options.selector) {
-      await page.waitForSelector(options.selector, { timeout: 10000 }).catch(() => {});
+      await page.waitForSelector(options.selector, { timeout: 10000 }).catch((e) => {
+        console.warn('[agentBrowser] waitForSelector failed:', e && e.message);
+      });
     }
     const screenshotBuffer = await page.screenshot({ fullPage: options.fullPage || false });
     await context.close();

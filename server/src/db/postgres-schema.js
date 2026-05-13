@@ -288,6 +288,27 @@ CREATE TABLE IF NOT EXISTS voice_clones (
   created_at      TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS agent_tasks (
+  id          BIGSERIAL PRIMARY KEY,
+  title       TEXT NOT NULL,
+  description TEXT,
+  parent_id   BIGINT REFERENCES agent_tasks(id) ON DELETE CASCADE,
+  priority    TEXT DEFAULT 'normal',
+  status      TEXT DEFAULT 'not_started',
+  created_at  TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_agent_tasks_status ON agent_tasks(status);
+CREATE INDEX IF NOT EXISTS idx_agent_tasks_parent ON agent_tasks(parent_id);
+
+CREATE TABLE IF NOT EXISTS vision_revenue (
+  id              BIGSERIAL PRIMARY KEY,
+  user_id         BIGINT NOT NULL,
+  revenue_minutes DOUBLE PRECISION NOT NULL,
+  created_at      TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_vision_revenue_user ON vision_revenue(user_id);
+
 CREATE TABLE IF NOT EXISTS whatsapp_contact_voices (
   id              BIGSERIAL PRIMARY KEY,
   contact_id      TEXT UNIQUE NOT NULL,
@@ -324,6 +345,8 @@ ALTER TABLE credits_consume_state  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE trial_usage            ENABLE ROW LEVEL SECURITY;
 ALTER TABLE demo_requests           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE voice_clones            ENABLE ROW LEVEL SECURITY;
+ALTER TABLE agent_tasks             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE vision_revenue            ENABLE ROW LEVEL SECURITY;
 
 -- Allow the postgres/service_role to bypass RLS (idempotent).
 -- These policies are named kelion_service_* so they don't conflict with
@@ -392,6 +415,14 @@ DO $$ BEGIN
   -- Demo requests
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'kelion_service_demo') THEN
     CREATE POLICY kelion_service_demo ON demo_requests FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+  -- Agent tasks
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'kelion_service_agent_tasks') THEN
+    CREATE POLICY kelion_service_agent_tasks ON agent_tasks FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+  -- Vision revenue
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'kelion_service_vision_revenue') THEN
+    CREATE POLICY kelion_service_vision_revenue ON vision_revenue FOR ALL USING (true) WITH CHECK (true);
   END IF;
 END $$;
 `;

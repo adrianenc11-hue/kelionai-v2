@@ -4,8 +4,8 @@ const { execCommand } = require('./agentShell');
 
 async function runTests(filter = '') {
   const cmd = filter
-    ? `npx playwright test --grep "${filter}" --reporter=list`
-    : 'npx playwright test --reporter=list';
+    ? `cd server && npx jest --testPathPattern="${filter}" --verbose`
+    : 'cd server && npx jest --verbose';
   return execCommand(cmd, 300000);
 }
 

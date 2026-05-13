@@ -546,7 +546,7 @@ async function toolWebSearch({ query, limit }) {
           source: 'google-custom-search',
         };
       }
-    } catch (_) {}
+    } catch (e) { console.warn('[toolSearch] Google CSE failed:', e && e.message); }
   }
 
   // Tavily (Key required)
@@ -567,7 +567,7 @@ async function toolWebSearch({ query, limit }) {
           source: 'tavily.com',
         };
       }
-    } catch (_) {}
+    } catch (e) { console.warn('[toolSearch] Tavily failed:', e && e.message); }
   }
 
   // Serper.dev (Key required)
@@ -588,7 +588,7 @@ async function toolWebSearch({ query, limit }) {
           source: 'serper.dev',
         };
       }
-    } catch (_) {}
+    } catch (e) { console.warn('[toolSearch] Serper failed:', e && e.message); }
   }
 
   return { ok: false, query: q, error: 'No search results found after trying all providers.' };
@@ -3651,30 +3651,7 @@ async function executeRealTool(name, args, ctx) {
     case 'run_command': return toolRunTerminalCommand(a);
     case 'write_to_file': return toolEditLocalFile(a);
     case 'replace_file_content': return toolReplaceInFile(a);
-    case 'multi_replace_file_content':
-      return toolMultiReplaceFileContent(args, ctx); {
-      // Accepts { path, replacements: '[{target_content,replacement_content},...]' }
-      try {
-        const filePath = String(a?.path || '').trim();
-        const reps = JSON.parse(a?.replacements || '[]');
-        if (!filePath) return { ok: false, error: 'path is required' };
-        const resolvedPath = _path.resolve(REPO_ROOT, filePath);
-        if (!isPathSafe(resolvedPath)) return { ok: false, error: 'access denied' };
-        if (!_fs.existsSync(resolvedPath)) return { ok: false, error: 'file not found' };
-        let content = _fs.readFileSync(resolvedPath, 'utf8');
-        let applied = 0;
-        for (const r of reps) {
-          if (r.target_content && content.includes(r.target_content)) {
-            content = content.replace(r.target_content, r.replacement_content || '');
-            applied++;
-          }
-        }
-        _fs.writeFileSync(resolvedPath, content, 'utf8');
-        return { ok: true, path: filePath, applied, total: reps.length };
-      } catch (err) {
-        return { ok: false, error: err.message };
-      }
-    }
+    case 'multi_replace_file_content': return toolMultiReplaceFileContent(a, ctx);
     // ── Agentic Expert Tools ──
     case 'run_terminal_command': return toolRunTerminalCommand(a);
     case 'commit_and_push_to_github': return toolCommitAndPushToGithub(a);
