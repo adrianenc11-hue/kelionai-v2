@@ -70,7 +70,6 @@ const VisitorsPage  = lazy(() => import('./pages/admin/VisitorsPage'))
 const PayoutsPage   = lazy(() => import('./pages/admin/PayoutsPage'))
 const SettingsPage  = lazy(() => import('./pages/admin/SettingsPage'))
 const AgentPage     = lazy(() => import('./pages/admin/AgentPage'))
-const AgentPage     = lazy(() => import('./pages/admin/AgentPage'))
 
 function Loader() {
   return (
