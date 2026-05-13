@@ -1713,6 +1713,14 @@ export default function KelionStage() {
     },
   })
 
+  useEffect(() => {
+    const handleFlip = (e) => {
+      setMonitorOpen(e.detail);
+    };
+    window.addEventListener('kelion:flipMonitor', handleFlip);
+    return () => window.removeEventListener('kelion:flipMonitor', handleFlip);
+  }, []);
+
   return (
     <div
       
@@ -1856,12 +1864,6 @@ export default function KelionStage() {
               background: '#0d0b1d', overflow: 'hidden'
             }}>
               <MonitorOverlay />
-              <div style={{ position: 'absolute', top: 16, right: 24, zIndex: 9999 }}>
-                <button onClick={() => setMonitorOpen(false)} style={{ background: 'rgba(37, 99, 235, 0.85)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 16px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, backdropFilter: 'blur(8px)', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-                  Comută Chat
-                </button>
-              </div>
               {/* Transcript Overlay for Monitor Mode */}
               {(() => {
                 const lastDisplayMessage = [...turns].reverse().find(m => !m.isThought && (m.text || m.transcript) && typeof (m.text || m.transcript) === 'string' && (m.text || m.transcript).trim().length > 0);
@@ -1898,6 +1900,10 @@ export default function KelionStage() {
                 <ContactShadows position={[0, -1.25, 0]} opacity={0.55} scale={5} blur={2.6} far={2.5} />
               </Suspense>
             </Canvas>
+          </div>
+          {/* Permanent AE Studio Logo (moves up when chat expands) */}
+          <div style={{ display: 'flex', justifyContent: 'center', paddingBottom: 8, zIndex: 10 }}>
+            <img src="/ae_studio_logo.png" alt="AE Studio" style={{ height: 24, opacity: 0.8 }} />
           </div>
           {/* Chat Input Container */}
           <div style={{ padding: '12px 24px 16px', background: '#ffffff', borderTop: '1px solid #e0e0e0', zIndex: 10, flexShrink: 0 }}>
