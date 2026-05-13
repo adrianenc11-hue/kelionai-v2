@@ -217,48 +217,28 @@ function MonitorOverlay() {
         }}>
           {m.title || 'Monitor'}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              // Find the closest MonitorOpen setter by dispatching a custom event, or just handleShowOnMonitor
-              // Actually, since we want to toggle the flip, we can dispatch a window event
-              window.dispatchEvent(new CustomEvent('kelion:flipMonitor', { detail: false }));
-            }}
-            style={{
-              background: 'rgba(37, 99, 235, 0.85)', color: 'white', border: '1px solid rgba(255,255,255,0.1)',
-              borderRadius: 8, padding: '6px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-              display: 'flex', alignItems: 'center', gap: 6, backdropFilter: 'blur(8px)',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-            Comută Chat
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close monitor"
-            style={{
-              appearance: 'none',
-              border: '1px solid rgba(167, 139, 250, 0.35)',
-              background: 'rgba(124, 58, 237, 0.18)',
-              color: '#ede9fe',
-              width: 32,
-              height: 32,
-              borderRadius: 999,
-              cursor: 'pointer',
-              fontSize: 16,
-              lineHeight: '16px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            ×
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close monitor"
+          style={{
+            appearance: 'none',
+            border: '1px solid rgba(167, 139, 250, 0.35)',
+            background: 'rgba(124, 58, 237, 0.18)',
+            color: '#ede9fe',
+            width: 32,
+            height: 32,
+            borderRadius: 999,
+            cursor: 'pointer',
+            fontSize: 16,
+            lineHeight: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          ×
+        </button>
       </div>
       <div style={{ flex: '1 1 auto', minHeight: 0, background: '#0d0b1d' }}>
         {isHtml ? (
