@@ -98,7 +98,6 @@ createRoot(document.getElementById('root')).render(
   <StrictMode>
     <ErrorBoundary>
       <BrowserRouter>
-        <PermanentLogo />
         <Suspense fallback={<Loader />}>
           <Routes>
             <Route path="/" element={<KelionStage />} />
