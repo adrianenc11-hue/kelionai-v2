@@ -530,7 +530,7 @@ async function toolWebSearch({ query, limit }) {
   } catch (_) { /* continue to Premium tools */ }
 
   // ── Step 4: Premium Fallbacks (Google, Tavily, Serper) ────────────
-  
+
   // Google Custom Search (Key required)
   const googleKey = process.env.GOOGLE_API_KEY, googleCseId = process.env.GOOGLE_CSE_ID;
   if (googleKey && googleCseId) {
@@ -2562,21 +2562,21 @@ async function toolCommitAndPushToGithub(args) {
   if (!process.env.GITHUB_TOKEN) {
     return { ok: false, error: 'GITHUB_TOKEN environment variable is missing. Tell the user to set it in Railway or locally before you can push.' };
   }
-  
+
   const msg = args.commit_message || 'Update from Kelion';
   const branch = args.branch || 'HEAD';
   const token = process.env.GITHUB_TOKEN;
-  
+
   try {
     const { execSync } = require('child_process');
     const rootDir = process.cwd();
-    
+
     // Config git user if missing
     try { execSync('git config user.name', { cwd: rootDir }); } catch {
       execSync('git config user.name "Kelion Autonomous"', { cwd: rootDir });
       execSync('git config user.email "kelion@kelionai.app"', { cwd: rootDir });
     }
-    
+
     // Set remote URL with token securely
     const originUrl = `https://x-access-token:${token}@github.com/adrianenc11-hue/kelionai-v2.git`;
     try {
@@ -2584,18 +2584,18 @@ async function toolCommitAndPushToGithub(args) {
     } catch {
       execSync(`git remote add origin ${originUrl}`, { cwd: rootDir });
     }
-    
+
     execSync('git add .', { cwd: rootDir });
-    
+
     // Check if there are changes to commit
     const status = execSync('git status --porcelain', { cwd: rootDir }).toString().trim();
     if (!status) {
       return { ok: true, skipped: true, result: "No changes to commit." };
     }
-    
+
     execSync(`git commit -m "${msg.replace(/"/g, '\\"')}"`, { cwd: rootDir });
     execSync(`git push origin ${branch}`, { cwd: rootDir });
-    
+
     return { ok: true, result: `Successfully committed with message '${msg}' and pushed to ${branch}.` };
   } catch (err) {
     return { ok: false, error: err.message, stderr: err.stderr ? err.stderr.toString() : null };
@@ -3126,6 +3126,98 @@ async function toolReplaceInFile(args) {
     return { ok: false, error: err.message };
   }
 }
+
+// ── Agent coding tools ──
+
+async function toolVerifyBuild(args) {
+  const mode = String(args?.mode || 'full').trim();
+  try {
+    const results = {};
+    if (mode === 'build' || mode === 'full') {
+      try {
+        const { stdout, stderr } = await _exec('npm run build', { cwd: REPO_ROOT, timeout: 120000 });
+        results.build = { ok: true, stdout: stdout.slice(0, 5000), stderr: stderr.slice(0, 2000) };
+      } catch (err) {
+        results.build = { ok: false, error: err.message, stdout: (err.stdout || '').slice(0, 5000), stderr: (err.stderr || '').slice(0, 5000) };
+      }
+    }
+    if (mode === 'test' || mode === 'full') {
+      try {
+        const { stdout, stderr } = await _exec('npm test', { cwd: REPO_ROOT, timeout: 120000 });
+        results.test = { ok: true, stdout: stdout.slice(0, 5000), stderr: stderr.slice(0, 2000) };
+      } catch (err) {
+        results.test = { ok: false, error: err.message, stdout: (err.stdout || '').slice(0, 5000), stderr: (err.stderr || '').slice(0, 5000) };
+      }
+    }
+    const allOk = Object.values(results).every(r => r.ok);
+    return { ok: allOk, mode, results, summary: allOk ? 'Build & tests passed.' : 'Build or tests failed. See results for details.' };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
+async function toolDiffEdit(args) {
+  try {
+    const filePath = String(args?.path || '').trim();
+    const blocksJson = String(args?.blocks || '[]').trim();
+    if (!filePath) return { ok: false, error: 'path is required' };
+
+    const resolvedPath = _path.resolve(REPO_ROOT, filePath);
+    if (!isPathSafe(resolvedPath)) return { ok: false, error: 'access denied: restricted directory' };
+    if (!_fs.existsSync(resolvedPath)) return { ok: false, error: 'file not found' };
+
+    let blocks;
+    try {
+      blocks = JSON.parse(blocksJson);
+    } catch (e) {
+      return { ok: false, error: 'blocks must be valid JSON array: ' + e.message };
+    }
+    if (!Array.isArray(blocks) || blocks.length === 0) {
+      return { ok: false, error: 'blocks must be a non-empty array' };
+    }
+
+    let content = _fs.readFileSync(resolvedPath, 'utf8');
+    const applied = [];
+    const failed = [];
+
+    for (let i = 0; i < blocks.length; i++) {
+      const b = blocks[i];
+      const search = String(b?.search || '');
+      const replace = String(b?.replace || '');
+      if (!search) {
+        failed.push({ index: i, reason: 'empty search' });
+        continue;
+      }
+      if (!content.includes(search)) {
+        failed.push({ index: i, reason: 'search text not found in current file content' });
+        continue;
+      }
+      content = content.replace(search, replace);
+      applied.push({ index: i, search_length: search.length, replace_length: replace.length });
+    }
+
+    if (failed.length > 0) {
+      return {
+        ok: false,
+        error: `${failed.length} block(s) failed. No changes applied.`,
+        failed,
+        applied_count: applied.length,
+        total: blocks.length,
+      };
+    }
+
+    _fs.writeFileSync(resolvedPath, content, 'utf8');
+    return {
+      ok: true,
+      path: filePath,
+      applied_count: applied.length,
+      total: blocks.length,
+    };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
 
 // GitHub REST API helper — uses GH_TOKEN env var, no gh CLI needed.
 const GITHUB_REPO = 'adrianenc11-hue/kelionai-v2';
@@ -3658,6 +3750,9 @@ async function executeRealTool(name, args, ctx) {
     // ── Voice clone library tools ──
     case 'list_voice_clones': return toolListVoiceClones(a, ctx);
     case 'activate_voice_clone': return toolActivateVoiceClone(a, ctx);
+    // ── Agent coding tools ──
+    case 'verify_build': return toolVerifyBuild(a);
+    case 'diff_edit': return toolDiffEdit(a);
 
     default: return null; // signal "not handled here"
   }
@@ -4584,7 +4679,7 @@ async function toolMultimediaAnalyzer(args) {
   const url = String(args?.url || '').trim();
   const type = String(args?.type || 'video');
   if (!url) return { ok: false, error: 'url is required for multimedia analysis' };
-  
+
   if (type === 'audio') {
     return toolAudioAnalyze({ url });
   } else {

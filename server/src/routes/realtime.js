@@ -1265,6 +1265,25 @@ const KELION_TOOLS = [
   { name: 'scheduled_task', description: "Schedule a reminder or task for future execution. Use when the user asks 'amintește-mi', 'remind me in 10 minutes', 'programează', 'schedule'.", properties: { action: { type: 'string', description: "'create', 'list', or 'cancel'." }, description: { type: 'string', description: "What to remind/do." }, delay_minutes: { type: 'integer', description: "Minutes from now (1-1440). Default 5." }, id: { type: 'string', description: "Task ID (for cancel action)." } }, required: [] },
   { name: 'qr_code', description: "Generate a QR code for any text, URL, or data. Returns an image URL ready to display on the monitor.", properties: { text: { type: 'string', description: "The text/URL to encode in the QR code." }, size: { type: 'integer', description: "QR image size in pixels (100-1000, default 300)." } }, required: ['text'] },
   { name: 'smart_alert', description: "Set up a condition-based alert that notifies the user when a condition is met. Use when the user asks 'alertă-mă când', 'notify me when', 'monitor this'.", properties: { action: { type: 'string', description: "'create', 'list', or 'delete'." }, condition: { type: 'string', description: "The condition to monitor." }, message: { type: 'string', description: "Alert message when triggered." }, id: { type: 'string', description: "Alert ID (for delete action)." } }, required: [] },
+
+  // ── Agent coding tools ──
+  {
+    name: 'verify_build',
+    description: "Run the project build and test suite to verify that recent code changes are valid. ALWAYS call this immediately after editing any code file (read_local_file, edit_local_file, replace_in_file, or multi_replace_file_content). If the build or tests fail, return the full error output so the model can diagnose and fix the issue.",
+    properties: {
+      mode: { type: 'string', enum: ['build', 'test', 'full'], description: "'build' = only npm run build. 'test' = only tests. 'full' = build then test (default)." },
+    },
+    required: [],
+  },
+  {
+    name: 'diff_edit',
+    description: "Apply precise SEARCH/REPLACE block edits to a file. Much safer than replace_in_file for complex changes because each edit is verified independently. Pass one or more blocks where each block contains the exact text to find (search) and the replacement text. If any block fails to match, NO changes are applied and the tool reports which block failed. Use this for multi-line edits, inserting code between functions, or changing specific methods without touching the rest of the file.",
+    properties: {
+      path: { type: 'string', description: "Path to the file to edit." },
+      blocks: { type: 'string', description: "JSON array of {search, replace} blocks. The search text must match EXACTLY (including whitespace)." },
+    },
+    required: ['path', 'blocks'],
+  },
 ];
 
 // Google v1alpha BidiGenerateContent — JSON schema with UPPERCASE types and
