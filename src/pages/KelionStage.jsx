@@ -954,7 +954,7 @@ export default function KelionStage() {
   // float on top of the overlay instead of being half-hidden behind it.
   // Adrian (2026-04-25) screenshot showed the map covering the bottom
   // composer: "promtul de scris si vorbut sunt acoperite de pagina".
-  const [monitorOpen, setMonitorOpen] = useState(false)
+  const [monitorOpen, setMonitorOpen] = useState(true)
   const [stageNarrow, setStageNarrow] = useState(() => (
     typeof window !== 'undefined' && window.innerWidth < 640
   ))
@@ -1908,8 +1908,16 @@ export default function KelionStage() {
             </Canvas>
           </div>
           {/* Permanent AE Studio Logo (moves up when chat expands) */}
-          <div style={{ display: 'flex', justifyContent: 'center', paddingBottom: 8, zIndex: 10 }}>
-            <img src="/ae_studio_logo.png" alt="AE Studio" style={{ height: 24, opacity: 0.8 }} />
+          <div style={{ display: 'flex', justifyContent: 'center', paddingBottom: 12, zIndex: 10, pointerEvents: 'none' }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '10px', opacity: 0.95,
+              background: 'rgba(0,0,0,0.6)', padding: '6px 14px', borderRadius: '12px',
+              backdropFilter: 'blur(8px)', border: '1px solid rgba(255, 215, 0, 0.3)',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.5)'
+            }}>
+              <img src="/ae_studio_logo_gold.png" alt="AE Studio Gold" style={{ height: '26px', filter: 'drop-shadow(0 0 8px rgba(255, 215, 0, 0.4))' }} />
+              <span style={{ color: '#ffd700', fontFamily: 'system-ui, sans-serif', fontSize: '12px', fontWeight: 'bold', letterSpacing: '0.1em', textTransform: 'uppercase' }}>AE Studio</span>
+            </div>
           </div>
           {/* Chat Input Container */}
           <div style={{ padding: '12px 24px 16px', background: '#ffffff', borderTop: '1px solid #e0e0e0', zIndex: 10, flexShrink: 0 }}>
