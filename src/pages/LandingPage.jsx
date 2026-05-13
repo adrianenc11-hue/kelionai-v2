@@ -20,14 +20,15 @@ const S = {
   },
   nav: {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    padding: '24px 48px', position: 'relative', zIndex: 2,
+    padding: 'clamp(12px, 3vw, 24px) clamp(16px, 4vw, 48px)', position: 'relative', zIndex: 2,
+    flexWrap: 'wrap',
   },
   logo: {
     fontSize: '24px', fontWeight: 800, letterSpacing: '0.12em',
     background: 'linear-gradient(135deg, #a78bfa, #6d28d9)',
     WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
   },
-  navLinks: { display: 'flex', gap: '32px', alignItems: 'center' },
+  navLinks: { display: 'flex', gap: 'clamp(12px, 3vw, 32px)', alignItems: 'center', flexWrap: 'wrap' },
   navLink: {
     color: '#94a3b8', fontSize: '14px', textDecoration: 'none',
     transition: 'color 0.2s', cursor: 'pointer',

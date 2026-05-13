@@ -1738,9 +1738,9 @@ export default function KelionStage() {
       {isTuningEnabled() && <TuningPanel />}
       <UIActionToast />
       {/* ═══ SPLIT LAYOUT: Chat Left 70% + Avatar Right 30% ═══ */}
-      <div style={{ display: 'flex', width: '100%', height: '100%' }}>
+      <div style={{ display: 'flex', flexDirection: stageNarrow ? 'column' : 'row', width: '100%', height: '100%' }}>
         {/* LEFT PANEL — Chat / Monitor (3D Flip Container) */}
-        <div style={{ flex: '0 0 70%', maxWidth: '70%', height: '100%', position: 'relative', perspective: '1500px' }}>
+        <div style={{ flex: stageNarrow ? '0 0 55%' : '0 0 70%', maxWidth: stageNarrow ? '100%' : '70%', height: '100%', position: 'relative', perspective: '1500px' }}>
           
           <div style={{
             width: '100%', height: '100%', position: 'relative',
@@ -1891,7 +1891,7 @@ export default function KelionStage() {
           </div>
         </div>
         {/* RIGHT PANEL — Avatar 3D & Chat Input */}
-        <div style={{ flex: '0 0 30%', maxWidth: '30%', height: '100%', position: 'relative', display: 'flex', flexDirection: 'column', background: '#0a0d1a' }}>
+        <div style={{ flex: stageNarrow ? '0 0 45%' : '0 0 30%', maxWidth: stageNarrow ? '100%' : '30%', height: '100%', position: 'relative', display: 'flex', flexDirection: 'column', background: '#0a0d1a' }}>
           <div style={{ flex: 1, position: 'relative', overflow: 'hidden', minHeight: 0 }}>
             <Canvas shadows={{ type: THREE.VSMShadowMap }} camera={{ position: [0, 0.2, 3.0], fov: 42 }} dpr={[1, 2]} gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.8, outputColorSpace: THREE.SRGBColorSpace, powerPreference: 'low-power' }} onCreated={({ gl }) => { const canvas = gl.domElement; if (canvas) { canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); console.warn('[kelion] WebGL context lost') }); canvas.addEventListener('webglcontextrestored', () => { console.log('[kelion] WebGL context restored') }) } }}>
               <color attach="background" args={['#0a0d1a']} />
