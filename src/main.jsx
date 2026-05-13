@@ -75,7 +75,7 @@ const PermanentLogo = () => (
   <div style={{
     position: 'fixed',
     bottom: '20px',
-    left: '50%',
+    left: '85%',
     transform: 'translateX(-50%)',
     zIndex: 9999,
     display: 'flex',

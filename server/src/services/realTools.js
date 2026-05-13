@@ -4790,7 +4790,7 @@ async function toolTaskOrchestrator(args, ctx) {
 async function toolUniversalExecutor(args) {
   const action = String(args?.action || '').trim().toLowerCase();
   if (action === 'run_code') return toolRunCode(args);
-  if (action === 'run_terminal') return toolRunTerminalCommand(args);
+  if (action === 'run_terminal') return toolRunTerminalCommand({ ...args, command: args.code || args.command });
   if (action === 'run_regex') return toolRunRegex(args);
   return { ok: false, error: 'Unknown universal_executor action.' };
 }
