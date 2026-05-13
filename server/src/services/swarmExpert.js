@@ -4,13 +4,23 @@ const { smartFetch } = require('./modelRouter');
 
 /**
  * Swarm Expert — Multi-agent orchestration for heavy/premium tasks.
- * Pattern: 1 to X agents depending on complexity and credits.
+ * Pattern: ARCHITECT → EXECUTORS → REVIEWER
  * 
- * Flow: ARCHITECT → EXECUTORS → REVIEWER
+ * FIX 2026-05-13: Added 30s timeout per agent to prevent infinite hangs.
+ * Admin always uses heavy model (no credit gating for admin).
  */
 
+const AGENT_TIMEOUT_MS = 30_000; // 30s max per agent call
+
+function withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(`${label} timed out after ${ms / 1000}s`)), ms))
+  ]);
+}
+
 async function runSwarmTask(task, context = {}, creditsBalance = 0, tools = undefined) {
-  console.log(`[swarm] Initiating swarm for task: "${task.slice(0, 50)}..."`);
+  console.log(`[swarm] Initiating swarm for task: "${task.slice(0, 80)}..."`);
   
   // 1. The ARCHITECT — Planning the execution
   const architectPrompt = `
@@ -23,83 +33,118 @@ async function runSwarmTask(task, context = {}, creditsBalance = 0, tools = unde
     Output ONLY a JSON array of tasks: ["task 1", "task 2", ...]
   `;
 
-  const architectResult = await smartFetch('coder', {
-    messages: [{ role: 'system', content: architectPrompt }],
-    temperature: 0.2
-  }, true); // Always HEAVY for Architect
-
   let subTasks = [];
   try {
+    const architectResult = await withTimeout(
+      smartFetch('coder', {
+        messages: [{ role: 'system', content: architectPrompt }],
+        temperature: 0.2,
+        max_tokens: 512,
+      }, true),
+      AGENT_TIMEOUT_MS,
+      'Architect'
+    );
     const raw = await architectResult.response.json();
     const content = raw.choices[0].message.content;
     subTasks = JSON.parse(content.match(/\[.*\]/s)[0]);
   } catch (err) {
-    console.error('[swarm] Architect failed to plan:', err.message);
+    console.error('[swarm] Architect failed:', err.message);
     subTasks = [task]; // Fallback to single task
   }
 
-  // 2. The EXECUTORS — Parallel execution
+  // 2. The EXECUTORS — Parallel execution (with timeout per executor)
   console.log(`[swarm] Dispatching ${subTasks.length} sub-tasks to executors...`);
   const executorResults = await Promise.all(subTasks.map(async (st, i) => {
     const executorPrompt = `Specialized Agent ${i+1}. Perform sub-task: ${st}. Context: ${task}.
     If you need to use tools, call them. You have full workspace access.`;
     
-    // Admin always gets the heaviest models for all agents. 
-    // Otherwise, depends on credits.
-    const useHeavyExecutor = (creditsBalance > 500); 
-
-    const result = await smartFetch('coder', {
-      messages: [{ role: 'system', content: executorPrompt }],
-      tools: tools,
-      temperature: 0.5
-    }, useHeavyExecutor);
-    const json = await result.response.json();
-    const choice = json.choices[0];
-    
-    if (choice.message.tool_calls) {
-      const { executeRealTool } = require('./realTools');
-      console.log(`[swarm] Executor ${i+1} calling ${choice.message.tool_calls.length} tools...`);
+    try {
+      const result = await withTimeout(
+        smartFetch('coder', {
+          messages: [{ role: 'system', content: executorPrompt }],
+          tools: tools,
+          temperature: 0.5,
+          max_tokens: 2048,
+        }, true), // Admin always gets heavy model
+        AGENT_TIMEOUT_MS,
+        `Executor ${i+1}`
+      );
+      const json = await result.response.json();
+      const choice = json.choices[0];
       
-      const toolResults = await Promise.all(choice.message.tool_calls.map(async (tc) => {
-        const r = await executeRealTool(tc.function.name, JSON.parse(tc.function.arguments || '{}'), context);
-        return `Tool ${tc.function.name} output: ${JSON.stringify(r)}`;
-      }));
-      
-      return `Agent ${i+1} executed tools and got: ${toolResults.join('\n')}\nContent: ${choice.message.content || ''}`;
+      if (choice.message.tool_calls) {
+        const { executeRealTool } = require('./realTools');
+        console.log(`[swarm] Executor ${i+1} calling ${choice.message.tool_calls.length} tools...`);
+        
+        const toolResults = await Promise.all(choice.message.tool_calls.map(async (tc) => {
+          try {
+            const r = await withTimeout(
+              executeRealTool(tc.function.name, JSON.parse(tc.function.arguments || '{}'), context),
+              15_000,
+              `Tool ${tc.function.name}`
+            );
+            return `Tool ${tc.function.name} output: ${JSON.stringify(r)}`;
+          } catch (toolErr) {
+            return `Tool ${tc.function.name} failed: ${toolErr.message}`;
+          }
+        }));
+        
+        return `Agent ${i+1} executed tools and got: ${toolResults.join('\n')}\nContent: ${choice.message.content || ''}`;
+      }
+      return choice.message.content || '[No output]';
+    } catch (err) {
+      console.error(`[swarm] Executor ${i+1} failed:`, err.message);
+      return `Agent ${i+1} failed: ${err.message}`;
     }
-    return choice.message.content || '[No output]';
   }));
 
   // 3. The REVIEWER — Synthesis and Verification
   console.log(`[swarm] Synthesizing results...`);
-  const reviewerPrompt = `
-    You are the Kelion Swarm Reviewer. Combine the following agent outputs into a final, high-quality response.
-    Verify correctness and ensure it meets the original user intent.
-    
-    ORIGINAL TASK: ${task}
-    AGENT OUTPUTS:
-    ${executorResults.map((r, i) => `Agent ${i+1}: ${r}`).join('\n\n')}
-    
-    FINAL RESPONSE:
-  `;
+  try {
+    const reviewerPrompt = `
+      You are the Kelion Swarm Reviewer. Combine the following agent outputs into a final, high-quality response.
+      Verify correctness and ensure it meets the original user intent.
+      
+      ORIGINAL TASK: ${task}
+      AGENT OUTPUTS:
+      ${executorResults.map((r, i) => `Agent ${i+1}: ${r}`).join('\n\n')}
+      
+      FINAL RESPONSE:
+    `;
 
-  const finalResult = await smartFetch('coder', {
-    messages: [{ role: 'system', content: reviewerPrompt }],
-    tools: tools,
-    tool_choice: tools ? 'auto' : undefined,
-    temperature: 0.3
-  }, true); // Always HEAVY for Reviewer
+    const finalResult = await withTimeout(
+      smartFetch('coder', {
+        messages: [{ role: 'system', content: reviewerPrompt }],
+        tools: tools,
+        tool_choice: tools ? 'auto' : undefined,
+        temperature: 0.3,
+        max_tokens: 4096,
+      }, true),
+      AGENT_TIMEOUT_MS,
+      'Reviewer'
+    );
 
-  const finalJson = await finalResult.response.json();
-  const choice = finalJson.choices?.[0];
-  
-  return {
-    ok: true,
-    reply: choice?.message?.content || '',
-    toolCalls: choice?.message?.tool_calls,
-    agentsUsed: subTasks.length + 2,
-    plan: subTasks
-  };
+    const finalJson = await finalResult.response.json();
+    const choice = finalJson.choices?.[0];
+    
+    return {
+      ok: true,
+      reply: choice?.message?.content || '',
+      toolCalls: choice?.message?.tool_calls,
+      agentsUsed: subTasks.length + 2,
+      plan: subTasks
+    };
+  } catch (err) {
+    console.error('[swarm] Reviewer failed:', err.message);
+    // Return whatever the executors produced
+    return {
+      ok: true,
+      reply: executorResults.join('\n\n---\n\n'),
+      toolCalls: undefined,
+      agentsUsed: subTasks.length + 1,
+      plan: subTasks
+    };
+  }
 }
 
 module.exports = { runSwarmTask };
