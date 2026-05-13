@@ -199,6 +199,8 @@ const EXPECTED_TOOL_NAMES = [
   'deep_memory_architect',
   'task_orchestrator',
   'universal_executor',
+  'verify_build',
+  'diff_edit',
 ];
 
 describe('Kelion tool catalog', () => {

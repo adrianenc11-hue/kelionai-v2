@@ -1776,7 +1776,7 @@ export default function KelionStage() {
                     return (
                       <div style={{
                         background: sc.bg, border: `1px solid ${sc.border}`,
-                        padding: '6px 16px', borderRadius: 20, color: sc.color,
+                        borderRadius: 20, color: sc.color,
                         fontSize: 14, fontWeight: 700, textTransform: 'uppercase',
                         letterSpacing: 1, display: 'flex', alignItems: 'center', gap: 8,
                         boxShadow: sc.glow, transition: 'all 0.3s ease',
