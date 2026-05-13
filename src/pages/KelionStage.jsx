@@ -21,6 +21,8 @@ import { TopBarIconButton, AdminTabBar, VisitorsAnalyticsPanel, PayoutsPanel, Me
 import TranscriptDrawer from '../components/stage/TranscriptDrawer'
 import { useKelionVoice } from '../lib/kelionVoice'
 import { useWakeWord } from '../lib/useWakeWord'
+import { useNetworkStatus } from '../lib/useNetworkStatus'
+import { getCurrentFacingMode } from '../lib/cameraControl'
 import { useTrial } from '../lib/useTrial'
 import { useClientGeo } from '../lib/useClientGeo'
 import { TUNING, isTuningEnabled } from '../lib/tuning'
@@ -971,6 +973,21 @@ export default function KelionStage() {
   // sheet so leaving the composer at viewport-center is correct.
   const overlayShiftsBottom = monitorOpen && !stageNarrow
   const bottomLeft = overlayShiftsBottom ? '75%' : '50%'
+
+  // Network / mobile optimisations
+  const { online, slow: slowConnection, metered } = useNetworkStatus()
+  const [carMode, setCarMode] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return new URLSearchParams(window.location.search).get('car') === '1'
+  })
+  // Auto-enable car-mode when offline or on 2g/3g if user previously enabled it once
+  useEffect(() => {
+    try {
+      const everEnabled = sessionStorage.getItem('kelion_car_mode') === '1'
+      if (everEnabled && (!online || slowConnection)) setCarMode(true)
+    } catch (_) {}
+  }, [online, slowConnection])
+  const dprLow = slowConnection || metered || carMode
   // z-index sits above MonitorOverlay (zIndex 40) so a transparent
   // shift fallback still keeps the composer clickable in case a
   // future change widens the overlay past 50vw.
@@ -1893,7 +1910,7 @@ export default function KelionStage() {
         {/* RIGHT PANEL — Avatar 3D & Chat Input */}
         <div style={{ flex: stageNarrow ? '0 0 45%' : '0 0 30%', maxWidth: stageNarrow ? '100%' : '30%', height: '100%', position: 'relative', display: 'flex', flexDirection: 'column', background: '#0a0d1a' }}>
           <div style={{ flex: 1, position: 'relative', overflow: 'hidden', minHeight: 0 }}>
-            <Canvas shadows={{ type: THREE.VSMShadowMap }} camera={{ position: [0, 0.2, 3.0], fov: 42 }} dpr={[1, 2]} gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.8, outputColorSpace: THREE.SRGBColorSpace, powerPreference: 'low-power' }} onCreated={({ gl }) => { const canvas = gl.domElement; if (canvas) { canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); console.warn('[kelion] WebGL context lost') }); canvas.addEventListener('webglcontextrestored', () => { console.log('[kelion] WebGL context restored') }) } }}>
+            <Canvas shadows={{ type: THREE.VSMShadowMap }} camera={{ position: [0, 0.2, 3.0], fov: 42 }} dpr={dprLow ? [0.5, 1] : [1, 2]} gl={{ antialias: !dprLow, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.8, outputColorSpace: THREE.SRGBColorSpace, powerPreference: dprLow ? 'low-power' : 'default' }} onCreated={({ gl }) => { const canvas = gl.domElement; if (canvas) { canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); console.warn('[kelion] WebGL context lost') }); canvas.addEventListener('webglcontextrestored', () => { console.log('[kelion] WebGL context restored') }) } }}>
               <color attach="background" args={['#0a0d1a']} />
               <fog attach="fog" args={['#0e0b20', 6, 14]} />
               <Suspense fallback={null}>
@@ -2184,9 +2201,18 @@ export default function KelionStage() {
             {t('tools')}
           </div>
           {cameraStream ? (
-            <MenuItem onClick={() => { stopCamera(); setMenuOpen(false) }}>
-              {t('cameraOff')}
-            </MenuItem>
+            <>
+              <MenuItem onClick={() => { stopCamera(); setMenuOpen(false) }}>
+                {t('cameraOff')}
+              </MenuItem>
+              <MenuItem onClick={() => {
+                const next = getCurrentFacingMode() === 'user' ? 'environment' : 'user'
+                startCamera({ facingMode: next }).catch(() => {})
+                setMenuOpen(false)
+              }}>
+                🔄 Schimbă camera
+              </MenuItem>
+            </>
           ) : (
             <MenuItem onClick={() => {
               startCamera().catch(() => {})
@@ -2200,6 +2226,9 @@ export default function KelionStage() {
 
           <MenuItem onClick={() => { setTranscriptOpen(true); setMenuOpen(false) }}>
             Transcript
+          </MenuItem>
+          <MenuItem onClick={() => { setCarMode(v => { const n = !v; try { sessionStorage.setItem('kelion_car_mode', n ? '1' : '0') } catch (_) {} return n }); setMenuOpen(false) }}>
+            {carMode ? '🚗 Ieșire mod mașină' : '🚗 Mod mașină'}
           </MenuItem>
           <MenuItem onClick={() => { navigate('/contact'); setMenuOpen(false) }}>
             {t('contactUs')}
