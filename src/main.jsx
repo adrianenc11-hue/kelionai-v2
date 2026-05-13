@@ -1,10 +1,25 @@
 import { StrictMode, Suspense, lazy } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import * as Sentry from '@sentry/react'
 import ErrorBoundary from './components/ErrorBoundary'
 import { installErrorReporter } from './lib/errorReporter'
 import { getCsrfToken } from './lib/api'
 import './index.css'
+
+// Sentry error tracking (optional — only activates when VITE_SENTRY_DSN is set).
+if (import.meta.env.VITE_SENTRY_DSN) {
+  Sentry.init({
+    dsn: import.meta.env.VITE_SENTRY_DSN,
+    integrations: [
+      Sentry.browserTracingIntegration(),
+      Sentry.replayIntegration({ maskAllText: false, blockAllMedia: false }),
+    ],
+    tracesSampleRate: 1.0,
+    replaysSessionSampleRate: 0.1,
+    replaysOnErrorSampleRate: 1.0,
+  })
+}
 
 // Audit H4: install global safety net on the client side. Before this,
 // any uncaught exception or unhandled promise rejection inside the

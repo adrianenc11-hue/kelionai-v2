@@ -8,6 +8,17 @@ const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
 const rateLimit = require('express-rate-limit');
 
+// Sentry error tracking (optional — only activates when SENTRY_DSN is set).
+let Sentry;
+if (process.env.SENTRY_DSN) {
+  Sentry = require('@sentry/node');
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    integrations: [Sentry.httpIntegration(), Sentry.expressIntegration()],
+    tracesSampleRate: 1.0,
+  });
+}
+
 const config = require('./config');
 const { csrfSeed, csrfProtection } = require('./middleware/csrf');
 const { visitorLog } = require('./middleware/visitorLog');
@@ -102,6 +113,12 @@ if (fs.existsSync(distPath)) {
   console.log(`[kelion-startup] dist folder FOUND. Files: ${JSON.stringify(fs.readdirSync(distPath))}`);
 } else {
   console.warn(`[kelion-startup] dist folder not found at: ${distPath} (expected in production)`);
+}
+
+// Sentry request handler — must be first middleware.
+if (Sentry && Sentry.Handlers) {
+  app.use(Sentry.Handlers.requestHandler());
+  app.use(Sentry.Handlers.tracingHandler());
 }
 
 app.use(
@@ -517,6 +534,11 @@ if (require.main === module) {
       console.warn('[TitanWatchdog] Failed to start:', err.message);
     }
   });
+}
+
+// Sentry error handler — must be the last error-handling middleware.
+if (Sentry && Sentry.Handlers) {
+  app.use(Sentry.Handlers.errorHandler());
 }
 
 module.exports = app;
