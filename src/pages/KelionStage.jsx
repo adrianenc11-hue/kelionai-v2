@@ -10,7 +10,7 @@ import { subscribeComposer, getComposer, openEmailComposer, closeComposer } from
 import { setClientGeoProvider } from '../lib/clientGeoProvider'
 import { setUIActionController } from '../lib/uiActionStore'
 import UIActionToast from '../components/UIActionToast'
-import TaskStatusPanel from '../components/TaskStatusPanel'
+import { subscribeTaskStatus } from '../lib/taskStatusStore'
 // Stage components extracted from this file for maintainability
 import AvatarModel from '../components/stage/AvatarModel'
 import Halo from '../components/stage/Halo'
@@ -171,7 +171,6 @@ export default function KelionStage() {
   // Real-time task status from the voice/tool pipeline
   const [taskStatus, setTaskStatusState] = useState(null)
   useEffect(() => {
-    const { subscribeTaskStatus } = require('../lib/taskStatusStore')
     return subscribeTaskStatus((s) => setTaskStatusState(s))
   }, [])
 
