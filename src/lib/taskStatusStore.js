@@ -102,6 +102,9 @@ export function failTask(error) {
 
 /** Clear task status immediately. */
 export function clearTaskStatus() {
+  if (_monitorOpen) {
+    postDone(true, 0)
+  }
   _current = null
   _monitorOpen = false
   _lastTool = null
