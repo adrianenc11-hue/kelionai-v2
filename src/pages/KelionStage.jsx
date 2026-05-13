@@ -1730,7 +1730,6 @@ export default function KelionStage() {
           carries ?debug=1 or ?tune=1; zero cost for real users. */}
       {isTuningEnabled() && <TuningPanel />}
       <UIActionToast />
-      <TaskStatusPanel />
       {/* ═══ SPLIT LAYOUT: Chat Left 70% + Avatar Right 30% ═══ */}
       <div style={{ display: 'flex', width: '100%', height: '100%' }}>
         {/* LEFT PANEL — Chat / Monitor (3D Flip Container) */}
