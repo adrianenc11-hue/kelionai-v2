@@ -113,9 +113,9 @@ async function smartFetch(taskType, body, useHeavy = false) {
 
   console.log(`[modelRouter] ${taskType} (heavy=${useHeavy}) → ${model} via ${endpoint.provider}`);
 
-  // Try primary provider with a hard 15s timeout
+  // Try primary provider — 45s timeout (heavy tasks like audits need time)
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 15000);
+  const timer = setTimeout(() => ctrl.abort(), 45000);
   try {
     const response = await fetch(endpoint.url, {
       method: 'POST',

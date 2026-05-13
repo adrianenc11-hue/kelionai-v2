@@ -1735,7 +1735,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
 
       httpBusyRef.current = true
       setStatus('thinking')
-      _setTaskStatus({ tool: 'chat', progress: 10, label: 'Gândesc...', phase: 'thinking' });
+      _setTaskStatus({ tool: 'chat', progress: 5, label: '📩 Mesaj primit...', phase: 'thinking' });
       try {
         let currentMessage = clean;
         let currentImage = image;
@@ -1748,7 +1748,17 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
           sessionIdRef.current = 'ses_' + Math.random().toString(36).substring(2, 10);
         }
 
+        // Global timeout: if the entire chat loop takes >90s, bail out
+        const _chatDeadline = Date.now() + 90_000;
+        const _seenTools = new Map(); // circuit breaker: track repeated tool calls
+
         while (maxLoops-- > 0) {
+          // ── Deadline check ──
+          if (Date.now() > _chatDeadline) {
+            _failTask('⏰ Timeout — prea mult timp, opresc bucla');
+            finalReply = 'Am depășit limita de timp. Încearcă din nou cu o cerere mai simplă.';
+            break;
+          }
           // If buffered messages arrived while tools were running, append them
           while (httpMsgBufferRef.current.length > 0) {
             const next = httpMsgBufferRef.current.shift()
@@ -1759,22 +1769,25 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
           httpAbortRef.current = new AbortController()
           let data;
 
+          // ── Puter.js silent attempt ──
           try {
-            // Puter.js — use Opus 4.7 ONLY if already authenticated (no popup).
-            // If the user hasn't logged in to Puter yet, skip silently → backend.
             const puterMod = await import('@heyputer/puter.js');
             const puter = puterMod.puter || puterMod.default;
             const isAuthed = puter && puter.auth && (typeof puter.auth.isSignedIn === 'function' ? puter.auth.isSignedIn() : puter.authToken || puter.auth.token);
             if (puter && puter.ai && isAuthed && (!toolResponses || toolResponses.length === 0)) {
+              _setTaskStatus({ tool: 'puter-opus', progress: 20, label: '🧠 Opus 4.7 (Puter)...', phase: 'thinking' });
               const sysPrompt = "You are KelionAI, a genius expert coder and architect. Do your best to help the user immediately. Since you are running via Puter, you cannot use native backend tools. Output the response in raw text.";
               const puterResp = await puter.ai.chat([{ role: 'system', content: sysPrompt }, { role: 'user', content: currentMessage }], { model: 'claude-opus-4-7' });
               data = { reply: puterResp?.message?.content?.[0]?.text || '', model: 'claude-opus-4-7 (Puter)' };
+              _setTaskStatus({ tool: 'puter-opus', progress: 80, label: '✅ Răspuns Opus primit', phase: 'working' });
             }
           } catch (e) {
             console.log('[kelionVoice] Puter silent fallback:', e?.message || e);
           }
 
+          // ── Backend API call ──
           if (!data) {
+            _setTaskStatus({ tool: 'api-chat', progress: 20, label: '📡 Trimit la server...', phase: 'thinking' });
             const r = await fetch('/api/chat', {
               method: 'POST',
               signal: httpAbortRef.current.signal,
@@ -1793,16 +1806,32 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
             })
             if (!r.ok) {
               const err = await r.json().catch(() => ({ error: 'Chat failed' }))
+              _setTaskStatus({ tool: 'api-chat', progress: 100, label: `❌ Server: ${err.error || r.status}`, phase: 'error' });
               finalReply = err.error || 'Sorry, something went wrong.';
               break;
             }
             data = await r.json()
+            _setTaskStatus({ tool: 'api-chat', progress: 60, label: `📨 Răspuns de la ${data.model || 'server'}`, phase: 'working' });
           }
 
+          // ── Tool execution loop ──
           if (data.toolCalls && data.toolCalls.length > 0) {
             setStatus('working')
             const results = [];
             const totalTools = data.toolCalls.length;
+            // Circuit breaker: detect repeated tool calls
+            for (const tc of data.toolCalls) {
+              const key = tc.name + ':' + (tc.args?.path || tc.args?.command || '').slice(0, 50);
+              _seenTools.set(key, (_seenTools.get(key) || 0) + 1);
+              if (_seenTools.get(key) > 3) {
+                _failTask(`🔄 Buclă detectată: ${tc.name} apelat de ${_seenTools.get(key)}× — opresc`);
+                finalReply = `Am detectat o buclă (${tc.name} repetat). Opresc și încerc altceva.`;
+                maxLoops = 0; // break outer loop
+                break;
+              }
+            }
+            if (maxLoops <= 0) break;
+            _setTaskStatus({ tool: 'tools', progress: 0, label: `🔧 ${totalTools} tool${totalTools > 1 ? '-uri' : ''} de executat`, phase: 'working' });
             for (let ti = 0; ti < totalTools; ti++) {
               const call = data.toolCalls[ti];
               const file = call.args?.path || call.args?.target || call.args?.file || call.args?.command || null;
@@ -1810,7 +1839,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
                 tool: call.name,
                 file,
                 progress: Math.round(((ti) / totalTools) * 100),
-                label: `Rulez ${call.name.replace(/_/g, ' ')}...`,
+                label: `▶ Rulez ${call.name.replace(/_/g, ' ')}...`,
                 phase: 'working',
               });
               const res = await runTool(call.name, call.args);
@@ -1819,15 +1848,16 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
                 tool: call.name,
                 file,
                 progress: Math.round(((ti + 1) / totalTools) * 100),
-                label: ti === totalTools - 1 ? 'Finalizez...' : `${call.name.replace(/_/g, ' ')} ✓`,
-                phase: ti === totalTools - 1 ? 'working' : 'working',
+                label: `✓ ${call.name.replace(/_/g, ' ')} gata`,
+                phase: 'working',
               });
             }
-            _completeTask(`${totalTools} tool${totalTools > 1 ? '-uri' : ''} executat${totalTools > 1 ? 'e' : ''} ✓`);
+            _setTaskStatus({ tool: 'tools', progress: 100, label: `✅ ${totalTools} tool-uri executate`, phase: 'working' });
             toolResponses = results;
-            currentMessage = undefined; // Do not send message again
+            currentMessage = undefined;
             currentImage = undefined;
-            continue; // Loop back to send toolResponses
+            _setTaskStatus({ tool: 'api-chat', progress: 30, label: '🔄 Retrimit rezultate la AI...', phase: 'thinking' });
+            continue;
           }
 
           finalReply = data.reply || '';
@@ -1837,7 +1867,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
 
         // Prevent empty bubbles
         if (finalReply) {
-          _completeTask('Răspuns generat ✓');
+          _completeTask(`✅ Răspuns generat (${finalModel || 'AI'})`);
           appendTurn('assistant', finalReply, true, finalModel ? `🤖 ${finalModel}` : undefined)
         } else {
           _clearTaskStatus();
@@ -1848,15 +1878,17 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
         if (playAudio && finalReply.trim() !== '') {
           clearAudioQueue()
           setStatus('speaking')
+          _setTaskStatus({ tool: 'tts', progress: 10, label: '🔊 Generez vocea...', phase: 'working' });
 
           // Split full reply into sentences and enqueue them sequentially
-          // This eliminates the 15-20s wait for ElevenLabs to process massive blocks of text.
           const sentences = finalReply.match(/[^.!?\n]+[.!?\n]+/g) || [finalReply];
-          for (const s of sentences) {
-            if (s.trim()) {
-              await processTtsChunk(s.trim());
+          for (let si = 0; si < sentences.length; si++) {
+            if (sentences[si].trim()) {
+              _setTaskStatus({ tool: 'tts', progress: Math.round(((si + 1) / sentences.length) * 100), label: `🔊 TTS propoziția ${si + 1}/${sentences.length}`, phase: 'working' });
+              await processTtsChunk(sentences[si].trim());
             }
           }
+          _completeTask('🔊 Voce redată ✓');
         } else {
           setStatus(window.__restRecRef ? 'listening' : 'idle')
         }

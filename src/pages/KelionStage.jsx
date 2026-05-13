@@ -168,6 +168,13 @@ export default function KelionStage() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [voiceLibraryOpen, setVoiceLibraryOpen] = useState(false)
 
+  // Real-time task status from the voice/tool pipeline
+  const [taskStatus, setTaskStatusState] = useState(null)
+  useEffect(() => {
+    const { subscribeTaskStatus } = require('../lib/taskStatusStore')
+    return subscribeTaskStatus((s) => setTaskStatusState(s))
+  }, [])
+
   // Stage 3 — auth + memory state
   const [authState, setAuthState] = useState({ signedIn: false, user: null })
   // JWT bearer-token fallback. register/login return a `token` in the body
@@ -1723,7 +1730,6 @@ export default function KelionStage() {
           carries ?debug=1 or ?tune=1; zero cost for real users. */}
       {isTuningEnabled() && <TuningPanel />}
       <UIActionToast />
-      <TaskStatusPanel />
       {/* ═══ SPLIT LAYOUT: Chat Left 70% + Avatar Right 30% ═══ */}
       <div style={{ display: 'flex', width: '100%', height: '100%' }}>
         {/* LEFT PANEL — Chat / Monitor (3D Flip Container) */}
@@ -1762,20 +1768,53 @@ export default function KelionStage() {
                         padding: '6px 16px', borderRadius: 20, color: sc.color,
                         fontSize: 14, fontWeight: 700, textTransform: 'uppercase',
                         letterSpacing: 1, display: 'flex', alignItems: 'center', gap: 8,
-                        boxShadow: sc.glow, transition: 'all 0.3s ease'
+                        boxShadow: sc.glow, transition: 'all 0.3s ease',
+                        minWidth: taskStatus ? 260 : 'auto', flexDirection: taskStatus ? 'column' : 'row',
+                        padding: taskStatus ? '8px 16px' : '6px 16px',
                       }}>
-                        {status !== 'idle' && status !== 'error' && (
-                          <span style={{
-                            width: 8, height: 8, borderRadius: '50%', background: sc.color,
-                            boxShadow: `0 0 8px ${sc.color}`, animation: 'pulse 1.5s infinite'
-                          }} />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
+                          {status !== 'idle' && status !== 'error' && (
+                            <span style={{
+                              width: 8, height: 8, borderRadius: '50%', background: sc.color,
+                              boxShadow: `0 0 8px ${sc.color}`, animation: 'pulse 1.5s infinite'
+                            }} />
+                          )}
+                          <span>
+                            {status === 'listening' && 'Recepție...'}
+                            {status === 'thinking' && (taskStatus ? `🧠 ${taskStatus.label}` : 'Gândește...')}
+                            {status === 'working' && (taskStatus ? `⚙️ ${taskStatus.tool.replace(/_/g,' ')}` : 'Aplică unelte...')}
+                            {status === 'speaking' && 'Răspunde...'}
+                            {status === 'idle' && 'Inactiv'}
+                            {status === 'error' && 'Eroare'}
+                          </span>
+                        </div>
+                        {/* Real-time task details: file + progress bar */}
+                        {taskStatus && (status === 'thinking' || status === 'working') && (
+                          <>
+                            {taskStatus.file && (
+                              <div style={{
+                                fontSize: 10, color: sc.color, opacity: 0.8,
+                                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                                width: '100%', fontFamily: 'monospace', textTransform: 'none',
+                                letterSpacing: 0, fontWeight: 400,
+                              }}>
+                                📄 {taskStatus.file}
+                              </div>
+                            )}
+                            <div style={{
+                              width: '100%', height: 4, background: 'rgba(255,255,255,0.15)',
+                              borderRadius: 2, overflow: 'hidden', marginTop: 2,
+                            }}>
+                              <div style={{
+                                width: `${taskStatus.progress || 0}%`,
+                                height: '100%',
+                                background: sc.color,
+                                borderRadius: 2,
+                                transition: 'width 0.4s ease',
+                              }} />
+                            </div>
+                          </>
                         )}
-                        {status === 'listening' && 'Recepție...'}
-                        {status === 'thinking' && 'Gândește...'}
-                        {status === 'working' && 'Aplică unelte...'}
-                        {status === 'speaking' && 'Răspunde...'}
-                        {status === 'idle' && 'Inactiv'}
-                        {status === 'error' && 'Eroare'}
                       </div>
                     );
                   })()}
