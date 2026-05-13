@@ -69,6 +69,8 @@ const AiCreditsPage = lazy(() => import('./pages/admin/AiCreditsPage'))
 const VisitorsPage  = lazy(() => import('./pages/admin/VisitorsPage'))
 const PayoutsPage   = lazy(() => import('./pages/admin/PayoutsPage'))
 const SettingsPage  = lazy(() => import('./pages/admin/SettingsPage'))
+const AgentPage     = lazy(() => import('./pages/admin/AgentPage'))
+const AgentPage     = lazy(() => import('./pages/admin/AgentPage'))
 
 function Loader() {
   return (
@@ -140,6 +142,7 @@ createRoot(document.getElementById('root')).render(
               <Route path="visitors" element={<VisitorsPage />} />
               <Route path="payouts" element={<PayoutsPage />} />
               <Route path="settings" element={<SettingsPage />} />
+              <Route path="agent" element={<AgentPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

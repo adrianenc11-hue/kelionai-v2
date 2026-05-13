@@ -45,6 +45,7 @@ const demoRouter       = require('./routes/demo');
 const chatRouter       = require('./routes/chat');
 const proxyRouter      = require('./routes/proxy');
 const whatsappRouter   = require('./routes/whatsapp');
+const agentRouter      = require('./routes/agent');
 const { attachVertexLiveProxy } = require('./routes/vertexLiveProxy');
 const proactive        = require('./services/proactive');
 const { bootstrapAdmin, healAdminCredits } = require('./services/adminBootstrap');
@@ -71,6 +72,16 @@ app.locals.processHandlerStats = processHandlerStats;
 // password by just changing the Railway env var and redeploying.
 initDb().then(async () => {
   console.log('[kelion-startup] Database initialized');
+  // Initialize Agent Mode tasks table if Agent Mode is enabled.
+  if (process.env.AGENT_ENABLED === '1') {
+    try {
+      const { initTasksTable } = require('./services/agentTasks');
+      await initTasksTable();
+      console.log('[kelion-startup] Agent tasks table initialized');
+    } catch (err) {
+      console.warn('[kelion-startup] Agent tasks init failed:', err && err.message);
+    }
+  }
   try {
     const result = await bootstrapAdmin();
     if (result && result.seeded) {
@@ -378,6 +389,15 @@ app.use('/api/proxy', proxyRouter);
 // QR scan auth, no Business API needed. Kelion responds when mentioned.
 app.use('/api/whatsapp', requireAuth, chatLimiter, whatsappRouter);
 
+// ── Agent Mode ──────────────────────────────────────────────────────────────────────────────
+// Kelion Agent API — gives Kelion the same capabilities as an AI coding assistant:
+// file system access, shell execution, web search, browser automation,
+// GitHub operations, deploy control, diagnostics, and task management.
+// Admin-only. Requires AGENT_ENABLED=1 to be active.
+if (process.env.AGENT_ENABLED === '1') {
+  app.use('/api/agent', agentRouter);
+  console.log('[kelion-api] Agent Mode enabled at /api/agent');
+}
 
 if (process.env.NODE_ENV !== 'test' && process.env.PROACTIVE_DISABLED !== '1') {
   try { proactive.start(require('./routes/push').getWebPush()); }

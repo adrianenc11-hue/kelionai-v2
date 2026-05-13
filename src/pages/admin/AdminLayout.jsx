@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   { to: '/admin/visitors', icon: '📈', label: 'Analitics' },
   { to: '/admin/payouts',  icon: '💸', label: 'Payouts' },
   { to: '/admin/settings', icon: '⚙️', label: 'Setări' },
+  { to: '/admin/agent',    icon: '🤖', label: 'Agent Mode' },
 ]
 
 const PAGE_TITLES = {
@@ -25,6 +26,7 @@ const PAGE_TITLES = {
   '/admin/visitors': 'Analitics',
   '/admin/payouts':  'Payouts',
   '/admin/settings': 'Setări',
+  '/admin/agent':    'Agent Mode',
 }
 
 export default function AdminLayout() {
