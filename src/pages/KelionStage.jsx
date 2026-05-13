@@ -954,7 +954,7 @@ export default function KelionStage() {
   // float on top of the overlay instead of being half-hidden behind it.
   // Adrian (2026-04-25) screenshot showed the map covering the bottom
   // composer: "promtul de scris si vorbut sunt acoperite de pagina".
-  const [monitorOpen, setMonitorOpen] = useState(false)
+  const [monitorOpen, setMonitorOpen] = useState(true)
   const [stageNarrow, setStageNarrow] = useState(() => (
     typeof window !== 'undefined' && window.innerWidth < 640
   ))
