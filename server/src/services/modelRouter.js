@@ -181,9 +181,23 @@ function getFallbackChain(taskType) {
  */
 function isCodingTask(msg) {
   if (!msg) return false;
-  // Adrian: "trebuie sa detecteze orice task de software/cod". 
+  // Adrian: "trebuie sa detecteze orice task de software/cod".
   // Added Romanian keywords: soft, program, aplicație, crea, dezvolt, proiect, sistem.
   return /\b(cod[e]?|script|funcți[ei]|debug|refactor|implement|api|endpoint|bug|error|class|component|python|javascript|typescript|react|node|sql|html|css|java|rust|algorithm|soft|program|aplicați|creează|dezvolt|proiect|arhitectur|sistem)\b/i.test(msg.toLowerCase());
+}
+
+/**
+ * Auto-detect: is this a complex/heavy-reasoning task that warrants the premium model?
+ * Catches non-coding requests that still benefit from a stronger brain: audits,
+ * analysis, planning, strategy, multi-step reasoning, comparisons, deep explanations.
+ */
+function isComplexTask(msg) {
+  if (!msg) return false;
+  const m = msg.toLowerCase();
+  // Long prompts almost always need reasoning — trigger on length too.
+  if (msg.length >= 600) return true;
+  // Prefix match (no trailing \b) so e.g. "planific" matches both "planific" and "planifica".
+  return /\b(audit|analiz|planific|strateg|complic|complex|dificil|profund|detaliat|compar|evalu|decid|gândeș|gindeste|reason|reflect|explic|justific|argumentez|sintetiz|rezum|optim|îmbunătăț|imbunata|review|critic|recomand)/i.test(m);
 }
 
 /**
@@ -379,4 +393,5 @@ module.exports = {
   getFallbackChain,
   smartFetch,
   isCodingTask,
+  isComplexTask,
 };

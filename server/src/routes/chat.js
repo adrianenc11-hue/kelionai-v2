@@ -103,7 +103,7 @@ router.post('/', async (req, res) => {
     }
 
     // Smart Model Router — unified stable routing
-    const { smartFetch, isCodingTask } = require('../services/modelRouter');
+    const { smartFetch, isCodingTask, isComplexTask } = require('../services/modelRouter');
     const swarmExpert = require('../services/swarmExpert');
 
 
@@ -129,9 +129,21 @@ router.post('/', async (req, res) => {
     step(`db mem=${memoryItems.length} bal=${creditsBalance}`);
 
     // ── Task Detection: Basic Chat vs Complex Coding ──────────────────
-    const taskType = isCodingTask(message) ? 'coder' : 'chat';
-    // Admin ALWAYS gets the heavy model for coding/software tasks. Normal users need credits.
-    const isHeavy = taskType === 'coder' && (isAdmin || (creditsBalance > 0));
+    // Two independent signals trigger the premium model:
+    //   - isCodingTask: explicit software/code request
+    //   - isComplexTask: audit/analysis/planning/strategy/long prompt
+    const codingTask = isCodingTask(message);
+    const complexTask = isComplexTask(message);
+    const taskType = codingTask ? 'coder' : 'chat';
+    // Premium brain (e.g. Opus 4.7 Fast) is gated by credit balance to protect margin.
+    // Revenue is ~£0.25/credit (Standard/Pro pack), gross margin 25% = £0.0625/credit.
+    // One premium query costs ~£0.07 (≈3K in + 600 out tokens at Claude 4 rates), so
+    // the >=10 threshold guarantees every premium user has at least £2.50 of realised
+    // margin before the heavy model is unlocked (covers ~35 queries with positive PnL).
+    // Admin always qualifies; free users and low-balance users get the light model.
+    const PREMIUM_CREDITS_THRESHOLD = Number(process.env.PREMIUM_CREDITS_THRESHOLD) || 10;
+    const canUsePremium = isAdmin || (Number(creditsBalance) >= PREMIUM_CREDITS_THRESHOLD);
+    const isHeavy = (codingTask || complexTask) && canUsePremium;
     // Adrian: "Să lucreze cu agenți la orice task mai complex".
     // Lowering threshold to 150 chars and adding more keywords.
     const isSoftGreu = false; // Disabled to force frontend tool execution for live progress
