@@ -22,9 +22,10 @@
 
 const { getDb } = require('../db');
 
-const TRIAL_WINDOW_MS   = 15 * 60 * 1000;            // 15 min per day
-const TRIAL_COOLDOWN_MS = 24 * 60 * 60 * 1000;       // 24 h between windows
-const TRIAL_LIFETIME_MS = 7 * 24 * 60 * 60 * 1000;   // 7 days total guest access per IP
+const TRIAL_WINDOW_MS   = parseInt(process.env.TRIAL_WINDOW_MINUTES, 10) * 60 * 1000 || 15 * 60 * 1000;
+const TRIAL_COOLDOWN_MS = parseInt(process.env.TRIAL_COOLDOWN_HOURS, 10) * 60 * 60 * 1000 || 24 * 60 * 60 * 1000;
+const TRIAL_LIFETIME_MS = parseInt(process.env.TRIAL_LIFETIME_DAYS, 10) * 24 * 60 * 60 * 1000 || 7 * 24 * 60 * 60 * 1000;
+const TRIAL_UNLIMITED   = process.env.TRIAL_UNLIMITED === '1';
 const MAX_CACHE = 10_000;
 
 // In-memory LRU cache: ip -> { firstEverStampAt, firstStampAt }
@@ -93,6 +94,9 @@ async function saveToDb(ip, rec) {
 // optionally call stampTrialIfFresh() to mark the start of the
 // 15-minute window on the first real interaction.
 async function trialStatus(ip) {
+  if (TRIAL_UNLIMITED) {
+    return { allowed: true, remainingMs: TRIAL_WINDOW_MS, lifetimeRemainingMs: TRIAL_LIFETIME_MS, fresh: false };
+  }
   if (!ip) {
     return {
       allowed: true,

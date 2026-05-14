@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "Kelion AI Companion",
+  "version": "1.0.0",
+  "description": "Open Kelion from any tab. Ask, code, navigate, and control your workspace with voice + AI.",
+  "permissions": ["activeTab", "storage"],
+  "host_permissions": ["https://kelionai.app/*", "http://localhost:*/*"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Open Kelion"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "commands": {
+    "open-kelion": {
+      "suggested_key": { "default": "Ctrl+Shift+K", "mac": "Command+Shift+K" },
+      "description": "Open Kelion in a new tab"
+    }
+  },
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
+}
