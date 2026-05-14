@@ -57,6 +57,10 @@ async function deleteTask(id) {
 
 async function initTasksTable() {
   const db = _db();
+  if (db._isPg) {
+    // Postgres: agent_tasks is already created by postgres-schema.js
+    return;
+  }
   await db.exec(`
     CREATE TABLE IF NOT EXISTS agent_tasks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

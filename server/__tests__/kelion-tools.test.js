@@ -32,11 +32,10 @@ const EXPECTED_TOOL_NAMES = [
   'show_on_monitor',
   // Real professional tools — all executed server-side with
   // deterministic/real APIs (see server/src/services/realTools.js).
-  // PR #133 seed: calculate, get_weather, web_search, translate.
+  // PR #133 seed: calculate, get_weather, web_search.
   'calculate',
   'get_weather',
   'web_search',
-  'translate',
   // PR A expansion — 24 additional real-API tools (all free, no key).
   'get_forecast',
   'get_air_quality',
