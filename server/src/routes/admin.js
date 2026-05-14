@@ -841,18 +841,20 @@ router.post('/purge-users', async (req, res) => {
       'referrals',
       'users',
     ];
+    // DB-agnostic: skip the pre-existence probe (sqlite_master doesn't
+    // exist on Postgres). Attempt the DELETE directly — both adapters
+    // throw on missing tables (SQLite "no such table", Postgres
+    // "relation does not exist"), caught here and recorded.
     const deleted = {};
     for (const t of tables) {
       try {
-        const exists = await db.get(
-          "SELECT name FROM sqlite_master WHERE type='table' AND name = ?",
-          [t],
-        );
-        if (!exists) { deleted[t] = 'table not present'; continue; }
         const result = await db.run(`DELETE FROM ${t}`);
         deleted[t] = result && result.changes != null ? result.changes : 'ok';
       } catch (err) {
-        deleted[t] = `error: ${err && err.message}`;
+        const msg = err && err.message ? err.message : String(err);
+        deleted[t] = /no such table|does not exist/i.test(msg)
+          ? 'table not present'
+          : `error: ${msg}`;
       }
     }
 
@@ -1020,10 +1022,10 @@ setTimeout(() => {
 
 // ── Health Watchdog Dashboard ──
 // GET /api/admin/health — live health report from permanent watchdog
+// (admin gate already enforced by router.use(requireAdmin) above; a
+// secondary req.user.role check would 403 admins whitelisted via
+// ADMIN_EMAILS whose JWT still carries role:'user').
 router.get('/health', async (req, res) => {
-  if (req.user?.role !== 'admin') {
-    return res.status(403).json({ error: 'Admin only' });
-  }
   try {
     const { getHealthReport } = require('../services/healthWatchdog');
     const db = require('../db');
