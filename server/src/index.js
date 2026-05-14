@@ -46,6 +46,7 @@ const chatRouter       = require('./routes/chat');
 const proxyRouter      = require('./routes/proxy');
 const whatsappRouter   = require('./routes/whatsapp');
 const agentRouter      = require('./routes/agent');
+const docsRouter         = require('./routes/docs');
 const { attachVertexLiveProxy } = require('./routes/vertexLiveProxy');
 const proactive        = require('./services/proactive');
 const { bootstrapAdmin, healAdminCredits } = require('./services/adminBootstrap');
@@ -342,6 +343,7 @@ app.use('/api/trial', chatLimiter, trialRouter);
 // auth (enforced inside credits.js via requireAuth).
 app.use('/api/credits', creditsRouter);
 app.use('/api/diag', diagRouter);
+app.use('/api/docs', docsRouter);
 
 // Stage 3 — M13 passkey (public — register/auth flows need to be reachable
 // without auth) + M14/M16/M17 memory (signed-in users only).

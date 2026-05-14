@@ -19,6 +19,7 @@ import CameraRig from '../components/stage/CameraRig'
 import MonitorOverlay from '../components/stage/MonitorOverlay'
 import { TopBarIconButton, AdminTabBar, VisitorsAnalyticsPanel, PayoutsPanel, MenuItem, friendlyCreditStatus, uaIsBot, uaBrowser, uaOs, refHost, flagEmoji, RevenueChart, LiveSessionsPanel, ExportButtons } from '../components/stage/AdminPanels'
 import TranscriptDrawer from '../components/stage/TranscriptDrawer'
+import FeaturesModal from '../components/stage/FeaturesModal'
 import { useKelionVoice } from '../lib/kelionVoice'
 import { useWakeWord } from '../lib/useWakeWord'
 import { useNetworkStatus } from '../lib/useNetworkStatus'
@@ -957,6 +958,7 @@ export default function KelionStage() {
   // Adrian (2026-04-25) screenshot showed the map covering the bottom
   // composer: "promtul de scris si vorbut sunt acoperite de pagina".
   const [monitorOpen, setMonitorOpen] = useState(false)
+  const [featuresOpen, setFeaturesOpen] = useState(false)
   const [stageNarrow, setStageNarrow] = useState(() => (
     typeof window !== 'undefined' && window.innerWidth < 640
   ))
@@ -1787,6 +1789,10 @@ export default function KelionStage() {
                 
                 {/* NEW HIGHLY VISIBLE STATUS */}
                 <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
+                  <button onClick={() => setFeaturesOpen(true)} style={{ marginRight: 12, background: '#f3f4f6', color: '#374151', border: '1px solid #d1d5db', borderRadius: 8, padding: '8px 14px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                    Features
+                  </button>
                   <button onClick={() => setMonitorOpen(true)} style={{ marginRight: 16, background: '#2563eb', color: 'white', border: 'none', borderRadius: 8, padding: '8px 16px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
                     Comută Monitor
@@ -2523,6 +2529,14 @@ export default function KelionStage() {
         userEmail={authState.user && authState.user.email}
         userName={authState.user && (authState.user.name || authState.user.displayName)}
       />
+
+      {/* Features overview — what Kelion can do, split by user vs admin. */}
+      {featuresOpen && (
+        <FeaturesModal
+          isAdmin={isAdmin}
+          onClose={() => setFeaturesOpen(false)}
+        />
+      )}
 
       {/* Stage 3 — "Remember me" soft prompt */}
       {rememberPromptOpen && (
