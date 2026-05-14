@@ -49,6 +49,16 @@ async function checkStripe() {
   return { name: 'Stripe Secret Key', ok: r.ok, status: r.status, error: r.ok ? null : 'Invalid key' };
 }
 
+async function checkStripeWebhook() {
+  const sec = process.env.STRIPE_WEBHOOK_SECRET;
+  return {
+    name: 'Stripe Webhook Secret',
+    ok: !!sec,
+    value: sec ? 'set' : 'not set',
+    error: sec ? null : 'Without STRIPE_WEBHOOK_SECRET, POST /api/credits/webhook returns 503 and no real top-up ever lands in credit_ledger',
+  };
+}
+
 async function checkGithubToken() {
   const key = process.env.GITHUB_TOKEN || process.env.AGENT_GITHUB_TOKEN;
   if (!key) return { name: 'GitHub Token', ok: false, error: 'Not set (GITHUB_TOKEN or AGENT_GITHUB_TOKEN)' };
@@ -124,6 +134,7 @@ async function runEnvAudit() {
     checkOpenRouter(),
     checkElevenLabs(),
     checkStripe(),
+    checkStripeWebhook(),
     checkGithubToken(),
     checkGoogleSearch(),
     checkRailwayToken(),

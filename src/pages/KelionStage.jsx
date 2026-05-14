@@ -17,7 +17,7 @@ import Halo from '../components/stage/Halo'
 import StudioDecor from '../components/stage/StudioDecor'
 import CameraRig from '../components/stage/CameraRig'
 import MonitorOverlay from '../components/stage/MonitorOverlay'
-import { TopBarIconButton, AdminTabBar, VisitorsAnalyticsPanel, PayoutsPanel, MenuItem, friendlyCreditStatus, uaIsBot, uaBrowser, uaOs, refHost, flagEmoji, RevenueChart, LiveSessionsPanel, ExportButtons } from '../components/stage/AdminPanels'
+import { TopBarIconButton, AdminTabBar, VisitorsAnalyticsPanel, PayoutsPanel, MenuItem, friendlyCreditStatus, uaIsBot, uaBrowser, uaOs, refHost, trafficSource, flagEmoji, RevenueChart, LiveSessionsPanel, ExportButtons } from '../components/stage/AdminPanels'
 import TranscriptDrawer from '../components/stage/TranscriptDrawer'
 import FeaturesModal from '../components/stage/FeaturesModal'
 import { useKelionVoice } from '../lib/kelionVoice'
@@ -3030,7 +3030,7 @@ export default function KelionStage() {
       )}
 
       {/* Admin-only — live business metrics drawer. */}
-      {businessOpen && (
+      {isAdmin && businessOpen && (
         <div
           onClick={() => setBusinessOpen(false)}
           style={{
@@ -3040,7 +3040,7 @@ export default function KelionStage() {
           }}
         />
       )}
-      {businessOpen && (
+      {isAdmin && businessOpen && (
         <div
           onClick={(e) => e.stopPropagation()}
           style={{
@@ -3159,7 +3159,7 @@ export default function KelionStage() {
           "configured" signal + a top-up link that deep-links into the
           provider's billing console. Clicking a card opens the top-up
           page in a new tab. */}
-      {creditsOpen && (
+      {isAdmin && creditsOpen && (
         <div
           onClick={() => setCreditsOpen(false)}
           style={{
@@ -3169,7 +3169,7 @@ export default function KelionStage() {
           }}
         />
       )}
-      {creditsOpen && (
+      {isAdmin && creditsOpen && (
         <div
           onClick={(e) => e.stopPropagation()}
           style={{
@@ -3731,7 +3731,7 @@ export default function KelionStage() {
           in, timestamp). Auto-refresh 10s. Adrian 2026-04-20: "nu vad
           buton vizite reale cine a vizitat situl, ip tara restul
           datelor lor". */}
-      {visitorsOpen && (
+      {isAdmin && visitorsOpen && (
         <div
           onClick={() => setVisitorsOpen(false)}
           style={{
@@ -3741,7 +3741,7 @@ export default function KelionStage() {
           }}
         />
       )}
-      {visitorsOpen && (
+      {isAdmin && visitorsOpen && (
         <div
           onClick={(e) => e.stopPropagation()}
           style={{
@@ -3829,6 +3829,7 @@ export default function KelionStage() {
                     const browser = uaBrowser(v.userAgent)
                     const os = uaOs(v.userAgent)
                     const ref = refHost(v.referer)
+                    const src = trafficSource(v.referer)
                     return (
                       <div
                         key={v.id}
@@ -3849,10 +3850,22 @@ export default function KelionStage() {
                             opacity: 0.75,
                           }}>{whenShort}</div>
                           <div style={{
-                            fontSize: 11, opacity: 0.6, letterSpacing: '0.05em',
+                            fontSize: 11, opacity: 0.85, letterSpacing: '0.05em',
+                            display: 'flex', alignItems: 'center', gap: 6,
                           }}>
-                            <span style={{ marginRight: 4 }}>{flagEmoji(v.country)}</span>
-                            {v.country || '??'} · {v.ip || '—'}
+                            <span style={{
+                              padding: '1px 6px',
+                              borderRadius: 6,
+                              background: `${src.color}22`,
+                              color: src.color,
+                              fontSize: 10,
+                              fontWeight: 600,
+                              letterSpacing: '0.04em',
+                            }}>{src.label}</span>
+                            <span style={{ opacity: 0.7 }}>
+                              <span style={{ marginRight: 4 }}>{flagEmoji(v.country)}</span>
+                              {v.country || '??'} · {v.ip || '—'}
+                            </span>
                           </div>
                         </div>
                         <div style={{ marginBottom: 2 }}>
@@ -3890,7 +3903,7 @@ export default function KelionStage() {
           view ledger). Adrian 2026-04-20: "Users list, search email,
           grant credits, ban, reset password, view history". Marked
           "nu acum" for the mutating actions — they land in PR E5. */}
-      {usersOpen && (
+      {isAdmin && usersOpen && (
         <div
           onClick={() => setUsersOpen(false)}
           style={{
@@ -3900,7 +3913,7 @@ export default function KelionStage() {
           }}
         />
       )}
-      {usersOpen && (
+      {isAdmin && usersOpen && (
         <div
           onClick={(e) => e.stopPropagation()}
           style={{
@@ -4354,7 +4367,7 @@ export default function KelionStage() {
           Adrian 2026-04-20: "A pot da cardul unde sa se faca payouut?"
           — answered via the "Set up payout destination" link, which
           deep-links to Stripe's external-account settings. */}
-      {payoutsOpen && (
+      {isAdmin && payoutsOpen && (
         <div
           onClick={() => setPayoutsOpen(false)}
           style={{
@@ -4364,7 +4377,7 @@ export default function KelionStage() {
           }}
         />
       )}
-      {payoutsOpen && (
+      {isAdmin && payoutsOpen && (
         <div
           onClick={(e) => e.stopPropagation()}
           style={{
