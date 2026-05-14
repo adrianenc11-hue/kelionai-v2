@@ -74,7 +74,7 @@ function getPackages() {
       priceCents: 2500,           // £25
       minutes: 100,               // £0.25/min
       highlight: true,
-      description: 'About 100 minutes. Best for most.',
+      description: 'About 100 minutes. Unlocks the premium AI brain for complex tasks.',
     },
     {
       id: 'pro',
@@ -82,7 +82,7 @@ function getPackages() {
       priceCents: 10000,          // £100
       minutes: 400,               // £0.25/min
       highlight: false,
-      description: 'About 400 minutes. Power users.',
+      description: 'About 400 minutes. Premium AI brain for complex tasks, priority queue.',
     },
   ];
 }

@@ -20,7 +20,11 @@ const router = Router();
 // This function is called for every WhatsApp message that triggers
 // Kelion (name mentioned or translate mode).
 async function kelionChatHandler(message, senderName, chatName, isGroup, options = {}) {
-  const { smartFetch } = require('../services/modelRouter');
+  const { smartFetch, isCodingTask, isComplexTask } = require('../services/modelRouter');
+  // WhatsApp bridge runs under the admin account, so admin tier always applies:
+  // route complex/coding requests to the premium heavy model, simple ones stay light.
+  const useHeavy = isCodingTask(message) || isComplexTask(message);
+  const taskType = isCodingTask(message) ? 'coder' : 'chat';
   let messages = [];
 
   if (options.isTranslateMode || options.isExplicitTranslate) {
@@ -72,11 +76,11 @@ If someone speaks a different language, respond in THEIR language.`;
   }
 
   try {
-    const fetchRes = await smartFetch('chat', {
+    const fetchRes = await smartFetch(taskType, {
       messages,
       temperature: 0.7,
       max_tokens: 600,
-    });
+    }, useHeavy);
 
     const result = await fetchRes.response.json();
 
