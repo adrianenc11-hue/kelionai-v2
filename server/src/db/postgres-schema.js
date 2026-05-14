@@ -238,6 +238,21 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_studio_workspaces_user_name
 CREATE INDEX IF NOT EXISTS idx_studio_workspaces_user
   ON studio_workspaces(user_id, updated_at DESC);
 
+-- Generic per-user file storage (uploads). Mirrors the SQLite DDL in
+-- server/src/db/index.js so /api/files works on both backends.
+CREATE TABLE IF NOT EXISTS user_files (
+  id            BIGSERIAL PRIMARY KEY,
+  user_id       BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  filename      TEXT NOT NULL,
+  original_name TEXT NOT NULL,
+  mime_type     TEXT,
+  size_bytes    BIGINT NOT NULL DEFAULT 0,
+  storage_type  TEXT NOT NULL DEFAULT 'local',
+  storage_path  TEXT NOT NULL,
+  created_at    TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_user_files_user ON user_files(user_id, created_at DESC);
+
 -- Audit M7 — cross-instance consume state for the H1 silent-bypass
 -- cap. Mirrors the SQLite definition in server/src/db/index.js. The
 -- timestamps are stored as epoch-ms INTEGER so the same
@@ -341,6 +356,7 @@ ALTER TABLE voice_clone_events     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE action_history         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE visitor_events         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE studio_workspaces      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_files             ENABLE ROW LEVEL SECURITY;
 ALTER TABLE credits_consume_state  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE trial_usage            ENABLE ROW LEVEL SECURITY;
 ALTER TABLE demo_requests           ENABLE ROW LEVEL SECURITY;
@@ -403,6 +419,10 @@ DO $$ BEGIN
   -- Studio workspaces
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'kelion_service_studio') THEN
     CREATE POLICY kelion_service_studio ON studio_workspaces FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+  -- User files
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'kelion_service_user_files') THEN
+    CREATE POLICY kelion_service_user_files ON user_files FOR ALL USING (true) WITH CHECK (true);
   END IF;
   -- Credits consume state
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'kelion_service_consume') THEN
