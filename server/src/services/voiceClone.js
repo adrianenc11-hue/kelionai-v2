@@ -167,9 +167,39 @@ async function deleteClonedVoice(voiceId) {
   return true;
 }
 
+/**
+ * Update an existing cloned voice name/description on ElevenLabs.
+ * PATCH /v1/voices/{voice_id}
+ */
+async function updateClonedVoice(voiceId, { name, description, labels }) {
+  const apiKey = assertEnabled();
+  if (!voiceId) throw new VoiceCloneError('Missing voice_id.', 400);
+  const body = {};
+  if (name !== undefined) body.name = String(name).slice(0, 100);
+  if (description !== undefined) body.description = String(description).slice(0, 500);
+  if (labels !== undefined) body.labels = labels;
+  const r = await fetch(`${ELEVENLABS_API_BASE}/voices/${encodeURIComponent(voiceId)}`, {
+    method: 'PATCH',
+    headers: {
+      'xi-api-key': apiKey,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) {
+    const text = await r.text().catch(() => '');
+    throw new VoiceCloneError(
+      `ElevenLabs update failed: ${r.status} ${String(text).slice(0, 300)}`,
+      r.status
+    );
+  }
+  return true;
+}
+
 module.exports = {
   createClonedVoice,
   deleteClonedVoice,
+  updateClonedVoice,
   VoiceCloneError,
   MAX_SAMPLE_BYTES,
   MIN_SAMPLE_BYTES,

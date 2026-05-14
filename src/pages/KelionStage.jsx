@@ -1047,7 +1047,7 @@ export default function KelionStage() {
     loadTurns,
   } = liveHook
   statusRef.current = status
-  liveSendTextRef.current = liveSendText
+  liveSendTextRef.current = sendText
   const startRef = useRef(null)
   startRef.current = start
 
@@ -1769,7 +1769,7 @@ export default function KelionStage() {
       <div style={{ display: 'flex', flexDirection: stageNarrow ? 'column' : 'row', width: '100%', height: '100%' }}>
         {/* LEFT PANEL — Chat / Monitor (3D Flip Container) */}
         <div style={{ flex: stageNarrow ? '0 0 55%' : '0 0 70%', maxWidth: stageNarrow ? '100%' : '70%', height: '100%', position: 'relative', perspective: '1500px' }}>
-          
+
           <div style={{
             width: '100%', height: '100%', position: 'relative',
             transformStyle: 'preserve-3d',

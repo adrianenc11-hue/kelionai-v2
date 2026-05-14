@@ -33,6 +33,7 @@ const {
 const {
   createClonedVoice,
   deleteClonedVoice,
+  updateClonedVoice,
   VoiceCloneError,
   MAX_SAMPLE_BYTES,
 } = require('../services/voiceClone');
@@ -919,6 +920,61 @@ router.post('/library/:id/activate', async (req, res) => {
   }
 });
 
+// POST /api/voice/clone/library/:id/preview — synthesise a short TTS sample
+// using this cloned voice so the user can hear who it belongs to.
+router.post('/library/:id/preview', async (req, res) => {
+  const userId = uidOf(req);
+  if (!userId) return res.status(401).json({ error: 'Not authenticated.' });
+  const apiKey = process.env.ELEVENLABS_API_KEY;
+  if (!apiKey) return res.status(503).json({ error: 'ElevenLabs not configured.' });
+
+  const cloneId = Number(req.params.id);
+  const clone = await db.get(
+    'SELECT voice_id, display_name FROM voice_clones WHERE id = ? AND user_id = ?',
+    [cloneId, userId]
+  );
+  if (!clone) return res.status(404).json({ error: 'Clone not found.' });
+
+  const previewText = req.body && req.body.text
+    ? String(req.body.text).trim().slice(0, 200)
+    : "Bună, aceasta este previzualizarea vocii mele clonate.";
+
+  try {
+    const tts = await fetch(
+      `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(clone.voice_id)}/stream`,
+      {
+        method: 'POST',
+        headers: {
+          'xi-api-key': apiKey,
+          'Content-Type': 'application/json',
+          'Accept': 'audio/mpeg',
+        },
+        body: JSON.stringify({
+          text: previewText,
+          model_id: 'eleven_turbo_v2_5',
+          voice_settings: {
+            stability: 0.4,
+            similarity_boost: 0.85,
+            speed: 1.0,
+          },
+        }),
+      }
+    );
+    if (!tts.ok) {
+      const errText = await tts.text().catch(() => '');
+      console.error(`[voice/preview] ElevenLabs ${tts.status}: ${errText.slice(0, 300)}`);
+      return res.status(tts.status === 404 ? 404 : 502).json({ error: 'Preview generation failed.' });
+    }
+    res.setHeader('Content-Type', 'audio/mpeg');
+    res.setHeader('Cache-Control', 'no-store');
+    const audioBuffer = await tts.arrayBuffer();
+    res.end(Buffer.from(audioBuffer));
+  } catch (err) {
+    console.error('[voice/preview] network error:', err?.message);
+    res.status(502).json({ error: 'Preview network error.' });
+  }
+});
+
 // POST /api/voice/clone/library/deactivate — switch back to native voice
 router.post('/library/deactivate', async (req, res) => {
   const userId = uidOf(req);
@@ -933,6 +989,7 @@ router.post('/library/deactivate', async (req, res) => {
 });
 
 // PATCH /api/voice/clone/library/:id — update display name or language
+// Also syncs the new name to ElevenLabs so it appears in their dashboard.
 router.patch('/library/:id', async (req, res) => {
   const userId = uidOf(req);
   if (!userId) return res.status(401).json({ error: 'Not authenticated.' });
@@ -940,6 +997,15 @@ router.patch('/library/:id', async (req, res) => {
   try {
     const updated = await updateVoiceClone(userId, Number(req.params.id), { displayName, language });
     if (!updated) return res.status(404).json({ error: 'Clone not found or nothing to update.' });
+    // Sync name change to ElevenLabs
+    if (displayName !== undefined && updated.voice_id) {
+      try {
+        await updateClonedVoice(updated.voice_id, { name: String(displayName).slice(0, 100) });
+      } catch (elErr) {
+        console.warn('[voice/library PATCH] ElevenLabs rename failed:', elErr?.message);
+        // Non-blocking: local DB is updated, ElevenLabs may be offline
+      }
+    }
     res.json({ ok: true, clone: updated });
   } catch (err) {
     console.error('[voice/library PATCH]', err?.message);

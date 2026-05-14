@@ -1,10 +1,11 @@
 // taskStatusStore.js — Reactive store for real-time task execution status.
-// Displays what Kelion is doing RIGHT NOW on the user's screen:
-//   tool name, file being worked on, progress 0..100%, status text.
-// Also pushes every action to the MONITOR (liveTerminal) so the user
-// sees a live log of everything Kelion does.
+// Displays what Kelion is doing RIGHT NOW:
+//   • TaskStatusPanel (bottom-left overlay): tool name, file, progress, status.
+//   • Monitor live terminal: shows live progress WHILE working,
+//     auto-cleared when the task finishes.
 
 import { showTerminal, postLine, postDone } from './liveTerminal'
+import { handleShowOnMonitor } from './monitorStore'
 
 let _current = null
 let _monitorOpen = false   // tracks if we've already opened the terminal
@@ -18,7 +19,7 @@ function notify() {
 
 /**
  * Set the current task status. All fields optional except `tool`.
- * Also pushes to the monitor live terminal.
+ * Pushes live progress to the monitor terminal while the task runs.
  */
 export function setTaskStatus(status) {
   _current = {
@@ -31,21 +32,18 @@ export function setTaskStatus(status) {
   }
   notify()
 
-  // ── Push to Monitor ──
+  // ── Push to Monitor (live progress while working) ──
   const toolName = status.tool || 'unknown'
   if (!_monitorOpen || _lastTool !== toolName) {
-    // Open a fresh terminal on the monitor for this task
     showTerminal('kelion-live', `Kelion lucrează...`)
     _monitorOpen = true
     _lastTool = toolName
-    // Small delay so iframe mounts
     setTimeout(() => {
       postLine('stdout', `⚙️  ${toolName.replace(/_/g, ' ').toUpperCase()}`)
       if (status.file) postLine('stdout', `   📄 ${status.file}`)
       if (status.label) postLine('stdout', `   ${status.label}`)
     }, 200)
   } else {
-    // Just append a line to the existing terminal
     const prefix = status.phase === 'error' ? '❌' : status.phase === 'done' ? '✅' : '▶'
     const line = `${prefix}  ${toolName.replace(/_/g, ' ')}${status.file ? '  📄 ' + status.file : ''}  [${status.progress || 0}%]`
     postLine(status.phase === 'error' ? 'stderr' : 'stdout', line)
@@ -67,17 +65,17 @@ export function completeTask(label) {
   _current.phase = 'done'
   _current.label = label || 'Gata ✓'
   notify()
-  // Show done on monitor
+  // Final done line on monitor, then clear it after 2s
   postLine('stdout', `✅  ${label || 'Gata'}`)
   postDone(true, 0)
-  _monitorOpen = false
-  _lastTool = null
-  // Auto-clear after 2s
   setTimeout(() => {
     if (_current?.phase === 'done') {
       _current = null
       notify()
     }
+    handleShowOnMonitor({ kind: 'clear' })
+    _monitorOpen = false
+    _lastTool = null
   }, 2000)
 }
 
@@ -87,16 +85,16 @@ export function failTask(error) {
   _current.phase = 'error'
   _current.label = error || 'Eroare ✗'
   notify()
-  // Show error on monitor
   postLine('stderr', `❌  ${error || 'Eroare'}`)
   postDone(false, 1)
-  _monitorOpen = false
-  _lastTool = null
   setTimeout(() => {
     if (_current?.phase === 'error') {
       _current = null
       notify()
     }
+    handleShowOnMonitor({ kind: 'clear' })
+    _monitorOpen = false
+    _lastTool = null
   }, 4000)
 }
 
@@ -104,6 +102,7 @@ export function failTask(error) {
 export function clearTaskStatus() {
   if (_monitorOpen) {
     postDone(true, 0)
+    handleShowOnMonitor({ kind: 'clear' })
   }
   _current = null
   _monitorOpen = false

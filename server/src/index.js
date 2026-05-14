@@ -43,6 +43,7 @@ const generatedImagesRouter = require('./routes/generatedImages');
 const voiceCloneRouter = require('./routes/voiceClone');
 const demoRouter       = require('./routes/demo');
 const chatRouter       = require('./routes/chat');
+const filesRouter      = require('./routes/files');
 const proxyRouter      = require('./routes/proxy');
 const whatsappRouter   = require('./routes/whatsapp');
 const agentRouter      = require('./routes/agent');
@@ -361,6 +362,8 @@ app.use('/api/conversations', requireAuth, conversationsRouter);
 // require a signed-in user; ownership is enforced again inside every
 // DB helper (listStudioWorkspaces, getStudioWorkspace, …).
 app.use('/api/studio', requireAuth, studioRouter);
+// Stage 6 — User File Store (upload/download any format, streaming)
+app.use('/api/files', requireAuth, filesRouter);
 
 // Stage 4 — M19 (browser use) + M20 (web search status) + M21 (MCP stubs).
 // Router is PUBLIC by design: voice tool-call flow has no login gate,

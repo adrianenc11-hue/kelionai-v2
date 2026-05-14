@@ -12,6 +12,58 @@
 // much more generous (30 RPM for Flash, 1500 RPD).
 // ─────────────────────────────────────────────────────────────────
 
+// ── Rate-limit token bucket (Google AI Studio 30 RPM) ────────────
+// Protects the free tier so bursts (e.g. 5 users chatting at once)
+// don't trigger 429. Requests exceeding the bucket wait in a FIFO
+// queue and are flushed every 2 s.
+const BUCKET_MAX = parseInt(process.env.GOOGLE_RPM_LIMIT, 10) || 25; // leave 5 RPM headroom
+const REFILL_MS = 60_000;
+let bucketTokens = BUCKET_MAX;
+let bucketLastRefill = Date.now();
+const _modelQueue = [];
+let _modelQueueRunning = false;
+
+function _canTakeToken() {
+  const now = Date.now();
+  if (now - bucketLastRefill >= REFILL_MS) {
+    bucketTokens = BUCKET_MAX;
+    bucketLastRefill = now;
+  }
+  if (bucketTokens > 0) {
+    bucketTokens--;
+    return true;
+  }
+  return false;
+}
+
+async function _flushModelQueue() {
+  if (_modelQueueRunning) return;
+  _modelQueueRunning = true;
+  while (_modelQueue.length > 0) {
+    if (_canTakeToken()) {
+      const { fn, resolve, reject } = _modelQueue.shift();
+      try { resolve(await fn()); } catch (e) { reject(e); }
+    } else {
+      const now = Date.now();
+      const wait = Math.max(2000, REFILL_MS - (now - bucketLastRefill));
+      await new Promise(r => setTimeout(r, wait));
+    }
+  }
+  _modelQueueRunning = false;
+}
+
+/**
+ * Enqueue a model call behind the token bucket.
+ * All smartFetch() calls for the Google AI Studio primary provider
+ * go through here so we never exceed the RPM cap.
+ */
+function _queuedModelCall(fn) {
+  return new Promise((resolve, reject) => {
+    _modelQueue.push({ fn, resolve, reject });
+    _flushModelQueue();
+  });
+}
+
 // Google AI Studio endpoint (direct, no OpenRouter middleman)
 const GOOGLE_AI_STUDIO = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
 
@@ -126,21 +178,36 @@ async function smartFetch(taskType, body, useHeavy = false) {
   console.log(`[modelRouter] ${taskType} (heavy=${useHeavy}) → ${model} via ${endpoint.provider}`);
 
   // Try primary provider — 45s timeout (heavy tasks like audits need time)
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 45000);
+  // Google AI Studio calls go through the token bucket so we never
+  // exceed the free-tier RPM cap under burst load.
+  const isGoogleStudio = endpoint.provider === 'google-ai-studio';
+  const makePrimaryCall = async () => {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 45000);
+    try {
+      const response = await fetch(endpoint.url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': endpoint.authHeader,
+          'HTTP-Referer': 'https://kelion.ai',
+          'X-Title': 'Kelion AI',
+        },
+        body: JSON.stringify({ ...body, model: endpoint.apiModel }),
+        signal: ctrl.signal,
+      });
+      clearTimeout(timer);
+      return response;
+    } catch (err) {
+      clearTimeout(timer);
+      throw err;
+    }
+  };
+
   try {
-    const response = await fetch(endpoint.url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': endpoint.authHeader,
-        'HTTP-Referer': 'https://kelion.ai',
-        'X-Title': 'Kelion AI',
-      },
-      body: JSON.stringify({ ...body, model: endpoint.apiModel }),
-      signal: ctrl.signal,
-    });
-    clearTimeout(timer);
+    const response = isGoogleStudio
+      ? await _queuedModelCall(makePrimaryCall)
+      : await makePrimaryCall();
 
     if (response.ok) {
       return { response, model, provider: endpoint.provider };
@@ -149,7 +216,6 @@ async function smartFetch(taskType, body, useHeavy = false) {
     const errText = await response.text().catch(() => '');
     console.warn(`[modelRouter] ${model} via ${endpoint.provider} failed: ${response.status} - ${errText}`);
   } catch (err) {
-    clearTimeout(timer);
     console.warn(`[modelRouter] ${model} via ${endpoint.provider} error: ${err.message}`);
   }
 
