@@ -2292,14 +2292,19 @@ function isRfc5322ish(addr) {
 }
 
 async function toolSendEmail(args) {
-  const key = process.env.RESEND_API_KEY;
-  if (!key) {
-    return needConfig('Email sending is not configured. Set RESEND_API_KEY (https://resend.com/api-keys) to enable send_email.');
+  const resendKey = process.env.RESEND_API_KEY;
+  const smtpHost  = process.env.SMTP_HOST;
+  const smtpUser  = process.env.SMTP_USER;
+  const smtpPass  = process.env.SMTP_PASS;
+  const smtpPort  = Number(process.env.SMTP_PORT) || 587;
+  const hasProvider = Boolean(resendKey) || Boolean(smtpHost && smtpUser && smtpPass);
+  if (!hasProvider) {
+    return needConfig('Email sending is not configured. Set RESEND_API_KEY (https://resend.com/api-keys) OR SMTP_HOST + SMTP_USER + SMTP_PASS to enable send_email.');
   }
-  const defaultFrom = process.env.RESEND_FROM || process.env.EMAIL_FROM || '';
+  const defaultFrom = process.env.RESEND_FROM || process.env.SMTP_FROM || process.env.EMAIL_FROM || '';
   const from = String(args?.from || defaultFrom || '').trim();
   if (!from) {
-    return needConfig('No sender address. Set RESEND_FROM (a verified Resend domain address) or pass the `from` argument.');
+    return needConfig('No sender address. Set RESEND_FROM or SMTP_FROM (or EMAIL_FROM) or pass the `from` argument.');
   }
   if (!isRfc5322ish(from)) return { ok: false, error: 'invalid "from" address' };
   const rawTo = args?.to;
@@ -2316,30 +2321,59 @@ async function toolSendEmail(args) {
   if (text.length > 200_000 || html.length > 500_000) {
     return { ok: false, error: 'body too large (text ≤ 200 KB, html ≤ 500 KB)' };
   }
-  const body = { from, to, subject };
-  if (text) body.text = text;
-  if (html) body.html = html;
-  if (Array.isArray(args?.cc) && args.cc.length) body.cc = args.cc.slice(0, 20);
-  if (Array.isArray(args?.bcc) && args.bcc.length) body.bcc = args.bcc.slice(0, 20);
-  if (args?.reply_to && isRfc5322ish(String(args.reply_to))) body.reply_to = String(args.reply_to);
-  try {
-    const r = await fetchWithTimeout('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    }, 10_000);
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok) {
-      return {
-        ok: false,
-        status: r.status,
-        error: (j && (j.message || j.error || j.name)) || `Resend HTTP ${r.status}`,
-      };
+
+  // ── 1) Try Resend first ──
+  if (resendKey) {
+    const body = { from, to, subject };
+    if (text) body.text = text;
+    if (html) body.html = html;
+    if (Array.isArray(args?.cc) && args.cc.length) body.cc = args.cc.slice(0, 20);
+    if (Array.isArray(args?.bcc) && args.bcc.length) body.bcc = args.bcc.slice(0, 20);
+    if (args?.reply_to && isRfc5322ish(String(args.reply_to))) body.reply_to = String(args.reply_to);
+    try {
+      const r = await fetchWithTimeout('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }, 10_000);
+      const j = await r.json().catch(() => ({}));
+      if (r.ok) return { ok: true, id: j.id || null, provider: 'resend', to, subject };
+      // If Resend fails, fall through to SMTP if available
+      if (!smtpHost) {
+        return { ok: false, status: r.status, error: (j && (j.message || j.error || j.name)) || `Resend HTTP ${r.status}` };
+      }
+    } catch (err) {
+      if (!smtpHost) return { ok: false, error: `Resend failed and no SMTP fallback: ${err && err.message ? err.message : String(err)}` };
     }
-    return { ok: true, id: j.id || null, provider: 'resend', to, subject };
-  } catch (err) {
-    return { ok: false, error: err && err.message ? err.message : String(err) };
   }
+
+  // ── 2) Fallback / primary SMTP via Nodemailer ──
+  if (smtpHost && smtpUser && smtpPass) {
+    try {
+      const nodemailer = require('nodemailer');
+      const transporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: smtpPort,
+        secure: smtpPort === 465,
+        auth: { user: smtpUser, pass: smtpPass },
+      });
+      const info = await transporter.sendMail({
+        from,
+        to: to.join(', '),
+        subject,
+        text: text || undefined,
+        html: html || undefined,
+        cc: (Array.isArray(args?.cc) && args.cc.length) ? args.cc.slice(0, 20).join(', ') : undefined,
+        bcc: (Array.isArray(args?.bcc) && args.bcc.length) ? args.bcc.slice(0, 20).join(', ') : undefined,
+        replyTo: args?.reply_to && isRfc5322ish(String(args.reply_to)) ? String(args.reply_to) : undefined,
+      });
+      return { ok: true, id: info.messageId || null, provider: 'smtp', to, subject };
+    } catch (err) {
+      return { ok: false, error: `SMTP failed: ${err && err.message ? err.message : String(err)}` };
+    }
+  }
+
+  return needConfig('Email sending is not configured. Set RESEND_API_KEY (https://resend.com/api-keys) OR SMTP_HOST + SMTP_USER + SMTP_PASS to enable send_email.');
 }
 
 function normalizeE164(s) {
@@ -3574,6 +3608,214 @@ async function toolActivateVoiceClone(args, ctx) {
   }
 }
 
+// ── Stage 6 — User File Store tools ──
+const _fileStoreDir = _path.resolve(__dirname, '../../data/files');
+
+async function toolUploadFile(args, ctx) {
+  try {
+    const userId = ctx?.user?.id;
+    if (!userId) return { ok: false, error: 'sign in first' };
+    const filename = String(args?.filename || '').trim();
+    const contentB64 = String(args?.content || '');
+    const mimeType = String(args?.mime_type || args?.mimeType || '').trim() || 'application/octet-stream';
+    if (!filename) return { ok: false, error: 'missing filename' };
+    if (!contentB64) return { ok: false, error: 'missing content (base64)' };
+
+    const buf = Buffer.from(contentB64, 'base64');
+    const storageName = `${Date.now()}-${Math.round(Math.random() * 1e9)}-${filename}`;
+    const filePath = _path.join(_fileStoreDir, storageName);
+    if (!_fs.existsSync(_fileStoreDir)) _fs.mkdirSync(_fileStoreDir, { recursive: true });
+    _fs.writeFileSync(filePath, buf);
+
+    const db = require('../db');
+    const rec = await db.createUserFile(userId, {
+      filename: storageName,
+      originalName: filename,
+      mimeType,
+      sizeBytes: buf.length,
+      storageType: 'local',
+      storagePath: storageName,
+    });
+    return { ok: true, file: rec };
+  } catch (err) {
+    return { ok: false, error: 'Upload failed: ' + (err?.message || err) };
+  }
+}
+
+async function toolListUserFiles(_args, ctx) {
+  try {
+    const userId = ctx?.user?.id;
+    if (!userId) return { ok: false, error: 'sign in first' };
+    const db = require('../db');
+    const items = await db.listUserFiles(userId, 200);
+    return { ok: true, items };
+  } catch (err) {
+    return { ok: false, error: 'List failed: ' + (err?.message || err) };
+  }
+}
+
+async function toolDownloadFile(args, ctx) {
+  try {
+    const userId = ctx?.user?.id;
+    if (!userId) return { ok: false, error: 'sign in first' };
+    const id = parseInt(args?.id, 10);
+    if (!Number.isFinite(id)) return { ok: false, error: 'missing id' };
+    const db = require('../db');
+    const rec = await db.getUserFileById(userId, id);
+    if (!rec) return { ok: false, error: 'file not found' };
+    const filePath = _path.join(_fileStoreDir, rec.storage_path);
+    if (!_fs.existsSync(filePath)) return { ok: false, error: 'file missing on disk' };
+    const buf = _fs.readFileSync(filePath);
+    return {
+      ok: true,
+      file: {
+        id: rec.id,
+        filename: rec.original_name,
+        mime_type: rec.mime_type,
+        size_bytes: rec.size_bytes,
+        content_base64: buf.toString('base64'),
+      },
+    };
+  } catch (err) {
+    return { ok: false, error: 'Download failed: ' + (err?.message || err) };
+  }
+}
+
+async function toolDeleteFile(args, ctx) {
+  try {
+    const userId = ctx?.user?.id;
+    if (!userId) return { ok: false, error: 'sign in first' };
+    const id = parseInt(args?.id, 10);
+    if (!Number.isFinite(id)) return { ok: false, error: 'missing id' };
+    const db = require('../db');
+    const rec = await db.getUserFileById(userId, id);
+    if (!rec) return { ok: false, error: 'file not found' };
+    const filePath = _path.join(_fileStoreDir, rec.storage_path);
+    if (_fs.existsSync(filePath)) {
+      try { _fs.unlinkSync(filePath); } catch (_) { /* ignore */ }
+    }
+    await db.deleteUserFile(userId, id);
+    return { ok: true, deleted: id };
+  } catch (err) {
+    return { ok: false, error: 'Delete failed: ' + (err?.message || err) };
+  }
+}
+
+// ── Stage 6b — Generate Mobile App Scaffold ──
+async function toolGenerateMobileApp(args, ctx) {
+  try {
+    const userId = ctx?.user?.id;
+    if (!userId) return { ok: false, error: 'sign in first' };
+    const framework = String(args?.framework || 'react_native').trim().toLowerCase();
+    const appName = String(args?.app_name || 'KelionApp').trim() || 'KelionApp';
+    const features = Array.isArray(args?.features) ? args.features : [];
+    if (!['react_native', 'flutter'].includes(framework)) {
+      return { ok: false, error: 'framework must be react_native or flutter' };
+    }
+
+    const JSZip = require('jszip');
+    const zip = new JSZip();
+    const safeName = appName.replace(/[^a-zA-Z0-9_-]/g, '_');
+
+    if (framework === 'react_native') {
+      zip.file('package.json', JSON.stringify({
+        name: safeName,
+        version: '1.0.0',
+        main: 'node_modules/expo/AppEntry.js',
+        scripts: { start: 'expo start', android: 'expo start --android', ios: 'expo start --ios', web: 'expo start --web' },
+        dependencies: { expo: '~52.0.0', react: '18.3.1', 'react-native': '0.76.3', ...features.includes('camera') && { 'expo-camera': '~16.0.0' }, ...features.includes('gps') && { 'expo-location': '~18.0.0' } },
+      }, null, 2));
+      zip.file('App.js', `import React from 'react';
+import { StyleSheet, Text, View, Button } from 'react-native';
+
+export default function App() {
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>${safeName}</Text>
+      <Text>Welcome to your new app!</Text>
+      ${features.includes('camera') ? `<Text>Camera feature included</Text>` : ''}
+      ${features.includes('gps') ? `<Text>GPS feature included</Text>` : ''}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  title: { fontSize: 24, fontWeight: 'bold', marginBottom: 16 },
+});
+`);
+      zip.file('README.md', `# ${safeName}\n\nGenerated by Kelion AI.\n\n## Features\n${features.map(f => `- ${f}`).join('\n') || '- None'}\n\n## Run\n\`\`\`bash\nnpm install\nnpm start\n\`\`\`\n`);
+    } else {
+      zip.file('pubspec.yaml', `name: ${safeName}\ndescription: Generated by Kelion AI\nversion: 1.0.0+1\nenvironment:\n  sdk: '>=3.0.0 <4.0.0'\ndependencies:\n  flutter:\n    sdk: flutter\n  ${features.includes('camera') ? 'camera: ^0.11.0\n  ' : ''}${features.includes('gps') ? 'geolocator: ^13.0.0\n  ' : ''}cupertino_icons: ^1.0.8\n`);
+      zip.file('lib/main.dart', `import 'package:flutter/material.dart';
+
+void main() => runApp(const MyApp());
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: '${safeName}',
+      theme: ThemeData(primarySwatch: Colors.blue),
+      home: const HomePage(),
+    );
+  }
+}
+
+class HomePage extends StatelessWidget {
+  const HomePage({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('${safeName}')),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text('Welcome to ${safeName}!', style: Theme.of(context).textTheme.headlineMedium),
+            ${features.includes('camera') ? `Text('Camera feature included'),` : ''}
+            ${features.includes('gps') ? `Text('GPS feature included'),` : ''}
+          ],
+        ),
+      ),
+    );
+  }
+}
+`);
+      zip.file('README.md', `# ${safeName}\n\nGenerated by Kelion AI.\n\n## Features\n${features.map(f => `- ${f}`).join('\n') || '- None'}\n\n## Run\n\`\`\`bash\nflutter pub get\nflutter run\n\`\`\`\n`);
+    }
+
+    const zipBuf = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+    const filename = `${safeName}-${framework}.zip`;
+    const storageName = `${Date.now()}-${Math.round(Math.random() * 1e9)}-${filename}`;
+    const filePath = _path.join(_fileStoreDir, storageName);
+    if (!_fs.existsSync(_fileStoreDir)) _fs.mkdirSync(_fileStoreDir, { recursive: true });
+    _fs.writeFileSync(filePath, zipBuf);
+
+    const db = require('../db');
+    const rec = await db.createUserFile(userId, {
+      filename: storageName,
+      originalName: filename,
+      mimeType: 'application/zip',
+      sizeBytes: zipBuf.length,
+      storageType: 'local',
+      storagePath: storageName,
+    });
+
+    return {
+      ok: true,
+      file: rec,
+      framework,
+      features,
+      download_url: `/api/files/${rec.id}/download`,
+      message: `Generated ${framework} project "${appName}" (${features.length} features) and saved as ${filename}.`,
+    };
+  } catch (err) {
+    return { ok: false, error: 'Generate mobile app failed: ' + (err?.message || err) };
+  }
+}
+
 async function executeRealTool(name, args, ctx) {
   // Strip any leading-underscore keys from caller-supplied args. These are
   // reserved for internal wrappers (e.g. toolGetForecast passes `_maxDays`
@@ -3736,6 +3978,12 @@ async function executeRealTool(name, args, ctx) {
     // ── Agent coding tools ──
     case 'verify_build': return toolVerifyBuild(a);
     case 'diff_edit': return toolDiffEdit(a);
+    // ── Stage 6 — user file store ──
+    case 'upload_file': return toolUploadFile(a, ctx);
+    case 'list_user_files': return toolListUserFiles(a, ctx);
+    case 'download_file': return toolDownloadFile(a, ctx);
+    case 'delete_file': return toolDeleteFile(a, ctx);
+    case 'generate_mobile_app': return toolGenerateMobileApp(a, ctx);
 
     default: return null; // signal "not handled here"
   }

@@ -13,6 +13,8 @@ export default function ClonedVoiceLibrary({ onClose }) {
   const [activeId, setActiveId] = useState(null)
   const [editingId, setEditingId] = useState(null)
   const [editName, setEditName] = useState('')
+  const [previewAudio, setPreviewAudio] = useState(null) // HTMLAudioElement
+  const [playingId, setPlayingId] = useState(null)
 
   const fetchClones = async () => {
     setLoading(true)
@@ -95,6 +97,51 @@ export default function ClonedVoiceLibrary({ onClose }) {
       }
     } catch (err) {
       console.error('[Library] delete failed', err)
+    }
+  }
+
+  const stopPreview = () => {
+    if (previewAudio) {
+      previewAudio.pause()
+      previewAudio.currentTime = 0
+      setPreviewAudio(null)
+    }
+    setPlayingId(null)
+  }
+
+  const playPreview = async (clone) => {
+    stopPreview()
+    try {
+      const r = await fetch(`/api/voice/clone/library/${clone.id}/preview`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': getCsrfToken(),
+        },
+        credentials: 'include',
+      })
+      if (!r.ok) {
+        console.error('[Library] preview failed', r.status)
+        return
+      }
+      const blob = await r.blob()
+      const url = URL.createObjectURL(blob)
+      const audio = new Audio(url)
+      audio.onended = () => {
+        setPlayingId(null)
+        setPreviewAudio(null)
+        URL.revokeObjectURL(url)
+      }
+      audio.onerror = () => {
+        setPlayingId(null)
+        setPreviewAudio(null)
+        URL.revokeObjectURL(url)
+      }
+      setPreviewAudio(audio)
+      setPlayingId(clone.id)
+      audio.play().catch(() => setPlayingId(null))
+    } catch (err) {
+      console.error('[Library] preview error', err)
     }
   }
 
@@ -195,6 +242,19 @@ export default function ClonedVoiceLibrary({ onClose }) {
                   <button onClick={() => handleUpdate(c.id)} style={{ padding: '6px 12px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>Salvează</button>
                 ) : (
                   <>
+                    <button
+                      onClick={() => playingId === c.id ? stopPreview() : playPreview(c)}
+                      title={playingId === c.id ? 'Oprește previzualizarea' : 'Ascultă previzualizarea'}
+                      style={{
+                        padding: '6px 10px',
+                        background: playingId === c.id ? 'rgba(239, 68, 68, 0.15)' : 'rgba(34, 197, 94, 0.15)',
+                        color: playingId === c.id ? '#f87171' : '#4ade80',
+                        border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14, fontWeight: 600,
+                        minWidth: 34,
+                      }}
+                    >
+                      {playingId === c.id ? '⏹️' : '▶️'}
+                    </button>
                     <button
                       onClick={() => activeId === c.id ? handleDeactivate() : handleActivate(c)}
                       style={{

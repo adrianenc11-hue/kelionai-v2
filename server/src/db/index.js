@@ -278,6 +278,25 @@ async function initDb() {
   `);
   await db.exec('CREATE INDEX IF NOT EXISTS idx_proactive_log_user ON proactive_log(user_id, created_at DESC)');
 
+  // Stage 6 — User File Store. Any format, streaming upload/download.
+  // Storage path is relative: local filesystem under server/data/files/
+  // or S3/R2 when S3_BUCKET env var is configured.
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS user_files (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      filename TEXT NOT NULL,
+      original_name TEXT NOT NULL,
+      mime_type TEXT,
+      size_bytes INTEGER DEFAULT 0,
+      storage_type TEXT NOT NULL DEFAULT 'local',
+      storage_path TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+  await db.exec('CREATE INDEX IF NOT EXISTS idx_user_files_user ON user_files(user_id, created_at DESC)');
+
   // Stage 7 — Monetization: per-user Kelion-Live credit balance measured in
   // whole minutes (1 credit = 1 min of voice + tools). User tops up via
   // Stripe Checkout; each completed session consumes credits based on its
@@ -2245,6 +2264,41 @@ function listStudioFiles(workspace) {
   }));
 }
 
+// Stage 6 — User File Store helpers (any format, streaming)
+async function createUserFile(userId, { filename, originalName, mimeType, sizeBytes, storageType = 'local', storagePath }) {
+  const r = await db.run(
+    `INSERT INTO user_files (user_id, filename, original_name, mime_type, size_bytes, storage_type, storage_path)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [userId, filename, originalName, mimeType || null, sizeBytes || 0, storageType, storagePath]
+  );
+  return { id: r.lastID, user_id: userId, filename, original_name: originalName, mime_type: mimeType, size_bytes: sizeBytes, storage_type: storageType, storage_path: storagePath };
+}
+
+async function listUserFiles(userId, limit = 200) {
+  return db.all(
+    `SELECT id, filename, original_name, mime_type, size_bytes, storage_type, storage_path, created_at
+       FROM user_files
+      WHERE user_id = ?
+      ORDER BY created_at DESC
+      LIMIT ?`,
+    [userId, limit]
+  );
+}
+
+async function getUserFileById(userId, id) {
+  return db.get(
+    `SELECT id, user_id, filename, original_name, mime_type, size_bytes, storage_type, storage_path, created_at
+       FROM user_files
+      WHERE id = ? AND user_id = ?`,
+    [id, userId]
+  );
+}
+
+async function deleteUserFile(userId, id) {
+  const r = await db.run('DELETE FROM user_files WHERE id = ? AND user_id = ?', [id, userId]);
+  return r.changes > 0;
+}
+
 module.exports = {
   initDb,
   getDb,
@@ -2368,6 +2422,11 @@ module.exports = {
   // Vision revenue tracking
   logVisionRevenue,
   getVisionRevenue,
+  // Stage 6 — user file store
+  createUserFile,
+  listUserFiles,
+  getUserFileById,
+  deleteUserFile,
 };
 
 // ─── Stage 5 helpers ────────────────────────────────────────────────

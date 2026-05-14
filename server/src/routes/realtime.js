@@ -1290,6 +1290,49 @@ const KELION_TOOLS = [
     },
     required: ['path', 'blocks'],
   },
+  // ── Stage 6 — User File Store tools ──
+  {
+    name: 'upload_file',
+    description: "Save a file to the user's Kelion cloud storage. Any format accepted. Provide the original filename and the file content as a base64 string. The file is stored persistently and can be downloaded later via download_file or the /api/files endpoints.",
+    properties: {
+      filename: { type: 'string', description: "Original filename with extension, e.g. 'report.docx', 'photo.jpg', 'data.csv'." },
+      content: { type: 'string', description: "File content encoded as base64. For text files you may UTF-8 encode then base64." },
+      mime_type: { type: 'string', description: "Optional MIME type, e.g. 'application/pdf', 'image/png'. Inferred from extension if omitted." },
+    },
+    required: ['filename', 'content'],
+  },
+  {
+    name: 'list_user_files',
+    description: "List all files stored by the signed-in user in Kelion cloud storage. Returns metadata (name, size, mime type, upload date) but NOT content.",
+    properties: {},
+    required: [],
+  },
+  {
+    name: 'download_file',
+    description: "Download a previously uploaded file from the user's Kelion cloud storage. Returns the file content as base64 along with metadata. Use the id from list_user_files.",
+    properties: {
+      id: { type: 'integer', description: "Numeric file ID returned by list_user_files." },
+    },
+    required: ['id'],
+  },
+  {
+    name: 'delete_file',
+    description: "Permanently delete a file from the user's Kelion cloud storage. Use the id from list_user_files. This action is irreversible.",
+    properties: {
+      id: { type: 'integer', description: "Numeric file ID returned by list_user_files." },
+    },
+    required: ['id'],
+  },
+  {
+    name: 'generate_mobile_app',
+    description: "Generate a mobile app project scaffold (React Native or Flutter), zip it, and save it to the user's Kelion cloud storage. Use when the user asks to create a mobile app, generate an APK project, or build a Flutter/React Native starter.",
+    properties: {
+      framework: { type: 'string', enum: ['react_native', 'flutter'], description: "Mobile framework to scaffold." },
+      app_name: { type: 'string', description: "App name / project name." },
+      features: { type: 'array', items: { type: 'string' }, description: "Optional list of features to include stubs for: camera, gps, push_notifications, biometric, offline_storage, maps, social_login." },
+    },
+    required: ['framework', 'app_name'],
+  },
 ];
 
 // Google v1alpha BidiGenerateContent — JSON schema with UPPERCASE types and
