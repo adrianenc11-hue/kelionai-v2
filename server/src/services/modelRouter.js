@@ -16,18 +16,20 @@
 const GOOGLE_AI_STUDIO = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
 
 const MODELS = {
-  // Primary: Claude Sonnet 3.5 (stable, verified on OpenRouter)
-  // Override via env for quick A/B without deploy.
-  chat: process.env.MODEL_CHAT || 'anthropic/claude-3.5-sonnet',
-  chat_heavy: process.env.MODEL_CHAT_HEAVY || 'anthropic/claude-3-opus-20240229',
+  // Adrian: Google AI Studio direct (free 30 RPM) is the PRIMARY
+  // provider because OpenRouter free tier is exhausted (402/404).
+  // Every default model is Gemini so getEndpoint() routes to AI Studio.
+  // Override via env if you ever want to switch back.
+  chat: process.env.MODEL_CHAT || 'gemini-2.5-flash',
+  chat_heavy: process.env.MODEL_CHAT_HEAVY || 'gemini-2.5-pro',
 
-  // Coding: same Sonnet, heavy = Opus
-  coder: process.env.MODEL_CODER || 'anthropic/claude-3.5-sonnet',
-  coder_heavy: process.env.MODEL_CODER_HEAVY || 'anthropic/claude-3-opus-20240229',
+  // Coding: Flash is fast and cheap, Pro is for heavy audits.
+  coder: process.env.MODEL_CODER || 'gemini-2.5-flash',
+  coder_heavy: process.env.MODEL_CODER_HEAVY || 'gemini-2.5-pro',
 
-  // Vision: Sonnet supports vision reliably
-  vision: process.env.MODEL_VISION || 'anthropic/claude-3.5-sonnet',
-  vision_heavy: process.env.MODEL_VISION_HEAVY || 'anthropic/claude-3-opus-20240229',
+  // Vision: Gemini 2.5 Flash has strong multimodal support.
+  vision: process.env.MODEL_VISION || 'gemini-2.5-flash',
+  vision_heavy: process.env.MODEL_VISION_HEAVY || 'gemini-2.5-pro',
 };
 
 // Fallback chain — OpenRouter free tier (16 RPM combined).
