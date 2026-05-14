@@ -96,9 +96,10 @@ describe('Agent Capability Evaluation — 10 advanced scenarios', () => {
   // ── 7. Web Research & Data Extraction via terminal ──
   it('07 fetches a live webpage via curl and extracts the title tag', async () => {
     const r = await executeRealTool('run_terminal_command', {
-      command: `curl -sL https://example.com | findstr /i "<title>"`,
+      command: `curl -sL https://example.com`,
     });
     expect(r.ok).toBe(true);
+    expect((r.stdout || '').toLowerCase()).toContain('<title>');
     expect((r.stdout || '').toLowerCase()).toContain('example domain');
   });
 
