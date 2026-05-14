@@ -57,6 +57,7 @@ const ContactPage = lazy(() => import('./pages/ContactPage'))
 // the backend lives under /api/studio/* from DS-1/DS-3). Lazy-loaded
 // so the ~4 MB Monaco bundle never ships with the landing page.
 const KelionStudio = lazy(() => import('./pages/KelionStudio'))
+const WorkspacePage = lazy(() => import('./pages/WorkspacePage'))
 const LandingPage = lazy(() => import('./pages/LandingPage'))
 
 // Admin dashboard — full-page admin panel replacing the old side-drawer.
@@ -131,6 +132,9 @@ createRoot(document.getElementById('root')).render(
                 KelionStudio will surface the auth error inline if
                 the user isn't signed in. */}
             <Route path="/studio" element={<KelionStudio />} />
+            {/* Kelion Workspace — repo IDE used inside the monitor overlay.
+                embed=1 hides the chrome so it fits cleanly in the iframe. */}
+            <Route path="/workspace" element={<WorkspacePage />} />
             {/* Admin dashboard — full-page panel with sidebar navigation.
                 Auth-guarded inside AdminLayout (redirects non-admins). */}
             <Route path="/admin" element={<AdminLayout />}>

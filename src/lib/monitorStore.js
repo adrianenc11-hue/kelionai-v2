@@ -698,6 +698,14 @@ L.marker([${lat},${lon}]).addTo(map).bindPopup(${JSON.stringify(name)}).openPopu
       return result || { kind: 'cad', src, title: label, embedType: 'external' };
     }
 
+    case 'workspace': {
+      const q2 = (query || '').toString().trim();
+      if (!q2) return null;
+      // Same-origin workspace page — allowed even though isSelfUrl would block it
+      // under 'web'. Workspace is our own UI so it is safe to embed.
+      return { kind: 'workspace', src: q2, title: 'Workspace', embedType: 'iframe' };
+    }
+
     case 'web': {
       const src = safeUrl(q);
       if (!src) return null;
