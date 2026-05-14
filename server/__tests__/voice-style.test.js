@@ -57,6 +57,36 @@ describe('buildKelionPersona — minimal prompt with full tool catalog', () => {
     });
   });
 
+  describe('Anti-hallucination rules (PR #659)', () => {
+    const prompt = buildKelionPersona({});
+
+    it('has the HONESTY block', () => {
+      expect(prompt).toMatch(/HONESTY/);
+    });
+
+    it('forbids past-tense action claims without a tool result', () => {
+      expect(prompt).toMatch(/NEVER claim an action was performed unless a tool call returned/i);
+      expect(prompt).toMatch(/Am instalat/);
+      expect(prompt).toMatch(/Am clonat/);
+      expect(prompt).toMatch(/Am afișat/);
+    });
+
+    it('requires honest "nu am tool" fallback when no matching tool exists', () => {
+      expect(prompt).toMatch(/Nu am tool pentru asta/);
+    });
+
+    it('routes display requests through show_on_monitor', () => {
+      expect(prompt).toMatch(/DISPLAY REQUESTS/);
+      expect(prompt).toMatch(/show_on_monitor/);
+    });
+
+    it('declares runtime constraints (no install at runtime)', () => {
+      expect(prompt).toMatch(/RUNTIME CONSTRAINTS/);
+      expect(prompt).toMatch(/npm install/);
+      expect(prompt).toMatch(/read-only at runtime/i);
+    });
+  });
+
   describe('Tool catalog completeness', () => {
     const prompt = buildKelionPersona({});
 
