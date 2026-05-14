@@ -9,7 +9,6 @@
  *   - calculate        → mathjs (local, offline)
  *   - get_weather      → Open-Meteo (free, no key)
  *   - web_search       → DuckDuckGo Instant Answer (free, no key)
- *   - translate        → LibreTranslate (public instance, no key)
  *   - get_route        → OSRM + Nominatim (free, no key)
  *   - get_news         → GDELT Doc API (free, no key)
  *   - get_crypto_price → CoinGecko (free, no key)
@@ -592,134 +591,6 @@ async function toolWebSearch({ query, limit }) {
   }
 
   return { ok: false, query: q, error: 'No search results found after trying all providers.' };
-}
-
-// ──────────────────────────────────────────────────────────────────
-// translate
-
-async function toolTranslate({ text, to, from }) {
-  const src = (text || '').toString();
-  if (!src.trim()) return { ok: false, error: 'missing text' };
-  if (src.length > 5000) return { ok: false, error: 'text too long (max 5000 chars)' };
-  const target = (to || '').toString().toLowerCase().slice(0, 5) || 'en';
-  const source = (from || 'auto').toString().toLowerCase().slice(0, 5) || 'auto';
-
-  // ── Strategy: Free First (Easy to Hard) ──────────────────────────
-
-  // Step 1: LibreTranslate (Public instances, no key)
-  const endpoints = [
-    process.env.LIBRETRANSLATE_URL,
-    'https://translate.terraprint.co/translate',
-    'https://libretranslate.de/translate',
-  ].filter(Boolean);
-
-  for (const url of endpoints) {
-    try {
-      const r = await fetchWithTimeout(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ q: src, source, target, format: 'text' }),
-      });
-      if (!r.ok) continue;
-      const data = await r.json();
-      if (data && typeof data.translatedText === 'string') {
-        return {
-          ok: true,
-          translated: data.translatedText,
-          detectedSource: data.detectedLanguage?.language || source,
-          target,
-          source: 'libretranslate',
-        };
-      }
-    } catch (_) { continue; }
-  }
-
-  // Step 2: MyMemory (Free, no key)
-  try {
-    const mmSource = source === 'auto' ? 'autodetect' : source;
-    const langPair = `${mmSource}|${target}`;
-    const mmUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(src)}&langpair=${encodeURIComponent(langPair)}`;
-    const r = await fetchWithTimeout(mmUrl, {}, 8000);
-    if (r.ok) {
-      const data = await r.json();
-      const txt = data?.responseData?.translatedText;
-      if (txt && !txt.startsWith('INVALID') && !txt.startsWith('MYMEMORY')) {
-        return {
-          ok: true,
-          translated: txt,
-          detectedSource: data.responseData?.detectedLanguage || mmSource,
-          target,
-          source: 'mymemory',
-        };
-      }
-    }
-  } catch (_) {}
-
-  // ── Step 3: Premium Fallbacks (Google, DeepL) ────────────────────
-
-  // Google Cloud Translation (Key required)
-  const googleApiKey = process.env.GOOGLE_API_KEY;
-  if (googleApiKey) {
-    try {
-      const r = await fetchWithTimeout('https://translation.googleapis.com/language/translate/v2', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          q: src,
-          target,
-          source: source === 'auto' ? undefined : source,
-          key: googleApiKey,
-          format: 'text',
-        }),
-      });
-      if (r.ok) {
-        const data = await r.json();
-        const t0 = data?.data?.translations?.[0];
-        if (t0) {
-          return {
-            ok: true,
-            translated: t0.translatedText,
-            detectedSource: (t0.detectedSourceLanguage || source).toLowerCase(),
-            target,
-            source: 'google-translate',
-          };
-        }
-      }
-    } catch (_) {}
-  }
-
-  // DeepL (Key required)
-  const deeplKey = process.env.DEEPL_API_KEY;
-  if (deeplKey) {
-    try {
-      const host = deeplKey.endsWith(':fx') ? 'api-free.deepl.com' : 'api.deepl.com';
-      const body = new URLSearchParams();
-      body.append('auth_key', deeplKey);
-      body.append('text', src);
-      body.append('target_lang', target.toUpperCase());
-      if (source !== 'auto') body.append('source_lang', source.toUpperCase());
-      const r = await fetchWithTimeout(`https://${host}/v2/translate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: body.toString(),
-      });
-      if (r.ok) {
-        const data = await r.json();
-        const first = data?.translations?.[0];
-        if (first) {
-          return {
-            ok: true,
-            translated: first.text,
-            detectedSource: (first.detected_source_language || source).toLowerCase(),
-            target,
-            source: 'deepl',
-          };
-        }
-      }
-    } catch (_) {}
-  }
-
-  return { ok: false, error: 'No translation provider available after trying all options.' };
 }
 
 // ──────────────────────────────────────────────────────────────────
@@ -1649,10 +1520,6 @@ const TOOL_FORCE_RULES = [
   {
     name: 'web_search',
     re: /\b(search (?:the web|online|for)|google (?:for|up)|look up|find me info(?:rmation)? (?:on|about)|caut[aă] pe (?:net|google|internet)|g[aă]se[șs]te info)\b/i,
-  },
-  {
-    name: 'translate',
-    re: /\b(translate\s+(this|that|to|into)|how do you say .+ in|traduc(?:e|eți)\s+(asta|ăsta|textul|asta\s+în|în)|tradu\s+(asta|în|textul)|traducere\s+în)\b/i,
   },
   {
     name: 'get_news',
@@ -3863,8 +3730,6 @@ async function executeRealTool(name, args, ctx) {
     // ── knowledge ──
     case 'wikipedia_search': return toolWikipediaSearch(a);
     case 'dictionary': return toolDictionary(a);
-    // ── translation ──
-    case 'translate': return toolTranslate(a);
 
     // ── PR B — documents + OCR ──
     case 'read_pdf': return toolReadPdf(a);
@@ -5755,7 +5620,6 @@ const REAL_TOOL_NAMES = [
   'web_search', 'search_academic', 'search_github', 'search_stackoverflow',
   'fetch_url', 'rss_read',
   'wikipedia_search', 'dictionary',
-  'translate',
   // PR B — documents + OCR
   'read_pdf', 'read_docx', 'ocr_image', 'ocr_passport',
   // PR C — sandboxed runners + user-intern tools
@@ -5840,8 +5704,6 @@ module.exports = {
   // knowledge
   toolWikipediaSearch,
   toolDictionary,
-  // translation
-  toolTranslate,
   // PR B — documents + OCR
   toolReadPdf,
   toolReadDocx,
