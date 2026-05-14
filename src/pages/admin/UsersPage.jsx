@@ -33,6 +33,13 @@ export default function UsersPage() {
   // Duplicates
   const [dupGroups, setDupGroups] = useState([])
 
+  // Test candidates — users with no Stripe customer and no topup ever.
+  // Adrian 2026-05-14: "scoate toti utilizatori facuti de tine, ramin
+  // doar reali". Fetched on demand and rendered above the main table.
+  const [testCandidates, setTestCandidates] = useState(null)
+  const [testLoading, setTestLoading] = useState(false)
+  const [deleteCandidate, setDeleteCandidate] = useState(null)
+
   const fetchUsers = useCallback(async (q = query, status = statusFilter) => {
     setLoading(true)
     try {
@@ -136,6 +143,43 @@ export default function UsersPage() {
       setActionBusy(false)
     }
   }, [selected, getCsrfToken, loadDetail, fetchUsers, toast])
+
+  // Test-candidates — load + delete one
+  const loadTestCandidates = useCallback(async () => {
+    setTestLoading(true)
+    try {
+      const r = await fetch('/api/admin/users/test-candidates', { credentials: 'include' })
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      const j = await r.json()
+      setTestCandidates(Array.isArray(j.candidates) ? j.candidates : [])
+    } catch (err) {
+      toast?.error?.(`Eroare: ${err.message}`)
+      setTestCandidates([])
+    } finally {
+      setTestLoading(false)
+    }
+  }, [toast])
+
+  const handleDeleteCandidate = useCallback(async () => {
+    if (!deleteCandidate) return
+    setActionBusy(true)
+    try {
+      const csrf = await ensureCsrfToken()
+      const r = await fetch(`/api/admin/users/${encodeURIComponent(deleteCandidate.id)}`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: { 'X-CSRF-Token': csrf || getCsrfToken() },
+      })
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `HTTP ${r.status}`)
+      toast?.success?.(`Șters: ${deleteCandidate.email}`)
+      setDeleteCandidate(null)
+      await Promise.all([loadTestCandidates(), fetchUsers()])
+    } catch (err) {
+      toast?.error?.(err.message)
+    } finally {
+      setActionBusy(false)
+    }
+  }, [deleteCandidate, getCsrfToken, loadTestCandidates, fetchUsers, toast])
 
   // Reset password
   const handleReset = useCallback(async () => {
@@ -246,7 +290,67 @@ export default function UsersPage() {
           <button className="admin-btn" onClick={() => fetchUsers(query, statusFilter)} disabled={loading}>
             {loading ? 'Se încarcă…' : '🔍 Caută'}
           </button>
+          <button className="admin-btn" onClick={loadTestCandidates} disabled={testLoading}>
+            {testLoading ? '…' : '🧹 User-i fără plată'}
+          </button>
         </div>
+
+        {/* Test candidates — users with no Stripe topup ever. Read-only
+            list; deletion goes through ConfirmModal one row at a time. */}
+        {testCandidates !== null && (
+          <div className="admin-card" style={{ marginBottom: 16 }}>
+            <div className="admin-card-header">
+              <div className="admin-card-title">
+                🧹 Candidați pentru ștergere · {testCandidates.length}
+              </div>
+              <button
+                className="admin-btn sm"
+                onClick={() => setTestCandidates(null)}
+                style={{ background: 'transparent' }}
+              >✕</button>
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--admin-text-dim)', marginBottom: 10 }}>
+              Utilizatori fără stripe_customer_id și fără nicio tranzacție
+              topup. Rol ≠ admin. Verifică manual înainte de ștergere.
+            </div>
+            {testCandidates.length === 0 ? (
+              <div style={{ fontSize: 13, opacity: 0.7 }}>
+                Niciun candidat — toți userii non-admin au plătit cel puțin o dată sau au un Stripe customer asociat.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {testCandidates.map((c) => (
+                  <div
+                    key={c.id}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      padding: '8px 10px',
+                      background: 'var(--admin-surface-2, rgba(255,255,255,0.03))',
+                      border: '1px solid var(--admin-border)',
+                      borderRadius: 8,
+                      fontSize: 13,
+                    }}
+                  >
+                    <span style={{ flex: 1, fontFamily: 'ui-monospace, monospace' }}>
+                      #{c.id} · {c.email || '(no email)'}
+                    </span>
+                    <span style={{ fontSize: 11, opacity: 0.6 }}>
+                      sold: {c.credits_balance_minutes ?? '—'}
+                    </span>
+                    <span style={{ fontSize: 11, opacity: 0.6 }}>
+                      {c.created_at ? new Date(c.created_at).toLocaleDateString('ro-RO') : '—'}
+                    </span>
+                    <button
+                      className="admin-btn sm"
+                      style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#fecaca' }}
+                      onClick={() => setDeleteCandidate(c)}
+                    >🗑 Șterge</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Table */}
         {loading ? <Skeleton height={300} /> : (
@@ -399,6 +503,16 @@ export default function UsersPage() {
         busy={actionBusy}
         onConfirm={handleReset}
         onCancel={() => setResetModal({ open: false })}
+      />
+      <ConfirmModal
+        open={Boolean(deleteCandidate)}
+        title="Șterge user fără plată"
+        message={`Ștergi definitiv "${deleteCandidate?.email}" (#${deleteCandidate?.id})? Acțiune ireversibilă. Toate datele asociate (conversații, memory, sesiuni) dispar.`}
+        confirmLabel="Șterge definitiv"
+        danger
+        busy={actionBusy}
+        onConfirm={handleDeleteCandidate}
+        onCancel={() => setDeleteCandidate(null)}
       />
     </div>
   )

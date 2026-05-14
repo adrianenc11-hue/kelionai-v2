@@ -930,14 +930,14 @@ router.post('/library/:id/preview', async (req, res) => {
 
   const cloneId = Number(req.params.id);
   const clone = await db.get(
-    'SELECT voice_id, display_name FROM voice_clones WHERE id = ? AND user_id = ?',
+    'SELECT voice_id, display_name, preview_text FROM voice_clones WHERE id = ? AND user_id = ?',
     [cloneId, userId]
   );
   if (!clone) return res.status(404).json({ error: 'Clone not found.' });
 
-  const previewText = req.body && req.body.text
-    ? String(req.body.text).trim().slice(0, 200)
-    : "Bună, aceasta este previzualizarea vocii mele clonate.";
+  const bodyText = req.body && req.body.text ? String(req.body.text).trim() : '';
+  const stored = clone.preview_text ? String(clone.preview_text).trim() : '';
+  const previewText = (bodyText || stored || "Bună, aceasta este previzualizarea vocii mele clonate.").slice(0, 200);
 
   try {
     const tts = await fetch(
@@ -993,9 +993,9 @@ router.post('/library/deactivate', async (req, res) => {
 router.patch('/library/:id', async (req, res) => {
   const userId = uidOf(req);
   if (!userId) return res.status(401).json({ error: 'Not authenticated.' });
-  const { displayName, language } = req.body || {};
+  const { displayName, language, previewText } = req.body || {};
   try {
-    const updated = await updateVoiceClone(userId, Number(req.params.id), { displayName, language });
+    const updated = await updateVoiceClone(userId, Number(req.params.id), { displayName, language, previewText });
     if (!updated) return res.status(404).json({ error: 'Clone not found or nothing to update.' });
     // Sync name change to ElevenLabs
     if (displayName !== undefined && updated.voice_id) {

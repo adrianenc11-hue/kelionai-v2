@@ -13,6 +13,7 @@ export default function ClonedVoiceLibrary({ onClose }) {
   const [activeId, setActiveId] = useState(null)
   const [editingId, setEditingId] = useState(null)
   const [editName, setEditName] = useState('')
+  const [editPreview, setEditPreview] = useState('')
   const [previewAudio, setPreviewAudio] = useState(null) // HTMLAudioElement
   const [playingId, setPlayingId] = useState(null)
 
@@ -73,7 +74,7 @@ export default function ClonedVoiceLibrary({ onClose }) {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
         credentials: 'include',
-        body: JSON.stringify({ displayName: editName }),
+        body: JSON.stringify({ displayName: editName, previewText: editPreview }),
       })
       if (r.ok) {
         setEditingId(null)
@@ -220,13 +221,23 @@ export default function ClonedVoiceLibrary({ onClose }) {
               <div style={{ fontSize: 24 }}>👤</div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 {editingId === c.id ? (
-                  <input
-                    autoFocus
-                    value={editName}
-                    onChange={e => setEditName(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleUpdate(c.id)}
-                    style={{ background: '#1a1b26', border: '1px solid #7c3aed', color: '#fff', padding: '4px 8px', borderRadius: 4, width: '100%' }}
-                  />
+                  <>
+                    <input
+                      autoFocus
+                      value={editName}
+                      onChange={e => setEditName(e.target.value)}
+                      placeholder="Nume voce (ex: Adrian)"
+                      style={{ background: '#1a1b26', border: '1px solid #7c3aed', color: '#fff', padding: '4px 8px', borderRadius: 4, width: '100%', marginBottom: 6 }}
+                    />
+                    <input
+                      value={editPreview}
+                      onChange={e => setEditPreview(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && handleUpdate(c.id)}
+                      placeholder="Text scurt pentru previzualizare (max 200 caractere)"
+                      maxLength={200}
+                      style={{ background: '#1a1b26', border: '1px solid #475569', color: '#cbd5e1', padding: '4px 8px', borderRadius: 4, width: '100%', fontSize: 12 }}
+                    />
+                  </>
                 ) : (
                   <div style={{ color: '#fff', fontWeight: 600, fontSize: 15, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {c.display_name}
@@ -235,6 +246,11 @@ export default function ClonedVoiceLibrary({ onClose }) {
                 <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>
                   ID: {c.voice_id.slice(0, 8)}... · {c.language === 'auto' ? 'Limbă Auto' : c.language}
                 </div>
+                {editingId !== c.id && c.preview_text && (
+                  <div style={{ fontSize: 12, color: '#a78bfa', marginTop: 4, fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={c.preview_text}>
+                    “{c.preview_text}”
+                  </div>
+                )}
               </div>
 
               <div style={{ display: 'flex', gap: 8 }}>
@@ -266,7 +282,7 @@ export default function ClonedVoiceLibrary({ onClose }) {
                     >
                       {activeId === c.id ? 'Dezactivează' : 'Activează'}
                     </button>
-                    <button onClick={() => { setEditingId(c.id); setEditName(c.display_name) }} style={{ padding: '6px', background: 'transparent', border: '1px solid #334155', borderRadius: 8, cursor: 'pointer' }}>✏️</button>
+                    <button onClick={() => { setEditingId(c.id); setEditName(c.display_name); setEditPreview(c.preview_text || '') }} style={{ padding: '6px', background: 'transparent', border: '1px solid #334155', borderRadius: 8, cursor: 'pointer' }}>✏️</button>
                     <button onClick={() => handleDelete(c.id)} style={{ padding: '6px', background: 'transparent', border: '1px solid #334155', borderRadius: 8, cursor: 'pointer' }}>🗑️</button>
                   </>
                 )}

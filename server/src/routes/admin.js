@@ -502,6 +502,51 @@ router.get('/users/duplicates', async (_req, res) => {
 });
 
 /**
+ * GET /api/admin/users/test-candidates
+ *
+ * Adrian 2026-05-14: "scoate toti utilizatorii facuti de tine, ramin
+ * doar reali". A "real" user is one that paid (has a `topup` row in
+ * credit_ledger) OR has admin role. Everyone else — no Stripe customer
+ * id, no top-up history, role=user — is a candidate for deletion
+ * (signup probes, dev seeds, agent-created test accounts).
+ *
+ * Read-only: returns the list with reason flags so the admin can
+ * confirm before invoking DELETE /users/:id (one row at a time;
+ * no bulk-delete here to keep the destructive surface small).
+ */
+router.get('/users/test-candidates', async (_req, res) => {
+  try {
+    const users = await getAllUsers();
+    const candidates = [];
+    for (const u of users) {
+      if (u.role === 'admin') continue;
+      const hasStripe = Boolean(u.stripe_customer_id);
+      // listCreditTransactions(userId, limit) — pull the most recent
+      // rows and look for any real Stripe top-up. A user with only
+      // `admin_grant` / `consume` / `refund` rows is still a candidate.
+      const rows = await listCreditTransactions(u.id, 50).catch(() => []);
+      const paid = Array.isArray(rows) && rows.some((r) => r && r.kind === 'topup');
+      if (hasStripe || paid) continue;
+      let balance = null;
+      try { balance = await getCreditsBalance(u.id); } catch (_) { balance = null; }
+      candidates.push({
+        id: u.id,
+        email: u.email,
+        name: u.name,
+        role: u.role,
+        created_at: u.created_at,
+        credits_balance_minutes: balance,
+        reasons: ['no_stripe_customer', 'no_topup_ever'],
+      });
+    }
+    res.json({ candidates, total: candidates.length });
+  } catch (err) {
+    console.error('[admin/users/test-candidates] Error:', err.message);
+    res.status(500).json({ error: 'Failed to list test candidates' });
+  }
+});
+
+/**
  * POST /api/admin/users/merge
  *
  * F3 — merge `sourceId` into `targetId`. All FK'd rows (conversations,

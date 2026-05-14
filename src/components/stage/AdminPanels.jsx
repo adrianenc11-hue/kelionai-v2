@@ -159,6 +159,23 @@ function refHost(ref) {
   }
 }
 
+// Classify a visit's traffic source from its referer URL. Returns
+// `{ label, color }` so the row badge stays consistent across the
+// panel. "Intern" means the visit came from another page on our own
+// domain (in-app nav), not a new acquisition channel.
+function trafficSource(ref) {
+  const h = refHost(ref)
+  if (!h) return { label: 'Direct', color: '#94a3b8' }
+  if (h === 'kelionai.app' || h.endsWith('.kelionai.app')) return { label: 'Intern', color: '#64748b' }
+  if (/(^|\.)(google|bing|duckduckgo|yahoo|yandex|baidu|ecosia|brave)\./.test(h) || /^(google|bing|duckduckgo)\./.test(h)) {
+    return { label: 'Search', color: '#60a5fa' }
+  }
+  if (/(facebook|instagram|twitter|x\.com|linkedin|tiktok|youtube|reddit|pinterest|threads|whatsapp|telegram|discord)/.test(h)) {
+    return { label: 'Social', color: '#f472b6' }
+  }
+  return { label: 'Referral', color: '#a78bfa' }
+}
+
 function VisitorsAnalyticsPanel({ data }) {
   if (!data) return null
   const totals = data.totals || { visits: 0, signedInVisits: 0, uniqueUsers: 0 }
@@ -816,4 +833,4 @@ function ExportButtons() {
   )
 }
 
-export { TopBarIconButton, AdminTabBar, VisitorsAnalyticsPanel, PayoutsPanel, MenuItem, friendlyCreditStatus, uaIsBot, uaBrowser, uaOs, refHost, flagEmoji, RevenueChart, LiveSessionsPanel, ExportButtons }
+export { TopBarIconButton, AdminTabBar, VisitorsAnalyticsPanel, PayoutsPanel, MenuItem, friendlyCreditStatus, uaIsBot, uaBrowser, uaOs, refHost, trafficSource, flagEmoji, RevenueChart, LiveSessionsPanel, ExportButtons }
