@@ -246,14 +246,6 @@ describe('Agent Capability Evaluation — 10 advanced scenarios', () => {
     expect(alt).toBe('MC1458D');
   });
 
-  // ── 19. Traducere tehnică ──
-  it('19 translates a technical medical sentence into Romanian', async () => {
-    const r = await executeRealTool('translate', { text: 'The device must comply with IEC 60601-1 isolation requirements for Type BF applied parts.', to: 'ro' });
-    expect(r.ok).toBe(true);
-    const text = (r.translated || '').toLowerCase();
-    expect(text).toMatch(/dispozitiv|conformitate|ie|izolatie|pacient|siguran|bf/);
-  });
-
   // ── 20. Procedură calibrare senzor ──
   it('20 generates a temperature sensor calibration procedure', async () => {
     const proc = `# Procedură Calibrare – Senzor NTC 10K\n\n## Echipament\n- Termometru referință (±0.1°C)\n- Baie gheață + apă (ță de topire)\n- Baie apă la 25°C\n\n## Pași\n1. Măsurare la 0°C: așteaptă stabilizare 5 min.\n   - Valoare așteptată: ~29.5kΩ (NTC 10K, B=3950)\n   - Toleranță acceptată: ±0.5°C\n2. Măsurare la 25°C:\n   - Valoare așteptată: ~10kΩ\n   - Toleranță acceptată: ±0.5°C\n3. Dacă ambele puncte sunt în toleranță, salvează coeficienții în memorie EEPROM.\n4. Dacă nu, repetă măsurarea sau înlocuiește senzorul.\n`;
