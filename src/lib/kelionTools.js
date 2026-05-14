@@ -290,30 +290,29 @@ async function runRealToolRemote(name, args) {
     return summarizeRealTool('run_terminal_command', j)
   }
 
-  // File operations → live terminal display with content preview
+  // File operations → open the workspace IDE in the monitor so the user
+  // sees the file tree + editor exactly like Augment/Code.
   if (fileTools.includes(name)) {
     const path = args?.path || args?.target || '?'
-    showTerminal(name, path)
+    handleShowOnMonitor({
+      kind: 'workspace',
+      query: path !== '?'
+        ? `/workspace?embed=1&file=${encodeURIComponent(path)}`
+        : '/workspace?embed=1',
+      title: 'Workspace',
+    })
     const j = await postJSON('/api/tools/execute', { name, args: args || {} })
-    await new Promise(r => setTimeout(r, 100))
-    const ok = j.ok !== false
-    postLine(ok ? 'stdout' : 'stderr', ok ? `✓ ${path} updated` : `✗ ${j.error || 'failed'}`)
-    if (args?.content && ok) {
-      const contentLines = String(args.content).split('\n')
-      contentLines.slice(0, 30).forEach(l => postLine('stdout', l))
-      if (contentLines.length > 30) postLine('stdout', `... (${contentLines.length - 30} more lines)`)
-    }
-    postDone(ok, ok ? 0 : 1)
     return summarizeRealTool(name, j)
   }
 
-  // Other dev tools → terminal display with result
+  // Other dev tools → open the workspace IDE in the monitor.
   if (otherDevTools.includes(name)) {
-    const info = name === 'ask_expert_coder' ? (args?.question || '').slice(0, 80) : JSON.stringify(args).slice(0, 80)
-    showTerminal(name, info)
+    handleShowOnMonitor({
+      kind: 'workspace',
+      query: '/workspace?embed=1',
+      title: 'Workspace',
+    })
     const j = await postJSON('/api/tools/execute', { name, args: args || {} })
-    await new Promise(r => setTimeout(r, 100))
-    displayBatchResult(j)
     return summarizeRealTool(name, j)
   }
 
