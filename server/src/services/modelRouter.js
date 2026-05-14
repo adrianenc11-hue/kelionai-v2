@@ -67,6 +67,19 @@ function _queuedModelCall(fn) {
 // Google AI Studio endpoint (direct, no OpenRouter middleman)
 const GOOGLE_AI_STUDIO = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
 
+// -- Multi-key rotation for Google AI Studio --
+// Support comma-separated GOOGLE_API_KEYS env var. When one key hits 429,
+// rotate to the next. This prevents a single exhausted free-tier project
+// from taking down the whole app.
+const GOOGLE_KEYS = (process.env.GOOGLE_API_KEYS || process.env.GOOGLE_API_KEY || '')
+  .split(',')
+  .map(k => k.trim())
+  .filter(Boolean);
+if (GOOGLE_KEYS.length === 0) {
+  console.warn('[modelRouter] No GOOGLE_API_KEY or GOOGLE_API_KEYS set. Gemini calls will fail.');
+}
+let _currentKeyIndex = 0;
+
 const MODELS = {
   // Adrian: Google AI Studio direct (free 30 RPM) is the PRIMARY
   // provider because OpenRouter free tier is exhausted (402/404).
@@ -84,16 +97,28 @@ const MODELS = {
   vision_heavy: process.env.MODEL_VISION_HEAVY || 'gemini-2.5-pro',
 };
 
+// Internal fallback — same provider (Google AI Studio), different model.
+// Each model has separate quota, so switching from Pro to Flash often works
+// when Pro is exhausted, *before* trying OpenRouter.
+const GOOGLE_FALLBACK = {
+  chat_heavy: ['gemini-2.5-flash', 'gemini-2.0-flash'],
+  chat:       ['gemini-2.5-flash', 'gemini-2.0-flash'],
+  coder_heavy:['gemini-2.5-flash', 'gemini-2.0-flash'],
+  coder:      ['gemini-2.5-flash', 'gemini-2.0-flash'],
+  vision_heavy:['gemini-2.5-flash'],
+  vision:     ['gemini-2.5-flash'],
+};
+
 // Fallback chain — OpenRouter free tier (16 RPM combined).
 // We keep 3–4 models so one rate-limit / outage doesn't exhaust the chain.
 // Google AI Studio direct is tried *first* via getEndpoint() when GOOGLE_API_KEY is set.
 const OPENROUTER_FALLBACK = {
-  chat:        ['google/gemini-2.0-flash', 'anthropic/claude-3-haiku', 'meta-llama/llama-3.3-70b-instruct'],
-  chat_heavy:  ['google/gemini-2.0-flash', 'anthropic/claude-3.5-sonnet', 'meta-llama/llama-3.3-70b-instruct'],
-  coder:       ['google/gemini-2.0-flash', 'anthropic/claude-3.5-sonnet', 'meta-llama/llama-3.3-70b-instruct'],
-  coder_heavy: ['google/gemini-2.0-flash', 'anthropic/claude-3-opus-20240229', 'meta-llama/llama-3.3-70b-instruct'],
-  vision:      ['google/gemini-2.0-flash', 'anthropic/claude-3.5-sonnet'],
-  vision_heavy:['google/gemini-2.0-flash', 'anthropic/claude-3-opus-20240229'],
+  chat:        ['google/gemini-2.0-flash-001', 'anthropic/claude-3-haiku', 'meta-llama/llama-3.3-70b-instruct'],
+  chat_heavy:  ['google/gemini-2.0-flash-001', 'anthropic/claude-3-5-sonnet-20241022', 'meta-llama/llama-3.3-70b-instruct'],
+  coder:       ['google/gemini-2.0-flash-001', 'anthropic/claude-3-5-sonnet-20241022', 'meta-llama/llama-3.3-70b-instruct'],
+  coder_heavy: ['google/gemini-2.0-flash-001', 'anthropic/claude-3-opus-20240229', 'meta-llama/llama-3.3-70b-instruct'],
+  vision:      ['google/gemini-2.0-flash-001', 'anthropic/claude-3-5-sonnet-20241022'],
+  vision_heavy:['google/gemini-2.0-flash-001', 'anthropic/claude-3-opus-20240229'],
 };
 
 /**
@@ -115,8 +140,8 @@ function getModel(taskType, useHeavy = false) {
  * @param {string} model - Model ID
  * @returns {{ url: string, authHeader: string, provider: string, apiModel: string }}
  */
-function getEndpoint(model) {
-  const googleKey = process.env.GOOGLE_API_KEY;
+function getEndpoint(model, keyIndex = 0) {
+  const googleKey = GOOGLE_KEYS[keyIndex % Math.max(GOOGLE_KEYS.length, 1)];
   const isGeminiModel = model.includes('gemini-');
 
   if (googleKey && isGeminiModel) {
@@ -204,23 +229,109 @@ async function smartFetch(taskType, body, useHeavy = false) {
     }
   };
 
-  try {
-    const response = isGoogleStudio
-      ? await _queuedModelCall(makePrimaryCall)
-      : await makePrimaryCall();
+  // Try each Google key in rotation
+  if (isGoogleStudio && GOOGLE_KEYS.length > 0) {
+    for (let keyIdx = 0; keyIdx < GOOGLE_KEYS.length; keyIdx++) {
+      const keyEndpoint = getEndpoint(model, keyIdx);
+      const keyCall = async () => {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 45000);
+        try {
+          const response = await fetch(keyEndpoint.url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': keyEndpoint.authHeader,
+              'HTTP-Referer': 'https://kelion.ai',
+              'X-Title': 'Kelion AI',
+            },
+            body: JSON.stringify({ ...body, model: keyEndpoint.apiModel }),
+            signal: ctrl.signal,
+          });
+          clearTimeout(timer);
+          return response;
+        } catch (err) {
+          clearTimeout(timer);
+          throw err;
+        }
+      };
 
-    if (response.ok) {
-      return { response, model, provider: endpoint.provider };
+      try {
+        const response = await _queuedModelCall(keyCall);
+        if (response.ok) {
+          _currentKeyIndex = keyIdx;
+          return { response, model, provider: keyEndpoint.provider };
+        }
+        const errText = await response.text().catch(() => '');
+        if (response.status === 429) {
+          console.warn(`[modelRouter] Key ${keyIdx + 1}/${GOOGLE_KEYS.length} rate-limited, rotating...`);
+          continue;
+        }
+        console.warn(`[modelRouter] ${model} key ${keyIdx + 1} failed: ${response.status} - ${errText}`);
+      } catch (err) {
+        console.warn(`[modelRouter] ${model} key ${keyIdx + 1} error: ${err.message}`);
+      }
     }
+  } else {
+    try {
+      const response = await makePrimaryCall();
+      if (response.ok) {
+        return { response, model, provider: endpoint.provider };
+      }
+      const errText = await response.text().catch(() => '');
+      console.warn(`[modelRouter] ${model} via ${endpoint.provider} failed: ${response.status} - ${errText}`);
+    } catch (err) {
+      console.warn(`[modelRouter] ${model} via ${endpoint.provider} error: ${err.message}`);
+    }
+  }
 
-    const errText = await response.text().catch(() => '');
-    console.warn(`[modelRouter] ${model} via ${endpoint.provider} failed: ${response.status} - ${errText}`);
-  } catch (err) {
-    console.warn(`[modelRouter] ${model} via ${endpoint.provider} error: ${err.message}`);
+  // Google AI Studio internal fallback: same provider, lighter model
+  const chainKey = useHeavy ? `${taskType}_heavy` : taskType;
+  const googleFallback = GOOGLE_FALLBACK[chainKey] || GOOGLE_FALLBACK[taskType];
+  if (googleFallback && GOOGLE_KEYS.length > 0) {
+    for (const fbModel of googleFallback) {
+      for (let keyIdx = 0; keyIdx < GOOGLE_KEYS.length; keyIdx++) {
+        const fbEndpoint = getEndpoint(fbModel, keyIdx);
+        const fbCall = async () => {
+          const ctrl = new AbortController();
+          const timer = setTimeout(() => ctrl.abort(), 45000);
+          try {
+            const response = await fetch(fbEndpoint.url, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': fbEndpoint.authHeader,
+                'HTTP-Referer': 'https://kelion.ai',
+                'X-Title': 'Kelion AI',
+              },
+              body: JSON.stringify({ ...body, model: fbEndpoint.apiModel }),
+              signal: ctrl.signal,
+            });
+            clearTimeout(timer);
+            return response;
+          } catch (err) {
+            clearTimeout(timer);
+            throw err;
+          }
+        };
+        try {
+          const response = await _queuedModelCall(fbCall);
+          if (response.ok) {
+            _currentKeyIndex = keyIdx;
+            console.log(`[modelRouter] Google fallback ${fbModel} succeeded!`);
+            return { response, model: fbModel, provider: fbEndpoint.provider };
+          }
+          const errText = await response.text().catch(() => '');
+          if (response.status === 429) continue;
+          console.warn(`[modelRouter] Google fallback ${fbModel} key ${keyIdx + 1} failed: ${response.status} - ${errText}`);
+        } catch (err) {
+          console.warn(`[modelRouter] Google fallback ${fbModel} key ${keyIdx + 1} error: ${err.message}`);
+        }
+      }
+    }
   }
 
   // Fallback to OpenRouter chain
-  const chainKey = useHeavy ? `${taskType}_heavy` : taskType;
   const chain = OPENROUTER_FALLBACK[chainKey] || OPENROUTER_FALLBACK[taskType] || OPENROUTER_FALLBACK.chat;
   const orKey = process.env.OPENROUTER_API_KEY;
   if (!orKey) throw new Error('No OPENROUTER_API_KEY for fallback');
