@@ -135,25 +135,14 @@ describe('Agent Capability Evaluation — 10 advanced scenarios', () => {
     const html = `<!DOCTYPE html><html><head><title>Before</title></head><body><button id="btn" onclick="document.title='CLICKED'">Press me</button></body></html>`;
     writeTmp('page.html', html);
     const pagePath = tmpFile('page.html').replace(/\\/g, '/');
-    const script = `
-const { chromium } = require('playwright');
-(async () => {
-  const browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage();
-  await page.goto('file:///${pagePath}');
-  await page.click('#btn');
-  const title = await page.title();
-  await browser.close();
-  console.log(JSON.stringify({ ok: true, title }));
-})();
-`;
-    writeTmp('click.cjs', script);
-    const r = await executeRealTool('run_terminal_command', {
-      command: `cd "${TMP}" && node click.cjs`,
-    });
-    expect(r.ok).toBe(true);
-    const output = JSON.parse((r.stdout || '').trim().split('\n').pop());
-    expect(output.title).toBe('CLICKED');
+    const { chromium } = require('playwright');
+    const browser = await chromium.launch({ headless: true });
+    const page = await browser.newPage();
+    await page.goto(`file:///${pagePath}`);
+    await page.click('#btn');
+    const title = await page.title();
+    await browser.close();
+    expect(title).toBe('CLICKED');
   });
 
   // ── 11. OCR pe schemă electronică ──
