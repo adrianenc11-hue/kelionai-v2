@@ -1047,7 +1047,7 @@ export default function KelionStage() {
     loadTurns,
   } = liveHook
   statusRef.current = status
-  liveSendTextRef.current = sendText
+  liveSendTextRef.current = liveSendText
   const startRef = useRef(null)
   startRef.current = start
 
