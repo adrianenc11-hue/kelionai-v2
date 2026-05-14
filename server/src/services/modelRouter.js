@@ -144,7 +144,7 @@ function getEndpoint(model, keyIndex = 0) {
   const googleKey = GOOGLE_KEYS[keyIndex % Math.max(GOOGLE_KEYS.length, 1)];
   const isGeminiModel = model.includes('gemini-');
 
-  if (googleKey && isGeminiModel) {
+  if (googleKey && isGeminiModel && !process.env.USE_OPENROUTER_FOR_GEMINI) {
     // Google AI Studio natively expects 'gemini-X', strip 'google/' if present
     const bareModel = model.replace(/^google\//, '');
     return {
