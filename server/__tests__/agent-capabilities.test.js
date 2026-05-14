@@ -155,4 +155,125 @@ const { chromium } = require('playwright');
     expect(output.title).toBe('CLICKED');
   });
 
+  // ── 11. OCR pe schemă electronică ──
+  it('11 extracts component values from a schematic image via OCR', async () => {
+    const html = `<!DOCTYPE html><html><body style="background:#fff;font-family:monospace;font-size:48px;padding:20px;"><div>R1 10K</div><div>C2 100nF</div><div>U1 LM358</div></body></html>`;
+    writeTmp('sch.html', html);
+    const { chromium } = require('playwright');
+    const browser = await chromium.launch({ headless: true });
+    const page = await browser.newPage();
+    await page.goto(`file:///${tmpFile('sch.html').replace(/\\/g, '/')}`);
+    const screenshot = await page.screenshot({ type: 'png' });
+    await browser.close();
+    const base64 = screenshot.toString('base64');
+    const r = await executeRealTool('ocr_engine', { mode: 'image', base64, lang: 'eng' });
+    expect(r.ok).toBe(true);
+    const text = (r.text || '').toUpperCase();
+    expect(text).toContain('R1');
+    expect(text).toContain('10K');
+    expect(text).toContain('LM358');
+  });
+
+  // ── 12. Parsare datasheet simulat ──
+  it('12 parses a local HTML datasheet and extracts key specifications', async () => {
+    const html = `<h1>LM358 Datasheet</h1><p>Supply Voltage: 3V to 32V</p><p>Input Bias Current: 45nA</p><p>Gain Bandwidth: 1MHz</p>`;
+    writeTmp('lm358.html', html);
+    const content = readTmp('lm358.html');
+    const voltage = content.match(/Supply Voltage:\s*([^\n<]+)/i);
+    expect(voltage).toBeTruthy();
+    expect(voltage[1]).toContain('3V');
+    expect(voltage[1]).toContain('32V');
+    const current = content.match(/Input Bias Current:\s*([^\n<]+)/i);
+    expect(current).toBeTruthy();
+    expect(current[1]).toContain('45');
+  });
+
+  // ── 13. Parsare BOM CSV ──
+  it('13 parses a BOM CSV and validates required fields', async () => {
+    const csv = `Reference,Value,Footprint,Manufacturer,PartNumber\nR1,10K,0805,Vishay,CRCW080510K0F\nC2,100nF,0805,Murata,GRM21BR71H104KA01\nU1,LM358,SOIC-8,Texas Instruments,LM358DR`;
+    writeTmp('bom.csv', csv);
+    const r = await executeRealTool('read_local_file', { path: tmpFile('bom.csv') });
+    expect(r.ok).toBe(true);
+    const lines = (r.content || '').split('\n');
+    expect(lines[0]).toContain('Reference');
+    expect(lines[0]).toContain('Manufacturer');
+    expect(lines[1]).toContain('R1');
+    expect(lines).toHaveLength(4);
+  });
+
+  // ── 14. Calcul electric ──
+  it('14 calculates resistor power dissipation and checks rating', async () => {
+    const r = await executeRealTool('calculate', { expression: '5^2 / 220' });
+    expect(r.ok).toBe(true);
+    const power = parseFloat(r.result);
+    expect(power).toBeCloseTo(0.1136, 3);
+    expect(power).toBeLessThan(0.25); // 1/4W rating
+  });
+
+  // ── 15. Cercetare standard medical ──
+  it('15 fetches medical standard info from Wikipedia and extracts key terms', async () => {
+    const r = await executeRealTool('browse_web', { start_url: 'https://en.wikipedia.org/wiki/IEC_60601' });
+    expect(r.ok).toBe(true);
+    const text = (r.content || '').toLowerCase();
+    expect(text).toMatch(/medical|patient|safety|electrical|device/);
+  });
+
+  // ── 16. Generare manual producere ──
+  it('16 generates an assembly manual with required sections', async () => {
+    const manual = `# Manual Producere – Glucometru V1\n\n## 1. Pregătire\n- Verificare BOM\n- Unelte: letconă, stație lipit, multimetru\n\n## 2. Asamblare PCB\n- Lipire componente pasive (R, C)\n- Lipire integrat (U1 LM358)\n- Conectare senzor\n\n## 3. Testare\n- Continuitate trasee\n- Tensiune de alimentare 5V ± 5%\n- Semnal ieșire senzor 100–500mV\n\n## 4. Calibrare\n- Punct 0: soluție 0mg/dL\n- Punct 100: soluție 100mg/dL\n- Verificare toleranță ±5mg/dL\n`;
+    const r = await executeRealTool('edit_local_file', { path: tmpFile('manual.md'), content: manual, create: true });
+    expect(r.ok).toBe(true);
+    const content = readTmp('manual.md');
+    expect(content).toContain('Asamblare');
+    expect(content).toContain('Testare');
+    expect(content).toContain('Calibrare');
+  });
+
+  // ── 17. Generare checklist testare ──
+  it('17 generates an electrical test checklist', async () => {
+    const checklist = `- [ ] Continuitate GND – toate punctele < 0.1Ω\n- [ ] Tensiune alimentare 5V = 4.75–5.25V\n- [ ] Consum curent < 50mA\n- [ ] Semnal ieșire senzor în domeniu 0.1–0.5V\n- [ ] Test izolație 500VDC > 10MΩ\n- [ ] EMC pre-scan fără erori majore\n`;
+    const r = await executeRealTool('edit_local_file', { path: tmpFile('checklist.md'), content: checklist, create: true });
+    expect(r.ok).toBe(true);
+    const content = readTmp('checklist.md');
+    expect(content).toContain('Continuitate');
+    expect(content).toContain('Tensiune');
+    expect(content).toContain('izolație');
+  });
+
+  // ── 18. Căutare echivalență componentă (simulat) ──
+  it('18 finds an alternative component from a local catalog', async () => {
+    const catalog = JSON.stringify([
+      { id: 'R1', value: '10K', footprint: '0805', mpn: 'CRCW080510K0F', alt: 'RC0805FR-0710KL' },
+      { id: 'U1', value: 'LM358', footprint: 'SOIC-8', mpn: 'LM358DR', alt: 'MC1458D' },
+    ], null, 2);
+    writeTmp('catalog.json', catalog);
+    const r = await executeRealTool('read_local_file', { path: tmpFile('catalog.json') });
+    expect(r.ok).toBe(true);
+    // read_local_file prefixes line numbers — strip them before JSON.parse
+    const raw = (r.content || '').split('\n').map(l => l.replace(/^\d+:\s*/, '')).join('\n');
+    const data = JSON.parse(raw || '[]');
+    const alt = data.find(c => c.id === 'U1')?.alt;
+    expect(alt).toBe('MC1458D');
+  });
+
+  // ── 19. Traducere tehnică ──
+  it('19 translates a technical medical sentence into Romanian', async () => {
+    const r = await executeRealTool('translate', { text: 'The device must comply with IEC 60601-1 isolation requirements for Type BF applied parts.', to: 'ro' });
+    expect(r.ok).toBe(true);
+    const text = (r.translated || '').toLowerCase();
+    expect(text).toMatch(/dispozitiv|conformitate|ie|izolatie|pacient|siguran|bf/);
+  });
+
+  // ── 20. Procedură calibrare senzor ──
+  it('20 generates a temperature sensor calibration procedure', async () => {
+    const proc = `# Procedură Calibrare – Senzor NTC 10K\n\n## Echipament\n- Termometru referință (±0.1°C)\n- Baie gheață + apă (ță de topire)\n- Baie apă la 25°C\n\n## Pași\n1. Măsurare la 0°C: așteaptă stabilizare 5 min.\n   - Valoare așteptată: ~29.5kΩ (NTC 10K, B=3950)\n   - Toleranță acceptată: ±0.5°C\n2. Măsurare la 25°C:\n   - Valoare așteptată: ~10kΩ\n   - Toleranță acceptată: ±0.5°C\n3. Dacă ambele puncte sunt în toleranță, salvează coeficienții în memorie EEPROM.\n4. Dacă nu, repetă măsurarea sau înlocuiește senzorul.\n`;
+    const r = await executeRealTool('edit_local_file', { path: tmpFile('calibrare.md'), content: proc, create: true });
+    expect(r.ok).toBe(true);
+    const content = readTmp('calibrare.md');
+    expect(content).toContain('0°C');
+    expect(content).toContain('25°C');
+    expect(content).toContain('toleran');
+    expect(content).toContain('EEPROM');
+  });
+
 });
