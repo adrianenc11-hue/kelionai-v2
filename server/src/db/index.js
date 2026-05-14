@@ -534,6 +534,10 @@ async function initDb() {
   `);
   await db.exec('CREATE INDEX IF NOT EXISTS idx_voice_clones_user ON voice_clones(user_id)');
   await db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_voice_clones_voice ON voice_clones(user_id, voice_id)');
+  const vcCols = await db.all("PRAGMA table_info(voice_clones)");
+  if (!vcCols.find(c => c.name === 'preview_text')) {
+    await db.exec('ALTER TABLE voice_clones ADD COLUMN preview_text TEXT');
+  }
 
   return db;
 }
@@ -839,7 +843,7 @@ async function listVoiceClones(userId) {
   if (!userId) return [];
   await _ensureLegacyVoiceMigrated(userId);
   return db.all(
-    `SELECT id, voice_id, display_name, language, is_active, consent_version, consent_at, created_at
+    `SELECT id, voice_id, display_name, language, is_active, consent_version, consent_at, created_at, preview_text
        FROM voice_clones WHERE user_id = ? ORDER BY created_at DESC`,
     [userId]
   );
@@ -891,6 +895,11 @@ async function updateVoiceClone(userId, cloneId, updates) {
   if (updates.language !== undefined) {
     sets.push('language = ?');
     params.push(String(updates.language).slice(0, 10));
+  }
+  if (updates.previewText !== undefined) {
+    sets.push('preview_text = ?');
+    const v = updates.previewText === null ? null : String(updates.previewText).slice(0, 200);
+    params.push(v);
   }
   if (sets.length === 0) return null;
   params.push(cloneId, userId);

@@ -12,6 +12,14 @@ export default function RevenuePage() {
   const [revenueChart, setRevenueChart] = useState(null)
   const [split, setSplit] = useState(null)
   const [ledger, setLedger] = useState([])
+  // Default to only Stripe top-ups (real money). admin_grant/refund/etc.
+  // shown only when toggled — otherwise the panel mixes test grants with
+  // real revenue and looks fake.
+  const [onlyReal, setOnlyReal] = useState(true)
+
+  const ledgerUrl = onlyReal
+    ? '/api/admin/credits/ledger?limit=100&kind=topup'
+    : '/api/admin/credits/ledger?limit=100'
 
   const fetchAll = useCallback(async () => {
     setLoading(true)
@@ -21,7 +29,7 @@ export default function RevenuePage() {
         fetch('/api/admin/business?days=30', opts).then(r => r.ok ? r.json() : null),
         fetch('/api/admin/revenue-chart?days=30', opts).then(r => r.ok ? r.json() : null),
         fetch('/api/admin/revenue-split?days=30', opts).then(r => r.ok ? r.json() : null),
-        fetch('/api/admin/credits/ledger?limit=100', opts).then(r => r.ok ? r.json() : null),
+        fetch(ledgerUrl, opts).then(r => r.ok ? r.json() : null),
       ])
       if (bizR.status === 'fulfilled') setBusiness(bizR.value)
       if (revR.status === 'fulfilled') setRevenueChart(revR.value)
@@ -32,7 +40,7 @@ export default function RevenuePage() {
     } finally {
       setLoading(false)
     }
-  }, [toast])
+  }, [toast, ledgerUrl])
 
   useEffect(() => { fetchAll() }, [fetchAll])
 
@@ -40,7 +48,7 @@ export default function RevenuePage() {
   useEffect(() => {
     const iv = setInterval(async () => {
       try {
-        const r = await fetch('/api/admin/credits/ledger?limit=100', { credentials: 'include' })
+        const r = await fetch(ledgerUrl, { credentials: 'include' })
         if (r.ok) {
           const j = await r.json()
           setLedger(Array.isArray(j.rows) ? j.rows : [])
@@ -48,7 +56,7 @@ export default function RevenuePage() {
       } catch (_) {}
     }, 5000)
     return () => clearInterval(iv)
-  }, [])
+  }, [ledgerUrl])
 
   const biz = business?.ledger || {}
   const revenue = (biz.revenueCents || 0) / 100
@@ -138,11 +146,30 @@ export default function RevenuePage() {
       {/* Live ledger */}
       <div className="admin-card">
         <div className="admin-card-header">
-          <div className="admin-card-title">📋 Tranzacții Recente</div>
-          <span style={{ fontSize: 11, color: 'var(--admin-text-dim)' }}>Auto-refresh 5s</span>
+          <div className="admin-card-title">
+            📋 Tranzacții Recente {onlyReal ? '· doar Stripe' : '· toate'}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <label style={{ fontSize: 11, color: 'var(--admin-text-dim)', display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={onlyReal}
+                onChange={(e) => setOnlyReal(e.target.checked)}
+                style={{ margin: 0 }}
+              />
+              doar venituri reale (Stripe)
+            </label>
+            <span style={{ fontSize: 11, color: 'var(--admin-text-dim)' }}>Auto-refresh 5s</span>
+          </div>
         </div>
         {loading ? <Skeleton height={200} /> : (
-          <DataTable columns={ledgerColumns} data={ledger} emptyText="Nicio tranzacție încă." />
+          <DataTable
+            columns={ledgerColumns}
+            data={ledger}
+            emptyText={onlyReal
+              ? 'Nicio tranzacție Stripe reală încă. Topup-urile apar aici după ce un client plătește prin Checkout (necesită STRIPE_WEBHOOK_SECRET configurat pe server).'
+              : 'Nicio tranzacție încă.'}
+          />
         )}
       </div>
     </div>
