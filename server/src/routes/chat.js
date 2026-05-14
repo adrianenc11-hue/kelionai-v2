@@ -28,16 +28,22 @@ setInterval(() => {
 }, 5 * 60 * 1000).unref();
 
 router.post('/', async (req, res) => {
+  const t0 = Date.now();
+  const step = (n) => console.log(`[chat] step=${n} t=${Date.now() - t0}ms`);
+  let adminUser = null;
+  let isAdmin = false;
   try {
+    step('start');
     const orKey = process.env.OPENROUTER_API_KEY;
     if (!orKey) {
       return res.status(503).json({ error: 'OPENROUTER_API_KEY not configured' });
     }
 
     // Auth / trial gating (same logic as realtime)
-    const adminUser = await peekSignedInUser(req);
-    const isAdmin = await isAdminUser(adminUser);
+    adminUser = await peekSignedInUser(req);
+    isAdmin = await isAdminUser(adminUser);
     const isGuest = !adminUser;
+    step(`auth user=${adminUser?.id || 'guest'} admin=${isAdmin}`);
 
     if (isGuest && !isAdmin) {
       const guestIp = ipGeo.clientIp(req) || req.ip || '';
@@ -114,8 +120,9 @@ router.post('/', async (req, res) => {
           listMemoryItems(adminUser.id, 60),
           getCreditsBalance(adminUser.id)
         ]);
-      } catch (_) { }
+      } catch (err) { console.warn('[chat] memory/credits fetch failed:', err && err.message); }
     }
+    step(`db mem=${memoryItems.length} bal=${creditsBalance}`);
 
     // ── Task Detection: Basic Chat vs Complex Coding ──────────────────
     const taskType = isCodingTask(message) ? 'coder' : 'chat';
@@ -127,7 +134,10 @@ router.post('/', async (req, res) => {
 
     const browserLang = (req.query.lang || 'en-US').toString().slice(0, 16);
     const forcedLang = (process.env.KELION_FORCE_LANG || browserLang).toString().slice(0, 16);
-    const ipGeoData = await ipGeo.lookup(ipGeo.clientIp(req));
+    let ipGeoData = null;
+    try { ipGeoData = await ipGeo.lookup(ipGeo.clientIp(req)); }
+    catch (err) { console.warn('[chat] ipGeo lookup failed:', err && err.message); }
+    step('ipgeo');
     
     const systemPrompt = buildKelionPersona({
       user: adminUser,
@@ -212,27 +222,30 @@ router.post('/', async (req, res) => {
 
     let result;
     let activeModel = 'Swarm (Multi-Agent)';
-    
+    step(`pre-model task=${taskType} heavy=${isHeavy} msgs=${sanitizedMessages.length} tools=${openRouterTools.length}`);
+
     try {
       if (isSoftGreu) {
         console.log('[chat] Triggering Swarm Expert for Soft Greu task...');
         const swarmResult = await swarmExpert.runSwarmTask(message, { history: session.history.slice(-5) }, creditsBalance, openRouterTools);
-        result = { 
-          choices: [{ 
-            message: { 
+        result = {
+          choices: [{
+            message: {
               content: swarmResult.reply,
               tool_calls: swarmResult.toolCalls
-            } 
-          }] 
+            }
+          }]
         };
       } else {
         const fetchRes = await smartFetch(taskType, body, isHeavy);
         activeModel = fetchRes.model;
+        step(`smartFetch ok model=${activeModel}`);
         result = await fetchRes.response.json();
+        step('json parsed');
       }
-      
-      const choice = result.choices?.[0];
-      
+
+      const choice = result?.choices?.[0];
+
       if (choice?.message?.tool_calls) {
         console.log(`[chat] Returning ${choice.message.tool_calls.length} tools to client for execution...`);
         return res.json({
@@ -251,14 +264,30 @@ router.post('/', async (req, res) => {
       if (reply) {
         session.history.push({ role: 'assistant', parts: [{ text: reply }] });
       }
+      // Surface upstream provider error so we don't return a silent empty reply.
+      if (!reply && result && result.error) {
+        const detail = typeof result.error === 'string' ? result.error : (result.error.message || JSON.stringify(result.error));
+        console.error('[chat] upstream returned error payload:', detail);
+        return res.status(502).json({
+          error: 'AI is temporarily unavailable. Please try again.',
+          ...(isAdmin ? { detail, model: activeModel } : {})
+        });
+      }
       return res.json({ reply, model: activeModel });
     } catch (err) {
-      console.error('[chat] AI generation failed:', err.message);
-      return res.status(502).json({ error: 'AI is temporarily unavailable. Please try again.' });
+      console.error('[chat] AI generation failed:', err && err.stack || err && err.message || err);
+      return res.status(502).json({
+        error: 'AI is temporarily unavailable. Please try again.',
+        ...(isAdmin ? { detail: String(err && err.message || err), step: 'smartFetch' } : {})
+      });
     }
   } catch (error) {
-    console.error('[chat] Error:', error.message);
-    res.status(500).json({ error: 'Internal server error during chat' });
+    console.error('[chat] Error:', error && error.stack || error && error.message || error);
+    if (res.headersSent) return;
+    res.status(500).json({
+      error: 'Internal server error during chat',
+      ...(isAdmin ? { detail: String(error && error.message || error) } : {})
+    });
   }
 });
 
