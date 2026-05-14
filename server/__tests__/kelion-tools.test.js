@@ -169,6 +169,7 @@ const EXPECTED_TOOL_NAMES = [
   'data_visualize',
   'computer_use',
   'auto_test',
+  'run_agent_eval',
   'session_persist',
   'parallel_tools',
   'video_analyze',

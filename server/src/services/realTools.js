@@ -3693,6 +3693,7 @@ async function executeRealTool(name, args, ctx) {
     case 'data_visualize': return toolDataVisualize(a);
     case 'computer_use': return toolComputerUse(a);
     case 'auto_test': return toolAutoTest(a);
+    case 'run_agent_eval': return toolRunAgentEval(a);
     case 'session_persist': return toolSessionPersist(a, ctx);
     case 'parallel_tools': return toolParallelTools(a, ctx);
     case 'document_parser': return toolDocumentParser(a);
@@ -4611,6 +4612,70 @@ async function toolAutoTest(args) {
   }
 }
 
+// 0.3A — run_agent_eval: List / run / get status of the 10 advanced capability tests.
+async function toolRunAgentEval(args) {
+  const action = String(args?.action || 'list').trim().toLowerCase();
+  const testFile = _path.join(REPO_ROOT, 'server', '__tests__', 'agent-capabilities.test.js');
+
+  const tests = [
+    { id: '01', name: '01 writes a working Express endpoint to a new file', skill: 'code_generation' },
+    { id: '02', name: '02 installs an npm package inside a temp project', skill: 'dependency_install' },
+    { id: '03', name: '03 fixes a runtime bug in a source file', skill: 'bugfix' },
+    { id: '04', name: '04 appends a required env variable to .env', skill: 'config_setup' },
+    { id: '05', name: '05 moves a function across files and updates imports', skill: 'cross_file_refactor' },
+    { id: '06', name: '06 adds a new table to a SQLite schema file', skill: 'schema_update' },
+    { id: '07', name: '07 fetches a live webpage via curl and extracts the title tag', skill: 'web_research' },
+    { id: '08', name: '08 stages, commits and pushes a change via terminal commands', skill: 'git_workflow' },
+    { id: '09', name: '09 builds a valid GitHub PR JSON payload with correct schema', skill: 'pr_creation' },
+    { id: '10', name: '10 opens a local HTML page and clicks a button via Playwright', skill: 'ui_button_click' },
+  ];
+
+  if (action === 'list') {
+    return { ok: true, action: 'list', tests, total: tests.length, file: testFile };
+  }
+
+  if (action === 'status') {
+    const exists = _fs.existsSync(testFile);
+    return { ok: true, action: 'status', tests, file_exists: exists, total: tests.length, note: 'Use action:run to execute.' };
+  }
+
+  if (action === 'run') {
+    const testId = String(args?.test_id || '').trim();
+    const testName = String(args?.test_name || '').trim();
+
+    let pattern = '';
+    if (testId) {
+      const t = tests.find(x => x.id === testId);
+      if (!t) return { ok: false, error: `Unknown test_id: ${testId}. Use action:list to see available tests.` };
+      pattern = t.name;
+    } else if (testName) {
+      pattern = testName;
+    } else {
+      pattern = 'Agent Capability Evaluation';
+    }
+
+    try {
+      const { stdout, stderr } = await _exec(
+        `npx jest "${testFile}" --runInBand --testNamePattern="${pattern.replace(/"/g, '\\"')}" --verbose --forceExit --testTimeout=30000 2>&1`,
+        { cwd: _path.join(REPO_ROOT, 'server'), timeout: 120000 }
+      );
+      const passed = stdout.includes('Tests:') && stdout.includes('passed') && !stdout.includes('failed');
+      return {
+        ok: true,
+        action: 'run',
+        pattern,
+        passed,
+        output: stdout.slice(-2000),
+        errors: stderr?.slice(-500) || '',
+      };
+    } catch (err) {
+      return { ok: false, error: err.message?.slice(0, 500), pattern };
+    }
+  }
+
+  return { ok: false, error: 'Unknown action. Use list, status, or run.' };
+}
+
 // 0.7 — session_persist: Save/restore key-value session data in DB.
 async function toolSessionPersist(args, ctx) {
   const userId = ctx?.user?.id;
@@ -5196,6 +5261,7 @@ module.exports = {
   toolDataVisualize,
   toolComputerUse,
   toolAutoTest,
+  toolRunAgentEval,
   toolSessionPersist,
   toolParallelTools,
   toolVideoAnalyze,
