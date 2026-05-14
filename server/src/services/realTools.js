@@ -5668,10 +5668,38 @@ const REAL_TOOL_NAMES = [
   'read_past_conversation',
 ];
 
+// Tools that allow code execution, arbitrary filesystem access, repo
+// mutation, DB writes, or anything else a guest visitor must never be
+// able to trigger. The `/api/tools/execute` route uses this list to 403
+// non-admins so a random IP cannot turn the server into a shell-as-a-
+// service via the public chat endpoint.
+const ADMIN_ONLY_TOOLS = new Set([
+  // Shell / RCE
+  'run_command', 'run_terminal_command',
+  // Filesystem mutation
+  'write_to_file', 'replace_file_content', 'multi_replace_file_content',
+  'edit_local_file', 'replace_in_file',
+  // Filesystem read (source / config / secrets in env files)
+  'read_local_file', 'list_local_files', 'search_codebase',
+  // Repo / GitHub mutation
+  'commit_and_push_to_github', 'create_github_pr', 'manage_github_prs',
+  // Multi-step orchestration that can call any of the above
+  'execute_plan',
+  // Database direct access
+  'query_database',
+  // Process management / npm
+  'check_updates', 'auto_test',
+  // Catch-all "do anything" tools
+  'computer_use', 'system_bridge', 'universal_executor',
+  'automation_engine', 'devops_toolkit',
+  'hardware_manager', 'cloud_manager',
+]);
+
 module.exports = {
   executeRealTool,
   pickForcedTool,
   REAL_TOOL_NAMES,
+  ADMIN_ONLY_TOOLS,
   // math / offline
   toolCalculate,
   toolUnitConvert,
