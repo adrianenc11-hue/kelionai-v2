@@ -3693,6 +3693,12 @@ async function executeRealTool(name, args, ctx) {
     case 'data_visualize': return toolDataVisualize(a);
     case 'computer_use': return toolComputerUse(a);
     case 'auto_test': return toolAutoTest(a);
+    case 'run_agent_eval': return toolRunAgentEval(a);
+    case 'spice_simulate': return toolSpiceSimulate(a);
+    case 'auto_install_dependency': return toolAutoInstallDependency(a);
+    case 'learn_new_skill': return toolLearnNewSkill(a);
+    case 'self_evaluate': return toolSelfEvaluate(a);
+    case 'auto_update_dependencies': return toolAutoUpdateDependencies(a);
     case 'session_persist': return toolSessionPersist(a, ctx);
     case 'parallel_tools': return toolParallelTools(a, ctx);
     case 'document_parser': return toolDocumentParser(a);
@@ -4611,6 +4617,449 @@ async function toolAutoTest(args) {
   }
 }
 
+// 0.3A — run_agent_eval: List / run / get status of the 10 advanced capability tests.
+async function toolRunAgentEval(args) {
+  const action = String(args?.action || 'list').trim().toLowerCase();
+  const testFile = _path.join(REPO_ROOT, 'server', '__tests__', 'agent-capabilities.test.js');
+
+  const tests = [
+    { id: '01', name: '01 writes a working Express endpoint to a new file', skill: 'code_generation' },
+    { id: '02', name: '02 installs an npm package inside a temp project', skill: 'dependency_install' },
+    { id: '03', name: '03 fixes a runtime bug in a source file', skill: 'bugfix' },
+    { id: '04', name: '04 appends a required env variable to .env', skill: 'config_setup' },
+    { id: '05', name: '05 moves a function across files and updates imports', skill: 'cross_file_refactor' },
+    { id: '06', name: '06 adds a new table to a SQLite schema file', skill: 'schema_update' },
+    { id: '07', name: '07 fetches a live webpage via curl and extracts the title tag', skill: 'web_research' },
+    { id: '08', name: '08 stages, commits and pushes a change via terminal commands', skill: 'git_workflow' },
+    { id: '09', name: '09 builds a valid GitHub PR JSON payload with correct schema', skill: 'pr_creation' },
+    { id: '10', name: '10 opens a local HTML page and clicks a button via Playwright', skill: 'ui_button_click' },
+  ];
+
+  if (action === 'list') {
+    return { ok: true, action: 'list', tests, total: tests.length, file: testFile };
+  }
+
+  if (action === 'status') {
+    const exists = _fs.existsSync(testFile);
+    return { ok: true, action: 'status', tests, file_exists: exists, total: tests.length, note: 'Use action:run to execute.' };
+  }
+
+  if (action === 'run') {
+    const testId = String(args?.test_id || '').trim();
+    const testName = String(args?.test_name || '').trim();
+
+    let pattern = '';
+    if (testId) {
+      const t = tests.find(x => x.id === testId);
+      if (!t) return { ok: false, error: `Unknown test_id: ${testId}. Use action:list to see available tests.` };
+      pattern = t.name;
+    } else if (testName) {
+      pattern = testName;
+    } else {
+      pattern = 'Agent Capability Evaluation';
+    }
+
+    try {
+      const { stdout, stderr } = await _exec(
+        `npx jest "${testFile}" --runInBand --testNamePattern="${pattern.replace(/"/g, '\\"')}" --verbose --forceExit --testTimeout=30000 2>&1`,
+        { cwd: _path.join(REPO_ROOT, 'server'), timeout: 120000 }
+      );
+      const passed = stdout.includes('Tests:') && stdout.includes('passed') && !stdout.includes('failed');
+      return {
+        ok: true,
+        action: 'run',
+        pattern,
+        passed,
+        output: stdout.slice(-2000),
+        errors: stderr?.slice(-500) || '',
+      };
+    } catch (err) {
+      return { ok: false, error: err.message?.slice(0, 500), pattern };
+    }
+  }
+
+  return { ok: false, error: 'Unknown action. Use list, status, or run.' };
+}
+
+// 0.3B — spice_simulate: Simulate electronic circuits (SPICE netlist + solver).
+async function toolSpiceSimulate(args) {
+  const components = Array.isArray(args?.components) ? args.components : [];
+  const analysis = args?.analysis || { type: 'dc' };
+  const probes = Array.isArray(args?.probes) ? args.probes : [];
+  if (!components.length) return { ok: false, error: 'components array is required' };
+
+  // Build SPICE netlist
+  const netlistLines = ['* Kelion SPICE Simulation'];
+  const nodeSet = new Set(['0']);
+  for (const c of components) {
+    const { type, name, value, nodes = [] } = c;
+    if (!name || value == null) continue;
+    nodes.forEach(n => nodeSet.add(n));
+    switch (type?.toUpperCase()) {
+      case 'R': netlistLines.push(`${name} ${nodes[0] || 0} ${nodes[1] || 0} ${value}`); break;
+      case 'C': netlistLines.push(`${name} ${nodes[0] || 0} ${nodes[1] || 0} ${value}`); break;
+      case 'L': netlistLines.push(`${name} ${nodes[0] || 0} ${nodes[1] || 0} ${value}`); break;
+      case 'V': netlistLines.push(`${name} ${nodes[0] || 0} ${nodes[1] || 0} DC ${value}`); break;
+      case 'I': netlistLines.push(`${name} ${nodes[0] || 0} ${nodes[1] || 0} DC ${value}`); break;
+      default: netlistLines.push(`* Unknown component ${name} type=${type}`);
+    }
+  }
+  netlistLines.push('.OP');
+  for (const n of probes) netlistLines.push(`.PRINT DC V(${n})`);
+  netlistLines.push('.END');
+  const netlist = netlistLines.join('\n');
+
+  // Try ngspice first
+  let ngspiceAvailable = false;
+  let results = [];
+  let usedSolver = 'none';
+  try {
+    const tmpNetlist = _path.join(TMP, `spice_${Date.now()}.cir`);
+    _fs.writeFileSync(tmpNetlist, netlist, 'utf8');
+    const { stdout } = await _exec(`ngspice -b "${tmpNetlist}" 2>&1`, { cwd: TMP, timeout: 15000 });
+    _fs.unlinkSync(tmpNetlist);
+    ngspiceAvailable = true;
+    // Parse voltages from stdout: "V(n1) = 2.500000e+00"
+    const voltageRe = /V\(([^)]+)\)\s*=\s*([+-]?[\d.eE+-]+)/g;
+    let m;
+    while ((m = voltageRe.exec(stdout)) !== null) {
+      results.push({ node: m[1], voltage: parseFloat(m[2]) });
+    }
+    usedSolver = 'ngspice';
+  } catch {
+    // Fallback to native Node.js solver for passive DC circuits
+    usedSolver = 'node-fallback';
+    results = _solveDcPassive(components, probes);
+  }
+
+  return {
+    ok: true,
+    netlist,
+    ngspice_available: ngspiceAvailable,
+    used_solver: usedSolver,
+    results,
+  };
+}
+
+// Simple DC solver for passive circuits (R + ideal V/I sources)
+function _solveDcPassive(components, probes) {
+  const nodeMap = new Map([['0', 0]]);
+  let nextIdx = 1;
+  const getNode = (n) => {
+    if (!nodeMap.has(n)) { nodeMap.set(n, nextIdx++); }
+    return nodeMap.get(n);
+  };
+
+  // Collect components by type
+  const resistors = [];
+  const voltageSources = [];
+  const currentSources = [];
+  for (const c of components) {
+    const t = String(c.type || '').toUpperCase();
+    const nodes = [String(c.nodes?.[0] || '0'), String(c.nodes?.[1] || '0')];
+    if (t === 'R') {
+      getNode(nodes[0]); getNode(nodes[1]);
+      resistors.push({ n1: nodeMap.get(nodes[0]), n2: nodeMap.get(nodes[1]), r: Number(c.value) || 1e-9 });
+    } else if (t === 'V') {
+      getNode(nodes[0]); getNode(nodes[1]);
+      voltageSources.push({ n1: nodeMap.get(nodes[0]), n2: nodeMap.get(nodes[1]), v: Number(c.value) || 0 });
+    } else if (t === 'I') {
+      getNode(nodes[0]); getNode(nodes[1]);
+      currentSources.push({ n1: nodeMap.get(nodes[0]), n2: nodeMap.get(nodes[1]), i: Number(c.value) || 0 });
+    }
+  }
+
+  const n = nextIdx; // number of unknown nodes (node 0 is ground)
+  if (n <= 1) return [];
+
+  // Build MNA matrices: G * V = I
+  const G = Array.from({ length: n }, () => Array(n).fill(0));
+  const I = Array(n).fill(0);
+
+  for (const { n1, n2, r } of resistors) {
+    const g = 1 / r;
+    G[n1][n1] += g; G[n2][n2] += g;
+    G[n1][n2] -= g; G[n2][n1] -= g;
+  }
+
+  for (const { n1, n2, i } of currentSources) {
+    I[n1] -= i;
+    I[n2] += i;
+  }
+
+  // Voltage sources: super-node or stamp. Simpler: add extra equations for each V source.
+  const vsCount = voltageSources.length;
+  const dim = n + vsCount;
+  const A = Array.from({ length: dim }, () => Array(dim).fill(0));
+  const b = Array(dim).fill(0);
+
+  // Copy G and I
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) A[i][j] = G[i][j];
+    b[i] = I[i];
+  }
+
+  for (let k = 0; k < vsCount; k++) {
+    const { n1, n2, v } = voltageSources[k];
+    const eq = n + k;
+    A[eq][n1] = 1; A[eq][n2] = -1; b[eq] = v;
+    A[n1][eq] = 1; A[n2][eq] = -1;
+  }
+
+  // Ground node 0: remove row/col 0
+  const reducedDim = dim - 1;
+  const Ar = Array.from({ length: reducedDim }, () => Array(reducedDim).fill(0));
+  const br = Array(reducedDim).fill(0);
+  for (let i = 1; i < dim; i++) {
+    for (let j = 1; j < dim; j++) Ar[i - 1][j - 1] = A[i][j];
+    br[i - 1] = b[i];
+  }
+
+  const sol = _gaussEliminate(Ar, br);
+  if (!sol) return [];
+
+  // Map node indices back
+  const voltages = new Map([['0', 0]]);
+  for (let i = 1; i < n; i++) {
+    const nodeName = [...nodeMap.entries()].find(([, idx]) => idx === i)?.[0];
+    if (nodeName) voltages.set(nodeName, sol[i - 1]);
+  }
+
+  return (probes.length ? probes : [...voltages.keys()]).map(node => ({
+    node,
+    voltage: voltages.get(node) ?? null,
+  }));
+}
+
+function _gaussEliminate(A, b) {
+  const n = A.length;
+  if (n === 0) return [];
+  // Augmented matrix
+  for (let i = 0; i < n; i++) {
+    let maxRow = i;
+    for (let k = i + 1; k < n; k++) {
+      if (Math.abs(A[k][i]) > Math.abs(A[maxRow][i])) maxRow = k;
+    }
+    [A[i], A[maxRow]] = [A[maxRow], A[i]];
+    [b[i], b[maxRow]] = [b[maxRow], b[i]];
+    if (Math.abs(A[i][i]) < 1e-12) return null; // singular
+    for (let k = i + 1; k < n; k++) {
+      const factor = A[k][i] / A[i][i];
+      b[k] -= factor * b[i];
+      for (let j = i; j < n; j++) A[k][j] -= factor * A[i][j];
+    }
+  }
+  const x = Array(n).fill(0);
+  for (let i = n - 1; i >= 0; i--) {
+    x[i] = b[i];
+    for (let j = i + 1; j < n; j++) x[i] -= A[i][j] * x[j];
+    x[i] /= A[i][i];
+  }
+  return x;
+}
+
+// 0.3C — auto_install_dependency: Install missing packages (npm, pip, choco, system).
+async function toolAutoInstallDependency(args) {
+  const name = String(args?.name || '').trim();
+  const type = String(args?.type || 'auto').trim().toLowerCase();
+  const globalFlag = Boolean(args?.global);
+  if (!name) return { ok: false, error: 'name is required' };
+
+  const isWin = process.platform === 'win32';
+
+  // Detection helpers
+  const checkNpm = async () => {
+    try { await _exec(`npm list ${name} --depth=0 2>&1`, { timeout: 10000 }); return true; } catch { return false; }
+  };
+  const checkPip = async () => {
+    try { await _exec(`pip show ${name} 2>&1`, { timeout: 10000 }); return true; } catch { return false; }
+  };
+  const checkSystem = async () => {
+    try {
+      const cmd = isWin ? `Get-Command ${name} -ErrorAction SilentlyContinue` : `which ${name}`;
+      await _exec(cmd, { timeout: 5000 });
+      return true;
+    } catch { return false; }
+  };
+
+  let resolvedType = type;
+  if (type === 'auto') {
+    if (await checkPip()) resolvedType = 'pip';
+    else if (await checkNpm()) resolvedType = 'npm';
+    else if (await checkSystem()) resolvedType = 'system';
+    else resolvedType = 'npm'; // default guess
+  }
+
+  if (resolvedType === 'npm') {
+    const already = await checkNpm();
+    if (already) return { ok: true, installed: true, type: 'npm', name };
+    try {
+      const g = globalFlag ? '-g' : '';
+      await _exec(`npm install ${g} ${name} --legacy-peer-deps 2>&1`, { timeout: 60000 });
+      return { ok: true, installed: true, type: 'npm', name };
+    } catch (err) {
+      return { ok: false, error: `npm install failed: ${err.message?.slice(0, 300)}`, type: 'npm', name };
+    }
+  }
+
+  if (resolvedType === 'pip') {
+    const already = await checkPip();
+    if (already) return { ok: true, installed: true, type: 'pip', name };
+    try {
+      const g = globalFlag ? '' : '--user';
+      await _exec(`pip install ${g} ${name} 2>&1`, { timeout: 60000 });
+      return { ok: true, installed: true, type: 'pip', name };
+    } catch (err) {
+      return { ok: false, error: `pip install failed: ${err.message?.slice(0, 300)}`, type: 'pip', name };
+    }
+  }
+
+  if (resolvedType === 'choco') {
+    try {
+      await _exec(`choco install ${name} -y 2>&1`, { timeout: 120000 });
+      return { ok: true, installed: true, type: 'choco', name };
+    } catch (err) {
+      return { ok: false, error: `choco install failed (may need admin): ${err.message?.slice(0, 300)}`, type: 'choco', name };
+    }
+  }
+
+  if (resolvedType === 'system') {
+    const already = await checkSystem();
+    if (already) return { ok: true, installed: true, type: 'system', name };
+    return { ok: false, error: `Cannot auto-install system package ${name}. Install manually.`, type: 'system', name };
+  }
+
+  return { ok: false, error: `Unknown type: ${resolvedType}. Use npm, pip, choco, system, or auto.`, name };
+}
+
+// 0.3D — learn_new_skill: Generate, test, and propose a new tool.
+async function toolLearnNewSkill(args) {
+  const skillName = String(args?.skill_name || '').trim().replace(/[^a-zA-Z0-9_]/g, '_');
+  const description = String(args?.description || '').trim();
+  const testInput = args?.test_input || {};
+  if (!skillName || !description) return { ok: false, error: 'skill_name and description are required' };
+
+  const funcName = `tool${skillName.charAt(0).toUpperCase()}${skillName.slice(1)}`;
+  const prompt = `Write a minimal Node.js async function named ${funcName} that does the following:\n${description}\n\nRequirements:\n- Accept a single argument object (args).\n- Return an object with at least { ok: boolean }.\n- Use only built-in Node.js modules (fs, path, child_process, util, os) or standard fetch.\n- Include basic input validation.\n- Output ONLY the function code, no explanation, no markdown.`;
+
+  const expert = await toolAskExpertCoder({ question: prompt, context: 'Generate a new Kelion tool function.' });
+  if (!expert?.ok) return { ok: false, error: 'Failed to generate skill code' };
+
+  let code = (expert.answer || '').replace(/\`\`\`[\w]*\n?/g, '').trim();
+  if (!code.includes(`async function ${funcName}`)) {
+    return { ok: false, error: `Generated code does not define ${funcName}. Preview: ${code.slice(0, 200)}` };
+  }
+
+  // Write to temp file and syntax-check
+  const tmpFile = _path.join(TMP, `${funcName}_eval_${Date.now()}.js`);
+  const wrapped = `'use strict';\n${code}\nmodule.exports = { ${funcName} };`;
+  _fs.writeFileSync(tmpFile, wrapped, 'utf8');
+  try {
+    const mod = require(tmpFile);
+    const fn = mod[funcName];
+    if (typeof fn !== 'function') throw new Error('Export is not a function');
+    // Run the generated function with test input
+    const testResult = await fn(testInput);
+    if (!testResult || typeof testResult.ok !== 'boolean') {
+      throw new Error('Function did not return { ok: boolean }');
+    }
+    _fs.unlinkSync(tmpFile);
+    return {
+      ok: true,
+      generated: true,
+      function_name: funcName,
+      test_result: testResult,
+      code_preview: code.slice(0, 800),
+      next_step: `Review the generated code. To make it permanent, add it to server/src/services/realTools.js and register it in KELION_TOOLS in server/src/routes/realtime.js.`,
+    };
+  } catch (err) {
+    try { _fs.unlinkSync(tmpFile); } catch (_) { }
+    return { ok: false, error: `Generated code failed validation: ${err.message}`, code_preview: code.slice(0, 500) };
+  }
+}
+
+// 0.3E — self_evaluate: Run the agent capability tests and report status.
+async function toolSelfEvaluate(args) {
+  const scope = String(args?.scope || 'agent-capabilities').trim().toLowerCase();
+  let pattern;
+  if (scope === 'all') pattern = '';
+  else if (scope === 'agent-capabilities') pattern = 'agent-capabilities';
+  else pattern = scope;
+
+  const testFileRel = '__tests__/agent-capabilities.test.js';
+  const isFileScope = scope === 'agent-capabilities' || (pattern && scope !== 'all');
+  const testPath = isFileScope ? testFileRel : '__tests__';
+
+  try {
+    const cmd = pattern
+      ? `npx jest "${testPath}" --runInBand --testNamePattern="${pattern.replace(/"/g, '\\"')}" --forceExit --testTimeout=30000 2>&1`
+      : `npx jest "${testPath}" --runInBand --forceExit --testTimeout=30000 2>&1`;
+    const { stdout, stderr } = await _exec(cmd, { cwd: _path.join(REPO_ROOT, 'server'), timeout: 180000 });
+    const output = stdout || stderr || '';
+    const passed = /Tests:\s*\d+\s*passed/.test(output) && !/failed/.test(output);
+    const failedMatch = output.match(/Tests:\s*(\d+)\s*passed.*?,(\s*\d+)\s*failed/);
+    const totalFailed = failedMatch ? parseInt(failedMatch[2], 10) : 0;
+    return {
+      ok: true,
+      scope,
+      passed,
+      total_failed: totalFailed,
+      summary: output.match(/Test Suites:[^\n]+/)?.[0] || 'N/A',
+      output_tail: output.slice(-1500),
+    };
+  } catch (err) {
+    const output = err.stdout || err.stderr || err.message || '';
+    return { ok: false, error: `Self-evaluation failed: ${output.slice(0, 300)}`, scope };
+  }
+}
+
+// 0.3F — auto_update_dependencies: Check outdated packages and propose updates.
+async function toolAutoUpdateDependencies(args) {
+  const manifest = String(args?.manifest || 'package.json').trim().toLowerCase();
+  const autoApply = Boolean(args?.auto_apply);
+
+  if (manifest === 'package.json' || manifest === 'npm') {
+    try {
+      let stdout = '';
+      try {
+        const res = await _exec('npm outdated --json 2>&1', { cwd: REPO_ROOT, timeout: 30000 });
+        stdout = res.stdout;
+      } catch (execErr) {
+        stdout = execErr.stdout || '';
+      }
+      let outdated = {};
+      try { outdated = JSON.parse(stdout); } catch { /* npm outdated returns empty JSON when nothing is outdated */ }
+      const entries = Object.entries(outdated).filter(([, v]) => v && v.current);
+      const recommendations = entries.map(([name, v]) => ({
+        name,
+        current: v.current,
+        wanted: v.wanted,
+        latest: v.latest,
+        command: `npm install ${name}@${v.wanted}`,
+      }));
+      if (autoApply && recommendations.length) {
+        const updates = recommendations.map(r => r.name + '@' + r.wanted).join(' ');
+        await _exec(`npm install ${updates} --legacy-peer-deps 2>&1`, { cwd: REPO_ROOT, timeout: 120000 });
+      }
+      return {
+        ok: true,
+        manifest: 'package.json',
+        outdated_count: recommendations.length,
+        recommendations,
+        auto_applied: autoApply && recommendations.length > 0,
+      };
+    } catch (err) {
+      return { ok: false, error: `npm outdated failed: ${err.message?.slice(0, 300)}`, manifest: 'package.json' };
+    }
+  }
+
+  if (manifest === 'requirements.txt' || manifest === 'pip') {
+    return { ok: true, manifest: 'requirements.txt', note: 'Use pip list --outdated and pip install -U <pkg>. Kelion can run these commands via run_terminal_command.' };
+  }
+
+  return { ok: false, error: `Unsupported manifest: ${manifest}. Use package.json or requirements.txt.`, manifest };
+}
+
 // 0.7 — session_persist: Save/restore key-value session data in DB.
 async function toolSessionPersist(args, ctx) {
   const userId = ctx?.user?.id;
@@ -5196,6 +5645,12 @@ module.exports = {
   toolDataVisualize,
   toolComputerUse,
   toolAutoTest,
+  toolRunAgentEval,
+  toolSpiceSimulate,
+  toolAutoInstallDependency,
+  toolLearnNewSkill,
+  toolSelfEvaluate,
+  toolAutoUpdateDependencies,
   toolSessionPersist,
   toolParallelTools,
   toolVideoAnalyze,
