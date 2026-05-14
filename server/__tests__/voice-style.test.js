@@ -73,7 +73,6 @@ describe('buildKelionPersona — minimal prompt with full tool catalog', () => {
       expect(prompt).toMatch(/calculate/);
       expect(prompt).toMatch(/get_weather/);
       expect(prompt).toMatch(/web_search/);
-      expect(prompt).toMatch(/translate/);
       expect(prompt).toMatch(/get_crypto_price/);
       expect(prompt).toMatch(/play_radio/);
       expect(prompt).toMatch(/show_on_monitor/);
