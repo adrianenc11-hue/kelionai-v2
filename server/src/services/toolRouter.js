@@ -69,7 +69,6 @@ const TOOL_CATEGORIES = {
     'rss_read',
     'dictionary',
     'search_academic',
-    'translate',
     'fetch_documentation',
     'browse_web',
     'computer_use',
