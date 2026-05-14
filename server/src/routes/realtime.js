@@ -683,16 +683,6 @@ const KELION_TOOLS = [
     },
     required: ['query'],
   },
-  {
-    name: 'translate',
-    description: "Translate a short text between languages using a real translator. Use whenever the user asks 'how do you say X in Y', 'translate this to Y', 'tradu ...', or similar. Prefer this over translating in your head — the external engine handles nuance, idioms, and less-common language pairs better.",
-    properties: {
-      text: { type: 'string', description: "Source text to translate. Max 5000 characters." },
-      to: { type: 'string', description: "Target language code (ISO 639-1, e.g. 'en', 'ro', 'fr', 'de', 'es', 'it', 'pt', 'ru', 'zh', 'ja', 'ar')." },
-      from: { type: 'string', description: "Source language code. Use 'auto' or omit to auto-detect." },
-    },
-    required: ['text', 'to'],
-  },
   // ── Feeds & live data ─────────────────────────────────────────────
   {
     name: 'get_forecast',
