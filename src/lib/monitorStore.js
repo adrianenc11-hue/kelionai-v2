@@ -676,14 +676,24 @@ L.marker([${lat},${lon}]).addTo(map).bindPopup(${JSON.stringify(name)}).openPopu
         return { kind: 'document', src: proxyUrl(src), title: label, embedType: 'iframe' };
       }
 
-      // Office / OpenDocument formats → Google Docs Viewer
-      const officeExts = ['doc','docx','xls','xlsx','ppt','pptx','odt','ods','odp','rtf','csv'];
-      if (officeExts.includes(ext2)) {
-        const viewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(src)}&embedded=true`;
+      // Office / OpenDocument formats → Microsoft Office Online Viewer.
+      // The previous Google Docs Viewer (`docs.google.com/viewer?...&embedded=true`)
+      // is deprecated and now returns the "Sorry, we are unable to generate a view
+      // of the document at this time" placeholder for ~all non-Google-hosted
+      // URLs, which is why "deschide xlsx pe monitor" used to show a blank
+      // card. Office Online Viewer renders DOC/DOCX/XLS/XLSX/PPT/PPTX
+      // real-time, requires no key, accepts public HTTP(S) URLs, and is
+      // explicitly iframe-friendly. Source MUST be publicly reachable.
+      const officeOnlineExts = ['doc','docx','xls','xlsx','ppt','pptx'];
+      if (officeOnlineExts.includes(ext2)) {
+        const viewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(src)}`;
         return { kind: 'document', src: viewerUrl, title: label, embedType: 'iframe' };
       }
-
-      // TXT or unknown → proxy directly
+      // OpenDocument / RTF / CSV — Office Online does not support these,
+      // and Google Docs Viewer is dead for arbitrary URLs. Proxy them
+      // through our server so the browser handles the bytes natively
+      // (CSV/RTF render as text, ODF gets a download prompt). Same path
+      // as the TXT/unknown fallback below.
       return { kind: 'document', src: proxyUrl(src), title: label, embedType: 'iframe' };
     }
 
