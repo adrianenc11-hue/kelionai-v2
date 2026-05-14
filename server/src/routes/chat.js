@@ -29,7 +29,11 @@ setInterval(() => {
 
 router.post('/', async (req, res) => {
   const t0 = Date.now();
-  const step = (n) => console.log(`[chat] step=${n} t=${Date.now() - t0}ms`);
+  let currentStep = 'init';
+  const step = (n) => {
+    currentStep = String(n).split(' ')[0];
+    console.log(`[chat] step=${n} t=${Date.now() - t0}ms`);
+  };
   let adminUser = null;
   let isAdmin = false;
   try {
@@ -270,23 +274,23 @@ router.post('/', async (req, res) => {
         console.error('[chat] upstream returned error payload:', detail);
         return res.status(502).json({
           error: 'AI is temporarily unavailable. Please try again.',
-          ...(isAdmin ? { detail, model: activeModel } : {})
+          ...(isAdmin ? { detail, model: activeModel, step: currentStep } : {})
         });
       }
       return res.json({ reply, model: activeModel });
     } catch (err) {
-      console.error('[chat] AI generation failed:', err && err.stack || err && err.message || err);
+      console.error(`[chat] AI generation failed at step=${currentStep}:`, err && err.stack || err && err.message || err);
       return res.status(502).json({
         error: 'AI is temporarily unavailable. Please try again.',
-        ...(isAdmin ? { detail: String(err && err.message || err), step: 'smartFetch' } : {})
+        ...(isAdmin ? { detail: String(err && err.message || err), step: currentStep } : {})
       });
     }
   } catch (error) {
-    console.error('[chat] Error:', error && error.stack || error && error.message || error);
+    console.error(`[chat] Error at step=${currentStep}:`, error && error.stack || error && error.message || error);
     if (res.headersSent) return;
     res.status(500).json({
       error: 'Internal server error during chat',
-      ...(isAdmin ? { detail: String(error && error.message || error) } : {})
+      ...(isAdmin ? { detail: String(error && error.message || error), step: currentStep } : {})
     });
   }
 });
