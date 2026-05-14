@@ -956,11 +956,20 @@ export default function KelionStage() {
   // float on top of the overlay instead of being half-hidden behind it.
   // Adrian (2026-04-25) screenshot showed the map covering the bottom
   // composer: "promtul de scris si vorbut sunt acoperite de pagina".
-  const [monitorOpen, setMonitorOpen] = useState(true)
+  const [monitorOpen, setMonitorOpen] = useState(false)
   const [stageNarrow, setStageNarrow] = useState(() => (
     typeof window !== 'undefined' && window.innerWidth < 640
   ))
-  useEffect(() => subscribeMonitor((s) => setMonitorOpen(!!s.src)), [])
+  useEffect(() => {
+    const unsub = subscribeMonitor((s) => {
+      const age = s.updatedAt ? Date.now() - s.updatedAt : Infinity
+      // Only auto-open the monitor for fresh tool results (< 5 s old),
+      // not for stale content restored from localStorage on page load.
+      if (s.src && age < 5000) setMonitorOpen(true)
+      if (!s.src) setMonitorOpen(false)
+    })
+    return unsub
+  }, [])
   useEffect(() => {
     if (typeof window === 'undefined') return undefined
     const onResize = () => setStageNarrow(window.innerWidth < 640)
