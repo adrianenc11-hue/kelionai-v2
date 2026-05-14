@@ -10,7 +10,8 @@
 const { Router } = require('express');
 const jwt = require('jsonwebtoken');
 const config = require('../config');
-const { executeRealTool, REAL_TOOL_NAMES } = require('../services/realTools');
+const { executeRealTool, REAL_TOOL_NAMES, ADMIN_ONLY_TOOLS } = require('../services/realTools');
+const { isAdminUser } = require('../middleware/optionalAuth');
 const { logAction } = require('../db');
 const { summarizeResultForHistory } = require('../services/actionHistorySummarizer');
 
@@ -292,6 +293,27 @@ router.post('/execute', async (req, res) => {
     // "sign in first" message when the ctx is absent, so this peek
     // never fails the request — it only enriches it.
     const user = await peekUser(req);
+    // Security: a subset of REAL_TOOL_NAMES executes shell commands,
+    // writes to the filesystem, mutates the repo, or hits the DB
+    // directly. Without this guard ANY visitor that holds the public
+    // CSRF cookie can POST {name: 'run_terminal_command', args: {...}}
+    // and turn the server into a shell-as-a-service. Admin-gate the
+    // dangerous subset; everything else (weather/maps/wiki/...) stays
+    // open so guests still have a useful assistant.
+    if (ADMIN_ONLY_TOOLS.has(name)) {
+      // Pass `req` to isAdminUser so it can re-decode the JWT and read
+      // the `role` claim — tools.js's local peekUser only keeps id/name/
+      // email, so role-based admins would otherwise be missed (email
+      // allowlist would still catch the primary admin but not custom
+      // role grants).
+      const admin = await isAdminUser(req);
+      if (!admin) {
+        return res.status(403).json({
+          ok: false,
+          error: `Tool "${name}" is admin-only on this deployment.`,
+        });
+      }
+    }
     const ctx = user ? { user } : undefined;
     const startedAt = Date.now();
     const result = await executeRealTool(name, args, ctx);
@@ -352,6 +374,12 @@ const TOOLS_REPO_ROOT = _path.resolve(__dirname, '../../../');
 
 router.post('/terminal-stream', async (req, res) => {
   const user = await peekUser(req);
+  // Same RCE concern as /execute above — spawn()'s a /bin/sh on the
+  // server with whatever the request supplies. Admin-only.
+  const admin = await isAdminUser(req);
+  if (!admin) {
+    return res.status(403).json({ ok: false, error: 'Admin-only endpoint.' });
+  }
   const ip = req.ip || 'anon';
   if (!rateOk(`stream:${ip}`, 30, 60_000)) {
     return res.status(429).json({ ok: false, error: 'Too many streaming commands.' });
