@@ -1,9 +1,40 @@
 // Root Jest config — ensures `npx jest` from the project root picks up the
 // same exclusions that server/package.json defines for `cd server && jest`.
 module.exports = {
+  roots: ['<rootDir>/server'],
   testPathIgnorePatterns: [
     '/node_modules/',
-    '__tests__/helpers/',   // helper modules, not test files
-    '/e2e/',                // Playwright tests — run via `npx playwright test`
+    '__tests__/helpers/',
+    '/e2e/',
+    '/AppData/',
+    '/.vscode/',
+    '/.cache/',
+    '/.cargo/',
+    '/.chocolatey/',
+    '/.cursor/',
+    '/.gradle/',
+    '/.kimi/',
+    '/.ollama/',
+    '/.openclaw/',
+    '/.openjarvis/',
+    '/.railway/',
+    '/.rustup/',
+    '/.supabase/',
+    '/.verdent/',
+    '/.windsurf/',
+    '/Contacts/',
+    '/Desktop/',
+    '/Documents/',
+    '/Downloads/',
+    '/Favorites/',
+    '/Links/',
+    '/Music/',
+    '/OneDrive/',
+    '/OpenJarvis/',
+    '/Saved Games/',
+    '/Searches/',
+    '/Videos/',
+    '/cypress/',
+    '/tmp_audit_db',
   ],
 };
