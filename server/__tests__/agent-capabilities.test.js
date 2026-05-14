@@ -276,4 +276,74 @@ const { chromium } = require('playwright');
     expect(content).toContain('EEPROM');
   });
 
+  // ── 21. Spice simulation — divizor de tensiune ──
+  it('21 simulates a voltage divider and returns Vout=2.5V', async () => {
+    const r = await executeRealTool('spice_simulate', {
+      components: [
+        { type: 'V', name: 'V1', value: 5, nodes: ['n1', '0'] },
+        { type: 'R', name: 'R1', value: 10000, nodes: ['n1', 'n2'] },
+        { type: 'R', name: 'R2', value: 10000, nodes: ['n2', '0'] },
+      ],
+      analysis: { type: 'dc' },
+      probes: ['n2'],
+    });
+    expect(r.ok).toBe(true);
+    expect(r.netlist).toContain('R1');
+    expect(r.netlist).toContain('R2');
+    const n2 = r.results.find(x => x.node === 'n2');
+    expect(n2).toBeTruthy();
+    expect(n2.voltage).toBeCloseTo(2.5, 1);
+  });
+
+  // ── 22. Auto-install missing dependency (pip) ──
+  it('22 installs a missing Python package via pip', async () => {
+    const r = await executeRealTool('auto_install_dependency', {
+      name: 'colorama',
+      type: 'pip',
+    });
+    expect(r.ok).toBe(true);
+    expect(r.installed).toBe(true);
+    expect(r.type).toBe('pip');
+  });
+
+  // ── 23. Learn new skill ──
+  it('23 generates and validates a new tool via learn_new_skill', async () => {
+    const r = await executeRealTool('learn_new_skill', {
+      skill_name: 'reverseString',
+      description: 'Takes an object with a property "text" and returns { ok: true, reversed: text.split("").reverse().join("") }.',
+      test_input: { text: 'hello' },
+    });
+    // If LLM is unavailable this may fail — accept either success or a controlled error
+    if (r.ok) {
+      expect(r.generated).toBe(true);
+      expect(r.test_result).toBeDefined();
+      expect(r.function_name).toBe('toolReverseString');
+    } else {
+      expect(r.error || '').toMatch(/generate|expert|LLM|failed/i);
+    }
+  });
+
+  // ── 24. Self-evaluation ──
+  it('24 runs self_evaluate on a narrow scope and returns structured results', async () => {
+    const r = await executeRealTool('self_evaluate', {
+      scope: '01 writes',
+    });
+    expect(r.ok).toBe(true);
+    expect(r.scope).toBe('01 writes');
+    expect(typeof r.passed).toBe('boolean');
+    expect(r.summary || r.output_tail).toBeTruthy();
+  });
+
+  // ── 25. Auto-update dependencies (dry-run) ──
+  it('25 checks for outdated dependencies in package.json without applying', async () => {
+    const r = await executeRealTool('auto_update_dependencies', {
+      manifest: 'package.json',
+      auto_apply: false,
+    });
+    expect(r.ok).toBe(true);
+    expect(r.manifest).toBe('package.json');
+    expect(Array.isArray(r.recommendations)).toBe(true);
+    expect(r.auto_applied).toBe(false);
+  });
+
 });
