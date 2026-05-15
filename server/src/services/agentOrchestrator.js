@@ -38,6 +38,17 @@ const agentShell = require('./agentShell');
 const agentDiagnostics = require('./agentDiagnostics');
 const agentGitHub = require('./agentGitHub');
 
+// ── Mutex: prevent parallel autonomous tasks from clobbering each other ──
+let _taskLock = false;
+function _acquireLock() {
+  if (_taskLock) return false;
+  _taskLock = true;
+  return true;
+}
+function _releaseLock() {
+  _taskLock = false;
+}
+
 // ── Safety Guardrails ──
 /** @const {RegExp[]} Paths that may NEVER be read or written by the agent. */
 const BLOCKED_PATHS = [
@@ -350,8 +361,11 @@ Rules:
     const fix = JSON.parse(payload);
 
     if (fix.type === 'write' && fix.path && isPathAllowed(fix.path)) {
-      const orig = await agentFs.readFile(fix.path);
-      if (orig.ok) state.backups[fix.path] = orig.content;
+      // Păstrăm backup-ul ORIGINAL — nu-l suprascriem cu versiunea intermediară de pe disc.
+      if (!state.backups[fix.path]) {
+        const orig = await agentFs.readFile(fix.path);
+        if (orig.ok) state.backups[fix.path] = orig.content;
+      }
       const wr = await agentFs.writeFile(fix.path, fix.content);
       state.fileCache[fix.path] = fix.content;
       state.modifiedPaths.add(fix.path);
@@ -376,6 +390,17 @@ Rules:
  * @returns {Promise<{ok:boolean, taskId:number, status:string, logs:object[], narratives:object[], modifiedPaths:string[]}>}
  */
 async function startTask(description, options = {}) {
+  if (!_acquireLock()) {
+    return { ok: false, error: 'Another autonomous task is already running. Wait for it to finish or cancel it.', status: 'locked' };
+  }
+  try {
+    return await _startTaskLocked(description, options);
+  } finally {
+    _releaseLock();
+  }
+}
+
+async function _startTaskLocked(description, options = {}) {
   const { approvedCommit = false, approvedPush = false, codebaseSummary = '' } = options;
 
   const task = await createTask({

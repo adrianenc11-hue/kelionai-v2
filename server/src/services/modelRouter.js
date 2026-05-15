@@ -475,5 +475,4 @@ module.exports = {
   runTandem,
   isCodingTask,
   isComplexTask,
-  MODELS,
 };
