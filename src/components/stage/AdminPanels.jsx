@@ -44,6 +44,7 @@ const ADMIN_TABS = [
   { key: 'visitors', label: 'Visitors', emoji: '👥' },
   { key: 'users',    label: 'Users',    emoji: '🧑‍🤝‍🧑' },
   { key: 'payouts',  label: 'Payouts',  emoji: '💸' },
+  { key: 'devagent', label: 'Dev Agent', emoji: '🤖' },
 ];
 
 function AdminTabBar({ active, onSelect }) {
@@ -809,6 +810,103 @@ function LiveSessionsPanel({ data, loading, isAdmin }) {
     </div>
   )
 }
+// Dev Agent panel — autonomous developer task queue, input, approval controls.
+function DevAgentPanel({ data, loading, error, onStart, onApprove, onRevert, busy }) {
+  const [taskInput, setTaskInput] = React.useState('')
+
+  return (
+    <div>
+      <div style={{
+        marginTop: 4, padding: '14px 16px',
+        background: 'rgba(16, 185, 129, 0.08)',
+        border: '1px solid rgba(16, 185, 129, 0.25)',
+        borderRadius: 12, fontSize: 13, lineHeight: 1.55,
+      }}>
+        <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 14 }}>
+          🤖 Dezvoltator Autonom
+        </div>
+        <div style={{ opacity: 0.82, marginBottom: 10 }}>
+          Kelion poate modifica cod, rula teste și deploy-ui singur.
+          Fiecare task necesită aprobare pentru commit/push.
+        </div>
+        <textarea
+          value={taskInput}
+          onChange={e => setTaskInput(e.target.value)}
+          placeholder="Descrie task-ul (ex: scoate bula de chat din fața gurii avatarului)..."
+          rows={3}
+          style={{
+            width: '100%', background: '#1a1b26', border: '1px solid #334155',
+            color: '#fff', borderRadius: 8, padding: '8px 10px', fontSize: 13,
+            resize: 'vertical', marginBottom: 8,
+          }}
+        />
+        <button
+          onClick={() => { if (taskInput.trim()) onStart(taskInput.trim()); }}
+          disabled={busy || !taskInput.trim()}
+          style={{
+            width: '100%', padding: '10px 14px',
+            background: busy ? 'rgba(167,139,250,0.08)' : 'linear-gradient(180deg, rgba(167,139,250,0.32), rgba(139,92,246,0.22))',
+            border: '1px solid rgba(167,139,250,0.45)', borderRadius: 10,
+            color: '#ede9fe', fontWeight: 600, fontSize: 13, cursor: busy ? 'not-allowed' : 'pointer',
+          }}
+        >
+          {busy ? 'Se execută...' : '▶️ Start Task'}
+        </button>
+      </div>
+
+      {error && (
+        <div style={{ marginTop: 10, padding: '10px 12px', background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.35)', borderRadius: 10, fontSize: 12, color: '#fecaca' }}>
+          Eroare: {error}
+        </div>
+      )}
+
+      {loading && (
+        <div style={{ marginTop: 10, opacity: 0.6, fontSize: 13 }}>Se încarcă task-urile...</div>
+      )}
+
+      {data && data.tasks && data.tasks.length > 0 && (
+        <div style={{ marginTop: 14 }}>
+          <div style={{ fontSize: 11, opacity: 0.6, letterSpacing: '0.1em', marginBottom: 8 }}>
+            ISTORIC TASK-URI
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {data.tasks.map(t => (
+              <div key={t.id} style={{
+                padding: '10px 12px', borderRadius: 10,
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid rgba(167,139,250,0.12)',
+                fontSize: 12,
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontWeight: 600, color: '#fff' }}>#{t.id}</span>
+                  <span style={{
+                    padding: '2px 8px', borderRadius: 999, fontSize: 11, fontWeight: 600,
+                    background: t.status === 'done' ? 'rgba(16,185,129,0.15)' : t.status === 'failed' ? 'rgba(239,68,68,0.15)' : 'rgba(167,139,250,0.15)',
+                    color: t.status === 'done' ? '#bbf7d0' : t.status === 'failed' ? '#fecaca' : '#ede9fe',
+                  }}>
+                    {t.status}
+                  </span>
+                </div>
+                <div style={{ marginTop: 4, opacity: 0.75 }}>{t.title}</div>
+                {t.status === 'pending_approval' && (
+                  <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                    <button onClick={() => onApprove(t.id, true, true)} style={{ flex: 1, padding: '6px 10px', background: 'rgba(16,185,129,0.2)', border: '1px solid rgba(16,185,129,0.4)', borderRadius: 6, color: '#bbf7d0', fontSize: 11, cursor: 'pointer' }}>
+                      ✅ Aprobă Commit + Push
+                    </button>
+                    <button onClick={() => onRevert(t.id)} style={{ flex: 1, padding: '6px 10px', background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 6, color: '#fecaca', fontSize: 11, cursor: 'pointer' }}>
+                      ❌ Revert
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 
 // Export buttons — CSV download for users and transactions.
 function ExportButtons() {
@@ -837,4 +935,4 @@ function ExportButtons() {
   )
 }
 
-export { TopBarIconButton, AdminTabBar, VisitorsAnalyticsPanel, PayoutsPanel, MenuItem, friendlyCreditStatus, uaIsBot, uaBrowser, uaOs, refHost, trafficSource, flagEmoji, RevenueChart, LiveSessionsPanel, ExportButtons }
+export { TopBarIconButton, AdminTabBar, VisitorsAnalyticsPanel, PayoutsPanel, MenuItem, friendlyCreditStatus, uaIsBot, uaBrowser, uaOs, refHost, trafficSource, flagEmoji, RevenueChart, LiveSessionsPanel, ExportButtons, DevAgentPanel }

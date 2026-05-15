@@ -17,7 +17,7 @@ import Halo from '../components/stage/Halo'
 import StudioDecor from '../components/stage/StudioDecor'
 import CameraRig from '../components/stage/CameraRig'
 import MonitorOverlay from '../components/stage/MonitorOverlay'
-import { TopBarIconButton, AdminTabBar, VisitorsAnalyticsPanel, PayoutsPanel, MenuItem, friendlyCreditStatus, uaIsBot, uaBrowser, uaOs, refHost, trafficSource, flagEmoji, RevenueChart, LiveSessionsPanel, ExportButtons } from '../components/stage/AdminPanels'
+import { TopBarIconButton, AdminTabBar, VisitorsAnalyticsPanel, PayoutsPanel, MenuItem, friendlyCreditStatus, uaIsBot, uaBrowser, uaOs, refHost, trafficSource, flagEmoji, RevenueChart, LiveSessionsPanel, ExportButtons, DevAgentPanel } from '../components/stage/AdminPanels'
 import TranscriptDrawer from '../components/stage/TranscriptDrawer'
 import FeaturesModal from '../components/stage/FeaturesModal'
 import { useKelionVoice } from '../lib/kelionVoice'
@@ -572,6 +572,10 @@ export default function KelionStage() {
   // existing fetcher so the data is always fresh.
   const [usersOpen, setUsersOpen] = useState(false)
   const [payoutsOpen, setPayoutsOpen] = useState(false)
+  const [devAgentOpen, setDevAgentOpen] = useState(false)
+  const [devAgentData, setDevAgentData] = useState(null)
+  const [devAgentBusy, setDevAgentBusy] = useState(false)
+  const [devAgentError, setDevAgentError] = useState(null)
 
   // PR E5 — Users drawer state. `usersData` holds the last list
   // response; `usersQuery`/`usersStatus` are the current filters;
@@ -870,6 +874,70 @@ export default function KelionStage() {
     }
   }, [isAdmin, payoutBusy, refreshPayoutsData])
 
+  // ── Dev Agent ──
+  const refreshDevAgentTasks = useCallback(async () => {
+    if (!isAdmin) return
+    setDevAgentBusy(true)
+    setDevAgentError(null)
+    try {
+      const r = await fetch('/api/agent/tasks', { credentials: 'include' })
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      setDevAgentData(await r.json())
+    } catch (err) {
+      setDevAgentError(err.message || 'Eroare task-uri agent')
+    } finally {
+      setDevAgentBusy(false)
+    }
+  }, [isAdmin])
+  const startDevAgent = useCallback(async (description) => {
+    if (!isAdmin || devAgentBusy) return
+    setDevAgentBusy(true)
+    setDevAgentError(null)
+    try {
+      const r = await fetch('/api/agent/dev/start', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+        body: JSON.stringify({ description }),
+      })
+      const body = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`)
+      await refreshDevAgentTasks()
+    } catch (err) {
+      setDevAgentError(err.message || 'Eroare start task')
+    } finally {
+      setDevAgentBusy(false)
+    }
+  }, [isAdmin, devAgentBusy, refreshDevAgentTasks])
+  const approveDevAgent = useCallback(async (taskId, commit, push) => {
+    if (!isAdmin) return
+    try {
+      await fetch('/api/agent/dev/approve', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+        body: JSON.stringify({ taskId, commit, push }),
+      })
+      await refreshDevAgentTasks()
+    } catch (err) {
+      setDevAgentError(err.message || 'Eroare aprobare')
+    }
+  }, [isAdmin, refreshDevAgentTasks])
+  const revertDevAgent = useCallback(async (taskId) => {
+    if (!isAdmin) return
+    try {
+      await fetch('/api/agent/dev/revert', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+        body: JSON.stringify({ taskId }),
+      })
+      await refreshDevAgentTasks()
+    } catch (err) {
+      setDevAgentError(err.message || 'Eroare revert')
+    }
+  }, [isAdmin, refreshDevAgentTasks])
+
   const switchAdminTab = useCallback((tab) => {
     // Close non-target tabs first so only one panel is on screen at a
     // time. Each open*() call on the target flips its own state to true.
@@ -878,11 +946,13 @@ export default function KelionStage() {
     if (tab !== 'visitors') setVisitorsOpen(false)
     if (tab !== 'users')    setUsersOpen(false)
     if (tab !== 'payouts')  setPayoutsOpen(false)
+    if (tab !== 'devagent') setDevAgentOpen(false)
     if (tab === 'business') { openBusiness() }
     else if (tab === 'ai')       { openCredits() }
     else if (tab === 'visitors') { openVisitors() }
     else if (tab === 'users')    { openUsers(); refreshDuplicateUsers() }
     else if (tab === 'payouts')  { openPayouts() }
+    else if (tab === 'devagent') { setDevAgentOpen(true); refreshDevAgentTasks() }
   }, [openBusiness, openCredits, openVisitors, openUsers, openPayouts, refreshDuplicateUsers])
 
   // Stage 6 — emotion mirroring + voice style
@@ -4531,6 +4601,62 @@ export default function KelionStage() {
             busy={payoutBusy}
             result={payoutResult}
             isAdmin={isAdmin}
+          />
+        </div>
+      )}
+
+      {/* Admin-only — Dev Agent drawer. Autonomous developer task queue. */}
+      {isAdmin && devAgentOpen && (
+        <div
+          onClick={() => setDevAgentOpen(false)}
+          style={{
+            position: 'absolute', inset: 0,
+            background: 'rgba(3, 4, 10, 0.35)',
+            zIndex: 25,
+          }}
+        />
+      )}
+      {isAdmin && devAgentOpen && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: 'absolute', top: 0, right: 0, bottom: 0,
+            width: 'min(560px, 98vw)',
+            background: 'rgba(10, 8, 20, 0.92)',
+            backdropFilter: 'blur(22px)',
+            borderLeft: '1px solid rgba(167, 139, 250, 0.2)',
+            padding: '70px 20px 24px 20px',
+            overflowY: 'auto',
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+            zIndex: 26,
+            color: '#ede9fe',
+          }}
+        >
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            marginBottom: 12,
+          }}>
+            <div style={{ fontSize: 11, opacity: 0.6, letterSpacing: '0.15em' }}>
+              ADMIN · DEV AGENT
+            </div>
+            <button
+              onClick={() => setDevAgentOpen(false)}
+              style={{
+                background: 'transparent', border: 'none', color: '#ede9fe',
+                fontSize: 20, cursor: 'pointer', opacity: 0.7,
+              }}
+              aria-label="Close"
+            >×</button>
+          </div>
+          <AdminTabBar active="devagent" onSelect={switchAdminTab} />
+          <DevAgentPanel
+            data={devAgentData}
+            loading={devAgentBusy}
+            error={devAgentError}
+            onStart={startDevAgent}
+            onApprove={approveDevAgent}
+            onRevert={revertDevAgent}
+            busy={devAgentBusy}
           />
         </div>
       )}

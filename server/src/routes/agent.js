@@ -12,6 +12,7 @@ const agentGitHub = require('../services/agentGitHub');
 const agentDeploy = require('../services/agentDeploy');
 const agentDiagnostics = require('../services/agentDiagnostics');
 const agentTasks = require('../services/agentTasks');
+const agentOrchestrator = require('../services/agentOrchestrator');
 
 const router = Router();
 
@@ -242,6 +243,52 @@ router.delete('/tasks/:id', async (req, res) => {
   } catch (err) {
     console.error('[agent/tasks/delete]', err && err.message);
     res.status(500).json({ error: 'Task deletion failed' });
+  }
+});
+
+// ── Dev Agent Orchestrator ──
+// Starts an autonomous coding task: plan → execute → test → commit.
+// Requires admin approval for commit/push steps.
+
+router.post('/dev/start', async (req, res) => {
+  try {
+    const { description, codebaseSummary, approvedCommit, approvedPush } = req.body || {};
+    if (!description || typeof description !== 'string') {
+      return res.status(400).json({ error: 'description required' });
+    }
+    const result = await agentOrchestrator.startTask(description, {
+      codebaseSummary: String(codebaseSummary || ''),
+      approvedCommit: Boolean(approvedCommit),
+      approvedPush: Boolean(approvedPush),
+    });
+    res.status(result.ok ? 200 : 422).json(result);
+  } catch (err) {
+    console.error('[agent/dev/start]', err && err.message);
+    res.status(500).json({ error: 'Dev agent start failed', detail: err.message });
+  }
+});
+
+router.post('/dev/approve', async (req, res) => {
+  try {
+    const { taskId, commit, push } = req.body || {};
+    if (!taskId) return res.status(400).json({ error: 'taskId required' });
+    const result = await agentOrchestrator.approveTask(taskId, { commit: Boolean(commit), push: Boolean(push) });
+    res.status(200).json(result);
+  } catch (err) {
+    console.error('[agent/dev/approve]', err && err.message);
+    res.status(500).json({ error: 'Approval failed' });
+  }
+});
+
+router.post('/dev/revert', async (req, res) => {
+  try {
+    const { taskId, state } = req.body || {};
+    if (!taskId) return res.status(400).json({ error: 'taskId required' });
+    const result = await agentOrchestrator.revertTask(taskId, state || {});
+    res.status(200).json(result);
+  } catch (err) {
+    console.error('[agent/dev/revert]', err && err.message);
+    res.status(500).json({ error: 'Revert failed' });
   }
 });
 
