@@ -1124,7 +1124,7 @@ export default function KelionStage() {
 
   // chat via the shared 15-min/day IP window on the server. Collapses
   // (`applicable: false`) the moment the user signs in.
-  
+
   const sendTextMessage = useCallback(async () => {
     const text = chatInput.trim()
     if (!text && !attachedFile) return
@@ -1134,7 +1134,7 @@ export default function KelionStage() {
       try {
         const ext = attachedFile.name.split('.').pop().toLowerCase()
         const isText = ['txt', 'md', 'csv', 'json', 'js', 'py', 'html', 'css', 'jsx', 'ts', 'tsx'].includes(ext)
-        
+
         if (isText && attachedFile.size < 1000000) { // < 1MB text
           const txtContent = await attachedFile.text()
           finalPayload += `\n\n[Sistem: Utilizatorul a atașat fișierul text "${attachedFile.name}". Conținut:\n${txtContent}\n]`
@@ -1147,7 +1147,7 @@ export default function KelionStage() {
           })
           if (!req.ok) throw new Error('Upload temp failed')
           const { id: file_id } = await req.json()
-          
+
           finalPayload += `\n\n[Sistem: Utilizatorul a atașat fișierul "${attachedFile.name}". Acesta a fost salvat temporar cu file_id="${file_id}". Dacă este PDF, folosește tool-ul 'read_pdf' (cu argumentul 'file_id'). Dacă e DOCX folosește 'read_docx'. Dacă e imagine folosește 'ocr_image'.]`
         }
       } catch (err) {
@@ -1782,7 +1782,7 @@ export default function KelionStage() {
 
   return (
     <div
-      
+
       style={{
         position: 'fixed', inset: 0,
         background: 'radial-gradient(ellipse at center top, #0d0b1e 0%, #05060a 70%)',
@@ -1805,26 +1805,26 @@ export default function KelionStage() {
             width: '100%', height: '100%', position: 'relative',
             transformStyle: 'preserve-3d',
             transition: 'transform 0.8s cubic-bezier(0.4, 0, 0.2, 1)',
-            transform: monitorOpen ? 'rotateY(-180deg)' : 'rotateY(0deg)'
+            transform: 'rotateY(-180deg)'
           }}>
 
             {/* Front Face (Chat) */}
             <div style={{
               position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
-              backfaceVisibility: 'hidden', background: '#ffffff',
+              backfaceVisibility: 'hidden', background: '#ffffff', display: 'none',
               display: 'flex', flexDirection: 'column', overflow: 'hidden'
             }}>
               <audio ref={audioRef} autoPlay playsInline onPlay={(e) => attachTts(e.target)} onPause={resetTts} onEnded={resetTts} onError={resetTts} />
               <div style={{ padding: '16px 24px', borderBottom: '1px solid #e5e5e5', display: 'flex', alignItems: 'center' }}>
                 <div style={{ fontSize: 18, fontWeight: 700, color: '#1a1a1a' }}>KelionAI</div>
-                
+
                 {/* NEW HIGHLY VISIBLE STATUS */}
                 <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
                   <button onClick={() => setFeaturesOpen(true)} style={{ marginRight: 12, background: '#f3f4f6', color: '#374151', border: '1px solid #d1d5db', borderRadius: 8, padding: '8px 14px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
                     Features
                   </button>
-                  <button onClick={() => setMonitorOpen(true)} style={{ marginRight: 16, background: '#2563eb', color: 'white', border: 'none', borderRadius: 8, padding: '8px 16px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <button onClick={() => setMonitorOpen(true)} style={{ marginRight: 16, background: '#2563eb', color: 'white', border: 'none', borderRadius: 8, padding: '8px 16px', fontWeight: 600, cursor: 'pointer', display: 'none', alignItems: 'center', gap: 6 }}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
                     Comută Monitor
                   </button>
@@ -1841,7 +1841,7 @@ export default function KelionStage() {
                         background: sc.bg, border: `1px solid ${sc.border}`,
                         borderRadius: 20, color: sc.color,
                         fontSize: 14, fontWeight: 700, textTransform: 'uppercase',
-                        letterSpacing: 1, display: 'flex', alignItems: 'center', gap: 8,
+                        letterSpacing: 1, display: 'none', alignItems: 'center', gap: 8,
                         boxShadow: sc.glow, transition: 'all 0.3s ease',
                         minWidth: taskStatus ? 260 : 'auto', flexDirection: taskStatus ? 'column' : 'row',
                         padding: taskStatus ? '8px 16px' : '6px 16px',
@@ -1928,7 +1928,7 @@ export default function KelionStage() {
             }}>
               <MonitorOverlay />
               <div style={{ position: 'absolute', top: 10, right: 60, zIndex: 9999 }}>
-                <button onClick={() => setMonitorOpen(false)} style={{ background: 'rgba(37, 99, 235, 0.85)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '6px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, backdropFilter: 'blur(8px)', boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
+                <button onClick={() => setMonitorOpen(false)} style={{ background: 'rgba(37, 99, 235, 0.85)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '6px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'none', alignItems: 'center', gap: 6, backdropFilter: 'blur(8px)', boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
                   Comută Chat
                 </button>
@@ -1969,6 +1969,20 @@ export default function KelionStage() {
                 <ContactShadows position={[0, -1.25, 0]} opacity={0.55} scale={5} blur={2.6} far={2.5} />
               </Suspense>
             </Canvas>
+            {/* Cartoon speech bubble — latest assistant message near avatar mouth */}
+            {(() => {
+              const lastAssistant = [...turns].reverse().find(m => m.role !== 'user' && (m.text || m.transcript) && typeof (m.text || m.transcript) === 'string' && (m.text || m.transcript).trim().length > 0);
+              if (!lastAssistant) return null;
+              const txt = lastAssistant.text || lastAssistant.transcript;
+              return (
+                <div style={{ position: 'absolute', top: '15%', left: '50%', transform: 'translateX(-50%)', zIndex: 50, maxWidth: 320, width: '90%', pointerEvents: 'none' }}>
+                  <div style={{ background: '#ffffff', borderRadius: 20, padding: '14px 18px', boxShadow: '0 8px 24px rgba(0,0,0,0.35)', fontFamily: 'system-ui, -apple-system, sans-serif', fontSize: 15, lineHeight: 1.5, color: '#1a1a1a', position: 'relative', textAlign: 'center' }}>
+                    {txt}
+                    <div style={{ position: 'absolute', bottom: -10, left: '50%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '10px solid transparent', borderRight: '10px solid transparent', borderTop: '12px solid #ffffff' }} />
+                  </div>
+                </div>
+              );
+            })()}
           </div>
           {/* Permanent AE Studio Logo (moves up when chat expands) */}
           <div style={{ display: 'flex', justifyContent: 'center', paddingBottom: 12, zIndex: 10, pointerEvents: 'none' }}>
@@ -2006,24 +2020,24 @@ export default function KelionStage() {
                 <textarea value={chatInput} onChange={(e) => { setChatInput(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 150) + 'px'; }} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendTextMessage(); } }} onPaste={(e) => { try { const cd = e.clipboardData || window.clipboardData; if (!cd) return; const items = cd.items ? Array.from(cd.items) : []; const imgItem = items.find((it) => it && it.kind === 'file' && typeof it.type === 'string' && it.type.startsWith('image/')); if (imgItem) { const blob = imgItem.getAsFile(); if (blob) { e.preventDefault(); const ext = (blob.type.split('/')[1] || 'png').split(';')[0]; const stamp = new Date().toISOString().replace(/[:.]/g, '-'); setAttachedFile((typeof File !== 'undefined') ? new File([blob], `pasted-${stamp}.${ext}`, { type: blob.type }) : blob); return; } } } catch (_) {} }} placeholder="Ask anything" disabled={status === 'thinking'} rows={1} style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', color: '#1a1a1a', fontSize: 16, fontFamily: 'system-ui, -apple-system, sans-serif', resize: 'none', maxHeight: 150, overflowY: 'auto', minHeight: 24, padding: '4px 0', lineHeight: 1.5 }} />
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                <button 
-                  type="button" 
-                  onClick={() => { 
-                    if (status === 'idle' || status === 'error') { 
-                      startVoiceWithPriorTurns(); 
-                      setMicOff(false); 
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (status === 'idle' || status === 'error') {
+                      startVoiceWithPriorTurns();
+                      setMicOff(false);
                       setIntendedVoiceActive(true);
-                    } else { 
-                      if (typeof stop === 'function') stop(); 
+                    } else {
+                      if (typeof stop === 'function') stop();
                       setIntendedVoiceActive(false);
-                    } 
-                  }} 
-                  style={{ 
-                    width: 34, height: 34, borderRadius: '50%', 
-                    background: 'transparent', border: 'none', 
-                    color: (status !== 'idle' && status !== 'error') ? '#ef4444' : '#888', 
-                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 
-                  }} 
+                    }
+                  }}
+                  style={{
+                    width: 34, height: 34, borderRadius: '50%',
+                    background: 'transparent', border: 'none',
+                    color: (status !== 'idle' && status !== 'error') ? '#ef4444' : '#888',
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18
+                  }}
                   title="Voice"
                 >
                   {(status !== 'idle' && status !== 'error') ? (
@@ -2038,25 +2052,25 @@ export default function KelionStage() {
                 {chatInput.trim().length > 0 || attachedFile ? (
                   <button type="submit" disabled={status === 'thinking'} title="Send" style={{ width: 36, height: 36, borderRadius: '50%', background: '#1a1a1a', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 700 }}>↑</button>
                 ) : (
-                  <button 
-                    type="button" 
-                    onClick={() => { 
-                      if (status === 'idle' || status === 'error') { 
-                        startVoiceWithPriorTurns(); 
-                        setMicOff(false); 
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (status === 'idle' || status === 'error') {
+                        startVoiceWithPriorTurns();
+                        setMicOff(false);
                         setIntendedVoiceActive(true);
                       } else {
                         if (typeof stop === 'function') stop();
                         setIntendedVoiceActive(false);
                       }
-                    }} 
-                    title="Voice mode" 
-                    style={{ 
-                      width: 36, height: 36, borderRadius: '50%', 
-                      background: (status !== 'idle' && status !== 'error') ? '#ef4444' : '#f0f0f0', 
-                      border: 'none', 
-                      color: (status !== 'idle' && status !== 'error') ? '#fff' : '#888', 
-                      cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 
+                    }}
+                    title="Voice mode"
+                    style={{
+                      width: 36, height: 36, borderRadius: '50%',
+                      background: (status !== 'idle' && status !== 'error') ? '#ef4444' : '#f0f0f0',
+                      border: 'none',
+                      color: (status !== 'idle' && status !== 'error') ? '#fff' : '#888',
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16
                     }}
                   >
                     {(status !== 'idle' && status !== 'error') ? '■' : (
@@ -2359,7 +2373,7 @@ export default function KelionStage() {
           {authState.signedIn ? (
             <>
               {/* ISOLATED: 'whatDoYouKnow' hidden from menu — AI uses memory automatically */}
-              
+
               {/* Admin only features: Voice Clone and Pings */}
               {isAdmin && (
                 <>
@@ -2367,7 +2381,7 @@ export default function KelionStage() {
                   <MenuItem onClick={() => { setVoiceCloneOpen(true); setMenuOpen(false) }}>
                     {t('cloneMyVoice')}
                   </MenuItem>
-                  
+
                   {/* Stage 5 — proactive pings (admin only) */}
                   {pushState.supported && (
                     pushState.enabled ? (
@@ -2405,7 +2419,7 @@ export default function KelionStage() {
                   {t('installApp')}
                 </MenuItem>
               )}
-              
+
               <MenuItem onClick={() => { window.location.href = '/api/tools/mcp/connect'; }}>
                 🔗 Conectează Google (MCP)
               </MenuItem>
@@ -2419,7 +2433,7 @@ export default function KelionStage() {
               </MenuItem>
             )
           )}
-          
+
           <div
             style={{
               height: 1,
