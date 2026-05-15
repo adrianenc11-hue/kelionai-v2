@@ -87,10 +87,12 @@ const MODELS = {
   // Override via env if you ever want to switch back.
   chat: process.env.MODEL_CHAT || 'gemini-2.5-flash',
   chat_heavy: process.env.MODEL_CHAT_HEAVY || 'gemini-2.5-pro',
+  chat_heavy_fast: process.env.MODEL_CHAT_HEAVY_FAST || process.env.MODEL_CHAT_HEAVY || 'gemini-2.5-pro',
 
   // Coding: Flash is fast and cheap, Pro is for heavy audits.
   coder: process.env.MODEL_CODER || 'gemini-2.5-flash',
   coder_heavy: process.env.MODEL_CODER_HEAVY || 'gemini-2.5-pro',
+  coder_heavy_fast: process.env.MODEL_CODER_HEAVY_FAST || process.env.MODEL_CODER_HEAVY || 'gemini-2.5-pro',
 
   // Vision: Gemini 2.5 Flash has strong multimodal support.
   vision: process.env.MODEL_VISION || 'gemini-2.5-flash',
@@ -127,7 +129,11 @@ const OPENROUTER_FALLBACK = {
  * @param {boolean} useHeavy - Whether to use the premium/heavy model
  * @returns {string} Model ID
  */
-function getModel(taskType, useHeavy = false) {
+function getModel(taskType, useHeavy = false, fastMode = false) {
+  if (fastMode && useHeavy) {
+    const fastKey = `${taskType}_heavy_fast`;
+    if (MODELS[fastKey]) return MODELS[fastKey];
+  }
   const key = useHeavy ? `${taskType}_heavy` : taskType;
   return MODELS[key] || MODELS[taskType] || MODELS.chat;
 }
@@ -208,13 +214,14 @@ function isComplexTask(msg) {
  * @param {'chat'|'coder'|'vision'} taskType
  * @param {object} body - Request body (messages, tools, etc.)
  * @param {boolean} useHeavy - Whether to use the premium/heavy model
+ * @param {boolean} fastMode - Whether to use the fast premium variant (6x cost, 3x speed)
  * @returns {Promise<{response: Response, model: string, provider: string}>}
  */
-async function smartFetch(taskType, body, useHeavy = false) {
-  const model = getModel(taskType, useHeavy);
+async function smartFetch(taskType, body, useHeavy = false, fastMode = false) {
+  const model = getModel(taskType, useHeavy, fastMode);
   const endpoint = getEndpoint(model);
 
-  console.log(`[modelRouter] ${taskType} (heavy=${useHeavy}) → ${model} via ${endpoint.provider}`);
+  console.log(`[modelRouter] ${taskType} (heavy=${useHeavy} fast=${fastMode}) → ${model} via ${endpoint.provider}`);
 
   // Try primary provider — 45s timeout (heavy tasks like audits need time)
   // Google AI Studio calls go through the token bucket so we never
@@ -382,7 +389,7 @@ async function smartFetch(taskType, body, useHeavy = false) {
     }
   }
 
-  throw new Error(`All models exhausted for ${taskType} (heavy=${useHeavy})`);
+  throw new Error(`All models exhausted for ${taskType} (heavy=${useHeavy} fast=${fastMode})`);
 }
 
 module.exports = {
@@ -394,4 +401,5 @@ module.exports = {
   smartFetch,
   isCodingTask,
   isComplexTask,
+  MODELS,
 };
