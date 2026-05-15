@@ -3661,7 +3661,7 @@ export default function KelionStage() {
             // admins scanning the grid read "credit suficient" /
             // "credit aproape terminat" / "cheie lipsa" instead of
             // parsing `123,456 / 500,000 chars` every time.
-            const friendly = friendlyCreditStatus(c)
+            const friendly = friendlyCreditStatus(c, isAdmin)
             const headlineColor = ({
               ok: '#bbf7d0', warn: '#fde68a', error: '#fecaca', muted: '#e2e8f0',
             })[friendly.tone] || '#ede9fe'

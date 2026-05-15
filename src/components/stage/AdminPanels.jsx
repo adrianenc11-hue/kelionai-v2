@@ -628,15 +628,15 @@ function formatSchedule(schedule) {
 //
 // Adrian 2026-04-20: "poti schimba stilul de comunicare, la ai ex
 // credit suficient, atentie la ai .. x.. trebuie credit".
-function friendlyCreditStatus(card) {
+function friendlyCreditStatus(card, isAdmin) {
   if (!card) return { headline: '—', tone: 'muted', sub: null };
   const isRevenue = card.kind === 'revenue';
   switch (card.status) {
     case 'ok':
       return {
-        headline: isRevenue ? 'Venit — în cont' : 'Credit suficient ✓',
+        headline: (isAdmin && isRevenue) ? 'Venit — în cont' : 'Credit suficient ✓',
         tone: 'ok',
-        sub: isRevenue ? 'Banii așteaptă payout-ul automat.' : null,
+        sub: (isAdmin && isRevenue) ? 'Banii așteaptă payout-ul automat.' : null,
       };
     case 'low':
       return {
