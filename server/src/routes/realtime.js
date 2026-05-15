@@ -222,6 +222,22 @@ Context: ${localTime} (${weekday}, ${tz}).${locationLine ? ` GPS: ${locationLine
 // Kelion is told these are *third parties*, not the speaker. This matters
 // because the model otherwise anchors on whichever profile section comes
 // last and starts greeting the user with that person's job.
+// Lightweight sanitiser for memory facts before they enter the system prompt.
+// Prevents prompt-injection via backticks, newlines that break the markdown list,
+// and obvious instruction-override phrases.
+function _sanitizeFact(text) {
+  if (typeof text !== 'string') return String(text || '');
+  // 1. Collapse newlines so a fact stays on a single markdown-list line.
+  // 2. Escape backticks which could break fenced code blocks inside the prompt.
+  // 3. Strip common prompt-injection prefix phrases (case-insensitive).
+  let s = text
+    .replace(/\r?\n/g, ' ')
+    .replace(/`/g, '\\`');
+  const injectionRx = /\b(ignore\s+(all\s+)?previous\s+(instructions|commands|prompts)|disregard\s+(all\s+above|above\s+instructions)|you\s+are\s+now\s+a|new\s+system\s+prompt|override\s+previous|replace\s+your\s+instructions)\b/gi;
+  s = s.replace(injectionRx, '[redacted]');
+  return s.slice(0, 280);
+}
+
 function formatMemoryBlocks(memoryItems) {
   if (!Array.isArray(memoryItems) || !memoryItems.length) return '';
   const self = [];
@@ -240,13 +256,13 @@ function formatMemoryBlocks(memoryItems) {
   let out = '';
   if (self.length) {
     out += '\n\nKnown facts about the signed-in user (most recent first):\n';
-    out += self.map((m) => `- [${m.kind}] ${m.fact}`).join('\n');
+    out += self.map((m) => `- [${m.kind}] ${_sanitizeFact(m.fact)}`).join('\n');
   }
   if (other.size) {
     out += '\n\nOther people the user has mentioned (these facts are NOT about the user — never attribute them to the signed-in user):';
     for (const [name, rows] of other.entries()) {
       out += `\n• ${name}:`;
-      for (const m of rows) out += `\n    - [${m.kind}] ${m.fact}`;
+      for (const m of rows) out += `\n    - [${m.kind}] ${_sanitizeFact(m.fact)}`;
     }
   }
   return out;
