@@ -103,7 +103,7 @@ router.post('/', async (req, res) => {
     }
 
     // Smart Model Router — unified stable routing
-    const { smartFetch, isCodingTask, isComplexTask } = require('../services/modelRouter');
+    const { smartFetch, runTandem, isCodingTask, isComplexTask } = require('../services/modelRouter');
     const swarmExpert = require('../services/swarmExpert');
 
 
@@ -148,45 +148,11 @@ router.post('/', async (req, res) => {
     // Lowering threshold to 150 chars and adding more keywords.
     const isSoftGreu = false; // Disabled to force frontend tool execution for live progress
 
-    // ── Fast Mode Gating ────────────────────────────────────────────────────────────
-    // Standard = Opus 4.7 (default, gratis on normal credits).
-    // Fast    = Opus 4.7-fast (3x speed, 6x cost, +5 credits / query).
-    // Admin: always Fast gratis. Trial/guest: Fast blocked. Normal user: choice via modal.
-    const FAST_MODE_COST = 5;
-    let useFastMode = false;
-    if ((codingTask || complexTask) && isHeavy) {
-      if (isAdmin) {
-        useFastMode = true; // Admin always gets Fast for free
-      } else if (isGuest) {
-        useFastMode = false; // Trial/guest never gets Fast
-      } else if (typeof fastMode === 'boolean') {
-        // User already made a choice in a previous round-trip
-        if (fastMode && Number(creditsBalance) >= FAST_MODE_COST) {
-          try {
-            await addCreditsTransaction({
-              userId: adminUser.id,
-              deltaMinutes: -FAST_MODE_COST,
-              kind: 'fast_mode_upgrade',
-              note: `Fast mode ${taskType} task`,
-            });
-            useFastMode = true;
-          } catch (err) {
-            console.warn('[chat] Fast mode debit failed:', err.message);
-            useFastMode = false;
-          }
-        } else {
-          useFastMode = false;
-        }
-      } else {
-        // First encounter with a complex task — ask frontend to show decision modal
-        return res.json({
-          reply: '',
-          needsFastModeDecision: true,
-          taskType,
-          fastCost: FAST_MODE_COST,
-        });
-      }
-    }
+    // ── Tandem Mode (dual-brain) ───────────────────────────────────────────────────────
+    // When TANDEM_ENABLED=1, heavy tasks run Opus 4.7 + Kimi K2.6 in parallel.
+    // Primary (Opus) is returned; secondary (Kimi) is logged for comparison.
+    const TANDEM_ENABLED = process.env.TANDEM_ENABLED === '1';
+    const useTandem = TANDEM_ENABLED && isHeavy;
 
     const browserLang = (req.query.lang || 'en-US').toString().slice(0, 16);
     const forcedLang = (process.env.KELION_FORCE_LANG || browserLang).toString().slice(0, 16);
@@ -293,7 +259,9 @@ router.post('/', async (req, res) => {
           }]
         };
       } else {
-        const fetchRes = await smartFetch(taskType, body, isHeavy, useFastMode);
+        const fetchRes = useTandem
+          ? await runTandem(taskType, body)
+          : await smartFetch(taskType, body, isHeavy);
         activeModel = fetchRes.model;
         step(`smartFetch ok model=${activeModel}`);
         result = await fetchRes.response.json();

@@ -97,6 +97,10 @@ const MODELS = {
   // Vision: Gemini 2.5 Flash has strong multimodal support.
   vision: process.env.MODEL_VISION || 'gemini-2.5-flash',
   vision_heavy: process.env.MODEL_VISION_HEAVY || 'gemini-2.5-pro',
+
+  // Tandem second-brain (Kimi K2.6) — runs in parallel with Opus 4.7 on heavy tasks.
+  tandem_chat: process.env.MODEL_CHAT_TANDEM || 'moonshotai/kimi-k2.6',
+  tandem_coder: process.env.MODEL_CODER_TANDEM || 'moonshotai/kimi-k2.6',
 };
 
 // Internal fallback — same provider (Google AI Studio), different model.
@@ -392,6 +396,75 @@ async function smartFetch(taskType, body, useHeavy = false, fastMode = false) {
   throw new Error(`All models exhausted for ${taskType} (heavy=${useHeavy} fast=${fastMode})`);
 }
 
+/**
+ * Tandem execution: primary (Opus 4.7 standard) + secondary (Kimi K2.6) in parallel.
+ * Returns the primary response, but logs the secondary for comparison.
+ * If the primary fails, falls back to the secondary.
+ *
+ * @param {'chat'|'coder'} taskType
+ * @param {object} body
+ * @returns {Promise<{response: Response, model: string, provider: string}>}
+ */
+async function runTandem(taskType, body) {
+  const primaryModel = getModel(taskType, true, false); // Opus standard
+  const secondaryModel = MODELS[`tandem_${taskType}`] || MODELS.tandem_chat || 'moonshotai/kimi-k2.6';
+
+  const primaryPromise = smartFetch(taskType, body, true, false);
+  const secondaryPromise = (async () => {
+    const endpoint = getEndpoint(secondaryModel);
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 45000);
+    try {
+      const response = await fetch(endpoint.url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': endpoint.authHeader,
+          'HTTP-Referer': 'https://kelion.ai',
+          'X-Title': 'Kelion AI',
+        },
+        body: JSON.stringify({ ...body, model: endpoint.apiModel }),
+        signal: ctrl.signal,
+      });
+      clearTimeout(timer);
+      return { response, model: secondaryModel, provider: endpoint.provider };
+    } catch (err) {
+      clearTimeout(timer);
+      throw err;
+    }
+  })();
+
+  const t0 = Date.now();
+  let primary, secondary;
+  try {
+    [primary, secondary] = await Promise.allSettled([primaryPromise, secondaryPromise]);
+  } catch (e) {
+    console.error('[modelRouter] Tandem Promise.allSettled error:', e);
+  }
+
+  const duration = Date.now() - t0;
+  const primaryOk = primary?.status === 'fulfilled' && primary.value?.response?.ok;
+  const secondaryOk = secondary?.status === 'fulfilled' && secondary.value?.response?.ok;
+
+  console.log(`[modelRouter] Tandem complete in ${duration}ms | primary=${primaryModel} ok=${primaryOk} | secondary=${secondaryModel} ok=${secondaryOk}`);
+
+  if (primaryOk) {
+    return primary.value;
+  }
+  if (secondaryOk) {
+    console.log(`[modelRouter] Tandem fallback to secondary ${secondaryModel}`);
+    return secondary.value;
+  }
+
+  if (primary?.status === 'rejected') {
+    throw new Error(`Tandem primary failed: ${primary.reason?.message || primary.reason}`);
+  }
+  if (secondary?.status === 'rejected') {
+    throw new Error(`Tandem secondary failed: ${secondary.reason?.message || secondary.reason}`);
+  }
+  throw new Error('Tandem both models returned non-OK responses');
+}
+
 module.exports = {
   MODELS,
   OPENROUTER_FALLBACK,
@@ -399,6 +472,7 @@ module.exports = {
   getEndpoint,
   getFallbackChain,
   smartFetch,
+  runTandem,
   isCodingTask,
   isComplexTask,
   MODELS,
