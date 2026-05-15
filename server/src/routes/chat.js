@@ -266,11 +266,11 @@ router.post('/', async (req, res) => {
         console.log(`[chat] Returning ${choice.message.tool_calls.length} tools to client for execution...`);
         return res.json({
           reply: '',
-          toolCalls: choice.message.tool_calls.map(tc => ({
-            id: tc.id,
-            name: tc.function.name,
-            args: JSON.parse(tc.function.arguments || '{}')
-          })),
+          toolCalls: choice.message.tool_calls.map(tc => {
+            let args = {};
+            try { args = JSON.parse(tc.function.arguments || '{}'); } catch { /* ignore — model emitted bad JSON */ }
+            return { id: tc.id, name: tc.function?.name || 'unknown', args };
+          }),
           model: activeModel
         });
       }

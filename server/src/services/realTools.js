@@ -4222,7 +4222,8 @@ async function toolCheckUpdates(args) {
     } catch (e) {
       raw = e.stdout ? e.stdout.toString() : '{}';
     }
-    const outdated = JSON.parse(raw || '{}');
+    let outdated;
+    try { outdated = JSON.parse(raw || '{}'); } catch (e) { outdated = {}; }
     const packages = Object.entries(outdated).map(([name, info]) => ({
       name,
       current: info.current || 'N/A',

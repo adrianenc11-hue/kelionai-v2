@@ -1580,7 +1580,7 @@ const voiceTokenHandler = async (req, res) => {
       console.warn('[realtime] failed to fetch user facts', err.message);
     }
 
-    res.json({
+    const payload = {
       token: null,
       expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
       model: chatModel,
@@ -1593,9 +1593,10 @@ const voiceTokenHandler = async (req, res) => {
       voiceStyle: voiceStyle.label,
       setup: null,
       trial,
-    });
+    };
 
-    // Register active session for admin live-sessions.
+    // Register active session for admin live-sessions BEFORE sending response
+    // so any Map/timeout error is caught by the surrounding try-catch.
     const sid = `rest-${Date.now()}`;
     activeSessions.set(sid, {
       userId: user?.id || null,
@@ -1605,6 +1606,8 @@ const voiceTokenHandler = async (req, res) => {
     });
     // Auto-remove after 30 min (max session duration).
     setTimeout(() => activeSessions.delete(sid), 30 * 60 * 1000).unref();
+
+    return res.json(payload);
   } catch (err) {
     console.error('[realtime] token error:', err.message);
     res.status(500).json({ error: 'Failed to create voice session' });
@@ -1882,9 +1885,9 @@ router.post('/pipeline', async (req, res) => {
       // Execute each tool call
       for (const fc of fnCalls) {
         if (fc.type !== 'function') continue;
-        const name = fc.function.name;
+        const name = fc.function?.name || 'unknown';
         let args = {};
-        try { args = JSON.parse(fc.function.arguments || '{}'); } catch (e) { }
+        try { args = JSON.parse(fc.function?.arguments || '{}'); } catch (e) { }
         toolCalls.push({ name, args });
 
         let toolResult = { status: 'tool_not_found' };
