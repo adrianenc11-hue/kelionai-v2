@@ -46,7 +46,8 @@ async function runSwarmTask(task, context = {}, creditsBalance = 0, tools = unde
     );
     const raw = await architectResult.response.json();
     const content = raw.choices[0].message.content;
-    subTasks = JSON.parse(content.match(/\[.*\]/s)[0]);
+    const match = content.match(/\[[\s\S]*?\]/);
+    subTasks = match ? JSON.parse(match[0]) : [task];
   } catch (err) {
     console.error('[swarm] Architect failed:', err.message);
     subTasks = [task]; // Fallback to single task
@@ -77,15 +78,18 @@ async function runSwarmTask(task, context = {}, creditsBalance = 0, tools = unde
         console.log(`[swarm] Executor ${i+1} calling ${choice.message.tool_calls.length} tools...`);
         
         const toolResults = await Promise.all(choice.message.tool_calls.map(async (tc) => {
+          const toolName = tc.function?.name || 'unknown';
+          let toolArgs = {};
+          try { toolArgs = JSON.parse(tc.function?.arguments || '{}'); } catch { /* leave empty */ }
           try {
             const r = await withTimeout(
-              executeRealTool(tc.function.name, JSON.parse(tc.function.arguments || '{}'), context),
+              executeRealTool(toolName, toolArgs, context),
               60_000,
-              `Tool ${tc.function.name}`
+              `Tool ${toolName}`
             );
-            return `Tool ${tc.function.name} output: ${JSON.stringify(r)}`;
+            return `Tool ${toolName} output: ${JSON.stringify(r)}`;
           } catch (toolErr) {
-            return `Tool ${tc.function.name} failed: ${toolErr.message}`;
+            return `Tool ${toolName} failed: ${toolErr.message}`;
           }
         }));
         
