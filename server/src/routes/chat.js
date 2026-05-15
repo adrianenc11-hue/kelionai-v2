@@ -62,7 +62,7 @@ router.post('/', async (req, res) => {
       await stampTrialIfFresh(guestIp, trial);
     }
 
-    const { message, sessionId, toolResponses, image, lat, lon, clientTimezone, clientLocalTime } = req.body || {};
+    const { message, sessionId, toolResponses, image, lat, lon, clientTimezone, clientLocalTime, fastMode } = req.body || {};
     if (!message && !toolResponses) {
       return res.status(400).json({ error: 'message or toolResponses is required' });
     }
@@ -114,7 +114,7 @@ router.post('/', async (req, res) => {
     // Build the unified Kelion persona (same as voice) for text chat.
     // This ensures identity consistency and follows the "Extra Credits" rule.
     const { buildKelionPersona, resolveLockedLangTag } = require('./realtime');
-    const { listMemoryItems, getCreditsBalance } = require('../db');
+    const { listMemoryItems, getCreditsBalance, addCreditsTransaction } = require('../db');
     
     let memoryItems = [];
     let creditsBalance = null;
