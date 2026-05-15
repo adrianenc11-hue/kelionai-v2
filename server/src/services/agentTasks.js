@@ -41,10 +41,11 @@ function _hydrate(row) {
 
 async function createTask({ title, description, parentId = null, priority = 'normal' }) {
   const db = _db();
+  const now = new Date().toISOString();
   const result = await db.run(
-    `INSERT INTO agent_tasks (title, description, parent_id, priority, status, created_at)
-     VALUES (?, ?, ?, ?, 'not_started', datetime('now'))`,
-    [title, description, parentId, priority]
+    `INSERT INTO agent_tasks (title, description, parent_id, priority, status, created_at, updated_at)
+     VALUES (?, ?, ?, ?, 'not_started', ?, ?)`,
+    [title, description, parentId, priority, now, now]
   );
   return { ok: true, id: result.lastID };
 }
@@ -64,6 +65,8 @@ async function updateTask(id, updates) {
     values.push(JSON_FIELDS.includes(key) ? _serialize(updates[key]) : updates[key]);
   }
   if (fields.length === 0) return { ok: false, error: 'No valid fields to update.' };
+  fields.push('updated_at = ?');
+  values.push(new Date().toISOString());
   values.push(id);
   await db.run(
     `UPDATE agent_tasks SET ${fields.join(', ')} WHERE id = ?`,
@@ -117,8 +120,8 @@ async function initTasksTable() {
       backups TEXT DEFAULT '{}',
       approved_commit INTEGER DEFAULT 0,
       approved_push INTEGER DEFAULT 0,
-      created_at TEXT,
-      updated_at TEXT
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
     )
   `);
   // Idempotent migrations for existing SQLite DBs that pre-date Faza 7.

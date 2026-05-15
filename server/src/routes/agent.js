@@ -282,7 +282,7 @@ router.post('/dev/start', async (req, res) => {
     res.status(result.ok ? 200 : 422).json(result);
   } catch (err) {
     console.error('[agent/dev/start]', err && err.message);
-    res.status(500).json({ error: 'Dev agent start failed', detail: err.message });
+    res.status(500).json({ error: 'Dev agent start failed' });
   }
 });
 
@@ -291,7 +291,7 @@ router.post('/dev/approve', async (req, res) => {
     const { taskId, commit, push } = req.body || {};
     if (!taskId) return res.status(400).json({ error: 'taskId required' });
     const result = await agentOrchestrator.approveTask(taskId, { commit: Boolean(commit), push: Boolean(push) });
-    res.status(200).json(result);
+    res.status(result.ok ? 200 : 400).json(result);
   } catch (err) {
     console.error('[agent/dev/approve]', err && err.message);
     res.status(500).json({ error: 'Approval failed' });
@@ -303,7 +303,7 @@ router.post('/dev/revert', async (req, res) => {
     const { taskId, state } = req.body || {};
     if (!taskId) return res.status(400).json({ error: 'taskId required' });
     const result = await agentOrchestrator.revertTask(taskId, state || {});
-    res.status(200).json(result);
+    res.status(result.ok ? 200 : 400).json(result);
   } catch (err) {
     console.error('[agent/dev/revert]', err && err.message);
     res.status(500).json({ error: 'Revert failed' });
