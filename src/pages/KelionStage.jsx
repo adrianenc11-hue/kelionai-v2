@@ -951,6 +951,8 @@ export default function KelionStage() {
   const [attachedFile, setAttachedFile] = useState(null)
   const fileInputRef = useRef(null)
   const liveSendTextRef = useRef(null)
+  const fastModePendingRef = useRef({ text: '', image: null })
+  const [fastModeModal, setFastModeModal] = useState({ open: false, taskType: '', fastCost: 0 })
 
 
   const micMouthOpen = useLipSync(audioRef)
@@ -1158,11 +1160,27 @@ export default function KelionStage() {
     setChatInput('')
     setAttachedFile(null)
     const payloadStr = finalPayload.trim()
+    fastModePendingRef.current = { text: payloadStr, image: attachedFile }
     // Always use liveSendText — it tries WebSocket first, then falls back
     // to /api/chat HTTP endpoint (Gemini). Never call start() for text-only
     // messages; start() fetches a voice token which may fail (500).
-    if (liveSendTextRef.current) await liveSendTextRef.current(payloadStr, null, true)
+    if (liveSendTextRef.current) {
+      const result = await liveSendTextRef.current(payloadStr, null, true)
+      if (result && result.needsFastModeDecision) {
+        setFastModeModal({ open: true, taskType: result.taskType, fastCost: result.fastCost })
+        return
+      }
+    }
   }, [chatInput, attachedFile, applyMuteCommand])
+
+  const submitFastModeChoice = useCallback(async (useFast) => {
+    setFastModeModal(m => ({ ...m, open: false }))
+    const { text, image } = fastModePendingRef.current
+    if (liveSendTextRef.current) {
+      await liveSendTextRef.current(text, image, true, useFast)
+    }
+  }, [])
+
   const trialHud = useTrial({ signedIn: !!authState.signedIn })
   const trialRemainingMs = trialHud.remainingMs
   // Tap-to-talk schedules a 600 ms setTimeout to refresh the HUD; we
@@ -1966,6 +1984,20 @@ export default function KelionStage() {
           </div>
           {/* Chat Input Container */}
           <div style={{ padding: '12px 24px 16px', background: '#ffffff', borderTop: '1px solid #e0e0e0', zIndex: 10, flexShrink: 0 }}>
+            {fastModeModal.open && (
+              <div style={{ marginBottom: 12, padding: '14px 16px', borderRadius: 14, background: '#fffbeb', border: '1.5px solid #f59e0b', color: '#92400e', fontSize: 14, fontFamily: 'system-ui, sans-serif' }}>
+                <div style={{ fontWeight: 700, marginBottom: 6, fontSize: 15 }}>⚡ Task complex detectat</div>
+                <div style={{ marginBottom: 12, lineHeight: 1.45 }}>Această cerere beneficiază de modelul premium. Alege versiunea dorită:</div>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button type="button" onClick={() => submitFastModeChoice(false)} style={{ flex: 1, padding: '10px 12px', borderRadius: 10, border: '1.5px solid #d1d5db', background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#374151' }}>
+                    Standard (~10s, gratis)
+                  </button>
+                  <button type="button" onClick={() => submitFastModeChoice(true)} style={{ flex: 1, padding: '10px 12px', borderRadius: 10, border: '1.5px solid #f59e0b', background: '#f59e0b', cursor: 'pointer', fontSize: 13, fontWeight: 700, color: '#fff' }}>
+                    ⚡ Rapid +{fastModeModal.fastCost} credite (~3s)
+                  </button>
+                </div>
+              </div>
+            )}
             <form onSubmit={(e) => { e.preventDefault(); sendTextMessage() }} style={{ display: 'flex', alignItems: 'flex-end', gap: 10, padding: '10px 14px', borderRadius: 26, background: '#f7f7f8', border: '1px solid #e5e5e5' }}>
               <input ref={fileInputRef} type="file" accept="*/*" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files && e.target.files[0]; if (f) setAttachedFile(f) }} />
               <button type="button" onClick={() => fileInputRef.current && fileInputRef.current.click()} disabled={status === 'thinking'} title="Attach file" style={{ width: 34, height: 34, borderRadius: '50%', background: 'transparent', border: '1.5px solid #ccc', color: '#555', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>+</button>

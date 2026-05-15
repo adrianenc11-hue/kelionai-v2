@@ -62,7 +62,7 @@ router.post('/', async (req, res) => {
       await stampTrialIfFresh(guestIp, trial);
     }
 
-    const { message, sessionId, toolResponses, image, lat, lon, clientTimezone, clientLocalTime } = req.body || {};
+    const { message, sessionId, toolResponses, image, lat, lon, clientTimezone, clientLocalTime, fastMode } = req.body || {};
     if (!message && !toolResponses) {
       return res.status(400).json({ error: 'message or toolResponses is required' });
     }
@@ -114,7 +114,7 @@ router.post('/', async (req, res) => {
     // Build the unified Kelion persona (same as voice) for text chat.
     // This ensures identity consistency and follows the "Extra Credits" rule.
     const { buildKelionPersona, resolveLockedLangTag } = require('./realtime');
-    const { listMemoryItems, getCreditsBalance } = require('../db');
+    const { listMemoryItems, getCreditsBalance, addCreditsTransaction } = require('../db');
     
     let memoryItems = [];
     let creditsBalance = null;
@@ -147,6 +147,46 @@ router.post('/', async (req, res) => {
     // Adrian: "Să lucreze cu agenți la orice task mai complex".
     // Lowering threshold to 150 chars and adding more keywords.
     const isSoftGreu = false; // Disabled to force frontend tool execution for live progress
+
+    // ── Fast Mode Gating ────────────────────────────────────────────────────────────
+    // Standard = Opus 4.7 (default, gratis on normal credits).
+    // Fast    = Opus 4.7-fast (3x speed, 6x cost, +5 credits / query).
+    // Admin: always Fast gratis. Trial/guest: Fast blocked. Normal user: choice via modal.
+    const FAST_MODE_COST = 5;
+    let useFastMode = false;
+    if ((codingTask || complexTask) && isHeavy) {
+      if (isAdmin) {
+        useFastMode = true; // Admin always gets Fast for free
+      } else if (isGuest) {
+        useFastMode = false; // Trial/guest never gets Fast
+      } else if (typeof fastMode === 'boolean') {
+        // User already made a choice in a previous round-trip
+        if (fastMode && Number(creditsBalance) >= FAST_MODE_COST) {
+          try {
+            await addCreditsTransaction({
+              userId: adminUser.id,
+              deltaMinutes: -FAST_MODE_COST,
+              kind: 'fast_mode_upgrade',
+              note: `Fast mode ${taskType} task`,
+            });
+            useFastMode = true;
+          } catch (err) {
+            console.warn('[chat] Fast mode debit failed:', err.message);
+            useFastMode = false;
+          }
+        } else {
+          useFastMode = false;
+        }
+      } else {
+        // First encounter with a complex task — ask frontend to show decision modal
+        return res.json({
+          reply: '',
+          needsFastModeDecision: true,
+          taskType,
+          fastCost: FAST_MODE_COST,
+        });
+      }
+    }
 
     const browserLang = (req.query.lang || 'en-US').toString().slice(0, 16);
     const forcedLang = (process.env.KELION_FORCE_LANG || browserLang).toString().slice(0, 16);
@@ -253,7 +293,7 @@ router.post('/', async (req, res) => {
           }]
         };
       } else {
-        const fetchRes = await smartFetch(taskType, body, isHeavy);
+        const fetchRes = await smartFetch(taskType, body, isHeavy, useFastMode);
         activeModel = fetchRes.model;
         step(`smartFetch ok model=${activeModel}`);
         result = await fetchRes.response.json();

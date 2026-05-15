@@ -1694,7 +1694,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
   const httpMsgBufferRef = useRef([]);
   const httpBusyRef = useRef(false);
 
-  const sendText = useCallback(async (text, image = null, playAudio = false) => {
+  const sendText = useCallback(async (text, image = null, playAudio = false, fastMode = false) => {
     const clean = (text || '').trim()
     if (!clean && !image) return
 
@@ -1816,6 +1816,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
                 toolResponses,
                 image: currentImage,
                 sessionId: sessionIdRef.current,
+                fastMode,
                 lat: coords?.lat,
                 lon: coords?.lon,
                 clientTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone || '',
@@ -1829,6 +1830,10 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
               break;
             }
             data = await r.json()
+            if (data.needsFastModeDecision) {
+              httpBusyRef.current = false;
+              return data;
+            }
             _setTaskStatus({ tool: 'api-chat', progress: 60, label: `📨 Răspuns de la ${data.model || 'server'}`, phase: 'working' });
           }
 
