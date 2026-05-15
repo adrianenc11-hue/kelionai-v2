@@ -3099,10 +3099,6 @@ export default function KelionStage() {
 
           {!businessLoading && businessData && (() => {
             const revenueGbp = (businessData.ledger.revenueCents / 100).toFixed(2)
-            // 50/50 split: half goes to AI vendors, half to us. This is a
-            // gross estimate — actual AI spend is visible on the provider
-            // cards. Stripe/tax fees will trim our half ~3%.
-            const platformEstGbp = (businessData.ledger.revenueCents / 200).toFixed(2)
             const minutesSold = businessData.ledger.minutesSold
             const minutesConsumed = businessData.ledger.minutesConsumed
             const topups = businessData.ledger.topups
@@ -3111,7 +3107,6 @@ export default function KelionStage() {
               { label: 'Gross revenue', value: `£${revenueGbp}`, hint: 'Sum of paid Stripe sessions' },
               { label: 'Minutes sold', value: `${minutesSold} min`, hint: 'Credits granted to users' },
               { label: 'Minutes consumed', value: `${minutesConsumed} min`, hint: 'Live conversation time used' },
-              { label: 'Platform share (est.)', value: `£${platformEstGbp}`, hint: '50% of gross, before Stripe fees' },
             ]
             return (
               <>
@@ -4440,9 +4435,7 @@ export default function KelionStage() {
               conectat ca "external account". Nu trebuie sa ini?iezi tu
               nimic — odata configurat, fiecare top-up al unui user trece
               prin: Stripe Checkout ? Stripe balance ? payout automat (zilnic
-              sau saptamânal, dupa setarea ta). Jumatate din fiecare top-up
-              e deja rezervata intern pentru costurile AI (Gemini Free,
-              ElevenLabs), cealalta jumatate e profitul net.
+              sau saptamânal, dupa setarea ta).
             </div>
           </div>
 
