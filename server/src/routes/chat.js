@@ -9,7 +9,7 @@ const { trialStatus, stampTrialIfFresh } = require('../services/trialQuota');
 const { peekSignedInUser, isAdminUser } = require('../middleware/optionalAuth');
 const { executeRealTool } = require('../services/realTools');
 const ipGeo = require('../services/ipGeo');
-const { buildKelionToolsChatCompletions } = require('./realtime');
+const { buildKelionToolsChatCompletions, buildKelionToolsChatCompletionsForMessage } = require('./realtime');
 const { recordCost, checkBudget, isFastAllowed } = require('../services/aiCostGuard');
 
 const router = Router();
@@ -108,7 +108,10 @@ router.post('/', async (req, res) => {
 
 
     // ── Demand-driven tool activation ─────────────────────────────────
-    const openRouterTools = buildKelionToolsChatCompletions();
+    // Select only tools relevant to the user's message (cuts token cost
+    // 60-90%) and force tool-calling when the intent is clearly action-based.
+    const { tools: openRouterTools, categories: toolCategories } = buildKelionToolsChatCompletionsForMessage(message);
+    const hasActionIntent = toolCategories && toolCategories.length > 0 && toolCategories.some(c => c !== 'CORE');
 
     // ── Persona & Identity ────────────────────────────────────────────
     // Build the unified Kelion persona (same as voice) for text chat.
@@ -243,7 +246,12 @@ router.post('/', async (req, res) => {
     const body = {
       messages: sanitizedMessages,
       tools: openRouterTools.length > 0 ? openRouterTools : undefined,
-      tool_choice: openRouterTools.length > 0 ? 'auto' : undefined,
+      // Force the model to use a tool when the user clearly asked for an
+      // action (map, weather, search, calculation, etc.). Otherwise let
+      // the model decide (greetings, simple chat).
+      tool_choice: openRouterTools.length > 0
+        ? (hasActionIntent ? 'required' : 'auto')
+        : undefined,
       temperature: 0.7,
       max_tokens: 4096,
     };
