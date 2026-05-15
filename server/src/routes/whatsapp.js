@@ -134,7 +134,7 @@ router.post('/connect', requireAdmin, async (req, res) => {
     });
   } catch (err) {
     console.error('[WhatsApp] Connect error:', err.message);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Connection failed' });
   }
 });
 
@@ -147,7 +147,8 @@ router.post('/disconnect', requireAdmin, async (req, res) => {
     await bridge.destroy();
     res.json({ ok: true, status: 'disconnected' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[WhatsApp] Disconnect error:', err.message);
+    res.status(500).json({ error: 'Disconnect failed' });
   }
 });
 
@@ -160,7 +161,8 @@ router.post('/logout', requireAdmin, async (req, res) => {
     await bridge.logout();
     res.json({ ok: true, status: 'logged_out', message: 'Sesiune WhatsApp ștearsă. Trebuie re-scanat QR-ul.' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[WhatsApp] Logout error:', err.message);
+    res.status(500).json({ error: 'Logout failed' });
   }
 });
 
