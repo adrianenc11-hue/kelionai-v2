@@ -247,6 +247,7 @@ export default function KelionStage() {
   const [grantMessage, setGrantMessage] = useState(null) // { ok: bool, text: string }
   const isAdmin = Boolean(authState.user && authState.user.isAdmin)
   const refreshLedger = useCallback(async () => {
+    if (!isAdmin) return
     try {
       const r = await fetch('/api/admin/credits/ledger?limit=50', { credentials: 'include' })
       if (!r.ok) throw new Error(`HTTP ${r.status}`)
@@ -256,7 +257,7 @@ export default function KelionStage() {
     } catch (err) {
       setLedgerError(err.message || 'Could not load ledger')
     }
-  }, [])
+  }, [isAdmin])
   // Submit handler for the Grant Credits form. Validates the inputs
   // client-side (the server validates again), POSTs to the admin
   // endpoint, and refreshes the ledger on success so the new
@@ -272,6 +273,7 @@ export default function KelionStage() {
       setGrantMessage({ ok: false, text: 'Enter a non-zero number of minutes (negative = clawback).' })
       return
     }
+    if (!isAdmin) return
     setGrantBusy(true)
     setGrantMessage(null)
     // Per-submission idempotency key — a double-click or retry uses
@@ -319,8 +321,9 @@ export default function KelionStage() {
     } finally {
       setGrantBusy(false)
     }
-  }, [grantEmail, grantMinutes, grantNote, refreshLedger])
+  }, [grantEmail, grantMinutes, grantNote, refreshLedger, isAdmin])
   const openCredits = useCallback(async () => {
+    if (!isAdmin) return
     setCreditsOpen(true)
     setCreditsLoading(true)
     setCreditsError(null)
@@ -342,7 +345,7 @@ export default function KelionStage() {
       .finally(() => setRevenueSplitLoading(false))
     const ledgerPromise = refreshLedger().finally(() => setLedgerLoading(false))
     await Promise.allSettled([cardsPromise, splitPromise, ledgerPromise])
-  }, [refreshLedger])
+  }, [refreshLedger, isAdmin])
 
   // Poll ledger every 5s while overlay is open. Cleared on close /
   // unmount so we never leak an interval.
@@ -365,6 +368,7 @@ export default function KelionStage() {
   const [visitorsLoading, setVisitorsLoading] = useState(false)
   const [visitorsError, setVisitorsError] = useState(null)
   const refreshVisitors = useCallback(async () => {
+    if (!isAdmin) return
     try {
       const [rRaw, rStats] = await Promise.all([
         fetch('/api/admin/visitors?limit=200&windowHours=24', { credentials: 'include' }),
@@ -382,13 +386,14 @@ export default function KelionStage() {
     } catch (err) {
       setVisitorsError(err.message || 'Could not load visitors')
     }
-  }, [])
+  }, [isAdmin])
   const openVisitors = useCallback(async () => {
+    if (!isAdmin) return
     setVisitorsOpen(true)
     setVisitorsLoading(true)
     await refreshVisitors()
     setVisitorsLoading(false)
-  }, [refreshVisitors])
+  }, [refreshVisitors, isAdmin])
   useEffect(() => {
     if (!visitorsOpen || !isAdmin) return undefined
     const id = setInterval(() => { refreshVisitors() }, 10000)
@@ -522,6 +527,7 @@ export default function KelionStage() {
   const [businessLoading, setBusinessLoading] = useState(false)
   const [businessError, setBusinessError] = useState(null)
   const openBusiness = useCallback(async () => {
+    if (!isAdmin) return
     setBusinessOpen(true)
     setBusinessLoading(true)
     setBusinessError(null)
@@ -534,12 +540,13 @@ export default function KelionStage() {
     } finally {
       setBusinessLoading(false)
     }
-  }, [])
+  }, [isAdmin])
 
   // Admin — Revenue chart + live sessions (fetched alongside business).
   const [revenueData, setRevenueData] = useState(null)
   const [liveSessionsData, setLiveSessionsData] = useState(null)
   const fetchRevenueAndSessions = useCallback(async () => {
+    if (!isAdmin) return
     try {
       const [revR, sessR] = await Promise.all([
         fetch('/api/admin/revenue-chart?days=30', { credentials: 'include' }),
@@ -548,7 +555,7 @@ export default function KelionStage() {
       if (revR.ok) setRevenueData(await revR.json())
       if (sessR.ok) setLiveSessionsData(await sessR.json())
     } catch (_) { /* best effort */ }
-  }, [])
+  }, [isAdmin])
   useEffect(() => {
     if (!businessOpen || !isAdmin) return
     fetchRevenueAndSessions()
@@ -585,6 +592,7 @@ export default function KelionStage() {
   const [selectedResult, setSelectedResult] = useState(null)
 
   const refreshUsersList = useCallback(async (q = usersQuery, status = usersStatus) => {
+    if (!isAdmin) return
     setUsersLoading(true)
     setUsersError(null)
     try {
@@ -600,18 +608,20 @@ export default function KelionStage() {
     } finally {
       setUsersLoading(false)
     }
-  }, [usersQuery, usersStatus])
+  }, [isAdmin, usersQuery, usersStatus])
 
   const openUsers = useCallback(async () => {
+    if (!isAdmin) return
     setUsersOpen(true)
     setSelectedUserId(null)
     setSelectedUser(null)
     setSelectedHistory(null)
     setSelectedResult(null)
     await refreshUsersList('', 'all')
-  }, [refreshUsersList])
+  }, [refreshUsersList, isAdmin])
 
   const loadUserDetail = useCallback(async (userId) => {
+    if (!isAdmin) return
     setSelectedUserId(userId)
     setSelectedUser(null)
     setSelectedHistory(null)
@@ -626,7 +636,7 @@ export default function KelionStage() {
     } catch (err) {
       setSelectedResult({ ok: false, error: err.message || 'Nu am putut citi detaliile' })
     }
-  }, [])
+  }, [isAdmin])
 
   const closeUserDetail = useCallback(() => {
     setSelectedUserId(null)
@@ -636,7 +646,7 @@ export default function KelionStage() {
   }, [])
 
   const banSelectedUser = useCallback(async (banned) => {
-    if (!selectedUserId || selectedBusy) return
+    if (!isAdmin || !selectedUserId || selectedBusy) return
     let reason = null
     if (banned) {
       reason = window.prompt('Motiv suspendare (opțional):', '') || ''
@@ -661,10 +671,10 @@ export default function KelionStage() {
     } finally {
       setSelectedBusy(false)
     }
-  }, [selectedUserId, selectedBusy, loadUserDetail, refreshUsersList])
+  }, [isAdmin, selectedUserId, selectedBusy, loadUserDetail, refreshUsersList])
 
   const grantCreditsToSelected = useCallback(async () => {
-    if (!selectedUserId || selectedBusy) return
+    if (!isAdmin || !selectedUserId || selectedBusy) return
     const raw = window.prompt('Câte minute adaugi? (negativ = retragi)', '10')
     if (raw == null) return
     const minutes = Number(raw)
@@ -694,10 +704,10 @@ export default function KelionStage() {
     } finally {
       setSelectedBusy(false)
     }
-  }, [selectedUserId, selectedBusy, loadUserDetail, refreshUsersList])
+  }, [isAdmin, selectedUserId, selectedBusy, loadUserDetail, refreshUsersList])
 
   const resetSelectedPassword = useCallback(async () => {
-    if (!selectedUserId || selectedBusy) return
+    if (!isAdmin || !selectedUserId || selectedBusy) return
     if (!window.confirm('?terg parola + passkey-ul? Userul va trebui sa se relogheaza cu Google sau passkey nou.')) {
       return
     }
@@ -718,7 +728,7 @@ export default function KelionStage() {
     } finally {
       setSelectedBusy(false)
     }
-  }, [selectedUserId, selectedBusy, loadUserDetail])
+  }, [isAdmin, selectedUserId, selectedBusy, loadUserDetail])
 
   // 15s live refresh of the users list while the drawer is open.
   useEffect(() => {
@@ -740,6 +750,7 @@ export default function KelionStage() {
   const [dupBusyKey, setDupBusyKey] = useState(null)
   const [dupResult, setDupResult] = useState(null)
   const refreshDuplicateUsers = useCallback(async () => {
+    if (!isAdmin) return
     setDupLoading(true)
     setDupError(null)
     try {
@@ -754,9 +765,9 @@ export default function KelionStage() {
     } finally {
       setDupLoading(false)
     }
-  }, [])
+  }, [isAdmin])
   const mergeDuplicateUsers = useCallback(async (sourceId, targetId, email) => {
-    if (sourceId == null || targetId == null) return
+    if (!isAdmin || sourceId == null || targetId == null) return
     const confirmMsg =
       `Merge user ${sourceId} ? ${targetId} (${email})?\n\n` +
       'Toate conversa?iile, creditele ?i istoricul sursei se vor muta pe ?inta.\n' +
@@ -789,7 +800,7 @@ export default function KelionStage() {
     } finally {
       setDupBusyKey(null)
     }
-  }, [refreshDuplicateUsers])
+  }, [isAdmin, refreshDuplicateUsers])
 
   // PR E3 — Payouts drawer pulls a live snapshot from Stripe (balance,
   // linked external account, next-payout schedule, last ~10 payouts)
@@ -807,6 +818,7 @@ export default function KelionStage() {
   // instant payout. `openPayouts` wraps it and additionally clears the
   // previous result so opening the drawer from scratch feels clean.
   const refreshPayoutsData = useCallback(async () => {
+    if (!isAdmin) return
     setPayoutsLoading(true)
     setPayoutsError(null)
     try {
@@ -818,14 +830,15 @@ export default function KelionStage() {
     } finally {
       setPayoutsLoading(false)
     }
-  }, [])
+  }, [isAdmin])
   const openPayouts = useCallback(async () => {
+    if (!isAdmin) return
     setPayoutsOpen(true)
     setPayoutResult(null)
     await refreshPayoutsData()
-  }, [refreshPayoutsData])
+  }, [refreshPayoutsData, isAdmin])
   const triggerInstantPayout = useCallback(async () => {
-    if (payoutBusy) return
+    if (!isAdmin || payoutBusy) return
     // A confirm() keeps this honest — an instant payout cannot be
     // undone, and the Stripe fee (~1% + €0.25) is real money.
     if (!window.confirm('Instant payout: transfera soldul disponibil pe cardul legat acum. Taxa Stripe ~1% + 0.25 EUR. Continuam?')) {
@@ -855,7 +868,7 @@ export default function KelionStage() {
     } finally {
       setPayoutBusy(false)
     }
-  }, [payoutBusy, refreshPayoutsData])
+  }, [isAdmin, payoutBusy, refreshPayoutsData])
 
   const switchAdminTab = useCallback((tab) => {
     // Close non-target tabs first so only one panel is on screen at a
@@ -3148,8 +3161,8 @@ export default function KelionStage() {
             )
           })()}
           {/* Revenue chart + Live sessions + Export */}
-          <RevenueChart data={revenueData} />
-          <LiveSessionsPanel data={liveSessionsData} loading={businessLoading} />
+          <RevenueChart data={revenueData} isAdmin={isAdmin} />
+          <LiveSessionsPanel data={liveSessionsData} loading={businessLoading} isAdmin={isAdmin} />
           <ExportButtons />
         </div>
       )}
@@ -3779,7 +3792,7 @@ export default function KelionStage() {
               24h header). Chart + country list + device mix + funnel.
               Renders only when the new endpoint returned data; the old
               rows table below is unchanged. */}
-          <VisitorsAnalyticsPanel data={visitorsAnalytics} />
+          <VisitorsAnalyticsPanel data={visitorsAnalytics} isAdmin={isAdmin} />
 
           {visitorsLoading && (
             <div style={{ opacity: 0.55, fontSize: 14 }}>Loading visitors…</div>
@@ -4492,6 +4505,7 @@ export default function KelionStage() {
             onInstantPayout={triggerInstantPayout}
             busy={payoutBusy}
             result={payoutResult}
+            isAdmin={isAdmin}
           />
         </div>
       )}

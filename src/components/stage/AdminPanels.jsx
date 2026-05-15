@@ -176,7 +176,8 @@ function trafficSource(ref) {
   return { label: 'Referral', color: '#a78bfa' }
 }
 
-function VisitorsAnalyticsPanel({ data }) {
+function VisitorsAnalyticsPanel({ data, isAdmin }) {
+  if (!isAdmin) return null
   if (!data) return null
   const totals = data.totals || { visits: 0, signedInVisits: 0, uniqueUsers: 0 }
   const byCountry = Array.isArray(data.byCountry) ? data.byCountry : []
@@ -423,7 +424,8 @@ function RankList({ card, label, rows, accent, empty }) {
 // payouts + 50/50 split over the last 30 days. The server aggregator
 // never throws; partial failures come back in `data.errors` and we
 // render whatever did load.
-function PayoutsPanel({ data, loading, error, onInstantPayout, busy, result }) {
+function PayoutsPanel({ data, loading, error, onInstantPayout, busy, result, isAdmin }) {
+  if (!isAdmin) return null
   if (loading && !data) {
     return <div style={{ fontSize: 13, opacity: 0.7, padding: '14px 4px' }}>Se încarcă…</div>
   }
@@ -684,7 +686,8 @@ function MenuItem({ children, onClick, disabled }) {
 }
 
 // Revenue chart — dual-line sparkline showing topup vs consume per day.
-function RevenueChart({ data }) {
+function RevenueChart({ data, isAdmin }) {
+  if (!isAdmin) return null
   if (!data || !Array.isArray(data.days) || data.days.length === 0) {
     return <div style={{ fontSize: 12, opacity: 0.5, padding: 12 }}>Nu sunt date de revenue încă.</div>
   }
@@ -755,7 +758,8 @@ function RevenueChart({ data }) {
 }
 
 // Live sessions panel — shows who's online right now.
-function LiveSessionsPanel({ data, loading }) {
+function LiveSessionsPanel({ data, loading, isAdmin }) {
+  if (!isAdmin) return null
   if (loading && !data) return <div style={{ fontSize: 12, opacity: 0.5, padding: 12 }}>Se încarcă sesiuni live…</div>
   if (!data) return null
 
