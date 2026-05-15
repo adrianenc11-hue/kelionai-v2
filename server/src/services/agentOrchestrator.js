@@ -532,7 +532,12 @@ async function _startTaskLocked(description, options = {}) {
  */
 async function approveTask(taskId, { commit = false, push = false } = {}) {
   const { ok: found, task } = await getTask(taskId);
-  if (!found) throw new Error(`Task ${taskId} not found`);
+  if (!found) return { ok: false, taskId, error: `Task ${taskId} not found.` };
+
+  const BLOCKED_APPROVAL_STATUSES = ['done', 'failed', 'reverted', 'blocked'];
+  if (BLOCKED_APPROVAL_STATUSES.includes(task.status)) {
+    return { ok: false, taskId, error: `Cannot approve a task that is already ${task.status}.` };
+  }
 
   // Re-hydrate state from DB
   const state = {
