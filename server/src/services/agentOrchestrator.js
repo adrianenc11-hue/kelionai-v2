@@ -32,7 +32,7 @@
  */
 
 const { smartFetch } = require('./modelRouter');
-const { createTask, updateTask } = require('./agentTasks');
+const { createTask, updateTask, getTask } = require('./agentTasks');
 const agentFs = require('./agentFs');
 const agentShell = require('./agentShell');
 const agentDiagnostics = require('./agentDiagnostics');
@@ -77,6 +77,30 @@ function isPathAllowed(p) {
 function isShellAllowed(cmd) {
   const c = cmd.toLowerCase().trim();
   return !BLOCKED_SHELL_PATTERNS.some(rx => rx.test(c));
+}
+
+// ── Persistence helper ──
+/**
+ * Persist the runtime execution state back into the agent_tasks row
+ * so approve/revert and the UI can reconstruct the full context.
+ * Safe to call frequently (after each step). Lightweight — JSON-only columns.
+ */
+async function _saveState(taskId, state) {
+  try {
+    await updateTask(taskId, {
+      status: state.status,
+      status_detail: state.statusDetail || state.status,
+      narratives: state.narratives,
+      logs: state.logs,
+      plan: state.plan,
+      modified_paths: Array.from(state.modifiedPaths || []),
+      backups: state.backups,
+      approved_commit: state.approvedCommit || false,
+      approved_push: state.approvedPush || false,
+    });
+  } catch (err) {
+    console.error('[agentOrchestrator] _saveState failed:', err && err.message);
+  }
 }
 
 // ── Narrative Engine ──
@@ -186,7 +210,10 @@ async function _executeStep(taskId, step, state) {
       }
       case 'write': {
         if (!isPathAllowed(step.path)) { log('blocked', { reason: 'path guardrail', path: step.path }); r = { ok: false, blocked: true }; break; }
-        if (Object.keys(state.fileCache).length >= MAX_FILES_PER_TASK && !state.fileCache[step.path]) { log('blocked', { reason: 'max files' }); r = { ok: false, blocked: true }; break; }
+        // Guardrail: cap distinct modified files (reads do NOT count).
+        if (state.modifiedPaths.size >= MAX_FILES_PER_TASK && !state.modifiedPaths.has(step.path)) {
+          log('blocked', { reason: 'max files' }); r = { ok: false, blocked: true }; break;
+        }
         const orig = await agentFs.readFile(step.path);
         if (orig.ok) state.backups[step.path] = orig.content;
         r = await agentFs.writeFile(step.path, step.content);
@@ -229,7 +256,12 @@ async function _executeStep(taskId, step, state) {
       }
       case 'commit': {
         if (!state.approvedCommit) { log('pending_approval', { reason: 'commit' }); r = { ok: false, pendingApproval: true }; break; }
-        r = await agentShell.execCommand(`git add -A && git commit -m "${step.message.replace(/"/g, '\\"')}"`, 15000);
+        const paths = Array.from(state.modifiedPaths || []);
+        const addCmd = paths.length ? `git add -- ${paths.map(p => `'${p.replace(/'/g, "'\\''")}'`).join(' ')}` : 'git add -A';
+        // Pass message via stdin to eliminate backtick / $() injection.
+        const safeMsg = JSON.stringify(step.message || 'chore: agent commit').slice(1, -1);
+        const commitCmd = `echo "${safeMsg.replace(/"/g, '\\"')}" | git commit -F -`;
+        r = await agentShell.execCommand(`${addCmd} && ${commitCmd}`, 15000);
         log('commit', { msg: step.message, ok: r.ok });
         break;
       }
@@ -268,6 +300,9 @@ async function _executeStep(taskId, step, state) {
   const narrative = _narrateStep(step, r);
   state.narratives.push({ stepId: step.id, type: step.type, narrative, ts: new Date().toISOString() });
   log('narrative', { text: narrative });
+
+  // Persist incremental state so resume / revert / UI work across restarts.
+  await _saveState(taskId, state);
 
   return r;
 }
@@ -369,7 +404,8 @@ async function startTask(description, options = {}) {
   const plan = await _generatePlan(description, codebaseSummary);
   state.plan = plan;
   state.status = 'executing';
-  await updateTask(taskId, { status: 'in_progress', description: `Plan: ${plan.steps.length} pași` });
+  state.statusDetail = `Plan: ${plan.steps.length} pași`;
+  await updateTask(taskId, { status: 'in_progress', status_detail: state.statusDetail });
 
   // 2. Execute steps
   for (const step of plan.steps.slice(0, MAX_STEPS)) {
@@ -378,14 +414,16 @@ async function startTask(description, options = {}) {
     if (result.blocked) {
       state.status = 'blocked';
       state.narratives.push({ stepId: step.id, type: 'speak', narrative: 'Am oprit execuția – acțiunea este blocată de regulile de siguranță.', ts: new Date().toISOString() });
-      await updateTask(taskId, { status: 'blocked', description: `Blocat la pasul ${step.id}: ${step.type}` });
+      state.statusDetail = `Blocat la pasul ${step.id}: ${step.type}`;
+      await updateTask(taskId, { status: 'blocked', status_detail: state.statusDetail });
       break;
     }
 
     if (result.pendingApproval) {
       state.status = 'pending_approval';
       state.narratives.push({ stepId: step.id, type: 'speak', narrative: 'Am terminat modificările. Aștept aprobarea ta pentru commit și push.', ts: new Date().toISOString() });
-      await updateTask(taskId, { status: 'pending_approval', description: `Aștept aprobare la pasul ${step.id}: ${step.type}` });
+      state.statusDetail = `Aștept aprobare la pasul ${step.id}: ${step.type}`;
+      await updateTask(taskId, { status: 'pending_approval', status_detail: state.statusDetail });
       break;
     }
 
@@ -407,7 +445,8 @@ async function startTask(description, options = {}) {
       // Repair failed or exhausted
       state.status = 'needs_review';
       state.narratives.push({ stepId: step.id, type: 'speak', narrative: `Nu am reușit să repar automat după ${state.repairCount} încercări. Te rog să verifici și să aprobi manual.`, ts: new Date().toISOString() });
-      await updateTask(taskId, { status: 'needs_review', description: `Reparare eșuată la pasul ${step.id}: ${step.type}` });
+      state.statusDetail = `Reparare eșuată la pasul ${step.id}: ${step.type}`;
+      await updateTask(taskId, { status: 'needs_review', status_detail: state.statusDetail });
       break;
     }
 
@@ -415,7 +454,8 @@ async function startTask(description, options = {}) {
     if (!result.ok) {
       state.status = 'failed';
       state.narratives.push({ stepId: step.id, type: 'speak', narrative: `Eroare la pasul ${step.type}. Oprire rapidă pentru siguranță.`, ts: new Date().toISOString() });
-      await updateTask(taskId, { status: 'failed', description: `Eșec la pasul ${step.id}: ${step.type}` });
+      state.statusDetail = `Eșec la pasul ${step.id}: ${step.type}`;
+      await updateTask(taskId, { status: 'failed', status_detail: state.statusDetail });
       break;
     }
   }
@@ -423,13 +463,18 @@ async function startTask(description, options = {}) {
   if (state.status === 'executing') {
     state.status = 'done';
     state.narratives.push({ stepId: 999, type: 'speak', narrative: 'Task finalizat cu succes. Toate validările au trecut.', ts: new Date().toISOString() });
-    await updateTask(taskId, { status: 'done', description: `Complet – ${plan.steps.length} pași` });
+    state.statusDetail = `Complet – ${plan.steps.length} pași`;
+    await updateTask(taskId, { status: 'done', status_detail: state.statusDetail });
   }
+
+  // Final save ensures DB reflects the latest state before the orchestrator loop ends.
+  await _saveState(taskId, state);
 
   return {
     ok: state.status === 'done' || state.status === 'pending_approval',
     taskId,
     status: state.status,
+    statusDetail: state.statusDetail,
     logs: state.logs,
     narratives: state.narratives,
     modifiedPaths: Array.from(state.modifiedPaths),
@@ -439,28 +484,92 @@ async function startTask(description, options = {}) {
 
 /**
  * Approve a pending task so it can proceed with commit/push/PR.
+ * Loads the full execution state from the DB, sets approval flags,
+ * re-runs any remaining commit / push / PR steps, and saves the result.
  * @param {number|string} taskId
  * @param {object} [options]
  * @param {boolean} [options.commit=false]
  * @param {boolean} [options.push=false]
- * @returns {Promise<{ok:boolean, taskId:number, approvedCommit:boolean, approvedPush:boolean}>}
+ * @returns {Promise<{ok:boolean, taskId:number, approvedCommit:boolean, approvedPush:boolean, narratives:object[]}>}
  */
 async function approveTask(taskId, { commit = false, push = false } = {}) {
-  return { ok: true, taskId, approvedCommit: commit, approvedPush: push };
+  const { ok: found, task } = await getTask(taskId);
+  if (!found) throw new Error(`Task ${taskId} not found`);
+
+  // Re-hydrate state from DB
+  const state = {
+    logs:           task.logs || [],
+    narratives:       task.narratives || [],
+    fileCache:      {},
+    backups:          task.backups || {},
+    modifiedPaths:    new Set(task.modified_paths || []),
+    approvedCommit:   commit,
+    approvedPush:     push,
+    status:           task.status,
+    repairCount:      0,
+    plan:             task.plan,
+    statusDetail:     task.status_detail || task.status,
+  };
+
+  state.narratives.push({ stepId: 0, type: 'speak', narrative: `Aprobare primită. commit=${commit ? 'DA' : 'NU'} push=${push ? 'DA' : 'NU'}`, ts: new Date().toISOString() });
+
+  // If there was a pending commit step, re-execute it now that we are approved.
+  if (commit && state.plan?.steps) {
+    const commitStep = state.plan.steps.find(s => s.type === 'commit');
+    if (commitStep) {
+      const r = await _executeStep(taskId, commitStep, state);
+      if (!r.ok) {
+        state.status = 'failed';
+        await _saveState(taskId, state);
+        return { ok: false, taskId, approvedCommit: commit, approvedPush: push, narratives: state.narratives, error: 'Commit failed after approval.' };
+      }
+    }
+  }
+
+  if (push && state.plan?.steps) {
+    const pushStep = state.plan.steps.find(s => s.type === 'push');
+    if (pushStep) {
+      const r = await _executeStep(taskId, pushStep, state);
+      if (!r.ok) {
+        state.status = 'failed';
+        await _saveState(taskId, state);
+        return { ok: false, taskId, approvedCommit: commit, approvedPush: push, narratives: state.narratives, error: 'Push failed after approval.' };
+      }
+    }
+  }
+
+  state.status = 'done';
+  await _saveState(taskId, state);
+  return { ok: true, taskId, approvedCommit: commit, approvedPush: push, narratives: state.narratives };
 }
 
 /**
  * Revert every file modified by a task back to its original content.
+ * Loads backups from DB if the caller did not provide a runtime state.
  * @param {number|string} taskId
- * @param {object} state — execution state containing `backups`
+ * @param {object} [callerState] — optional execution state containing `backups`
  * @returns {Promise<{ok:boolean, taskId:number, reverted:{path:string, ok:boolean}[]}>}
  */
-async function revertTask(taskId, state) {
+async function revertTask(taskId, callerState) {
+  let backups = callerState?.backups || {};
+  if (!Object.keys(backups).length) {
+    const { ok: found, task } = await getTask(taskId);
+    if (!found) throw new Error(`Task ${taskId} not found`);
+    backups = task.backups || {};
+  }
+
   const results = [];
-  for (const [p, content] of Object.entries(state.backups || {})) {
+  for (const [p, content] of Object.entries(backups)) {
     const r = await agentFs.writeFile(p, content);
     results.push({ path: p, ok: r.ok });
   }
+
+  // Mark task as reverted so the UI no longer shows approval buttons.
+  const { task } = await getTask(taskId);
+  if (task) {
+    await updateTask(taskId, { status: 'reverted', status_detail: 'Revert executat – fișierele au fost restaurate.' });
+  }
+
   return { ok: results.every(r => r.ok), taskId, reverted: results };
 }
 

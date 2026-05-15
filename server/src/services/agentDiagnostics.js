@@ -52,7 +52,10 @@ async function runLintFix() {
 async function runSyntaxCheck(files) {
   const passed = [];
   const failed = [];
+  // node --check cannot parse JSX / TS syntax; those are validated via lint+build.
+  const skipRx = /\.(jsx|tsx?)$/;
   for (const f of files.slice(0, 20)) {
+    if (skipRx.test(f)) { passed.push(f); continue; }
     const r = await execCommand(`node --check "${f}"`, 10000);
     if (r.ok) passed.push(f);
     else failed.push({ path: f, error: r.stderr || r.error || 'Syntax error' });
