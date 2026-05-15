@@ -152,10 +152,23 @@ router.post('/', async (req, res) => {
       console.warn(`[chat] Daily AI budget HARD CAP reached ($${budget.dailyCost.toFixed(2)}). Forcing light model.`);
     }
 
-    const isHeavy = (codingTask || complexTask) && canUsePremium && !budget.blocked;
+    let isHeavy = (codingTask || complexTask) && canUsePremium && !budget.blocked;
     // Adrian: "Să lucreze cu agenți la orice task mai complex".
     // Lowering threshold to 150 chars and adding more keywords.
     const isSoftGreu = false; // Disabled to force frontend tool execution for live progress
+
+    // ── Text-chat credit consumption ─────────────────────────────────
+    const TEXT_HEAVY_COST = Number(process.env.TEXT_HEAVY_COST_MINUTES) || 3;
+    let creditsConsumed = 0;
+    let balanceRemaining = creditsBalance;
+    let creditsWarning = null;
+    if (isHeavy && adminUser?.id && !isAdmin) {
+      if (Number(creditsBalance) < TEXT_HEAVY_COST) {
+        console.log(`[chat] User ${adminUser.id} has ${creditsBalance} credits, needs ${TEXT_HEAVY_COST} for heavy. Falling back to light.`);
+        isHeavy = false;
+        creditsWarning = 'insufficient';
+      }
+    }
 
     // ── Tandem Mode (dual-brain) ───────────────────────────────────────────────────────
     // When TANDEM_ENABLED=1, heavy tasks run Opus 4.7 + Kimi K2.6 in parallel.
@@ -286,6 +299,24 @@ router.post('/', async (req, res) => {
         }
       }
 
+      // Charge credits for heavy text-chat usage (non-admin, signed-in users)
+      if (isHeavy && adminUser?.id && !isAdmin && TEXT_HEAVY_COST > 0) {
+        try {
+          const tx = await addCreditsTransaction({
+            userId: adminUser.id,
+            deltaMinutes: -TEXT_HEAVY_COST,
+            kind: 'consume',
+            note: `Text heavy: ${activeModel}`,
+            idempotencyKey: `txt-heavy-${sessionId}-${Date.now()}`,
+          });
+          creditsConsumed = TEXT_HEAVY_COST;
+          balanceRemaining = tx.balance;
+          console.log(`[chat] Charged ${TEXT_HEAVY_COST} credits for heavy text. Balance=${tx.balance}`);
+        } catch (err) {
+          console.warn('[chat] Credit charge failed:', err.message);
+        }
+      }
+
       const choice = result?.choices?.[0];
 
       if (choice?.message?.tool_calls) {
@@ -297,7 +328,10 @@ router.post('/', async (req, res) => {
             try { args = JSON.parse(tc.function.arguments || '{}'); } catch { /* ignore — model emitted bad JSON */ }
             return { id: tc.id, name: tc.function?.name || 'unknown', args };
           }),
-          model: activeModel
+          model: activeModel,
+          creditsConsumed,
+          balanceRemaining,
+          creditsWarning,
         });
       }
 
