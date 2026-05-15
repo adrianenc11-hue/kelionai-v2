@@ -543,6 +543,37 @@ if (require.main === module) {
       );
     } catch { /* module not available — skip silently */ }
 
+    // ── Watchdog / Self-Heal Ticker (Faza 4 + 6) ─────────────────────────────────────────────
+    const WATCHDOG_INTERVAL_MS = 5 * 60 * 1000; // 5 min
+    let consecutiveFails = 0;
+    setInterval(async () => {
+      try {
+        const health = await fetch(`http://localhost:${PORT}/health`);
+        if (!health.ok) {
+          consecutiveFails++;
+          console.error(`[watchdog] Health FAIL #${consecutiveFails}: ${health.status}`);
+          if (consecutiveFails >= 3) {
+            console.error('[watchdog] CRITICAL: 3 consecutive health failures. Self-heal...');
+            try {
+              const { execSync } = require('child_process');
+              const lastCommits = execSync('git log --oneline -3', { encoding: 'utf-8', timeout: 5000 });
+              console.error('[watchdog] Recent commits:\n' + lastCommits);
+            } catch (e) {
+              console.error('[watchdog] Self-heal git log failed:', e.message);
+            }
+          }
+        } else {
+          if (consecutiveFails > 0) {
+            console.log(`[watchdog] Health OK. Recovered after ${consecutiveFails} fail(s).`);
+          }
+          consecutiveFails = 0;
+        }
+      } catch (err) {
+        consecutiveFails++;
+        console.error(`[watchdog] Health exception #${consecutiveFails}:`, err.message);
+      }
+    }, WATCHDOG_INTERVAL_MS).unref();
+
     // Start permanent health watchdog (checks every 5 min, alerts admin)
     try {
       const healthWatchdog = require('./services/healthWatchdog');

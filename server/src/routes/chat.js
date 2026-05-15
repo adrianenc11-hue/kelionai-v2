@@ -11,6 +11,7 @@ const { peekSignedInUser, isAdminUser } = require('../middleware/optionalAuth');
 const { executeRealTool } = require('../services/realTools');
 const ipGeo = require('../services/ipGeo');
 const { buildKelionToolsChatCompletions } = require('./realtime');
+const { recordCost, checkBudget } = require('../services/aiCostGuard');
 
 const router = Router();
 
@@ -143,7 +144,13 @@ router.post('/', async (req, res) => {
     // Admin always qualifies; free users and low-balance users get the light model.
     const PREMIUM_CREDITS_THRESHOLD = Number(process.env.PREMIUM_CREDITS_THRESHOLD) || 10;
     const canUsePremium = isAdmin || (Number(creditsBalance) >= PREMIUM_CREDITS_THRESHOLD);
-    const isHeavy = (codingTask || complexTask) && canUsePremium;
+    // ── Cost Guard ───────────────────────────────────────────────────────────
+    const budget = checkBudget();
+    if (budget.blocked && (codingTask || complexTask)) {
+      console.warn(`[chat] Daily AI budget HARD CAP reached ($${budget.dailyCost.toFixed(2)}). Forcing light model.`);
+    }
+
+    const isHeavy = (codingTask || complexTask) && canUsePremium && !budget.blocked;
     // Adrian: "Să lucreze cu agenți la orice task mai complex".
     // Lowering threshold to 150 chars and adding more keywords.
     const isSoftGreu = false; // Disabled to force frontend tool execution for live progress
@@ -258,6 +265,10 @@ router.post('/', async (req, res) => {
         step(`smartFetch ok model=${activeModel}`);
         result = await fetchRes.response.json();
         step('json parsed');
+        if (result?.usage) {
+          const { cost, dailyCost, remaining } = recordCost(activeModel, result.usage);
+          console.log(`[chat] cost=$${cost.toFixed(4)} daily=$${dailyCost.toFixed(2)} remaining=$${remaining.toFixed(2)} model=${activeModel}`);
+        }
       }
 
       const choice = result?.choices?.[0];
@@ -289,6 +300,22 @@ router.post('/', async (req, res) => {
           ...(isAdmin ? { detail, model: activeModel, step: currentStep } : {})
         });
       }
+      // ── Reflection Loop (Faza 5) ─────────────────────────────────────────────────────────────────
+      // After every heavy task, save a 1-2 sentence summary to memory as "lessons learned".
+      if (isHeavy && reply && reply.length > 200 && adminUser?.id) {
+        try {
+          const sentences = reply.match(/[^.!?]+[.!?]+/g) || [reply];
+          const reflection = sentences.slice(0, 2).join(' ').trim();
+          if (reflection.length > 20 && reflection.length < 500) {
+            const { addMemoryItems } = require('../db');
+            await addMemoryItems(adminUser.id, [{ content: reflection, kind: 'reflection', source: 'self' }]);
+            console.log(`[chat] Reflection saved for user=${adminUser.id}: ${reflection.substring(0, 80)}...`);
+          }
+        } catch (err) {
+          console.warn('[chat] Reflection save failed:', err.message);
+        }
+      }
+
       return res.json({ reply, model: activeModel });
     } catch (err) {
       console.error(`[chat] AI generation failed at step=${currentStep}:`, err && err.stack || err && err.message || err);
