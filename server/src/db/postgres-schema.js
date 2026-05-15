@@ -314,6 +314,15 @@ CREATE TABLE IF NOT EXISTS agent_tasks (
   created_at  TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   updated_at  TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+-- Faza 7 runtime state. JSONB so we can resume / revert / display narratives.
+ALTER TABLE agent_tasks ADD COLUMN IF NOT EXISTS status_detail   TEXT;
+ALTER TABLE agent_tasks ADD COLUMN IF NOT EXISTS narratives      JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE agent_tasks ADD COLUMN IF NOT EXISTS logs            JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE agent_tasks ADD COLUMN IF NOT EXISTS plan            JSONB;
+ALTER TABLE agent_tasks ADD COLUMN IF NOT EXISTS modified_paths  JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE agent_tasks ADD COLUMN IF NOT EXISTS backups         JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE agent_tasks ADD COLUMN IF NOT EXISTS approved_commit BOOLEAN DEFAULT FALSE;
+ALTER TABLE agent_tasks ADD COLUMN IF NOT EXISTS approved_push   BOOLEAN DEFAULT FALSE;
 CREATE INDEX IF NOT EXISTS idx_agent_tasks_status ON agent_tasks(status);
 CREATE INDEX IF NOT EXISTS idx_agent_tasks_parent ON agent_tasks(parent_id);
 

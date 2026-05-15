@@ -1,9 +1,8 @@
 'use strict';
 
-// POST /api/chat — text chat using Claude Opus via generateContent API.
-// This is a fallback/primary text chat route that does NOT require
-// This is the primary text chat route using Claude Opus via OpenRouter.
-// generateContent, including Claude Opus.
+// POST /api/chat — primary text chat route via OpenRouter (Claude Opus / Gemini).
+// Supports escalation to heavy models (Opus 4.7) for coding/complex tasks.
+// Uses in-memory session history + real tool execution (search, weather, wiki).
 
 const { Router } = require('express');
 const { trialStatus, stampTrialIfFresh } = require('../services/trialQuota');

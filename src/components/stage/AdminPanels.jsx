@@ -885,7 +885,7 @@ function DevAgentPanel({ data, loading, error, onStart, onApprove, onRevert, bus
       )}
 
       {/* Task timeline */}
-      {data && data.tasks && data.tasks.length > 0 && (
+      {data && data.tasks && data.tasks.length > 0 ? (
         <div style={{ marginTop: 14 }}>
           <div style={{ fontSize: 10, opacity: 0.5, letterSpacing: '0.12em', marginBottom: 8, textTransform: 'uppercase' }}>
             Istoric task-uri agent
@@ -951,6 +951,11 @@ function DevAgentPanel({ data, loading, error, onStart, onApprove, onRevert, bus
               )
             })}
           </div>
+        </div>
+      ) : (
+        <div style={{ marginTop: 12, padding: '14px 16px', borderRadius: 10, background: 'rgba(148,163,184,0.06)', border: '1px solid rgba(148,163,184,0.15)', fontSize: 12, color: '#94a3b8', textAlign: 'center' }}>
+          🤖 <strong>Nu sunt task-uri încă.</strong><br />
+          <span style={{ fontSize: 11, opacity: 0.8 }}>Scrie o descriere și apasă Start Task pentru a porni primul task autonom.</span>
         </div>
       )}
     </div>
