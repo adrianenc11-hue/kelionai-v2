@@ -417,12 +417,14 @@ router.post('/terminal-stream', async (req, res) => {
   });
 
   let killed = false;
+  let ended = false;
   const killTimer = setTimeout(() => {
     killed = true;
     child.kill('SIGKILL');
   }, 120000);
 
   const sendEvent = (type, data) => {
+    if (ended) return;
     try { res.write(`data: ${JSON.stringify({ type, data })}\n\n`); } catch {}
   };
 
@@ -442,18 +444,22 @@ router.post('/terminal-stream', async (req, res) => {
     }
   });
 
-  child.on('close', (code) => {
+  const endStream = () => {
+    if (ended) return;
+    ended = true;
     clearTimeout(killTimer);
-    sendEvent('exit', { code, killed });
     res.write('data: [DONE]\n\n');
     res.end();
+  };
+
+  child.on('close', (code) => {
+    sendEvent('exit', { code, killed });
+    endStream();
   });
 
   child.on('error', (err) => {
-    clearTimeout(killTimer);
     sendEvent('error', err.message);
-    res.write('data: [DONE]\n\n');
-    res.end();
+    endStream();
   });
 
   req.on('close', () => {
