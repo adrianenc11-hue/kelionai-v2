@@ -907,7 +907,7 @@ router.post('/purge-users', async (req, res) => {
     return res.json({ now: new Date().toISOString(), deleted, reseed });
   } catch (err) {
     console.error('[admin/purge-users] failed:', err && err.message);
-    return res.status(500).json({ error: err && err.message });
+    return res.status(500).json({ error: 'Purge failed' });
   }
 });
 

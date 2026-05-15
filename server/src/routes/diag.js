@@ -125,7 +125,8 @@ router.get('/whoami', async (req, res) => {
           : 'NO — no DB row matches; "Stale token" would be returned',
     });
   } catch (err) {
-    res.status(500).json({ error: err && err.message });
+    console.error('[diag/whoami]', err && err.message);
+    res.status(500).json({ error: 'Internal error' });
   }
 });
 
@@ -173,7 +174,8 @@ router.get('/db-path', async (req, res) => {
         : 'Path is not under a typical Railway volume mount (/app/server/data, /data, /mnt). SQLite will land on ephemeral disk and wipe on redeploy.',
     });
   } catch (err) {
-    res.status(500).json({ error: err && err.message });
+    console.error('[diag/db-path]', err && err.message);
+    res.status(500).json({ error: 'Internal error' });
   }
 });
 
@@ -243,7 +245,8 @@ router.get('/admin-bootstrap', requireAuth, requireAdmin, async (req, res) => {
       } : { exists: false },
     });
   } catch (err) {
-    res.status(500).json({ error: err && err.message });
+    console.error('[diag/db-user]', err && err.message);
+    res.status(500).json({ error: 'Internal error' });
   }
 });
 
@@ -315,7 +318,7 @@ router.post('/purge-users', async (req, res) => {
     });
   } catch (err) {
     console.error('[diag/purge-users] failed:', err && err.message);
-    return res.status(500).json({ error: err && err.message });
+    return res.status(500).json({ error: 'Internal error' });
   }
 });
 

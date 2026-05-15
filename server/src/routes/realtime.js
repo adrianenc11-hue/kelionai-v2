@@ -1934,7 +1934,7 @@ router.post('/pipeline', async (req, res) => {
 
   } catch (err) {
     console.error('[pipeline] error:', err.message);
-    return res.status(500).json({ error: 'Pipeline processing failed: ' + err.message });
+    return res.status(500).json({ error: 'Pipeline processing failed' });
   }
 });
 
