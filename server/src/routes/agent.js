@@ -13,6 +13,7 @@ const agentDeploy = require('../services/agentDeploy');
 const agentDiagnostics = require('../services/agentDiagnostics');
 const agentTasks = require('../services/agentTasks');
 const agentOrchestrator = require('../services/agentOrchestrator');
+const { isPathAllowed: _isPathAllowed, isShellAllowed: _isShellAllowed } = agentOrchestrator;
 
 const router = Router();
 
@@ -29,8 +30,13 @@ router.use(requireAdmin);
 router.use(agentLimiter);
 
 // ── File System ──
+// All FS routes apply the same path guardrails as the orchestrator to prevent
+// traversal into blocked files (auth, env, payment, agent source, secrets).
 router.post('/fs/read', async (req, res) => {
   try {
+    if (!_isPathAllowed(req.body.path)) {
+      return res.status(403).json({ ok: false, error: 'Path blocked by safety guardrail.' });
+    }
     const result = await agentFs.readFile(req.body.path);
     res.status(result.ok ? 200 : 400).json(result);
   } catch (err) {
@@ -41,6 +47,9 @@ router.post('/fs/read', async (req, res) => {
 
 router.post('/fs/write', async (req, res) => {
   try {
+    if (!_isPathAllowed(req.body.path)) {
+      return res.status(403).json({ ok: false, error: 'Path blocked by safety guardrail.' });
+    }
     const result = await agentFs.writeFile(req.body.path, req.body.content);
     res.status(result.ok ? 200 : 400).json(result);
   } catch (err) {
@@ -51,6 +60,9 @@ router.post('/fs/write', async (req, res) => {
 
 router.post('/fs/list', async (req, res) => {
   try {
+    if (req.body.path && !_isPathAllowed(req.body.path)) {
+      return res.status(403).json({ ok: false, error: 'Path blocked by safety guardrail.' });
+    }
     const result = await agentFs.listDir(req.body.path);
     res.status(result.ok ? 200 : 400).json(result);
   } catch (err) {
@@ -60,8 +72,14 @@ router.post('/fs/list', async (req, res) => {
 });
 
 // ── Shell ──
+// Applies the same shell-pattern blocklist as the orchestrator (regex-based,
+// catches eval(), curl | bash, rm -rf /, etc.). The simple string match in
+// agentShell.js is kept as a second redundant layer.
 router.post('/shell/exec', async (req, res) => {
   try {
+    if (!_isShellAllowed(req.body.command)) {
+      return res.status(403).json({ ok: false, error: 'Command blocked by safety guardrail.' });
+    }
     const result = await agentShell.execCommand(req.body.command, req.body.timeout);
     res.status(result.ok ? 200 : 400).json(result);
   } catch (err) {
