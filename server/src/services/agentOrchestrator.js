@@ -31,6 +31,7 @@
  * @module services/agentOrchestrator
  */
 
+const fs = require('fs').promises;
 const { smartFetch } = require('./modelRouter');
 const { createTask, updateTask, getTask } = require('./agentTasks');
 const agentFs = require('./agentFs');
@@ -109,8 +110,10 @@ async function _saveState(taskId, state) {
       approved_commit: state.approvedCommit || false,
       approved_push: state.approvedPush || false,
     });
+    return { ok: true };
   } catch (err) {
     console.error('[agentOrchestrator] _saveState failed:', err && err.message);
+    return { ok: false, error: err && err.message };
   }
 }
 
@@ -269,10 +272,20 @@ async function _executeStep(taskId, step, state) {
         if (!state.approvedCommit) { log('pending_approval', { reason: 'commit' }); r = { ok: false, pendingApproval: true }; break; }
         const paths = Array.from(state.modifiedPaths || []);
         const addCmd = paths.length ? `git add -- ${paths.map(p => `'${p.replace(/'/g, "'\\''")}'`).join(' ')}` : 'git add -A';
-        // Pass message via stdin to eliminate backtick / $() injection.
-        const safeMsg = JSON.stringify(step.message || 'chore: agent commit').slice(1, -1);
-        const commitCmd = `echo "${safeMsg.replace(/"/g, '\\"')}" | git commit -F -`;
-        r = await agentShell.execCommand(`${addCmd} && ${commitCmd}`, 15000);
+        // Cross-platform safe: write message to a temp file under .git/ (guaranteed to exist
+        // and excluded from path guardrails) and pass it via -F. Avoids echo | pipe breakage
+        // on Windows PowerShell and backtick/$() injection in the message itself.
+        const safeMsg = step.message || 'chore: agent commit';
+        const tmpMsgPath = '.git/TMP_AGENT_COMMIT_MSG';
+        const wr = await agentFs.writeFile(tmpMsgPath, safeMsg);
+        if (!wr.ok) {
+          r = { ok: false, error: 'Failed to write temp commit message file.' };
+          log('commit', { msg: step.message, ok: false, error: r.error });
+          break;
+        }
+        r = await agentShell.execCommand(`${addCmd} && git commit -F ${tmpMsgPath}`, 15000);
+        // Cleanup best-effort (non-blocking).
+        try { await fs.unlink(tmpMsgPath); } catch (_) {}
         log('commit', { msg: step.message, ok: r.ok });
         break;
       }
@@ -579,14 +592,22 @@ async function revertTask(taskId, callerState) {
   let backups = callerState?.backups || {};
   if (!Object.keys(backups).length) {
     const { ok: found, task } = await getTask(taskId);
-    if (!found) throw new Error(`Task ${taskId} not found`);
+    if (!found) return { ok: false, taskId, error: `Task ${taskId} not found.`, reverted: [] };
     backups = task.backups || {};
+  }
+
+  if (!Object.keys(backups).length) {
+    return { ok: false, taskId, error: 'No backups found for this task — nothing to revert.', reverted: [] };
   }
 
   const results = [];
   for (const [p, content] of Object.entries(backups)) {
+    if (content === null || content === undefined) {
+      results.push({ path: p, ok: false, error: 'Backup content is null or undefined — skipping.' });
+      continue;
+    }
     const r = await agentFs.writeFile(p, content);
-    results.push({ path: p, ok: r.ok });
+    results.push({ path: p, ok: r.ok, error: r.error || undefined });
   }
 
   // Mark task as reverted so the UI no longer shows approval buttons.
@@ -598,4 +619,4 @@ async function revertTask(taskId, callerState) {
   return { ok: results.every(r => r.ok), taskId, reverted: results };
 }
 
-module.exports = { startTask, approveTask, revertTask };
+module.exports = { startTask, approveTask, revertTask, isPathAllowed, isShellAllowed };
