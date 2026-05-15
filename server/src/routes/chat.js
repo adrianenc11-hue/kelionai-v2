@@ -10,7 +10,7 @@ const { peekSignedInUser, isAdminUser } = require('../middleware/optionalAuth');
 const { executeRealTool } = require('../services/realTools');
 const ipGeo = require('../services/ipGeo');
 const { buildKelionToolsChatCompletions } = require('./realtime');
-const { recordCost, checkBudget } = require('../services/aiCostGuard');
+const { recordCost, checkBudget, isFastAllowed } = require('../services/aiCostGuard');
 
 const router = Router();
 
@@ -267,7 +267,7 @@ router.post('/', async (req, res) => {
       } else {
         const fetchRes = useTandem
           ? await runTandem(taskType, body)
-          : await smartFetch(taskType, body, isHeavy);
+          : await smartFetch(taskType, body, isHeavy, Boolean(fastMode) && isFastAllowed());
         activeModel = fetchRes.model;
         step(`smartFetch ok model=${activeModel}`);
         result = await fetchRes.response.json();
