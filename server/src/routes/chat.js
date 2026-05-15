@@ -63,7 +63,7 @@ router.post('/', async (req, res) => {
       await stampTrialIfFresh(guestIp, trial);
     }
 
-    const { message, sessionId, toolResponses, image, lat, lon, clientTimezone, clientLocalTime } = req.body || {};
+    const { message, sessionId, toolResponses, image, lat, lon, clientTimezone, clientLocalTime, fastMode } = req.body || {};
     if (!message && !toolResponses) {
       return res.status(400).json({ error: 'message or toolResponses is required' });
     }
@@ -104,7 +104,7 @@ router.post('/', async (req, res) => {
     }
 
     // Smart Model Router — unified stable routing
-    const { smartFetch, isCodingTask, isComplexTask } = require('../services/modelRouter');
+    const { smartFetch, runTandem, isCodingTask, isComplexTask } = require('../services/modelRouter');
     const swarmExpert = require('../services/swarmExpert');
 
 
@@ -115,7 +115,7 @@ router.post('/', async (req, res) => {
     // Build the unified Kelion persona (same as voice) for text chat.
     // This ensures identity consistency and follows the "Extra Credits" rule.
     const { buildKelionPersona, resolveLockedLangTag } = require('./realtime');
-    const { listMemoryItems, getCreditsBalance } = require('../db');
+    const { listMemoryItems, getCreditsBalance, addCreditsTransaction } = require('../db');
     
     let memoryItems = [];
     let creditsBalance = null;
@@ -154,6 +154,12 @@ router.post('/', async (req, res) => {
     // Adrian: "Să lucreze cu agenți la orice task mai complex".
     // Lowering threshold to 150 chars and adding more keywords.
     const isSoftGreu = false; // Disabled to force frontend tool execution for live progress
+
+    // ── Tandem Mode (dual-brain) ───────────────────────────────────────────────────────
+    // When TANDEM_ENABLED=1, heavy tasks run Opus 4.7 + Kimi K2.6 in parallel.
+    // Primary (Opus) is returned; secondary (Kimi) is logged for comparison.
+    const TANDEM_ENABLED = process.env.TANDEM_ENABLED === '1';
+    const useTandem = TANDEM_ENABLED && isHeavy;
 
     const browserLang = (req.query.lang || 'en-US').toString().slice(0, 16);
     const forcedLang = (process.env.KELION_FORCE_LANG || browserLang).toString().slice(0, 16);
@@ -260,7 +266,9 @@ router.post('/', async (req, res) => {
           }]
         };
       } else {
-        const fetchRes = await smartFetch(taskType, body, isHeavy);
+        const fetchRes = useTandem
+          ? await runTandem(taskType, body)
+          : await smartFetch(taskType, body, isHeavy);
         activeModel = fetchRes.model;
         step(`smartFetch ok model=${activeModel}`);
         result = await fetchRes.response.json();

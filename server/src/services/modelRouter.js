@@ -87,14 +87,20 @@ const MODELS = {
   // Override via env if you ever want to switch back.
   chat: process.env.MODEL_CHAT || 'gemini-2.5-flash',
   chat_heavy: process.env.MODEL_CHAT_HEAVY || 'gemini-2.5-pro',
+  chat_heavy_fast: process.env.MODEL_CHAT_HEAVY_FAST || process.env.MODEL_CHAT_HEAVY || 'gemini-2.5-pro',
 
   // Coding: Flash is fast and cheap, Pro is for heavy audits.
   coder: process.env.MODEL_CODER || 'gemini-2.5-flash',
   coder_heavy: process.env.MODEL_CODER_HEAVY || 'gemini-2.5-pro',
+  coder_heavy_fast: process.env.MODEL_CODER_HEAVY_FAST || process.env.MODEL_CODER_HEAVY || 'gemini-2.5-pro',
 
   // Vision: Gemini 2.5 Flash has strong multimodal support.
   vision: process.env.MODEL_VISION || 'gemini-2.5-flash',
   vision_heavy: process.env.MODEL_VISION_HEAVY || 'gemini-2.5-pro',
+
+  // Tandem second-brain (Kimi K2.6) — runs in parallel with Opus 4.7 on heavy tasks.
+  tandem_chat: process.env.MODEL_CHAT_TANDEM || 'moonshotai/kimi-k2.6',
+  tandem_coder: process.env.MODEL_CODER_TANDEM || 'moonshotai/kimi-k2.6',
 };
 
 // Internal fallback — same provider (Google AI Studio), different model.
@@ -127,7 +133,11 @@ const OPENROUTER_FALLBACK = {
  * @param {boolean} useHeavy - Whether to use the premium/heavy model
  * @returns {string} Model ID
  */
-function getModel(taskType, useHeavy = false) {
+function getModel(taskType, useHeavy = false, fastMode = false) {
+  if (fastMode && useHeavy) {
+    const fastKey = `${taskType}_heavy_fast`;
+    if (MODELS[fastKey]) return MODELS[fastKey];
+  }
   const key = useHeavy ? `${taskType}_heavy` : taskType;
   return MODELS[key] || MODELS[taskType] || MODELS.chat;
 }
@@ -208,13 +218,14 @@ function isComplexTask(msg) {
  * @param {'chat'|'coder'|'vision'} taskType
  * @param {object} body - Request body (messages, tools, etc.)
  * @param {boolean} useHeavy - Whether to use the premium/heavy model
+ * @param {boolean} fastMode - Whether to use the fast premium variant (6x cost, 3x speed)
  * @returns {Promise<{response: Response, model: string, provider: string}>}
  */
-async function smartFetch(taskType, body, useHeavy = false) {
-  const model = getModel(taskType, useHeavy);
+async function smartFetch(taskType, body, useHeavy = false, fastMode = false) {
+  const model = getModel(taskType, useHeavy, fastMode);
   const endpoint = getEndpoint(model);
 
-  console.log(`[modelRouter] ${taskType} (heavy=${useHeavy}) → ${model} via ${endpoint.provider}`);
+  console.log(`[modelRouter] ${taskType} (heavy=${useHeavy} fast=${fastMode}) → ${model} via ${endpoint.provider}`);
 
   // Try primary provider — 45s timeout (heavy tasks like audits need time)
   // Google AI Studio calls go through the token bucket so we never
@@ -382,7 +393,76 @@ async function smartFetch(taskType, body, useHeavy = false) {
     }
   }
 
-  throw new Error(`All models exhausted for ${taskType} (heavy=${useHeavy})`);
+  throw new Error(`All models exhausted for ${taskType} (heavy=${useHeavy} fast=${fastMode})`);
+}
+
+/**
+ * Tandem execution: primary (Opus 4.7 standard) + secondary (Kimi K2.6) in parallel.
+ * Returns the primary response, but logs the secondary for comparison.
+ * If the primary fails, falls back to the secondary.
+ *
+ * @param {'chat'|'coder'} taskType
+ * @param {object} body
+ * @returns {Promise<{response: Response, model: string, provider: string}>}
+ */
+async function runTandem(taskType, body) {
+  const primaryModel = getModel(taskType, true, false); // Opus standard
+  const secondaryModel = MODELS[`tandem_${taskType}`] || MODELS.tandem_chat || 'moonshotai/kimi-k2.6';
+
+  const primaryPromise = smartFetch(taskType, body, true, false);
+  const secondaryPromise = (async () => {
+    const endpoint = getEndpoint(secondaryModel);
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 45000);
+    try {
+      const response = await fetch(endpoint.url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': endpoint.authHeader,
+          'HTTP-Referer': 'https://kelion.ai',
+          'X-Title': 'Kelion AI',
+        },
+        body: JSON.stringify({ ...body, model: endpoint.apiModel }),
+        signal: ctrl.signal,
+      });
+      clearTimeout(timer);
+      return { response, model: secondaryModel, provider: endpoint.provider };
+    } catch (err) {
+      clearTimeout(timer);
+      throw err;
+    }
+  })();
+
+  const t0 = Date.now();
+  let primary, secondary;
+  try {
+    [primary, secondary] = await Promise.allSettled([primaryPromise, secondaryPromise]);
+  } catch (e) {
+    console.error('[modelRouter] Tandem Promise.allSettled error:', e);
+  }
+
+  const duration = Date.now() - t0;
+  const primaryOk = primary?.status === 'fulfilled' && primary.value?.response?.ok;
+  const secondaryOk = secondary?.status === 'fulfilled' && secondary.value?.response?.ok;
+
+  console.log(`[modelRouter] Tandem complete in ${duration}ms | primary=${primaryModel} ok=${primaryOk} | secondary=${secondaryModel} ok=${secondaryOk}`);
+
+  if (primaryOk) {
+    return primary.value;
+  }
+  if (secondaryOk) {
+    console.log(`[modelRouter] Tandem fallback to secondary ${secondaryModel}`);
+    return secondary.value;
+  }
+
+  if (primary?.status === 'rejected') {
+    throw new Error(`Tandem primary failed: ${primary.reason?.message || primary.reason}`);
+  }
+  if (secondary?.status === 'rejected') {
+    throw new Error(`Tandem secondary failed: ${secondary.reason?.message || secondary.reason}`);
+  }
+  throw new Error('Tandem both models returned non-OK responses');
 }
 
 module.exports = {
@@ -392,6 +472,8 @@ module.exports = {
   getEndpoint,
   getFallbackChain,
   smartFetch,
+  runTandem,
   isCodingTask,
   isComplexTask,
+  MODELS,
 };
