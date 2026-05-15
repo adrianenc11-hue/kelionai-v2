@@ -12,8 +12,10 @@ const { readFile } = require('./agentFs');
  * @returns {Promise<{ok:boolean, stdout:string, stderr:string}>}
  */
 async function runTests(filter = '') {
-  const cmd = filter
-    ? `cd server && npx jest --testPathPattern="${filter}" --verbose`
+  // Sanitize filter to prevent shell injection via testPathPattern.
+  const safeFilter = String(filter || '').replace(/[^a-zA-Z0-9_\-./]/g, '');
+  const cmd = safeFilter
+    ? `cd server && npx jest --testPathPattern="${safeFilter}" --verbose`
     : 'cd server && npx jest --verbose';
   return execCommand(cmd, 300000);
 }
@@ -56,7 +58,9 @@ async function runSyntaxCheck(files) {
   const skipRx = /\.(jsx|tsx?)$/;
   for (const f of files.slice(0, 20)) {
     if (skipRx.test(f)) { passed.push(f); continue; }
-    const r = await execCommand(`node --check "${f}"`, 10000);
+    // Escape double quotes in the path to avoid breaking the shell string.
+    const safePath = String(f).replace(/"/g, '\\"');
+    const r = await execCommand(`node --check "${safePath}"`, 10000);
     if (r.ok) passed.push(f);
     else failed.push({ path: f, error: r.stderr || r.error || 'Syntax error' });
   }
