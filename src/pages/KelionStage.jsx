@@ -2039,21 +2039,7 @@ export default function KelionStage() {
                 <ContactShadows position={[0, -1.25, 0]} opacity={0.55} scale={5} blur={2.6} far={2.5} />
               </Suspense>
             </Canvas>
-            {/* Teardrop speech bubble — latest assistant message, right side, horizontal drop shape pointing to avatar */}
-            {(() => {
-              const lastAssistant = [...turns].reverse().find(m => m.role !== 'user' && (m.text || m.transcript) && typeof (m.text || m.transcript) === 'string' && (m.text || m.transcript).trim().length > 0);
-              if (!lastAssistant) return null;
-              const txt = lastAssistant.text || lastAssistant.transcript;
-              return (
-                <div style={{ position: 'absolute', top: '12%', right: '6%', zIndex: 50, maxWidth: 280, width: '90%', pointerEvents: 'none' }}>
-                  <div style={{ position: 'relative', background: '#ffffff', borderRadius: '50% 50% 50% 50% / 60% 60% 40% 40%', padding: '16px 20px', boxShadow: '0 8px 24px rgba(0,0,0,0.35)', fontFamily: 'system-ui, -apple-system, sans-serif', fontSize: 15, lineHeight: 1.5, color: '#1a1a1a', textAlign: 'center' }}>
-                    {txt}
-                    {/* Left pointer — teardrop tip facing the avatar */}
-                    <div style={{ position: 'absolute', left: -12, top: '50%', transform: 'translateY(-50%)', width: 0, height: 0, borderTop: '10px solid transparent', borderBottom: '10px solid transparent', borderRight: '14px solid #ffffff' }} />
-                  </div>
-                </div>
-              );
-            })()}
+           
           </div>
           {/* Permanent AE Studio Logo (moves up when chat expands) */}
           <div style={{ display: 'flex', justifyContent: 'center', paddingBottom: 12, zIndex: 10, pointerEvents: 'none' }}>
