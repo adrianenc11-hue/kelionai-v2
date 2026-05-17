@@ -684,6 +684,52 @@ router.post('/tts', async (req, res) => {
   const detectedLang = (lang || 'en').toLowerCase().split('-')[0];
   const elLangCode = ELEVENLABS_LANG_CODES[detectedLang] || detectedLang;
 
+  // ── Multilingual TTS Text Normalization ──────────────────────────────
+  // ElevenLabs sometimes reads symbols literally or in the wrong language.
+  // We expand them to spoken words in the detected language so the voice
+  // pronounces "22°C" as "douăzeci și două de grade Celsius" (ro),
+  // "twenty-two degrees Celsius" (en), "vingt-deux degrés Celsius" (fr), etc.
+  const TTS_LOCALE = {
+    ro: { degC: 'de grade Celsius', degF: 'de grade Fahrenheit', deg: 'de grade', pct: 'procente', eur: 'euro', usd: 'dolari', gbp: 'lire', lei: 'lei', kmh: 'kilometri pe oră', ms: 'metri pe secundă', km: 'kilometri', kg: 'kilograme', mg: 'miligrame', ml: 'mililitri', cm: 'centimetri', mm: 'milimetri', etc: 'etcetera', nr: 'numărul ', m2: 'metri pătrați', m3: 'metri cubi', plus: 'plus', times: 'ori', div: 'împărțit la', eq: 'egal' },
+    en: { degC: 'degrees Celsius', degF: 'degrees Fahrenheit', deg: 'degrees', pct: 'percent', eur: 'euros', usd: 'dollars', gbp: 'pounds', lei: 'lei', kmh: 'kilometers per hour', ms: 'meters per second', km: 'kilometers', kg: 'kilograms', mg: 'milligrams', ml: 'milliliters', cm: 'centimeters', mm: 'millimeters', etc: 'et cetera', nr: 'number ', m2: 'square meters', m3: 'cubic meters', plus: 'plus', times: 'times', div: 'divided by', eq: 'equals' },
+    es: { degC: 'grados Celsius', degF: 'grados Fahrenheit', deg: 'grados', pct: 'por ciento', eur: 'euros', usd: 'dólares', gbp: 'libras', lei: 'lei', kmh: 'kilómetros por hora', ms: 'metros por segundo', km: 'kilómetros', kg: 'kilogramos', mg: 'miligramos', ml: 'mililitros', cm: 'centímetros', mm: 'milímetros', etc: 'etcétera', nr: 'número ', m2: 'metros cuadrados', m3: 'metros cúbicos', plus: 'más', times: 'por', div: 'dividido entre', eq: 'igual a' },
+    fr: { degC: 'degrés Celsius', degF: 'degrés Fahrenheit', deg: 'degrés', pct: 'pour cent', eur: 'euros', usd: 'dollars', gbp: 'livres', lei: 'lei', kmh: 'kilomètres par heure', ms: 'mètres par seconde', km: 'kilomètres', kg: 'kilogrammes', mg: 'milligrammes', ml: 'millilitres', cm: 'centimètres', mm: 'millimètres', etc: 'et cetera', nr: 'numéro ', m2: 'mètres carrés', m3: 'mètres cubes', plus: 'plus', times: 'fois', div: 'divisé par', eq: 'égale' },
+    de: { degC: 'Grad Celsius', degF: 'Grad Fahrenheit', deg: 'Grad', pct: 'Prozent', eur: 'Euro', usd: 'Dollar', gbp: 'Pfund', lei: 'Lei', kmh: 'Kilometer pro Stunde', ms: 'Meter pro Sekunde', km: 'Kilometer', kg: 'Kilogramm', mg: 'Milligramm', ml: 'Milliliter', cm: 'Zentimeter', mm: 'Millimeter', etc: 'et cetera', nr: 'Nummer ', m2: 'Quadratmeter', m3: 'Kubikmeter', plus: 'plus', times: 'mal', div: 'geteilt durch', eq: 'gleich' },
+    it: { degC: 'gradi Celsius', degF: 'gradi Fahrenheit', deg: 'gradi', pct: 'per cento', eur: 'euro', usd: 'dollari', gbp: 'sterline', lei: 'lei', kmh: 'chilometri orari', ms: 'metri al secondo', km: 'chilometri', kg: 'chilogrammi', mg: 'milligrammi', ml: 'millilitri', cm: 'centimetri', mm: 'millimetri', etc: 'eccetera', nr: 'numero ', m2: 'metri quadrati', m3: 'metri cubi', plus: 'più', times: 'per', div: 'diviso', eq: 'uguale' },
+    pt: { degC: 'graus Celsius', degF: 'graus Fahrenheit', deg: 'graus', pct: 'por cento', eur: 'euros', usd: 'dólares', gbp: 'libras', lei: 'lei', kmh: 'quilômetros por hora', ms: 'metros por segundo', km: 'quilômetros', kg: 'quilogramas', mg: 'miligramas', ml: 'mililitros', cm: 'centímetros', mm: 'milímetros', etc: 'et cetera', nr: 'número ', m2: 'metros quadrados', m3: 'metros cúbicos', plus: 'mais', times: 'vezes', div: 'dividido por', eq: 'igual' },
+  };
+  function normalizeTTSText(raw) {
+    const L = TTS_LOCALE[elLangCode] || TTS_LOCALE['en']; // fallback to English
+    let s = raw;
+    s = s.replace(/(-?\d+)\s*°\s*C\b/gi, `$1 ${L.degC}`);
+    s = s.replace(/(-?\d+)\s*°\s*F\b/gi, `$1 ${L.degF}`);
+    s = s.replace(/(-?\d+)\s*°/g, `$1 ${L.deg}`);
+    s = s.replace(/(\d+(?:[.,]\d+)?)\s*%/g, `$1 ${L.pct}`);
+    s = s.replace(/€\s*(\d+(?:[.,]\d+)?)/g, `$1 ${L.eur}`);
+    s = s.replace(/(\d+(?:[.,]\d+)?)\s*€/g, `$1 ${L.eur}`);
+    s = s.replace(/\$\s*(\d+(?:[.,]\d+)?)/g, `$1 ${L.usd}`);
+    s = s.replace(/(\d+(?:[.,]\d+)?)\s*\$/g, `$1 ${L.usd}`);
+    s = s.replace(/£\s*(\d+(?:[.,]\d+)?)/g, `$1 ${L.gbp}`);
+    s = s.replace(/(\d+(?:[.,]\d+)?)\s*£/g, `$1 ${L.gbp}`);
+    s = s.replace(/(\d+(?:[.,]\d+)?)\s*RON\b/gi, `$1 ${L.lei}`);
+    s = s.replace(/(\d+)\s*km\/h/gi, `$1 ${L.kmh}`);
+    s = s.replace(/(\d+)\s*m\/s/gi, `$1 ${L.ms}`);
+    s = s.replace(/(\d+(?:[.,]\d+)?)\s*km\b/gi, `$1 ${L.km}`);
+    s = s.replace(/(\d+(?:[.,]\d+)?)\s*kg\b/gi, `$1 ${L.kg}`);
+    s = s.replace(/(\d+(?:[.,]\d+)?)\s*mg\b/gi, `$1 ${L.mg}`);
+    s = s.replace(/(\d+(?:[.,]\d+)?)\s*ml\b/gi, `$1 ${L.ml}`);
+    s = s.replace(/(\d+(?:[.,]\d+)?)\s*cm\b/gi, `$1 ${L.cm}`);
+    s = s.replace(/(\d+(?:[.,]\d+)?)\s*mm\b/gi, `$1 ${L.mm}`);
+    s = s.replace(/\betc\.\b/gi, L.etc);
+    s = s.replace(/\bnr\.\s*/gi, L.nr);
+    s = s.replace(/\bm²\b/g, L.m2);
+    s = s.replace(/\bm³\b/g, L.m3);
+    s = s.replace(/\s*×\s*/g, ` ${L.times} `);
+    s = s.replace(/\s*÷\s*/g, ` ${L.div} `);
+    s = s.replace(/\s{2,}/g, ' ').trim();
+    return s;
+  }
+
   // Helper to call TTS with a given voiceId
   async function callTTS(vid) {
     return fetch(
@@ -696,7 +742,7 @@ router.post('/tts', async (req, res) => {
           'Accept': 'audio/mpeg',
         },
         body: JSON.stringify({
-          text: text.trim().slice(0, 5000),
+          text: normalizeTTSText(text.trim()).slice(0, 5000),
           model_id: 'eleven_turbo_v2_5',
           // Explicit language_code ensures correct pronunciation rules.
           // Without this, ElevenLabs defaults to English pronunciation
