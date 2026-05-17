@@ -13,6 +13,7 @@ const agentDeploy = require('../services/agentDeploy');
 const agentDiagnostics = require('../services/agentDiagnostics');
 const agentTasks = require('../services/agentTasks');
 const agentOrchestrator = require('../services/agentOrchestrator');
+const agentSandbox = require('../services/agentSandbox');
 const { isPathAllowed: _isPathAllowed, isShellAllowed: _isShellAllowed } = agentOrchestrator;
 
 const router = Router();
@@ -130,6 +131,77 @@ router.post('/browser/content', async (req, res) => {
   }
 });
 
+// ── Browser: Full Navigation (NEW) ──
+router.post('/browser/navigate', async (req, res) => {
+  try {
+    const result = await agentBrowser.navigate(req.body.url, req.body.options);
+    res.status(result.ok ? 200 : 400).json(result);
+  } catch (err) {
+    console.error('[agent/browser/navigate]', err && err.message);
+    res.status(500).json({ error: 'Navigation failed' });
+  }
+});
+
+router.post('/browser/click', async (req, res) => {
+  try {
+    const result = await agentBrowser.click(req.body.url, req.body.selector, req.body.options);
+    res.status(result.ok ? 200 : 400).json(result);
+  } catch (err) {
+    console.error('[agent/browser/click]', err && err.message);
+    res.status(500).json({ error: 'Click failed' });
+  }
+});
+
+router.post('/browser/type', async (req, res) => {
+  try {
+    const result = await agentBrowser.type(req.body.url, req.body.selector, req.body.text, req.body.options);
+    res.status(result.ok ? 200 : 400).json(result);
+  } catch (err) {
+    console.error('[agent/browser/type]', err && err.message);
+    res.status(500).json({ error: 'Type failed' });
+  }
+});
+
+router.post('/browser/extract', async (req, res) => {
+  try {
+    const result = await agentBrowser.extractStructured(req.body.url, req.body.schema);
+    res.status(result.ok ? 200 : 400).json(result);
+  } catch (err) {
+    console.error('[agent/browser/extract]', err && err.message);
+    res.status(500).json({ error: 'Extract failed' });
+  }
+});
+
+router.post('/browser/fill-form', async (req, res) => {
+  try {
+    const result = await agentBrowser.fillForm(req.body.url, req.body.fields, req.body.options);
+    res.status(result.ok ? 200 : 400).json(result);
+  } catch (err) {
+    console.error('[agent/browser/fill-form]', err && err.message);
+    res.status(500).json({ error: 'Form fill failed' });
+  }
+});
+
+router.post('/browser/links', async (req, res) => {
+  try {
+    const result = await agentBrowser.getLinks(req.body.url);
+    res.status(result.ok ? 200 : 400).json(result);
+  } catch (err) {
+    console.error('[agent/browser/links]', err && err.message);
+    res.status(500).json({ error: 'Links extraction failed' });
+  }
+});
+
+router.post('/browser/evaluate', async (req, res) => {
+  try {
+    const result = await agentBrowser.evaluateJs(req.body.url, req.body.code);
+    res.status(result.ok ? 200 : 400).json(result);
+  } catch (err) {
+    console.error('[agent/browser/evaluate]', err && err.message);
+    res.status(500).json({ error: 'JS evaluation failed' });
+  }
+});
+
 // ── GitHub ──
 router.post('/github/create-pr', async (req, res) => {
   try {
@@ -179,6 +251,51 @@ router.get('/deploy/list', async (req, res) => {
   } catch (err) {
     console.error('[agent/deploy/list]', err && err.message);
     res.status(500).json({ error: 'Deployment list failed' });
+  }
+});
+
+// ── Deploy: Verification + Health (NEW) ──
+router.post('/deploy/verify', async (req, res) => {
+  try {
+    const result = await agentDeploy.deployAndVerify(req.body.commitSha);
+    res.status(result.ok ? 200 : 400).json(result);
+  } catch (err) {
+    console.error('[agent/deploy/verify]', err && err.message);
+    res.status(500).json({ error: 'Deploy verification failed' });
+  }
+});
+
+router.get('/deploy/health', async (req, res) => {
+  try {
+    const result = await agentDeploy.getProductionHealth();
+    res.status(result.ok ? 200 : 400).json(result);
+  } catch (err) {
+    console.error('[agent/deploy/health]', err && err.message);
+    res.status(500).json({ error: 'Health check failed' });
+  }
+});
+
+// ── Sandbox: Isolated JS Execution (NEW) ──
+router.post('/sandbox/execute', async (req, res) => {
+  try {
+    const result = await agentSandbox.executeJs(req.body.code, {
+      timeout: req.body.timeout,
+      globals: req.body.globals,
+    });
+    res.status(result.ok ? 200 : 400).json(result);
+  } catch (err) {
+    console.error('[agent/sandbox/execute]', err && err.message);
+    res.status(500).json({ error: 'Sandbox execution failed' });
+  }
+});
+
+router.post('/sandbox/validate', async (req, res) => {
+  try {
+    const result = agentSandbox.validateCode(req.body.code);
+    res.json(result);
+  } catch (err) {
+    console.error('[agent/sandbox/validate]', err && err.message);
+    res.status(500).json({ error: 'Code validation failed' });
   }
 });
 
