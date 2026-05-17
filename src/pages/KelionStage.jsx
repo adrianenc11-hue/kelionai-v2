@@ -1842,13 +1842,7 @@ export default function KelionStage() {
     },
   })
 
-  useEffect(() => {
-    const handleFlip = (e) => {
-      setMonitorOpen(e.detail);
-    };
-    window.addEventListener('kelion:flipMonitor', handleFlip);
-    return () => window.removeEventListener('kelion:flipMonitor', handleFlip);
-  }, []);
+  // kelion:flipMonitor removed — single-screen layout, no flip.
 
   return (
     <div
@@ -1868,20 +1862,15 @@ export default function KelionStage() {
       <UIActionToast />
       {/* ═══ SPLIT LAYOUT: Chat Left 70% + Avatar Right 30% ═══ */}
       <div style={{ display: 'flex', flexDirection: stageNarrow ? 'column' : 'row', width: '100%', height: '100%' }}>
-        {/* LEFT PANEL — Chat / Monitor (3D Flip Container) */}
-        <div style={{ flex: stageNarrow ? '0 0 55%' : '0 0 70%', maxWidth: stageNarrow ? '100%' : '70%', height: '100%', position: 'relative', perspective: '1500px' }}>
-
-          <div style={{
-            width: '100%', height: '100%', position: 'relative',
-            transformStyle: 'preserve-3d',
-            transition: 'transform 0.8s cubic-bezier(0.4, 0, 0.2, 1)',
-            transform: 'rotateY(-180deg)'
-          }}>
-
-            {/* Front Face (Chat) */}
+        {/* LEFT PANEL — Chat + Monitor Overlay (single screen) */}
+        <div style={{ flex: stageNarrow ? '0 0 55%' : '0 0 70%', maxWidth: stageNarrow ? '100%' : '70%', height: '100%', position: 'relative' }}>
+          <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+            {/* MonitorOverlay renders on top when active */}
+            <MonitorOverlay />
+            {/* Chat Panel — always visible */}
             <div style={{
               position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
-              backfaceVisibility: 'hidden', background: '#ffffff', display: 'none',
+              background: '#ffffff',
               display: 'flex', flexDirection: 'column', overflow: 'hidden'
             }}>
               <audio ref={audioRef} autoPlay playsInline onPlay={(e) => attachTts(e.target)} onPause={resetTts} onEnded={resetTts} onError={resetTts} />
@@ -1894,10 +1883,7 @@ export default function KelionStage() {
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
                     Features
                   </button>
-                  <button onClick={() => setMonitorOpen(true)} style={{ marginRight: 16, background: '#2563eb', color: 'white', border: 'none', borderRadius: 8, padding: '8px 16px', fontWeight: 600, cursor: 'pointer', display: 'none', alignItems: 'center', gap: 6 }}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-                    Comută Monitor
-                  </button>
+
                   {(() => {
                     const statusColors = {
                       idle: { color: '#888', bg: '#f5f5f5', border: '#e0e0e0', glow: 'none' },
@@ -1911,7 +1897,7 @@ export default function KelionStage() {
                         background: sc.bg, border: `1px solid ${sc.border}`,
                         borderRadius: 20, color: sc.color,
                         fontSize: 14, fontWeight: 700, textTransform: 'uppercase',
-                        letterSpacing: 1, display: 'none', alignItems: 'center', gap: 8,
+                        letterSpacing: 1, display: 'flex', alignItems: 'center', gap: 8,
                         boxShadow: sc.glow, transition: 'all 0.3s ease',
                         minWidth: taskStatus ? 260 : 'auto', flexDirection: taskStatus ? 'column' : 'row',
                         padding: taskStatus ? '8px 16px' : '6px 16px',
@@ -1990,37 +1976,6 @@ export default function KelionStage() {
             {chatError && (<div style={{ padding: '8px 16px', borderRadius: 10, background: '#fef2f2', color: '#dc2626', fontSize: 14, alignSelf: 'center' }}>{chatError}</div>)}
           </div>
           </div>
-            {/* Back Face (Monitor) */}
-            <div style={{
-              position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
-              backfaceVisibility: 'hidden', transform: 'rotateY(180deg)',
-              background: '#0d0b1d', overflow: 'hidden'
-            }}>
-              <MonitorOverlay />
-              <div style={{ position: 'absolute', top: 10, right: 60, zIndex: 9999 }}>
-                <button onClick={() => setMonitorOpen(false)} style={{ background: 'rgba(37, 99, 235, 0.85)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '6px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'none', alignItems: 'center', gap: 6, backdropFilter: 'blur(8px)', boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-                  Comută Chat
-                </button>
-              </div>
-              {/* Transcript Overlay for Monitor Mode */}
-              {(() => {
-                const lastDisplayMessage = [...turns].reverse().find(m => !m.isThought && (m.text || m.transcript) && typeof (m.text || m.transcript) === 'string' && (m.text || m.transcript).trim().length > 0);
-                if (!lastDisplayMessage) return null;
-                const displayText = lastDisplayMessage.text || lastDisplayMessage.transcript;
-                const isUser = lastDisplayMessage.role === 'user';
-                return (
-                  <div style={{ position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)', width: '80%', maxWidth: 800, background: 'rgba(10,13,26,0.85)', padding: '16px 24px', borderRadius: 16, color: 'white', fontFamily: 'Inter, sans-serif', fontSize: 16, textAlign: 'center', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 8px 32px rgba(0,0,0,0.5)', zIndex: 9999, pointerEvents: 'none', transition: 'all 0.3s ease' }}>
-                    <span style={{ color: isUser ? '#58a6ff' : '#4ade80', fontWeight: 'bold', marginRight: 12 }}>
-                      {isUser ? 'Tu:' : 'Kelion:'}
-                    </span>
-                    <span style={{ opacity: 0.95, lineHeight: 1.5 }}>
-                      {displayText}
-                    </span>
-                  </div>
-                );
-              })()}
-            </div>
           </div>
         </div>
         {/* RIGHT PANEL — Avatar 3D & Chat Input */}

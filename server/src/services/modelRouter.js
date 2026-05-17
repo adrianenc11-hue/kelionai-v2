@@ -81,31 +81,28 @@ if (GOOGLE_KEYS.length === 0) {
 let _currentKeyIndex = 0;
 
 const MODELS = {
-  // Adrian: Google AI Studio direct (free 30 RPM) is the PRIMARY
-  // provider because OpenRouter free tier is exhausted (402/404).
-  // Every default model is Gemini so getEndpoint() routes to AI Studio.
-  // Override via env if you ever want to switch back.
-  chat: process.env.MODEL_CHAT || 'gemini-2.5-flash',
-  chat_heavy: process.env.MODEL_CHAT_HEAVY || 'anthropic/claude-3-opus-20240229',
-  chat_heavy_fast: process.env.MODEL_CHAT_HEAVY_FAST || 'anthropic/claude-3-opus-20240229',
+  // Adrian 2026-05-17: switched PRIMARY brain to Claude Sonnet 4 via
+  // OpenRouter. Owner explicitly requested Claude ("creierul nu e Cloud 4.6").
+  // All routes go through OpenRouter with OPENROUTER_API_KEY.
+  chat: process.env.MODEL_CHAT || 'anthropic/claude-sonnet-4-20250514',
+  chat_heavy: process.env.MODEL_CHAT_HEAVY || 'anthropic/claude-sonnet-4-20250514',
+  chat_heavy_fast: process.env.MODEL_CHAT_HEAVY_FAST || process.env.MODEL_CHAT_HEAVY || 'anthropic/claude-sonnet-4-20250514',
 
-  // Coding: Flash is fast and cheap, Pro is for heavy audits.
-  coder: process.env.MODEL_CODER || 'gemini-2.5-flash',
-  coder_heavy: process.env.MODEL_CODER_HEAVY || 'anthropic/claude-3-opus-20240229',
-  coder_heavy_fast: process.env.MODEL_CODER_HEAVY_FAST || 'anthropic/claude-3-opus-20240229',
+  // Coding: Claude Sonnet 4 for all coding tasks.
+  coder: process.env.MODEL_CODER || 'anthropic/claude-sonnet-4-20250514',
+  coder_heavy: process.env.MODEL_CODER_HEAVY || 'anthropic/claude-sonnet-4-20250514',
+  coder_heavy_fast: process.env.MODEL_CODER_HEAVY_FAST || process.env.MODEL_CODER_HEAVY || 'anthropic/claude-sonnet-4-20250514',
 
-  // Vision: Gemini 2.5 Flash has strong multimodal support.
-  vision: process.env.MODEL_VISION || 'gemini-2.5-flash',
-  vision_heavy: process.env.MODEL_VISION_HEAVY || 'anthropic/claude-3-opus-20240229',
+  // Vision: Claude Sonnet 4 has strong multimodal support.
+  vision: process.env.MODEL_VISION || 'anthropic/claude-sonnet-4-20250514',
+  vision_heavy: process.env.MODEL_VISION_HEAVY || 'anthropic/claude-sonnet-4-20250514',
 
-  // Tandem second-brain (Kimi K2.6) — runs in parallel with Opus 4.7 on heavy tasks.
+  // Tandem second-brain (Kimi K2.6) — runs in parallel on heavy tasks.
   tandem_chat: process.env.MODEL_CHAT_TANDEM || 'moonshotai/kimi-k2.6',
   tandem_coder: process.env.MODEL_CODER_TANDEM || 'moonshotai/kimi-k2.6',
 };
 
-// Internal fallback — same provider (Google AI Studio), different model.
-// Each model has separate quota, so switching from Pro to Flash often works
-// when Pro is exhausted, *before* trying OpenRouter.
+// Internal fallback — Google AI Studio models tried when Claude is down.
 const GOOGLE_FALLBACK = {
   chat_heavy: ['gemini-2.5-flash', 'gemini-2.0-flash'],
   chat:       ['gemini-2.5-flash', 'gemini-2.0-flash'],
@@ -115,16 +112,14 @@ const GOOGLE_FALLBACK = {
   vision:     ['gemini-2.5-flash'],
 };
 
-// Fallback chain — OpenRouter free tier (16 RPM combined).
-// We keep 3–4 models so one rate-limit / outage doesn't exhaust the chain.
-// Google AI Studio direct is tried *first* via getEndpoint() when GOOGLE_API_KEY is set.
+// Fallback chain — OpenRouter models tried after Claude + Google AI Studio fail.
 const OPENROUTER_FALLBACK = {
-  chat:        ['google/gemini-2.0-flash-001', 'anthropic/claude-3-haiku', 'meta-llama/llama-3.3-70b-instruct'],
-  chat_heavy:  ['google/gemini-2.0-flash-001', 'anthropic/claude-3-5-sonnet-20241022', 'meta-llama/llama-3.3-70b-instruct'],
-  coder:       ['google/gemini-2.0-flash-001', 'anthropic/claude-3-5-sonnet-20241022', 'meta-llama/llama-3.3-70b-instruct'],
-  coder_heavy: ['google/gemini-2.0-flash-001', 'anthropic/claude-3-opus-20240229', 'meta-llama/llama-3.3-70b-instruct'],
-  vision:      ['google/gemini-2.0-flash-001', 'anthropic/claude-3-5-sonnet-20241022'],
-  vision_heavy:['google/gemini-2.0-flash-001', 'anthropic/claude-3-opus-20240229'],
+  chat:        ['anthropic/claude-3-5-sonnet-20241022', 'google/gemini-2.0-flash-001', 'meta-llama/llama-3.3-70b-instruct'],
+  chat_heavy:  ['anthropic/claude-3-5-sonnet-20241022', 'google/gemini-2.0-flash-001', 'meta-llama/llama-3.3-70b-instruct'],
+  coder:       ['anthropic/claude-3-5-sonnet-20241022', 'google/gemini-2.0-flash-001', 'meta-llama/llama-3.3-70b-instruct'],
+  coder_heavy: ['anthropic/claude-3-5-sonnet-20241022', 'google/gemini-2.0-flash-001', 'meta-llama/llama-3.3-70b-instruct'],
+  vision:      ['anthropic/claude-3-5-sonnet-20241022', 'google/gemini-2.0-flash-001'],
+  vision_heavy:['anthropic/claude-3-5-sonnet-20241022', 'google/gemini-2.0-flash-001'],
 };
 
 /**
