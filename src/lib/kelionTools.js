@@ -582,6 +582,32 @@ function autoDisplayOnMonitor(name, j, args) {
   } catch (err) {
     console.warn('[autoDisplay] failed:', err.message)
   }
+
+  // ── Catch-all fallback: show ANY tool result on monitor ──────────
+  // If no specific handler matched above, show a generic result card
+  // so the user always SEES what Kelion did on the monitor.
+  try {
+    const entries = Object.entries(j).filter(([k]) => !['ok', 'error', '__proto__'].includes(k)).slice(0, 8)
+    if (entries.length > 0) {
+      const rows = entries.map(([k, v]) => {
+        const val = typeof v === 'object' ? JSON.stringify(v).slice(0, 200) : String(v).slice(0, 200)
+        return `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(167,139,250,0.1)">
+          <span style="color:#a78bfa;font-weight:600;min-width:120px">${k.replace(/_/g, ' ')}</span>
+          <span style="text-align:right;word-break:break-all;max-width:60%">${val.replace(/</g,'&lt;')}</span>
+        </div>`
+      }).join('')
+      const toolLabel = name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+      handleShowOnMonitor({
+        kind: 'html',
+        query: `<div style="padding:32px;font-family:system-ui;color:#ede9fe;min-height:100%;background:linear-gradient(135deg,#0f0a1e,#1a1145)">
+          <div style="font-size:13px;color:#a78bfa;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Tool Result</div>
+          <div style="font-size:24px;font-weight:700;margin-bottom:20px">${toolLabel}</div>
+          ${rows}
+        </div>`,
+        title: toolLabel,
+      })
+    }
+  } catch (_) { /* best effort */ }
 }
 
 export async function runTool(name, args) {
