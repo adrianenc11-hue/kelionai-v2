@@ -38,6 +38,16 @@ const agentFs = require('./agentFs');
 const agentShell = require('./agentShell');
 const agentDiagnostics = require('./agentDiagnostics');
 const agentGitHub = require('./agentGitHub');
+const agentBrowser = require('./agentBrowser');
+const agentSandbox = require('./agentSandbox');
+const agentDeploy = require('./agentDeploy');
+
+// agentWeb loaded lazily to avoid circular deps if not present
+let _agentWeb;
+function _getAgentWeb() {
+  if (!_agentWeb) { try { _agentWeb = require('./agentWeb'); } catch (_) { _agentWeb = null; } }
+  return _agentWeb;
+}
 
 // ── Mutex: prevent parallel autonomous tasks from clobbering each other ──
 let _taskLock = false;
@@ -70,6 +80,8 @@ const MAX_FILES_PER_TASK = 10;
 const MAX_STEPS = 20;
 /** @const {number} Maximum auto-repair iterations before human approval is required. */
 const MAX_REPAIR_ITERATIONS = 3;
+/** @const {number} Maximum autonomy loop iterations (re-plan after completion assessment). */
+const MAX_AUTONOMY_ITERATIONS = 5;
 
 /**
  * Normalise and validate a file path against the blocklist.
@@ -133,6 +145,9 @@ function _narrateStep(step, result) {
     validate: 'rulez validarea exhaustivă', git_status: 'verific git-ul',
     commit: 'salvez commit', push: 'public pe remote', pr: 'creez pull request',
     think: 'analizez', repair: 'repar eroarea', speak: 'anunț',
+    browse: 'navighez pe web', sandbox: 'execut cod izolat',
+    deploy: 'deployez pe producție', verify_deploy: 'verific deploy-ul',
+    search_web: 'caut pe web',
   };
   const verb = typeNames[step.type] || step.type;
   if (result.blocked) return `Am blocat pasul ${step.type} — siguranța nu permite această acțiune.`;
@@ -144,6 +159,11 @@ function _narrateStep(step, result) {
   if (step.type === 'validate') return `Validarea exhaustivă ${result.ok ? 'a trecut' : 'a eșuat'} — ${result.stage || ''}.`;
   if (step.type === 'repair') return `Repar automat eroarea – încercarea ${step.iteration || 1}.`;
   if (step.type === 'speak') return step.content || '';
+  if (step.type === 'browse') return `Am navigat la ${step.url || '(url)'}${result.data?.title ? ' — ' + result.data.title : ''}.`;
+  if (step.type === 'sandbox') return `Am executat cod izolat${result.ok ? ' cu succes' : ' — eroare'}.`;
+  if (step.type === 'deploy') return `Deploy inițiat — aștept PR merge pe master.`;
+  if (step.type === 'verify_deploy') return `Deploy-ul ${result.ok ? 'a reușit' : 'a eșuat'} — SHA: ${result.data?.deploy_sha || 'unknown'}.`;
+  if (step.type === 'search_web') return `Am căutat pe web: ${step.query || ''}${result.data?.results ? ` (${result.data.results.length} rezultate)` : ''}.`;
   return `${verb} — ${result.ok ? 'OK' : 'eroare'}.`;
 }
 
@@ -159,7 +179,8 @@ function _narrateStep(step, result) {
  */
 async function _generatePlan(description, codebaseSummary) {
   const messages = [
-    { role: 'system', content: `You are Kelion Developer Agent — a disciplined software engineer.
+    { role: 'system', content: `You are Kelion Developer Agent — a fully autonomous AI agent.
+You can write code, browse the web, run sandboxed JS, execute shell commands, and deploy.
 
 Output STRICT JSON only. No markdown, no prose outside JSON.
 
@@ -170,8 +191,15 @@ Rules:
 4. Then "validate" step — this triggers syntax+security+lint+test+build automatically.
 5. Then "git_status".
 6. Last "commit" with a conventional commit message.
+7. If deployment is needed, add "pr" step to create a pull request.
 
-Supported types: read, write, shell, test, build, lint, validate, git_status, commit, push, pr, think, speak.
+Supported types:
+- Code: read, write, shell, test, build, lint, validate, git_status, commit, push, pr
+- Browser: browse (with url, action: navigate|click|type|extract|links, selector?, text?, schema?)
+- Sandbox: sandbox (with code, timeout?)
+- Web: search_web (with query)
+- Deploy: deploy, verify_deploy (with commitSha?)
+- Meta: think, speak, repair
 
 Max ${MAX_FILES_PER_TASK} files. Max ${MAX_STEPS} steps.
 Every step may include an optional "content" field used as TTS narrative.` },
@@ -311,6 +339,67 @@ async function _executeStep(taskId, step, state) {
         r = { ok: true };
         break;
       }
+      // ── NEW: Browser navigation ──
+      case 'browse': {
+        const action = step.action || 'navigate';
+        switch (action) {
+          case 'navigate':
+            r = await agentBrowser.navigate(step.url, step.options);
+            break;
+          case 'click':
+            r = await agentBrowser.click(step.url, step.selector, step.options);
+            break;
+          case 'type':
+            r = await agentBrowser.type(step.url, step.selector, step.text, step.options);
+            break;
+          case 'extract':
+            r = await agentBrowser.extractStructured(step.url, step.schema);
+            break;
+          case 'fill':
+            r = await agentBrowser.fillForm(step.url, step.fields, step.options);
+            break;
+          case 'links':
+            r = await agentBrowser.getLinks(step.url);
+            break;
+          case 'screenshot':
+            r = await agentBrowser.screenshot(step.url, step.options);
+            break;
+          case 'evaluate':
+            r = await agentBrowser.evaluateJs(step.url, step.code);
+            break;
+          default:
+            r = await agentBrowser.navigate(step.url);
+        }
+        log('browse', { url: step.url, action, ok: r.ok });
+        break;
+      }
+
+      // ── NEW: Sandboxed code execution ──
+      case 'sandbox': {
+        r = await agentSandbox.executeJs(step.code, { timeout: step.timeout, globals: step.globals });
+        log('sandbox', { ok: r.ok, duration_ms: r.duration_ms });
+        break;
+      }
+
+      // ── NEW: Web search ──
+      case 'search_web': {
+        const web = _getAgentWeb();
+        if (web && web.searchWeb) {
+          r = await web.searchWeb(step.query, step.numResults || 5);
+        } else {
+          r = { ok: false, error: 'agentWeb module not available.' };
+        }
+        log('search_web', { query: step.query, ok: r.ok });
+        break;
+      }
+
+      // ── NEW: Deploy verification ──
+      case 'verify_deploy': {
+        r = await agentDeploy.deployAndVerify(step.commitSha);
+        log('verify_deploy', { ok: r.ok });
+        break;
+      }
+
       default:
         log('unknown_step', { type: step.type });
         r = { ok: false, error: `Unknown step type: ${step.type}` };
@@ -505,6 +594,32 @@ async function _startTaskLocked(description, options = {}) {
     await updateTask(taskId, { status: 'done', status_detail: state.statusDetail });
   }
 
+  // ── Autonomy Loop: assess completion, re-plan if needed ──
+  if (state.status === 'done' && (options.autonomous || false) && (state.autonomyIteration || 0) < MAX_AUTONOMY_ITERATIONS) {
+    const assessment = await _assessCompletion(description, state);
+    if (!assessment.complete) {
+      state.autonomyIteration = (state.autonomyIteration || 0) + 1;
+      state.status = 'executing';
+      state.narratives.push({ stepId: 0, type: 'speak', narrative: `Iterația ${state.autonomyIteration}: ${assessment.reason}. Regeneez plan.`, ts: new Date().toISOString() });
+      await _saveState(taskId, state);
+
+      // Re-plan with context from previous iteration
+      const newPlan = await _generatePlan(assessment.nextSteps || description, codebaseSummary);
+      state.plan = newPlan;
+      for (const step of newPlan.steps.slice(0, MAX_STEPS)) {
+        const result = await _executeStep(taskId, step, state);
+        if (!result.ok && (step.type === 'validate' || step.type === 'test')) {
+          const repair = await _autoRepair(taskId, step, state, state.repairCount + 1);
+          if (repair.repaired) { state.repairCount++; continue; }
+          state.status = 'needs_review';
+          break;
+        }
+        if (result.blocked || result.pendingApproval || !result.ok) break;
+      }
+      if (state.status === 'executing') state.status = 'done';
+    }
+  }
+
   // Final save ensures DB reflects the latest state before the orchestrator loop ends.
   await _saveState(taskId, state);
 
@@ -622,6 +737,44 @@ async function revertTask(taskId, callerState) {
   }
 
   return { ok: results.every(r => r.ok), taskId, reverted: results };
+}
+
+// ── Completion Assessment (Autonomy Loop) ──
+/**
+ * Ask the LLM to assess whether the task is fully complete or needs more steps.
+ * Used by the autonomy loop to determine if re-planning is needed.
+ * @param {string} description — original task description
+ * @param {object} state — current execution state
+ * @returns {Promise<{complete: boolean, reason?: string, nextSteps?: string}>}
+ */
+async function _assessCompletion(description, state) {
+  try {
+    const context = [
+      `Original task: ${description}`,
+      `Steps completed: ${state.narratives?.length || 0}`,
+      `Modified files: ${Array.from(state.modifiedPaths || []).join(', ') || 'none'}`,
+      `Current status: ${state.status}`,
+      `Last 3 narratives: ${(state.narratives || []).slice(-3).map(n => n.narrative).join(' | ')}`,
+    ].join('\n');
+
+    const messages = [
+      { role: 'system', content: `You are Kelion Developer Agent — completion assessor.
+Given a task description and execution results, determine if the task is fully complete.
+Output STRICT JSON: { "complete": true/false, "reason": "...", "nextSteps": "..." }
+If complete is false, nextSteps should describe what remains to be done.` },
+      { role: 'user', content: context },
+    ];
+
+    const { response } = await smartFetch('coder', { messages, temperature: 0.1, max_tokens: 500 }, true, false);
+    const json = await response.json();
+    const raw = json.choices?.[0]?.message?.content || '';
+    const match = raw.match(/```json\s*([\s\S]*?)```/) || raw.match(/```\s*([\s\S]*?)```/);
+    const payload = match ? match[1].trim() : raw.trim();
+    return JSON.parse(payload);
+  } catch (e) {
+    console.error('[agentOrchestrator] _assessCompletion error:', e.message);
+    return { complete: true, reason: 'Assessment failed — assuming complete.' };
+  }
 }
 
 module.exports = { startTask, approveTask, revertTask, isPathAllowed, isShellAllowed };
