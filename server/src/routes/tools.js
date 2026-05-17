@@ -27,20 +27,8 @@ const router = Router();
 // absent here is equivalent to the user being signed out (exactly what
 // they need to do to get a fresh numeric-sub token anyway).
 async function peekUser(req) {
-  try {
-    const token = req.cookies?.['kelion.token'];
-    if (!token) return null;
-    const decoded = jwt.verify(token, config.jwt.secret);
-    if (process.env.DATABASE_URL) {
-      const sub = decoded.sub;
-      const numeric = Number.parseInt(sub, 10);
-      if (!Number.isFinite(numeric) || String(numeric) !== String(sub)) {
-        return null;
-      }
-      return { id: numeric, name: decoded.name, email: decoded.email };
-    }
-    return { id: decoded.sub, name: decoded.name, email: decoded.email };
-  } catch { return null; }
+  const { peekSignedInUser } = require('../middleware/optionalAuth');
+  return peekSignedInUser(req);
 }
 
 // Tiny per-IP rate cap so a runaway session cannot burn budget.
