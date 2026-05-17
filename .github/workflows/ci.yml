@@ -17,7 +17,7 @@ jobs:
           node-version: '22'
           cache: 'npm'
           cache-dependency-path: server/package-lock.json
-      - run: cd server && npm ci
+      - run: cd server && npm ci --no-optional
       - run: cd server && npx playwright install chromium
       - run: cd server && npm test
 
@@ -47,7 +47,7 @@ jobs:
           node-version: '22'
           cache: 'npm'
       - run: npm ci
-      - run: cd server && npm ci
+      - run: cd server && npm ci --no-optional
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - name: Start API
