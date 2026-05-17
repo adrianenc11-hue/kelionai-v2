@@ -76,7 +76,7 @@ describe('buildKelionPersona — minimal prompt with full tool catalog', () => {
     });
 
     it('routes display requests through show_on_monitor', () => {
-      expect(prompt).toMatch(/DISPLAY REQUESTS/);
+      expect(prompt).toMatch(/DISPLAY & PROACTIVE RESOLUTION/);
       expect(prompt).toMatch(/show_on_monitor/);
     });
 
