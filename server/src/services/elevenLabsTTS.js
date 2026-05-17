@@ -2,7 +2,7 @@
 
 // Use native fetch available in Node 18+
 // Some reliable default premium voices from ElevenLabs
-const DEFAULT_MALE_VOICE = '2EiwWnXFnvU5JabPnv8n'; // Clyde
+const DEFAULT_MALE_VOICE = 'onwK4e9ZLuTAKqWW03F9'; // Daniel — narration, academic Romanian pronunciation
 const DEFAULT_FEMALE_VOICE = '21m00Tcm4TlvDq8ikWAM'; // Rachel
 
 let cachedVoices = null;
