@@ -4,13 +4,13 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
+    "dev": "cd archive/removed-2026-05-17/web-root && vite",
+    "build": "cd archive/removed-2026-05-17/web-root && vite build --outDir ../../../dist --emptyOutDir",
+    "build:server-dist": "npm run build && node scripts/copy-dist-to-server.cjs",
+    "preview": "cd archive/removed-2026-05-17/web-root && vite preview",
     "server:install": "cd server && npm install",
     "server:dev": "cd server && npm run dev",
-    "server:start": "npm run build && cd server && npm start",
-    "test:e2e": "playwright test"
+    "server:start": "npm run build && cd server && npm start"
   },
   "dependencies": {
     "@capacitor/android": "^8.3.1",

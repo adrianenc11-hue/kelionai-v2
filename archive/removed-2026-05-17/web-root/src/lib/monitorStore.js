@@ -1,0 +1,786 @@
+// Simple pub/sub store for what the avatar's stage monitor should display.
+// The model calls the `show_on_monitor` tool → kelionTools.js resolves the
+// payload → sets the store → KelionStage.jsx (StageMonitor) subscribes and
+// renders an iframe / image / video embed on the in-scene screen.
+//
+// Intentionally dependency-free so both runTool() (outside React) and
+// React components (via a useSyncExternalStore hook below) can use it.
+//
+// State is persisted to localStorage so that whatever the user had open on
+// the monitor (map, WebVM, wiki, video…) survives a hard refresh or tab
+// restore. Entries older than MAX_AGE_MS are dropped on load so we never
+// show a week-old embed.
+
+const STORAGE_KEY = 'kelion.monitor.v1';
+const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+const state = {
+  kind: null,        // 'map' | 'weather' | 'image' | 'wiki' | 'web' | 'audio' | 'html' | null
+  src: null,         // string — final URL (iframe), image URL, or audio stream URL
+  title: null,       // short label shown above the frame
+  embedType: 'iframe', // 'iframe' | 'image' | 'external' | 'audio'
+  updatedAt: 0,
+};
+
+// Some providers (WebVM/CheerpX, JSLinux, v86) require a
+// cross-origin-isolated document (COOP: same-origin + COEP: require-corp).
+// kelionai.app is NOT isolated — adding the headers would break Google
+// Maps/Wikipedia/LoremFlickr embeds which don't serve CORP. So we render
+// these hosts as an external "Open in new tab" card instead of a broken
+// iframe. The host list is a small allowlist updated as we learn.
+// Exported so the renderer (`externalCardCopy` in KelionStage.jsx) can pick
+// the cross-origin-isolation card copy for the same hosts we route through
+// the external card. Keeping the list in one place avoids a silent drift
+// between routing and display when a new WebVM-style host is added.
+export const EXTERNAL_ONLY_HOSTS = new Set([
+  // Require cross-origin isolation (SAB)
+  'webvm.io',
+  'www.webvm.io',
+  'copy.sh',
+  'www.copy.sh',
+  'bellard.org',
+  'www.bellard.org',
+]);
+
+// F10 — Hosts that send `X-Frame-Options: DENY` (or a strict
+// `Content-Security-Policy: frame-ancestors`) and therefore render
+// as an empty gray box inside our monitor iframe (user screenshot
+// 2026-04-22 showed google.com as a broken icon). Matched by suffix
+// so `mail.google.com`, `accounts.google.com`, etc. all qualify.
+// The renderer already handles `embedType: 'external'` — the user
+// sees a friendly "open in new tab" card instead of a dead frame.
+const NON_EMBEDDABLE_HOST_SUFFIXES = [
+  'google.com',
+  'google.co.uk',
+
+  'facebook.com',
+  'instagram.com',
+  'twitter.com',
+  'x.com',
+  'linkedin.com',
+  'amazon.com',
+  'amazon.co.uk',
+  'reddit.com',
+  'netflix.com',
+  'github.com',
+  'gitlab.com',
+  'paypal.com',
+  'stripe.com',
+  'dropbox.com',
+  'apple.com',
+  'microsoft.com',
+  'office.com',
+  'live.com',
+];
+function isNonEmbeddableHost(host) {
+  const h = (host || '').toLowerCase();
+  return NON_EMBEDDABLE_HOST_SUFFIXES.some(
+    (sfx) => h === sfx || h.endsWith('.' + sfx),
+  );
+}
+
+// Detect whether a URL points to kelionai.app itself (any path).
+// Loading ourselves on the monitor creates an infinite Droste loop
+// (the embedded page renders another monitor which loads itself…).
+// This must be blocked at the store level so it never reaches the
+// iframe / proxy path at all.
+function isSelfUrl(url) {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, '').toLowerCase();
+    if (typeof window !== 'undefined') {
+      const currentHost = window.location.hostname.replace(/^www\./, '').toLowerCase();
+      return host === currentHost;
+    }
+    // Server-side fallback: match the known production hostname
+    return host === 'kelionai.app';
+  } catch { return false; }
+}
+
+function requiresExternalTab(url) {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    // Only truly cross-origin-isolated sites need a real tab;
+    // everything else we can proxy through /api/proxy.
+    if (EXTERNAL_ONLY_HOSTS.has(host)) return true;
+    return false;
+  } catch { return false; }
+}
+
+// Wrap a URL through our server-side proxy that strips X-Frame-Options/CSP.
+// Used for any external URL that normally blocks iframes.
+function proxyUrl(url) {
+  if (!url || typeof url !== 'string') return url;
+  return `/api/proxy?url=${encodeURIComponent(url)}`;
+}
+
+// Fallback geolocation provider — lets the React tree register the
+// current clientGeo so a voice command like "show me a map" without a
+// place name can still render a useful map centered on the user. Set by
+// KelionStage.jsx, read by resolveMonitor when kind='map' + empty query.
+let geoProvider = null;
+export function setMonitorGeoProvider(fn) {
+  geoProvider = typeof fn === 'function' ? fn : null;
+}
+
+function loadPersisted() {
+  if (typeof window === 'undefined' || !window.localStorage) return;
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return;
+    if (!parsed.src || !parsed.kind) return;
+    // Never restore a self-referencing URL from persistence —
+    // it would re-create the Droste loop on every page load.
+    if (isSelfUrl(parsed.src)) {
+      window.localStorage.removeItem(STORAGE_KEY);
+      return;
+    }
+    const updatedAt = Number(parsed.updatedAt) || 0;
+    if (!updatedAt || Date.now() - updatedAt > MAX_AGE_MS) {
+      window.localStorage.removeItem(STORAGE_KEY);
+      return;
+    }
+    state.kind = parsed.kind;
+    state.src = parsed.src;
+    state.title = parsed.title || null;
+    state.embedType = ['image', 'external', 'audio', 'html'].includes(parsed.embedType)
+      ? parsed.embedType
+      : 'iframe';
+    state.updatedAt = updatedAt;
+  } catch {
+    /* corrupt entry — ignore */
+  }
+}
+
+function savePersisted() {
+  if (typeof window === 'undefined' || !window.localStorage) return;
+  try {
+    if (!state.kind || !state.src) {
+      window.localStorage.removeItem(STORAGE_KEY);
+      return;
+    }
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      kind: state.kind,
+      src: state.src,
+      title: state.title,
+      embedType: state.embedType,
+      updatedAt: state.updatedAt,
+    }));
+  } catch {
+    /* quota / private mode — ignore */
+  }
+}
+
+loadPersisted();
+
+const listeners = new Set();
+
+function notify() {
+  for (const l of listeners) {
+    try { l(state); } catch { /* ignore */ }
+  }
+}
+
+export function getMonitorState() {
+  return state;
+}
+
+export function subscribeMonitor(fn) {
+  listeners.add(fn);
+  // Invoke immediately with current state so late subscribers (e.g. a React
+  // component re-mounted after a Suspense fallback) don't miss whatever is
+  // already being displayed. Wrapped in try/catch so a bad listener can't
+  // break the subscribe path.
+  try { fn(state); } catch { /* ignore */ }
+  return () => listeners.delete(fn);
+}
+
+function setState(patch) {
+  state.kind = patch.kind ?? null;
+  state.src = patch.src ?? null;
+  state.title = patch.title ?? null;
+  // Pin valid embed types only — anything else collapses to 'iframe'
+  // so a stale persisted record doesn't render the wrong renderer.
+  const allowedEmbed = new Set(['iframe', 'image', 'external', 'audio', 'html', 'video', 'cad']);
+
+  state.embedType = allowedEmbed.has(patch.embedType) ? patch.embedType : 'iframe';
+  state.updatedAt = Date.now();
+  savePersisted();
+  notify();
+}
+
+// Build a Google Maps Embed API URL for a real lat/lon.
+// The Embed API is free (no billing required), iframe-friendly (no
+// X-Frame-Options blocking), and renders a full interactive Google
+// Map with satellite/terrain toggle. Requires GOOGLE_API_KEY passed
+// at build time via VITE_GOOGLE_MAPS_KEY (or falls back to OSM).
+function googleMapEmbed(lat, lon, query) {
+  const key = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GOOGLE_MAPS_KEY)
+    || '';
+  if (key && !key.includes('PLACEHOLDER')) {
+    if (query) {
+      return `https://www.google.com/maps/embed/v1/place?key=${key}&q=${encodeURIComponent(query)}&center=${lat},${lon}&zoom=14`;
+    }
+    return `https://www.google.com/maps/embed/v1/view?key=${key}&center=${lat},${lon}&zoom=14&maptype=roadmap`;
+  }
+  // OpenStreetMap embed — always works, no key needed, no iframe blocking
+  const span = 0.04;
+  const bbox = `${(lon - span).toFixed(5)},${(lat - span).toFixed(5)},${(lon + span).toFixed(5)},${(lat + span).toFixed(5)}`;
+  return `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat.toFixed(5)},${lon.toFixed(5)}`;
+}
+
+// Build a Windy.com weather embed for a real lat/lon. Windy is the
+// industry-standard weather visualization (radar, wind, precipitation,
+// clouds, temperature, pressure, waves). Iframe-friendly with no key.
+// Default layer is `wind` which is the most visually striking; users
+// can switch via Windy's own UI inside the iframe.
+function windyWeatherEmbed(lat, lon, opts = {}) {
+  const overlay = (opts && opts.overlay) || 'wind';
+  const zoom = (opts && opts.zoom) || 8;
+  const params = new URLSearchParams({
+    lat: lat.toFixed(4),
+    lon: lon.toFixed(4),
+    zoom: String(zoom),
+    overlay,
+    level: 'surface',
+    type: 'map',
+    location: 'coordinates',
+    metricWind: 'default',
+    metricTemp: 'default',
+    detailLat: lat.toFixed(4),
+    detailLon: lon.toFixed(4),
+    pressure: 'true',
+    message: 'true',
+    marker: 'true',
+  });
+  return `https://embed.windy.com/embed2.html?${params.toString()}`;
+}
+
+// `lat,lon` literal coordinate strings (e.g. "46.7712,23.6236") get
+// recognized so we can skip geocoding when the model already has GPS
+// figures from get_geolocation / the client-provided coords.
+function parseLatLon(s) {
+  if (!s || typeof s !== 'string') return null;
+  const m = s.trim().match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/);
+  if (!m) return null;
+  const lat = Number.parseFloat(m[1]);
+  const lon = Number.parseFloat(m[2]);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
+  return { lat, lon };
+}
+
+// Fire-and-forget Nominatim geocode → swap the placeholder map / weather
+// card for the real embed when the lookup lands. Same shape as
+// queueYouTubeUpgrade: the most-recent call wins, all earlier ones are
+// no-ops if the user has moved on. Direct browser fetch is fine here —
+// Nominatim sends `Access-Control-Allow-Origin: *`, and the polite
+// rate limit (1 req/s) is met by user-driven request frequency.
+let lastGeocodeQuery = 0;
+async function queueGeocodeUpgrade(kind, query, opts = {}) {
+  if (typeof window === 'undefined' || !window.fetch) return;
+  const q = (query || '').toString().trim();
+  if (!q) return;
+  const token = ++lastGeocodeQuery;
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`;
+    const r = await fetch(url, { credentials: 'omit' });
+    if (token !== lastGeocodeQuery) return;
+    if (!r.ok) return;
+    const data = await r.json();
+    const hit = Array.isArray(data) ? data[0] : null;
+    if (!hit || hit.lat == null || hit.lon == null) return;
+    const lat = Number.parseFloat(hit.lat);
+    const lon = Number.parseFloat(hit.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+    if (token !== lastGeocodeQuery) return;
+    if (state.kind !== kind) return;
+    if (kind === 'map') {
+      const satellite = opts && opts.satellite;
+      const tileLayer = satellite
+        ? `L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{attribution:'Esri World Imagery',maxZoom:19})`
+        : `L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'\u00a9 OpenStreetMap',maxZoom:19})`;
+      const name = hit.display_name || q;
+      const html = `<div id="map" style="width:100%;height:100vh;margin:0"></div><script>\nvar map=L.map('map',{zoomControl:true}).setView([${lat},${lon}],13);\n${tileLayer}.addTo(map);\nL.marker([${lat},${lon}]).addTo(map).bindPopup(${JSON.stringify(name)}).openPopup();\n<\/script>`;
+      setState({
+        kind: 'map',
+        src: html,
+        title: `Hart\u0103 \u2014 ${hit.display_name || q}`,
+        embedType: 'html',
+      });
+    } else if (kind === 'weather') {
+      setState({
+        kind: 'weather',
+        src: windyWeatherEmbed(lat, lon),
+        title: hit.display_name ? `Vreme \u2014 ${hit.display_name}` : `Vreme \u2014 ${q}`,
+        embedType: 'iframe',
+      });
+    }
+  } catch {
+    /* Network / abort */
+  }
+}
+
+// Geocode two place names, fetch REAL driving route from OSRM, render on Leaflet.
+async function queueRouteWithOSRM(origin, destination) {
+  if (typeof window === 'undefined' || !window.fetch) return;
+  const token = ++lastGeocodeQuery;
+  try {
+    const geocode = async (name) => {
+      const r = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(name)}&format=json&limit=1`,
+        { credentials: 'omit' }
+      );
+      if (!r.ok) return null;
+      const data = await r.json();
+      const hit = Array.isArray(data) ? data[0] : null;
+      if (!hit) return null;
+      return { lat: Number.parseFloat(hit.lat), lon: Number.parseFloat(hit.lon), name: hit.display_name || name };
+    };
+    const [orig, dest] = await Promise.all([geocode(origin), geocode(destination)]);
+    if (token !== lastGeocodeQuery) return;
+    if (state.kind !== 'map') return;
+    if (!orig || !dest) return;
+
+    // Fetch real driving route from OSRM (free, no key needed)
+    let routeCoords = `[[${orig.lat},${orig.lon}],[${dest.lat},${dest.lon}]]`;
+    let distanceKm = '';
+    let durationMin = '';
+    try {
+      const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${orig.lon},${orig.lat};${dest.lon},${dest.lat}?overview=full&geometries=geojson`;
+      const osrmR = await fetch(osrmUrl, { credentials: 'omit' });
+      if (osrmR.ok) {
+        const osrmData = await osrmR.json();
+        if (osrmData.routes && osrmData.routes[0]) {
+          const route = osrmData.routes[0];
+          const coords = route.geometry.coordinates; // [lon, lat] pairs
+          routeCoords = '[' + coords.map(c => `[${c[1]},${c[0]}]`).join(',') + ']';
+          distanceKm = (route.distance / 1000).toFixed(1);
+          durationMin = Math.round(route.duration / 60);
+        }
+      }
+    } catch { /* OSRM failed, fall back to straight line */ }
+
+    if (token !== lastGeocodeQuery) return;
+
+    const infoText = distanceKm ? `${distanceKm} km • ~${durationMin} min` : '';
+    const origLabel = orig.name.split(',')[0];
+    const destLabel = dest.name.split(',')[0];
+
+    const html = `<div id="map" style="width:100%;height:100vh;margin:0"></div>
+<div style="position:fixed;bottom:12px;left:50%;transform:translateX(-50%);background:rgba(10,8,20,0.85);color:#ede9fe;padding:8px 18px;border-radius:999px;font:600 14px system-ui;border:1px solid rgba(167,139,250,0.4);z-index:999;backdrop-filter:blur(8px)">
+  🚗 ${origLabel} → ${destLabel}${infoText ? ' • ' + infoText : ''}
+</div>
+<script>
+var map=L.map('map',{zoomControl:true});
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM',maxZoom:18}).addTo(map);
+var startIcon=L.divIcon({html:'<div style="background:#22c55e;width:14px;height:14px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 6px rgba(0,0,0,0.4)"></div>',iconSize:[20,20],iconAnchor:[10,10]});
+var endIcon=L.divIcon({html:'<div style="background:#ef4444;width:14px;height:14px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 6px rgba(0,0,0,0.4)"></div>',iconSize:[20,20],iconAnchor:[10,10]});
+L.marker([${orig.lat},${orig.lon}],{icon:startIcon}).addTo(map).bindPopup('<b>Start:</b> ${origLabel.replace(/'/g,"\\'")}');
+L.marker([${dest.lat},${dest.lon}],{icon:endIcon}).addTo(map).bindPopup('<b>Finish:</b> ${destLabel.replace(/'/g,"\\'")}');
+var coords=${routeCoords};
+var route=L.polyline(coords,{color:'#7c3aed',weight:5,opacity:0.85}).addTo(map);
+map.fitBounds(route.getBounds(),{padding:[50,50]});
+<\/script>`;
+
+    setState({
+      kind: 'map',
+      src: html,
+      title: `Rută: ${origLabel} → ${destLabel}${infoText ? ' (' + infoText + ')' : ''}`,
+      embedType: 'html',
+    });
+  } catch { /* ignore */ }
+}
+
+
+
+function safeUrl(u) {
+  if (!u || typeof u !== 'string') return null;
+  const s = u.trim();
+  if (!/^https?:\/\//i.test(s)) return null;
+  try { new URL(s); return s; } catch { return null; }
+}
+
+// CAD / EDA / 3D engineering file viewer resolver.
+// Maps file extension to the best free browser-based viewer.
+function resolveCadUrl(src, ext, label) {
+  // 3D/CAD model formats → 3dviewer.net (free, no key, iframe-friendly, 50+ formats)
+  const viewer3d = ['dxf','step','stp','iges','igs','stl','obj','3dm','3ds','fbx','glb','gltf','off','ply','brep','bim'];
+  if (viewer3d.includes(ext)) {
+    return {
+      kind: 'cad',
+      src: `https://3dviewer.net/#model=${encodeURIComponent(src)}`,
+      title: label || `3D — ${ext.toUpperCase()}`,
+      embedType: 'iframe',
+    };
+  }
+  // KiCad PCB/schematic → KiCanvas (open-source KiCad web viewer)
+  if (['kicad_pcb','kicad_sch','kicad_pro'].includes(ext)) {
+    return {
+      kind: 'cad',
+      src: `https://kicanvas.org/?github=${encodeURIComponent(src)}`,
+      title: label || `KiCad — ${ext}`,
+      embedType: 'iframe',
+    };
+  }
+  // DWG (AutoCAD binary) → needs upload, open in new tab
+  if (ext === 'dwg') {
+    return { kind: 'cad', src, title: label || 'AutoCAD DWG', embedType: 'external' };
+  }
+  return null;
+}
+
+
+// Resolve a (kind, query) pair to a concrete embeddable URL. Centralized so
+// the AI can always trust that "map Cluj" produces a working Google Maps
+// embed, not just a hope-for-the-best fetch.
+function resolveMonitor(kind, query) {
+  const q = (query || '').toString().trim();
+  switch (kind) {
+    case 'clear':
+      return { kind: null, src: null, title: null, embedType: 'iframe' };
+
+    case 'map': {
+      let label = q;
+
+      // Helper: build Leaflet HTML card for a lat/lon + label.
+      function leafletMapHtml(lat, lon, name, satellite = false) {
+        const tile = satellite
+          ? `L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{attribution:'Esri World Imagery',maxZoom:19})`
+          : `L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:19})`;
+        return `<div id="map" style="width:100%;height:100vh;margin:0"></div><script>
+var map=L.map('map',{zoomControl:true}).setView([${lat},${lon}],13);
+${tile}.addTo(map);
+L.marker([${lat},${lon}]).addTo(map).bindPopup(${JSON.stringify(name)}).openPopup();
+<\/script>`;
+      }
+
+      // Already a coordinate string? Render Leaflet immediately.
+      const direct = parseLatLon(q);
+      if (direct) {
+        const satellite = /satelit|satellite|esri|aerial/i.test(q);
+        return {
+          kind: 'map',
+          src: leafletMapHtml(direct.lat, direct.lon, q, satellite),
+          title: `Hartă — ${q}`,
+          embedType: 'html',
+        };
+      }
+
+      // Empty query → user's location.
+      if (!q && geoProvider) {
+        try {
+          const g = geoProvider();
+          if (g && Number.isFinite(g.latitude) && Number.isFinite(g.longitude)) {
+            return {
+              kind: 'map',
+              src: leafletMapHtml(g.latitude, g.longitude, 'Locația ta'),
+              title: 'Hartă — locația ta',
+              embedType: 'html',
+            };
+          }
+        } catch { /* ignore */ }
+      }
+      if (!q) return null;
+
+      // Free-text → geocode async, show loading HTML in the meantime.
+      const satellite = /satelit|satellite|esri|aerial/i.test(q);
+      queueGeocodeUpgrade('map', q, { satellite });
+      return {
+        kind: 'map',
+        src: `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#a78bfa;font-size:18px;font-family:system-ui">⏳ Se încarcă harta pentru <b style="margin-left:6px">${label}</b>…</div>`,
+        title: `Hartă — ${label}`,
+        embedType: 'html',
+      };
+    }
+
+    // ROUTE — OSRM + Leaflet inline map with real driving route.
+    // Google Maps Embed API used when VITE_GOOGLE_MAPS_KEY is set,
+    // otherwise Leaflet + OSRM (free, no key, no CORS issues).
+    case 'route': {
+      const sep = q.includes('->') ? '->' : q.includes('|') ? '|' : q.includes(' to ') ? ' to ' : q.includes(' la ') ? ' la ' : q.includes(' spre ') ? ' spre ' : null;
+      let origin = q, destination = '';
+      if (sep) {
+        const parts = q.split(sep).map(s => s.trim());
+        origin = parts[0] || '';
+        destination = parts[1] || '';
+      }
+      if (!origin || !destination) {
+        return null;
+      }
+
+      const key = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GOOGLE_MAPS_KEY) || '';
+      if (key && !key.includes('PLACEHOLDER')) {
+        // Google Maps Embed API — real directions with routing
+        const src = `https://www.google.com/maps/embed/v1/directions?key=${key}&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}&mode=driving`;
+        return { kind: 'map', src, title: `Rută: ${origin} → ${destination}`, embedType: 'iframe' };
+      }
+      // Fallback: OSRM + Leaflet (free, works everywhere, no proxy needed)
+      queueRouteWithOSRM(origin, destination);
+      return {
+        kind: 'map',
+        src: `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#a78bfa;font-size:18px;font-family:system-ui">⏳ Se calculează ruta <b style="margin-left:6px">${origin} → ${destination}</b>…</div>`,
+        title: `Rută: ${origin} → ${destination}`,
+        embedType: 'html',
+      };
+    }
+
+    case 'weather': {
+
+      // Switched off the wttr.in text page — Adrian (2026-04-25)
+      // wanted "ceva profesional cu coordonatele reale GPS". Windy.com
+      // is the industry standard: live radar, wind, precipitation,
+      // clouds, temperature, pressure layers, all keyless and iframe-
+      // friendly. We center it on real GPS coords (client geo for "what's
+      // the weather?", or Nominatim-resolved lat/lon for "weather in X").
+
+      // Already a coordinate string? Render directly.
+      const direct = parseLatLon(q);
+      if (direct) {
+        return {
+          kind: 'weather',
+          src: windyWeatherEmbed(direct.lat, direct.lon),
+          title: `Vreme — ${q}`,
+          embedType: 'iframe',
+        };
+      }
+
+      // Empty query → center on the user's current GPS if available.
+      if (!q && geoProvider) {
+        try {
+          const g = geoProvider();
+          if (g && Number.isFinite(g.latitude) && Number.isFinite(g.longitude)) {
+            return {
+              kind: 'weather',
+              src: windyWeatherEmbed(g.latitude, g.longitude),
+              title: 'Vreme — locația ta',
+              embedType: 'iframe',
+            };
+          }
+        } catch { /* ignore */ }
+      }
+      if (!q) return null;
+
+      // Free-text place name → geocode async; in the meantime proxy Windy for the query
+      queueGeocodeUpgrade('weather', q);
+      return {
+        kind: 'weather',
+        src: `https://embed.windy.com/embed2.html?lat=51.5&lon=-0.1&zoom=6&overlay=wind&level=surface&type=map&location=coordinates&metricWind=default&metricTemp=default`,
+        title: `Vreme — ${q}`,
+        embedType: 'iframe',
+      };
+    }
+
+
+
+    // VIDEO — restored with full format support (2026-04-29).
+    // Supports: MP4, WebM, OGG (native player), YouTube, Vimeo (iframe embed),
+    // and any other video URL (proxied through server to strip X-Frame-Options).
+    case 'video': {
+      const src = safeUrl(q);
+      if (!src) return null;
+      let label = src;
+      try { label = new URL(src).hostname.replace(/^www\./, ''); } catch { /* ignore */ }
+
+      // Direct video file → native HTML5 player
+      const ext = src.split('?')[0].split('#')[0].split('.').pop().toLowerCase();
+      if (['mp4', 'webm', 'ogg', 'mov', 'm4v', 'mkv'].includes(ext)) {
+        return { kind: 'video', src, title: m?.title || label, embedType: 'video' };
+      }
+
+      // YouTube → use the /embed/ path (no X-Frame-Options blocking)
+      try {
+        const u = new URL(src);
+        const host = u.hostname.replace(/^www\./, '');
+        if (host === 'youtube.com' || host === 'youtu.be') {
+          let videoId = u.searchParams.get('v');
+          if (!videoId && host === 'youtu.be') videoId = u.pathname.slice(1);
+          if (!videoId) {
+            const m2 = u.pathname.match(/\/(?:embed|v|shorts)\/([a-zA-Z0-9_-]{11})/);
+            if (m2) videoId = m2[1];
+          }
+          if (videoId) {
+            const embedSrc = `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`;
+            return { kind: 'video', src: embedSrc, title: label, embedType: 'iframe' };
+          }
+        }
+        // Vimeo → use /video/ embed path
+        if (host === 'vimeo.com') {
+          const vid = u.pathname.replace(/^\//, '').split('/')[0];
+          if (vid && /^\d+$/.test(vid)) {
+            const embedSrc = `https://player.vimeo.com/video/${vid}?autoplay=1`;
+            return { kind: 'video', src: embedSrc, title: label, embedType: 'iframe' };
+          }
+        }
+      } catch { /* ignore */ }
+
+      // Any other video URL → proxy to strip X-Frame-Options
+      return { kind: 'video', src: proxyUrl(src), title: label, embedType: 'iframe' };
+    }
+
+    case 'image': {
+      if (!q) return null;
+      // LoremFlickr returns a topic-matching Flickr image directly, no key,
+      // CORS-friendly. Replaces source.unsplash.com which was retired by
+      // Unsplash in 2024 and now returns 503 for every request.
+      const src = `https://loremflickr.com/1280/720/${encodeURIComponent(q)}`;
+      return { kind: 'image', src, title: `Image — ${q}`, embedType: 'image' };
+    }
+
+    case 'wiki': {
+      if (!q) return null;
+      // Mobile Wikipedia embeds cleanly in iframes (desktop Wikipedia sets
+      // frame-ancestors 'self' since 2025). Use the user's language if the
+      // query is obviously ASCII English; otherwise default English too and
+      // let Wikipedia interwiki redirect.
+      const title = q.replace(/\s+/g, '_');
+      const src = `https://en.m.wikipedia.org/wiki/${encodeURIComponent(title)}`;
+      return { kind: 'wiki', src, title: `Wikipedia — ${q}`, embedType: 'iframe' };
+    }
+
+    case 'audio': {
+      // Faza A — global radio / live audio stream playback.
+      // The server-side `play_radio` tool returns a directly-playable
+      // HTTP(S) stream URL (radio-browser.info). We render it through
+      // an HTML5 <audio> element on the monitor — bypasses YouTube
+      // embed restrictions entirely. Accepts a tile-friendly title so
+      // the avatar can show "Now playing: BBC Radio 1".
+      const src = safeUrl(q);
+      if (!src) return null;
+      // `title` is passed through resolveMonitor's caller chain (see
+      // handleShowOnMonitor below) — preserve when explicitly given,
+      // otherwise derive from the host so we never show a blank label.
+      let label;
+      try { label = new URL(src).hostname.replace(/^www\./, ''); } catch { label = 'Live audio'; }
+      // HTTP streams on HTTPS pages: route through /api/proxy/stream
+      // which pipes the audio data (no buffering). HTTPS streams pass directly.
+      const audioSrc = src.startsWith('http://') ? `/api/proxy/stream?url=${encodeURIComponent(src)}` : src;
+      return { kind: 'audio', src: audioSrc, title: label, embedType: 'audio' };
+    }
+
+    case 'document': {
+      const src = safeUrl(q);
+      if (!src) return null;
+      let label;
+      try { label = decodeURIComponent(src.split('/').pop().split('?')[0]) || 'Document'; } catch { label = 'Document'; }
+
+      const ext2 = src.split('?')[0].split('#')[0].split('.').pop().toLowerCase();
+
+      // CAD formats — route to appropriate viewer
+      const cadResult = resolveCadUrl(src, ext2, label);
+      if (cadResult) return cadResult;
+
+      // PDF → browser renders natively inside iframe
+      if (ext2 === 'pdf') {
+        return { kind: 'document', src: proxyUrl(src), title: label, embedType: 'iframe' };
+      }
+
+      // Office / OpenDocument formats → Microsoft Office Online Viewer.
+      // The previous Google Docs Viewer (`docs.google.com/viewer?...&embedded=true`)
+      // is deprecated and now returns the "Sorry, we are unable to generate a view
+      // of the document at this time" placeholder for ~all non-Google-hosted
+      // URLs, which is why "deschide xlsx pe monitor" used to show a blank
+      // card. Office Online Viewer renders DOC/DOCX/XLS/XLSX/PPT/PPTX
+      // real-time, requires no key, accepts public HTTP(S) URLs, and is
+      // explicitly iframe-friendly. Source MUST be publicly reachable.
+      const officeOnlineExts = ['doc','docx','xls','xlsx','ppt','pptx'];
+      if (officeOnlineExts.includes(ext2)) {
+        const viewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(src)}`;
+        return { kind: 'document', src: viewerUrl, title: label, embedType: 'iframe' };
+      }
+      // OpenDocument / RTF / CSV — Office Online does not support these,
+      // and Google Docs Viewer is dead for arbitrary URLs. Proxy them
+      // through our server so the browser handles the bytes natively
+      // (CSV/RTF render as text, ODF gets a download prompt). Same path
+      // as the TXT/unknown fallback below.
+      return { kind: 'document', src: proxyUrl(src), title: label, embedType: 'iframe' };
+    }
+
+    // CAD / EDA / 3D engineering formats
+    case 'cad': {
+      const src = safeUrl(q);
+      if (!src) return null;
+      let label;
+      try { label = decodeURIComponent(src.split('/').pop().split('?')[0]) || 'CAD File'; } catch { label = 'CAD File'; }
+      const ext3 = src.split('?')[0].split('#')[0].split('.').pop().toLowerCase();
+      const result = resolveCadUrl(src, ext3, label);
+      return result || { kind: 'cad', src, title: label, embedType: 'external' };
+    }
+
+    case 'workspace': {
+      const q2 = (query || '').toString().trim();
+      if (!q2) return null;
+      // Same-origin workspace page — allowed even though isSelfUrl would block it
+      // under 'web'. Workspace is our own UI so it is safe to embed.
+      return { kind: 'workspace', src: q2, title: 'Workspace', embedType: 'iframe' };
+    }
+
+    case 'web': {
+      const src = safeUrl(q);
+      if (!src) return null;
+      // CRITICAL: never embed ourselves — causes infinite Droste loop
+      if (isSelfUrl(src)) return null;
+      let label = src;
+      try { label = new URL(src).hostname.replace(/^www\./, ''); } catch { /* ignore */ }
+      // Only truly cross-origin-isolated sites need a real tab;
+      // everything else goes through the proxy to strip X-Frame-Options.
+      if (requiresExternalTab(src)) {
+        return { kind: 'web', src, title: label, embedType: 'external' };
+      }
+      // Auto-detect document URLs even when kind='web'
+      const extW = src.split('?')[0].split('#')[0].split('.').pop().toLowerCase();
+      const docExts = ['pdf','doc','docx','xls','xlsx','ppt','pptx','odt','ods','odp','rtf'];
+      if (docExts.includes(extW)) {
+        return resolveMonitor('document', q);
+      }
+      // Route through server-side proxy — strips X-Frame-Options/CSP
+      return { kind: 'web', src: proxyUrl(src), title: label, embedType: 'iframe' };
+    }
+
+    case 'html': {
+      // Render raw HTML content directly on the monitor — used for math
+      // solutions, step-by-step demonstrations, formatted text, etc.
+      if (!q) return null;
+      return { kind: 'html', src: q, title: 'Kelion — Demonstrație', embedType: 'html' };
+    }
+
+
+    default:
+      return null;
+  }
+}
+
+// Called by runTool('show_on_monitor', ...). Returns a short string the AI
+// will hear back as the tool response — lets it acknowledge naturally.
+export function handleShowOnMonitor(args = {}) {
+  const resolved = resolveMonitor(args.kind, args.query);
+  if (!resolved) {
+    return 'Monitor update skipped (invalid kind or missing query).';
+  }
+  // The model may pass an explicit `title` (e.g. station name from
+  // play_radio). Honor it so the audio card / iframe header shows
+  // human-friendly text instead of a hostname or hash.
+  if (typeof args.title === 'string' && args.title.trim()) {
+    resolved.title = args.title.trim().slice(0, 120);
+  }
+  setState(resolved);
+  if (resolved.kind === null) return 'Monitor cleared.';
+  return `Monitor now showing: ${resolved.title || resolved.kind}.`;
+}
+
+// F11 — direct image-display entrypoint used by the `generate_image` tool.
+// Unlike `handleShowOnMonitor` this takes an already-resolved URL (produced
+// server-side → cached PNG) and skips the query→URL
+// mapping table. The monitor renderer already handles `embedType:'image'`
+// via the existing `kind:'image'` case, so all we do here is publish state.
+export function showImageOnMonitor({ src, title } = {}) {
+  if (!src || typeof src !== 'string') return 'No image to display.';
+  setState({
+    kind: 'image',
+    src,
+    title: title || 'Generated image',
+    embedType: 'image',
+  });
+  return `Monitor now showing: ${title || 'generated image'}.`;
+}

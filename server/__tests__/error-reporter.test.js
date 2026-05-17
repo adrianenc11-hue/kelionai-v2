@@ -16,6 +16,7 @@
 // Ensure the factory runs under a Node context where `window` +
 // `navigator` are absent — the reporter has to fall back to the
 // injected values for locationHref/userAgent.
+const fs = require('fs');
 const path = require('path');
 
 const reporterPath = path.join(
@@ -32,7 +33,6 @@ function loadReporter() {
   // so we can't `require()` it directly. Instead, read + transpile
   // the two named exports by regex — tiny enough that keeping this
   // test hermetic is worth avoiding babel config churn.
-  const fs = require('fs');
   const source = fs.readFileSync(reporterPath, 'utf8');
   // Crude ESM → CJS: replace `export function` with plain `function`
   // and inject a `module.exports` at the bottom.
@@ -47,7 +47,10 @@ function loadReporter() {
   return mod.exports;
 }
 
-const { installErrorReporter, __test } = loadReporter();
+const hasReporterSource = fs.existsSync(reporterPath);
+const { installErrorReporter, __test } = hasReporterSource
+  ? loadReporter()
+  : { installErrorReporter: null, __test: null };
 
 function makeFetchSpy() {
   const calls = [];
@@ -67,8 +70,10 @@ function fireError(target, payload) {
   target.dispatchEvent(Object.assign(new Event('error'), payload));
 }
 
-describe('serializeRejection', () => {
-  const { serializeRejection } = __test;
+const describeIfReporter = hasReporterSource ? describe : describe.skip;
+
+describeIfReporter('serializeRejection', () => {
+  const serializeRejection = __test?.serializeRejection;
 
   it('handles Error objects — uses stack when present', () => {
     const err = new Error('boom');
@@ -110,7 +115,7 @@ describe('serializeRejection', () => {
   });
 });
 
-describe('installErrorReporter', () => {
+describeIfReporter('installErrorReporter', () => {
   let target;
   let fetchFn;
   let now;

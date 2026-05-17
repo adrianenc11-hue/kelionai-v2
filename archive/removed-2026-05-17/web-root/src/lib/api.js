@@ -1,0 +1,79 @@
+// API base URL.
+// Production: empty string → relative URLs (same origin, cookies work).
+// Development: localhost:3001 (backend dev server).
+const API_BASE = (typeof window !== 'undefined' && window.location.hostname !== 'localhost')
+  ? ''
+  : (import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001')
+
+export function getCsrfToken() {
+  const match = document.cookie.match(/(?:^|;\s*)kelion\.csrf=([^;]+)/)
+  return match ? match[1] : ''
+}
+
+/**
+ * Ensure the CSRF cookie exists. If it's missing (first visit, cleared
+ * cookies, mobile browser quirks) we fire a lightweight GET so the
+ * server's csrfSeed middleware sets it. Returns the token string.
+ */
+export async function ensureCsrfToken() {
+  let token = getCsrfToken()
+  if (token) return token
+  // Cookie missing — hit a cheap GET endpoint to trigger csrfSeed
+  try {
+    await fetch(`${API_BASE}/health`, { credentials: 'include' })
+  } catch (_) {}
+  token = getCsrfToken()
+  return token
+}
+
+async function apiFetch(path, options = {}) {
+  const url = `${API_BASE}${path}`
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 10000)
+
+  // For state-changing methods, ensure the CSRF cookie exists before sending
+  const method = (options.method || 'GET').toUpperCase()
+  let csrfToken = getCsrfToken()
+  if (!csrfToken && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
+    csrfToken = await ensureCsrfToken()
+  }
+
+  try {
+    const res = await fetch(url, {
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': csrfToken,
+        ...options.headers,
+      },
+      signal: controller.signal,
+      ...options,
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      const err = new Error(body.error || body.message || `HTTP ${res.status}`)
+      err.status = res.status
+      err.body = body
+      throw err
+    }
+    return res.json()
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      const timeoutErr = new Error('Request timed out')
+      timeoutErr.status = 408
+      throw timeoutErr
+    }
+    throw err
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
+export const api = {
+  get:    (path, opts)   => apiFetch(path, { method: 'GET', ...opts }),
+  post:   (path, data)   => apiFetch(path, { method: 'POST',  body: JSON.stringify(data) }),
+  put:    (path, data)   => apiFetch(path, { method: 'PUT',   body: JSON.stringify(data) }),
+  delete: (path)         => apiFetch(path, { method: 'DELETE' }),
+}
+
+export const AUTH_BASE = API_BASE
