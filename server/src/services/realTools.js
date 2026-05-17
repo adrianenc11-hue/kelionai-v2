@@ -5827,5 +5827,65 @@ module.exports = {
 
 
 async function toolMultiReplaceFileContent(args, ctx) {
-  return { ok: false, error: "Not implemented natively yet. Use replace_file_content repeatedly." };
+  try {
+    const filePath = String(args?.TargetFile || args?.path || '').trim();
+    const chunks = args?.ReplacementChunks || args?.chunks || [];
+    if (!filePath) return { ok: false, error: 'TargetFile is required' };
+    if (!Array.isArray(chunks) || chunks.length === 0) {
+      return { ok: false, error: 'ReplacementChunks must be a non-empty array' };
+    }
+
+    const resolvedPath = _path.resolve(REPO_ROOT, filePath);
+    if (!isPathSafe(resolvedPath)) return { ok: false, error: 'access denied: restricted directory' };
+    if (!_fs.existsSync(resolvedPath)) return { ok: false, error: 'File does not exist' };
+
+    let content = _fs.readFileSync(resolvedPath, 'utf8');
+    const applied = [];
+    const failed = [];
+
+    for (let i = 0; i < chunks.length; i++) {
+      const c = chunks[i];
+      const targetText = String(c?.TargetContent || c?.search || '');
+      const replaceText = String(c?.ReplacementContent || c?.replace || '');
+      const allowMultiple = !!c?.AllowMultiple;
+
+      if (!targetText) {
+        failed.push({ chunk: i, reason: 'empty TargetContent' });
+        continue;
+      }
+
+      if (!content.includes(targetText)) {
+        failed.push({ chunk: i, reason: 'TargetContent not found in the file. It must match exactly.' });
+        continue;
+      }
+
+      if (!allowMultiple) {
+        // Check if there are multiple occurrences
+        const occurrences = content.split(targetText).length - 1;
+        if (occurrences > 1) {
+          failed.push({ chunk: i, reason: `TargetContent found ${occurrences} times but AllowMultiple is false.` });
+          continue;
+        }
+        content = content.replace(targetText, replaceText);
+      } else {
+        content = content.split(targetText).join(replaceText);
+      }
+      
+      applied.push({ chunk: i, replaced: targetText.length, with: replaceText.length });
+    }
+
+    if (failed.length > 0) {
+      return { 
+        ok: false, 
+        error: `Failed to apply some chunks. No changes written. Failed: ${JSON.stringify(failed)}`,
+        applied_would_be: applied 
+      };
+    }
+
+    _fs.writeFileSync(resolvedPath, content, 'utf8');
+    return { ok: true, path: filePath, applied_chunks: applied.length, status: 'Multi-replace successful' };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
 }
+
