@@ -80,10 +80,10 @@ describe('buildKelionPersona — minimal prompt with full tool catalog', () => {
       expect(prompt).toMatch(/show_on_monitor/);
     });
 
-    it('declares runtime constraints (no install at runtime)', () => {
-      expect(prompt).toMatch(/RUNTIME CONSTRAINTS/);
+    it('declares runtime capabilities (allows install at runtime)', () => {
+      expect(prompt).toMatch(/RUNTIME CAPABILITIES/);
       expect(prompt).toMatch(/npm install/);
-      expect(prompt).toMatch(/read-only at runtime/i);
+      expect(prompt).toMatch(/install dependencies/i);
     });
   });
 
