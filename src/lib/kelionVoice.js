@@ -928,6 +928,31 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
           if (!rawTranscript) return;
           const transcript = correctTranscript(rawTranscript);
 
+          // ── Stop Word Detection ──────────────────────────────────────
+          // If user says "oprește-te", "taci", "stop", "gata" etc.,
+          // immediately silence Kelion and return to listening.
+          // Do NOT send these commands to Claude (he'd respond with another paragraph).
+          const STOP_WORDS = /\b(opreste|opri|oprit|taci|stop|gata|ajunge|destul|lasa|las[aă]|shut\s*up|quiet|enough|silence|termina|termin[aă])\b/i;
+          if (STOP_WORDS.test(transcript)) {
+            console.log('[kelionVoice] Stop word detected:', transcript);
+            clearAudioQueue();
+            // Stop any active TTS
+            if (activeAudioElRef.current) {
+              try { activeAudioElRef.current.pause(); activeAudioElRef.current.src = ''; } catch (_) {}
+              activeAudioElRef.current = null;
+            }
+            if (ttsAbortControllerRef.current) {
+              ttsAbortControllerRef.current.abort();
+              ttsAbortControllerRef.current = null;
+            }
+            ttsBlobQueueRef.current = [];
+            ttsIsPlayingRef.current = false;
+            setStatus('listening');
+            setUserLevel(0);
+            startFakeAnim();
+            return; // Do NOT send to Claude
+          }
+
           setStatus('thinking');
           setUserLevel(0);
           if (fakeAnimFrame) cancelAnimationFrame(fakeAnimFrame);

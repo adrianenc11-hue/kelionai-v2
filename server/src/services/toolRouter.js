@@ -375,6 +375,15 @@ function detectCategories(message) {
   const lower = message.toLowerCase().trim();
   const matched = new Set();
 
+  // ── Greeting Detection ──────────────────────────────────────────
+  // Greetings like "bună", "salut", "hello" should activate weather
+  // and location tools so Kelion can respond proactively with context
+  // (e.g. "Bună seara. 22°C, parțial noros.") instead of a generic reply.
+  const GREETING_RX = /^\s*(bun[aă]|salut|hello|hi|hey|good\s*(morning|evening|afternoon|night)|ce\s*faci|cum\s*e|noapte\s*bun[aă]|servus|ziua\s*bun[aă]|bun[aă]\s*(diminea[tț]a|seara|ziua))\s*[.!?]*$/i;
+  if (GREETING_RX.test(lower)) {
+    matched.add('GEO_WEATHER');
+  }
+
   for (const [category, triggers] of Object.entries(CATEGORY_TRIGGERS)) {
     // Check patterns (regex)
     const hasPatternMatch = triggers.patterns.some(p => p.test(lower));
