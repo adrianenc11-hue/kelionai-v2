@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react'
+import MessageRenderer from './MessageRenderer'
 
 /**
  * TranscriptDrawer — extracted from KelionStage IIFE to fix React Error #310.
@@ -26,9 +27,8 @@ function cleanToolMarkup(text) {
   cleaned = cleaned.replace(/⚙\s*\*{0,2}Apeleaz[aăâ]\s*Tool:?\*{0,2}[^✅]*/gi, '')
   // Remove "✅ **Rezultat Tool:** ..." blocks
   cleaned = cleaned.replace(/✅\s*\*{0,2}Rezultat\s*Tool:?\*{0,2}\s*```[\s\S]*?```/gi, '')
-  // Remove any remaining fenced code blocks with JSON
+  // Remove only JSON fenced blocks (tool results), NOT code blocks with other langs
   cleaned = cleaned.replace(/```json[\s\S]*?```/gi, '')
-  cleaned = cleaned.replace(/```[\s\S]*?```/gi, '')
   // Remove standalone JSON objects like {"ok":true,"type":"conversations",...}
   cleaned = cleaned.replace(/\{["\s]*ok["\s]*:\s*true[\s\S]*?\}\s*/g, '')
   // Remove leftover ✅ markers
@@ -246,7 +246,7 @@ export default function TranscriptDrawer({ turns, authSignedIn, authToken, isAdm
               </div>
               {t.role === 'user'
                 ? (t.text || t.transcript || <i style={{ opacity: 0.4 }}>…</i>)
-                : (cleanToolMarkup(t.text || t.transcript || '') || <i style={{ opacity: 0.4 }}>…</i>)
+                : <MessageRenderer text={cleanToolMarkup(t.text || t.transcript || '')} />
               }
             </div>
           ))}
