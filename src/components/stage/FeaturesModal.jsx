@@ -29,7 +29,7 @@ export default function FeaturesModal({ onClose, isAdmin }) {
     'Self-learning agent — Kelion can generate new tools, run self-evaluation tests, auto-install dependencies, and auto-update packages.',
     'Electronics & engineering tools: SPICE circuit simulation, OCR on schematics, datasheet parsing, BOM CSV import, calibration checklists, component equivalence search, and technical translation.',
     'Web automation with Playwright — browse any website, click buttons, fill forms, and take screenshots on your behalf.',
-    'Mobile apps for iOS and Android (Capacitor).',
+    'Installable as a PWA on any device — mobile, tablet, and desktop.',
     'Credit-based pricing with Stripe — buy minutes, get refunds, view transaction history.',
     'Wake-word activation — say "Kelion" to start a voice session hands-free.',
     'Voice cloning — train a personal voice model for the avatar.',

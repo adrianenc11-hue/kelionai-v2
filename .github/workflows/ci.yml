@@ -33,16 +33,6 @@ jobs:
       - run: npm ci
       - run: npm run build
 
-  test-desktop:
-    name: Desktop Smoke
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - run: cd desktop && node src/smoke-test.cjs
-
   e2e:
     name: E2E (Playwright)
     runs-on: ubuntu-22.04

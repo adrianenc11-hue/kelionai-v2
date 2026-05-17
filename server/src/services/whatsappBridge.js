@@ -51,7 +51,7 @@ class WhatsAppBridge extends EventEmitter {
     this.status = 'disconnected';
 
     try {
-      // Resolve Chromium absolute path on production (nixpacks / Railway).
+      // Resolve Chromium absolute path on production (Docker / Railway).
       // Puppeteer requires a real filesystem path, not a command name.
       let execPath = undefined;
       if (process.env.NODE_ENV === 'production') {
