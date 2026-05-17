@@ -1,18 +1,18 @@
-# Kelion Voice
+# Kelion Server / Agent
 
-3D avatar voice-chat application with AI-powered conversation, Google OAuth authentication, user management, subscription tiers, and an admin panel.
+Production deployment is centered on the Node/Express server plus the admin-only agent subsystem. The web frontend still exists in-repo for local development, but containerized production deploys no longer require building or serving the Vite bundle.
 
 ## Architecture
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend (web) | React 18 + Vite, Three.js / React Three Fiber |
-| Backend API | Node.js + Express |
+| Frontend (web, optional in prod) | React 18 + Vite, Three.js / React Three Fiber |
+| Backend API / Agent | Node.js + Express |
 | Authentication | Google OAuth 2.0 / OpenID Connect |
 | Session (web) | `express-session` → HttpOnly cookie |
 | Token (mobile) | Signed JWT (Bearer token) |
 | Database | SQLite (`better-sqlite3`) |
-| Deployment | Railway (API + frontend) |
+| Deployment | Railway / Docker (server + agent API) |
 
 ---
 

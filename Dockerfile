@@ -13,20 +13,16 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Install root (frontend) dependencies
-COPY package.json package-lock.json ./
-RUN npm install
-
-# Install server dependencies
+# Install server dependencies only. Production deploys are API/agent-first
+# and no longer require the frontend toolchain or a prebuilt dist bundle.
 COPY server/package.json server/package-lock.json ./server/
 RUN cd server && npm install --omit=dev
 
 # Download Chromium browser for Playwright
 RUN cd server && npx playwright install chromium
 
-# Copy source and build frontend
+# Copy source
 COPY . .
-RUN npm run build
 
 ENV NODE_ENV=production
 ENV PORT=8080
