@@ -1685,16 +1685,10 @@ router.post('/vision', visionLimiter, async (req, res) => {
     const base64Data = `data:${mimeType || 'image/jpeg'};base64,${image}`;
 
     const { getModel: getVisionModel } = require('../services/modelRouter');
-    const googleKey = process.env.GOOGLE_API_KEY;
     const modelName = getVisionModel('vision');
     console.log(`[vision] Smart Router → ${modelName}`);
-    let apiUrl = url;
-    let authHeader = `Bearer ${openRouterKey}`;
-
-    if (googleKey) {
-      apiUrl = `https://generativelanguage.googleapis.com/v1beta/openai/chat/completions`;
-      authHeader = `Bearer ${googleKey}`;
-    }
+    const apiUrl = 'https://openrouter.ai/api/v1/chat/completions';
+    const authHeader = `Bearer ${openRouterKey}`;
 
     const r = await fetch(apiUrl, {
       method: 'POST',
@@ -1705,7 +1699,7 @@ router.post('/vision', visionLimiter, async (req, res) => {
         'X-Title': 'Kelion AI Vision'
       },
       body: JSON.stringify({
-        model: googleKey ? 'gemini-1.5-flash' : modelName,
+        model: modelName,
         messages: [
           {
             role: 'user',
@@ -1715,7 +1709,7 @@ router.post('/vision', visionLimiter, async (req, res) => {
                 text: `You are a vision system analyzing a real camera frame from a user's device. RULES:\n1. Describe ONLY what you can LITERALLY see in this image. Never invent, assume, or hallucinate details.\n2. If the image is blurry, dark, or unclear, say so honestly — do NOT guess what might be there.\n3. Focus on: people (position, clothing, actions), objects, text visible, environment (indoor/outdoor, vehicle, room type).\n4. If you see a steering wheel, dashboard, or road — the user is in a vehicle. Describe the driving scene.\n5. If you see a face close-up — this is likely a front-facing (selfie) camera.\n6. Keep to 1-2 factual sentences. No creative writing.${timeInfo}`
               },
               {
-                method: 'gemini-multimodal',
+                type: 'image_url',
                 image_url: {
                   url: base64Data
                 }
