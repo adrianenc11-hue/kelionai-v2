@@ -102,6 +102,11 @@ Expected:
 }
 ```
 
+`/health` is the Railway liveness check and must stay fast. It can return
+`database: "initializing"` or `runtime_secrets: "ephemeral"` while the service
+is still booting or while Railway secrets are missing. Fix those warnings in
+Railway variables, but they should not prevent the container from becoming live.
+
 ---
 
 **Deploy complete!** 🎉
