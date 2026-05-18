@@ -108,13 +108,30 @@ const MODELS = {
 // Kelion's brain to stay on Claude/OpenRouter.
 // Fallback chain — Claude/OpenRouter only. No Gemini routes.
 const OPENROUTER_FALLBACK = {
-  chat:        ['anthropic/claude-4.7-opus', 'anthropic/claude-opus-4.7', 'anthropic/claude-3-5-sonnet-20241022'],
-  chat_heavy:  ['anthropic/claude-4.7-opus', 'anthropic/claude-opus-4.7', 'anthropic/claude-3-5-sonnet-20241022'],
-  coder:       ['anthropic/claude-4.7-opus', 'anthropic/claude-opus-4.7', 'anthropic/claude-3-5-sonnet-20241022'],
-  coder_heavy: ['anthropic/claude-4.7-opus', 'anthropic/claude-opus-4.7', 'anthropic/claude-3-5-sonnet-20241022'],
+  chat:        ['anthropic/claude-4.7-opus', 'anthropic/claude-opus-4.7', 'anthropic/claude-sonnet-4.6'],
+  chat_heavy:  ['anthropic/claude-4.7-opus', 'anthropic/claude-opus-4.7', 'anthropic/claude-sonnet-4.6'],
+  coder:       ['anthropic/claude-4.7-opus', 'anthropic/claude-opus-4.7', 'anthropic/claude-sonnet-4.6'],
+  coder_heavy: ['anthropic/claude-4.7-opus', 'anthropic/claude-opus-4.7', 'anthropic/claude-sonnet-4.6'],
   vision:      ['anthropic/claude-4.7-opus', 'anthropic/claude-opus-4.7'],
   vision_heavy:['anthropic/claude-4.7-opus', 'anthropic/claude-opus-4.7'],
 };
+
+function openRouterError(status, body, model) {
+  let parsed = {};
+  try { parsed = body ? JSON.parse(body) : {}; } catch { parsed = {}; }
+  const message = parsed?.error?.message || body || `OpenRouter HTTP ${status}`;
+  const err = new Error(message);
+  err.status = status;
+  err.provider = 'openrouter';
+  err.model = model;
+  err.providerCode = parsed?.error?.code || status;
+  if (status === 402 || parsed?.error?.code === 402 || /insufficient credits/i.test(message)) {
+    err.code = 'OPENROUTER_INSUFFICIENT_CREDITS';
+  } else {
+    err.code = 'OPENROUTER_UPSTREAM_ERROR';
+  }
+  return err;
+}
 
 function enforceClaudeOnly(model, fallback = 'anthropic/claude-opus-4.7') {
   if (String(model || '').toLowerCase().includes('gemini')) {
@@ -239,7 +256,10 @@ async function smartFetch(taskType, body, useHeavy = false, fastMode = false) {
       }
       const errText = await response.text().catch(() => '');
       console.warn(`[modelRouter] ${model} via ${endpoint.provider} failed: ${response.status} - ${errText}`);
+      const upstreamError = openRouterError(response.status, errText, model);
+      if (upstreamError.code === 'OPENROUTER_INSUFFICIENT_CREDITS') throw upstreamError;
     } catch (err) {
+      if (err && err.code === 'OPENROUTER_INSUFFICIENT_CREDITS') throw err;
       console.warn(`[modelRouter] ${model} via ${endpoint.provider} error: ${err.message}`);
     }
   }
@@ -275,8 +295,11 @@ async function smartFetch(taskType, body, useHeavy = false, fastMode = false) {
       }
       const fErrText = await response.text().catch(() => '');
       console.warn(`[modelRouter] Fallback ${fbModel} failed: ${response.status} - ${fErrText}`);
+      const upstreamError = openRouterError(response.status, fErrText, fbModel);
+      if (upstreamError.code === 'OPENROUTER_INSUFFICIENT_CREDITS') throw upstreamError;
     } catch (err) {
       clearTimeout(fTimer);
+      if (err && err.code === 'OPENROUTER_INSUFFICIENT_CREDITS') throw err;
       console.warn(`[modelRouter] Fallback ${fbModel} error: ${err.message}`);
     }
   }

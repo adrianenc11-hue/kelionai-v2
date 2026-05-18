@@ -419,6 +419,13 @@ router.post('/', async (req, res) => {
           ...(isAdmin ? { detail: String(err.message || err), step: currentStep } : {})
         });
       }
+      if (err && err.code === 'OPENROUTER_INSUFFICIENT_CREDITS') {
+        return res.status(402).json({
+          code: 'OPENROUTER_INSUFFICIENT_CREDITS',
+          error: 'OpenRouter has insufficient credits. Add credits in OpenRouter, then retry Kelion.',
+          ...(isAdmin ? { detail: String(err.message || err), model: err.model, step: currentStep } : {})
+        });
+      }
       return res.status(502).json({
         code: 'AI_UPSTREAM_FAILED',
         error: 'AI is temporarily unavailable. Please try again.',

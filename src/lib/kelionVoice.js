@@ -1856,6 +1856,8 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
               const edgeHtmlError = /^\s*<!doctype html/i.test(rawError) || /^\s*<html/i.test(rawError);
               const serverError = err.code === 'AI_PROVIDER_NOT_CONFIGURED'
                 ? 'Nu exista provider AI configurat pe server. Seteaza OPENROUTER_API_KEY in Railway pentru kelionai.app.'
+                : err.code === 'OPENROUTER_INSUFFICIENT_CREDITS'
+                  ? 'OpenRouter nu are credite disponibile. Adauga credit in OpenRouter, apoi testeaza din nou Kelion.'
                 : err.code === 'CHAT_AI_TIMEOUT'
                   ? 'AI request timeout pe server. Incearca din nou dupa redeploy.'
                   : edgeHtmlError
