@@ -125,6 +125,18 @@ GET /api/admin/env-audit
 
 The audit returns `autonomy.ready=false` until all autonomy-critical checks pass.
 
+Agent endpoints:
+
+```text
+GET /api/agent/autonomy/status
+POST /api/agent/dev/start
+```
+
+`/api/agent/dev/start` now runs the autonomy preflight first. If required keys,
+durable state, explicit shell workspace, or PR protection are missing, it returns
+`428` with the blockers instead of starting an unsafe autonomous task. Pass
+`allowDegraded:true` only for controlled local diagnostics.
+
 ## Guardrails
 
 Agent Mode is available only when `AGENT_ENABLED=1`.
@@ -132,6 +144,11 @@ Agent Mode is available only when `AGENT_ENABLED=1`.
 Dangerous public tools are admin-gated. The developer agent requires explicit approval before commit, push, or PR steps.
 
 Direct pushes to `master`, `main`, or `HEAD` are blocked in the agent shell/orchestrator path. GitHub PR creation requires a non-master feature branch.
+
+Autonomous developer tasks default to the completion-assessment loop. Kelion
+plans, executes, validates, assesses whether the task is genuinely complete, and
+re-plans when needed. Commit/push/PR steps still require approval and must land
+through a PR targeting `master`.
 
 ## Main API Areas
 
@@ -159,6 +176,7 @@ node --check src/routes/realtime.js
 node --check src/services/agentShell.js
 node --check src/services/agentGitHub.js
 node --check src/services/agentOrchestrator.js
+node --check src/services/autonomySupervisor.js
 node --check src/services/envAudit.js
 node --check scripts/verify-env.js
 ```
