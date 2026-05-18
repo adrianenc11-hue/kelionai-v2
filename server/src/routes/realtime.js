@@ -118,10 +118,12 @@ const VOICE_STYLES = {
   playful: { label: 'playful', directive: 'Speak playfully — lighter energy, brighter pitch, a touch of smile in the voice, a quick wit. Not hyperactive, just sparkly.' },
   calm: { label: 'calm', directive: 'Speak calmly — steady, grounded pace, lower register, longer pauses, almost meditative. The voice of someone who has time for you.' },
   focused: { label: 'focused', directive: 'Speak with crisp focus — clear articulation, direct, a professional cadence. No extra words, no fluff. Still warm, just efficient.' },
+  auto: { label: 'auto', directive: 'ADAPTIVE TONE: Your baseline default is FOCUSED (crisp, direct, professional, efficient, no fluff). However, you must continuously auto-adapt your tone based on the context and the user\'s emotion. If the user is sad/stressed, become WARM. If the user is joking, become PLAYFUL. If the situation is tense, become CALM. Shift your personality dynamically as the conversation evolves.' },
 };
 function resolveVoiceStyle(raw) {
   const k = (raw || '').toString().toLowerCase();
-  return VOICE_STYLES[k] || VOICE_STYLES.warm;
+  // Default to 'auto' (which uses Focused as baseline + context detection)
+  return VOICE_STYLES[k] || VOICE_STYLES.auto;
 }
 
 // F4 — when the client falls back from one voice provider to the other

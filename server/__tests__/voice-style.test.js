@@ -21,10 +21,10 @@ describe('resolveVoiceStyle', () => {
     expect(resolveVoiceStyle('WARM').label).toBe('warm');
     expect(resolveVoiceStyle('Focused').label).toBe('focused');
   });
-  it('defaults to warm for unknown / empty', () => {
-    expect(resolveVoiceStyle('').label).toBe('warm');
-    expect(resolveVoiceStyle(null).label).toBe('warm');
-    expect(resolveVoiceStyle('stern').label).toBe('warm');
+  it('defaults to auto for unknown / empty', () => {
+    expect(resolveVoiceStyle('').label).toBe('auto');
+    expect(resolveVoiceStyle(null).label).toBe('auto');
+    expect(resolveVoiceStyle('stern').label).toBe('auto');
   });
 });
 
