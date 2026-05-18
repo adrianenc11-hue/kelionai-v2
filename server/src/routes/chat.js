@@ -42,7 +42,7 @@ router.post('/', async (req, res) => {
     if (!hasAiProvider()) {
       return res.status(503).json({
         code: 'AI_PROVIDER_NOT_CONFIGURED',
-        error: 'AI provider is not configured. Set OPENROUTER_API_KEY or GOOGLE_API_KEY / GOOGLE_API_KEYS in Railway.',
+        error: 'AI provider is not configured. Set OPENROUTER_API_KEY in Railway.',
       });
     }
 

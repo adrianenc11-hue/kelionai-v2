@@ -8,7 +8,6 @@
 
 import { setEmotion } from './emotionStore'
 import { handleShowOnMonitor, showImageOnMonitor } from './monitorStore'
-import { showTerminal, streamCommand, displayBatchResult, postLine, postDone } from './liveTerminal'
 import { openEmailComposer } from './composerStore'
 import { getLatestCameraFrame } from './cameraFrameBuffer'
 import { setNarrationMode } from './narrationMode'
@@ -274,19 +273,7 @@ async function runRealToolRemote(name, args) {
 
   // Terminal commands → SSE streaming with batch fallback (liveTerminal module)
   if (terminalTools.includes(name)) {
-    try {
-      const result = await streamCommand(args?.command || '', args?.cwd || '')
-      if (result && (result.stdout || result.stderr || result.ok !== undefined)) {
-        return summarizeRealTool('run_terminal_command', result)
-      }
-    } catch (e) {
-      console.warn('[kelionTools] SSE failed, batch fallback:', e?.message)
-    }
-    // Fallback: old batch execution + animated display
-    showTerminal(name, args?.command || '')
     const j = await postJSON('/api/tools/execute', { name, args: args || {} })
-    await new Promise(r => setTimeout(r, 100))
-    displayBatchResult(j)
     return summarizeRealTool('run_terminal_command', j)
   }
 

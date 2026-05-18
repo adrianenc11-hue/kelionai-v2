@@ -64,32 +64,19 @@ function _queuedModelCall(fn) {
   });
 }
 
-// Google AI Studio endpoint (direct, no OpenRouter middleman)
-const GOOGLE_AI_STUDIO = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
-
-// -- Multi-key rotation for Google AI Studio --
-// Support comma-separated GOOGLE_API_KEYS env var. When one key hits 429,
-// rotate to the next. This prevents a single exhausted free-tier project
-// from taking down the whole app.
-const GOOGLE_KEYS = (process.env.GOOGLE_API_KEYS || process.env.GOOGLE_API_KEY || '')
-  .split(',')
-  .map(k => k.trim())
-  .filter(Boolean);
-if (GOOGLE_KEYS.length === 0) {
-  console.log('[modelRouter] No GOOGLE_API_KEY or GOOGLE_API_KEYS set. Gemini calls are disabled.');
-}
-let _currentKeyIndex = 0;
+// Google/Gemini chat provider intentionally disabled.
+const GOOGLE_KEYS = [];
 
 function hasOpenRouterProvider() {
   return !!process.env.OPENROUTER_API_KEY;
 }
 
 function hasGoogleProvider() {
-  return GOOGLE_KEYS.length > 0;
+  return false;
 }
 
 function hasAiProvider() {
-  return hasOpenRouterProvider() || hasGoogleProvider();
+  return hasOpenRouterProvider();
 }
 
 const MODELS = {
@@ -115,25 +102,25 @@ const MODELS = {
   tandem_coder: process.env.MODEL_CODER_TANDEM || 'moonshotai/kimi-k2.6',
 };
 
-// Internal fallback — Google AI Studio models tried when Claude is down.
-const GOOGLE_FALLBACK = {
-  chat_heavy: ['gemini-2.5-flash', 'gemini-2.0-flash'],
-  chat:       ['gemini-2.5-flash', 'gemini-2.0-flash'],
-  coder_heavy:['gemini-2.5-flash', 'gemini-2.0-flash'],
-  coder:      ['gemini-2.5-flash', 'gemini-2.0-flash'],
-  vision_heavy:['gemini-2.5-flash'],
-  vision:     ['gemini-2.5-flash'],
+// Gemini is deliberately not used as a chat fallback. Adrian requires
+// Kelion's brain to stay on Claude/OpenRouter.
+// Fallback chain — Claude/OpenRouter only. No Gemini routes.
+const OPENROUTER_FALLBACK = {
+  chat:        ['anthropic/claude-4.7-opus', 'anthropic/claude-opus-4.7', 'anthropic/claude-3-5-sonnet-20241022'],
+  chat_heavy:  ['anthropic/claude-4.7-opus', 'anthropic/claude-opus-4.7', 'anthropic/claude-3-5-sonnet-20241022'],
+  coder:       ['anthropic/claude-4.7-opus', 'anthropic/claude-opus-4.7', 'anthropic/claude-3-5-sonnet-20241022'],
+  coder_heavy: ['anthropic/claude-4.7-opus', 'anthropic/claude-opus-4.7', 'anthropic/claude-3-5-sonnet-20241022'],
+  vision:      ['anthropic/claude-4.7-opus', 'anthropic/claude-opus-4.7'],
+  vision_heavy:['anthropic/claude-4.7-opus', 'anthropic/claude-opus-4.7'],
 };
 
-// Fallback chain — OpenRouter models tried after Claude + Google AI Studio fail.
-const OPENROUTER_FALLBACK = {
-  chat:        ['anthropic/claude-3-5-sonnet-20241022', 'google/gemini-2.0-flash-001', 'meta-llama/llama-3.3-70b-instruct'],
-  chat_heavy:  ['anthropic/claude-3-5-sonnet-20241022', 'google/gemini-2.0-flash-001', 'meta-llama/llama-3.3-70b-instruct'],
-  coder:       ['anthropic/claude-3-5-sonnet-20241022', 'google/gemini-2.0-flash-001', 'meta-llama/llama-3.3-70b-instruct'],
-  coder_heavy: ['anthropic/claude-3-5-sonnet-20241022', 'google/gemini-2.0-flash-001', 'meta-llama/llama-3.3-70b-instruct'],
-  vision:      ['anthropic/claude-3-5-sonnet-20241022', 'google/gemini-2.0-flash-001'],
-  vision_heavy:['anthropic/claude-3-5-sonnet-20241022', 'google/gemini-2.0-flash-001'],
-};
+function enforceClaudeOnly(model, fallback = 'anthropic/claude-opus-4.7') {
+  if (String(model || '').toLowerCase().includes('gemini')) {
+    console.warn(`[modelRouter] Ignoring Gemini model "${model}" because Kelion chat is Claude/OpenRouter only.`);
+    return fallback;
+  }
+  return model;
+}
 
 /**
  * Get the optimal model for a task type.
@@ -144,44 +131,27 @@ const OPENROUTER_FALLBACK = {
 function getModel(taskType, useHeavy = false, fastMode = false) {
   if (fastMode && useHeavy) {
     const fastKey = `${taskType}_heavy_fast`;
-    if (MODELS[fastKey]) return MODELS[fastKey];
+    if (MODELS[fastKey]) return enforceClaudeOnly(MODELS[fastKey]);
   }
   const key = useHeavy ? `${taskType}_heavy` : taskType;
-  return MODELS[key] || MODELS[taskType] || MODELS.chat;
+  return enforceClaudeOnly(MODELS[key] || MODELS[taskType] || MODELS.chat);
 }
 
 /**
  * Get the API endpoint and auth for a model.
- * If GOOGLE_API_KEY is set and model is a Gemini model, use AI Studio directly.
- * Otherwise, use OpenRouter.
+ * Always use OpenRouter for Claude chat/coder/vision calls.
  *
  * @param {string} model - Model ID
  * @returns {{ url: string, authHeader: string, provider: string, apiModel: string }}
  */
-function getEndpoint(model, keyIndex = 0) {
-  const googleKey = GOOGLE_KEYS[keyIndex % Math.max(GOOGLE_KEYS.length, 1)];
-  const isGeminiModel = model.includes('gemini-');
+function getEndpoint(model) {
+  const apiModel = enforceClaudeOnly(model);
 
-  if (googleKey && isGeminiModel && !process.env.USE_OPENROUTER_FOR_GEMINI) {
-    // Google AI Studio natively expects 'gemini-X', strip 'google/' if present
-    const bareModel = model.replace(/^google\//, '');
-    return {
-      url: GOOGLE_AI_STUDIO,
-      authHeader: `Bearer ${googleKey}`,
-      provider: 'google-ai-studio',
-      apiModel: bareModel
-    };
-  }
-
-  // Fall back to OpenRouter
-  // OpenRouter requires the 'google/' prefix for Gemini models
-  const openRouterModel = (!model.includes('/') && isGeminiModel) ? `google/${model}` : model;
-  
   return {
     url: 'https://openrouter.ai/api/v1/chat/completions',
     authHeader: `Bearer ${process.env.OPENROUTER_API_KEY}`,
     provider: 'openrouter',
-    apiModel: openRouterModel
+    apiModel
   };
 }
 
@@ -219,9 +189,7 @@ function isComplexTask(msg) {
 }
 
 /**
- * Make an API call with automatic provider selection + fallback.
- * 1. Try Google AI Studio (if GOOGLE_API_KEY set)
- * 2. If rate limited or error, try OpenRouter fallback chain
+ * Make an OpenRouter call with Claude-only fallback.
  *
  * @param {'chat'|'coder'|'vision'} taskType
  * @param {object} body - Request body (messages, tools, etc.)
@@ -236,9 +204,6 @@ async function smartFetch(taskType, body, useHeavy = false, fastMode = false) {
   console.log(`[modelRouter] ${taskType} (heavy=${useHeavy} fast=${fastMode}) → ${model} via ${endpoint.provider}`);
 
   // Try primary provider — 45s timeout (heavy tasks like audits need time)
-  // Google AI Studio calls go through the token bucket so we never
-  // exceed the free-tier RPM cap under burst load.
-  const isGoogleStudio = endpoint.provider === 'google-ai-studio';
   const makePrimaryCall = async () => {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 45000);
@@ -262,50 +227,7 @@ async function smartFetch(taskType, body, useHeavy = false, fastMode = false) {
     }
   };
 
-  // Try each Google key in rotation
-  if (isGoogleStudio && GOOGLE_KEYS.length > 0) {
-    for (let keyIdx = 0; keyIdx < GOOGLE_KEYS.length; keyIdx++) {
-      const keyEndpoint = getEndpoint(model, keyIdx);
-      const keyCall = async () => {
-        const ctrl = new AbortController();
-        const timer = setTimeout(() => ctrl.abort(), 45000);
-        try {
-          const response = await fetch(keyEndpoint.url, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': keyEndpoint.authHeader,
-              'HTTP-Referer': 'https://kelion.ai',
-              'X-Title': 'Kelion AI',
-            },
-            body: JSON.stringify({ ...body, model: keyEndpoint.apiModel }),
-            signal: ctrl.signal,
-          });
-          clearTimeout(timer);
-          return response;
-        } catch (err) {
-          clearTimeout(timer);
-          throw err;
-        }
-      };
-
-      try {
-        const response = await _queuedModelCall(keyCall);
-        if (response.ok) {
-          _currentKeyIndex = keyIdx;
-          return { response, model, provider: keyEndpoint.provider };
-        }
-        const errText = await response.text().catch(() => '');
-        if (response.status === 429) {
-          console.warn(`[modelRouter] Key ${keyIdx + 1}/${GOOGLE_KEYS.length} rate-limited, rotating...`);
-          continue;
-        }
-        console.warn(`[modelRouter] ${model} key ${keyIdx + 1} failed: ${response.status} - ${errText}`);
-      } catch (err) {
-        console.warn(`[modelRouter] ${model} key ${keyIdx + 1} error: ${err.message}`);
-      }
-    }
-  } else if (endpoint.provider === 'openrouter' && !hasOpenRouterProvider()) {
+  if (!hasOpenRouterProvider()) {
     console.log(`[modelRouter] Skipping ${model} via OpenRouter - OPENROUTER_API_KEY is not configured.`);
   } else {
     try {
@@ -320,53 +242,7 @@ async function smartFetch(taskType, body, useHeavy = false, fastMode = false) {
     }
   }
 
-  // Google AI Studio internal fallback: same provider, lighter model
   const chainKey = useHeavy ? `${taskType}_heavy` : taskType;
-  const googleFallback = GOOGLE_FALLBACK[chainKey] || GOOGLE_FALLBACK[taskType];
-  if (googleFallback && GOOGLE_KEYS.length > 0) {
-    for (const fbModel of googleFallback) {
-      for (let keyIdx = 0; keyIdx < GOOGLE_KEYS.length; keyIdx++) {
-        const fbEndpoint = getEndpoint(fbModel, keyIdx);
-        const fbCall = async () => {
-          const ctrl = new AbortController();
-          const timer = setTimeout(() => ctrl.abort(), 45000);
-          try {
-            const response = await fetch(fbEndpoint.url, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': fbEndpoint.authHeader,
-                'HTTP-Referer': 'https://kelion.ai',
-                'X-Title': 'Kelion AI',
-              },
-              body: JSON.stringify({ ...body, model: fbEndpoint.apiModel }),
-              signal: ctrl.signal,
-            });
-            clearTimeout(timer);
-            return response;
-          } catch (err) {
-            clearTimeout(timer);
-            throw err;
-          }
-        };
-        try {
-          const response = await _queuedModelCall(fbCall);
-          if (response.ok) {
-            _currentKeyIndex = keyIdx;
-            console.log(`[modelRouter] Google fallback ${fbModel} succeeded!`);
-            return { response, model: fbModel, provider: fbEndpoint.provider };
-          }
-          const errText = await response.text().catch(() => '');
-          if (response.status === 429) continue;
-          console.warn(`[modelRouter] Google fallback ${fbModel} key ${keyIdx + 1} failed: ${response.status} - ${errText}`);
-        } catch (err) {
-          console.warn(`[modelRouter] Google fallback ${fbModel} key ${keyIdx + 1} error: ${err.message}`);
-        }
-      }
-    }
-  }
-
-  // Fallback to OpenRouter chain
   const chain = OPENROUTER_FALLBACK[chainKey] || OPENROUTER_FALLBACK[taskType] || OPENROUTER_FALLBACK.chat;
   const orKey = process.env.OPENROUTER_API_KEY;
   if (!orKey) throw new Error('No OPENROUTER_API_KEY for fallback');
@@ -632,17 +508,10 @@ async function checkLatestModels() {
       .filter(m => !m.id.includes(':free') && !m.id.includes('beta'))
       .sort((a, b) => (b.id || '').localeCompare(a.id || ''));
 
-    // Find latest Gemini models for fallback awareness
-    const gemini = models
-      .filter(m => m.id && (m.id.startsWith('google/gemini') || m.id.startsWith('gemini')))
-      .filter(m => !m.id.includes(':free'))
-      .sort((a, b) => (b.id || '').localeCompare(a.id || ''));
-
     const report = {
       timestamp: new Date().toISOString(),
       latestClaudeOpus: claudeOpus[0]?.id || null,
       latestClaudeSonnet: claudeSonnet[0]?.id || null,
-      latestGemini: gemini[0]?.id || null,
       totalModels: models.length,
     };
 

@@ -602,11 +602,8 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
       // Suppress narration during tool execution — the cooldown prevents
       // the narrator from jumping in between chained tool calls.
       narrationCooldownRef.current = Date.now()
-      // Narrate to the transcript so the user SEES what Kelion is doing
-      // (audio narration is handled by the model itself per the persona).
       for (const fc of fcs) {
         logAiEvent('tool_call', { name: fc.name, args: fc.args })
-        appendTurn('assistant', `[tool: ${fc.name}]`, true, '⚙️ Tool Call')
       }
       try {
         const responses = await Promise.all(fcs.map(async (fc) => {
@@ -1830,7 +1827,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
 
           // ── Backend API call ──
           if (!data) {
-            _setTaskStatus({ tool: 'api-chat', progress: 20, label: '📡 Trimit la server...', phase: 'thinking' });
+            _setTaskStatus({ tool: 'work', progress: 20, label: 'Kelion lucreaza...', phase: 'thinking' });
             const r = await fetch('/api/chat', {
               method: 'POST',
               signal: currentAbortSignal,
@@ -1857,9 +1854,9 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
                 err = {};
               }
               const serverError = err.code === 'AI_PROVIDER_NOT_CONFIGURED'
-                ? 'Nu exista niciun provider AI configurat pe server. Seteaza OPENROUTER_API_KEY sau GOOGLE_API_KEY / GOOGLE_API_KEYS in Railway pentru kelionai.app.'
+                ? 'Nu exista provider AI configurat pe server. Seteaza OPENROUTER_API_KEY in Railway pentru kelionai.app.'
                 : (err.error || (rawError ? `Server ${r.status}: ${rawError.slice(0, 180)}` : `Server ${r.status}`));
-              _setTaskStatus({ tool: 'api-chat', progress: 100, label: `❌ Server: ${serverError}`, phase: 'error' });
+              _setTaskStatus({ tool: 'work', progress: 100, label: 'Server error', phase: 'error' });
               finalReply = serverError;
               break;
             }
@@ -1868,7 +1865,7 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
               httpBusyRef.current = false;
               return data;
             }
-            _setTaskStatus({ tool: 'api-chat', progress: 60, label: `📨 Răspuns de la ${data.model || 'server'}`, phase: 'working' });
+            _setTaskStatus({ tool: 'work', progress: 60, label: 'Kelion lucreaza...', phase: 'working' });
           }
 
           if (currentAbortSignal.aborted) break;
@@ -1899,41 +1896,40 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
               }));
               currentMessage = undefined;
               currentImage = undefined;
-              _setTaskStatus({ tool: 'api-chat', progress: 30, label: '🔄 Retrimit avertizare buclă...', phase: 'thinking' });
+              _setTaskStatus({ tool: 'work', progress: 30, label: 'Kelion lucreaza...', phase: 'thinking' });
               continue;
             }
 
-            _setTaskStatus({ tool: 'tools', progress: 0, label: `🔧 ${totalTools} tool${totalTools > 1 ? '-uri' : ''} de executat`, phase: 'working' });
+            _setTaskStatus({ tool: 'work', progress: 0, label: 'Kelion lucreaza...', phase: 'working' });
             for (let ti = 0; ti < totalTools; ti++) {
               if (currentAbortSignal.aborted) break;
               
               const call = data.toolCalls[ti];
-              const file = call.args?.path || call.args?.target || call.args?.file || call.args?.command || null;
               _setTaskStatus({
-                tool: call.name,
-                file,
+                tool: 'work',
+                file: null,
                 progress: Math.round(((ti) / totalTools) * 100),
-                label: `▶ Rulez ${call.name.replace(/_/g, ' ')}...`,
+                label: 'Kelion lucreaza...',
                 phase: 'working',
               });
               const res = await runTool(call.name, call.args);
               results.push({ name: call.name, response: res, id: call.id });
               _setTaskStatus({
-                tool: call.name,
-                file,
+                tool: 'work',
+                file: null,
                 progress: Math.round(((ti + 1) / totalTools) * 100),
-                label: `✓ ${call.name.replace(/_/g, ' ')} gata`,
+                label: 'Kelion lucreaza...',
                 phase: 'working',
               });
             }
             
             if (currentAbortSignal.aborted) break;
 
-            _setTaskStatus({ tool: 'tools', progress: 100, label: `✅ ${totalTools} tool-uri executate`, phase: 'working' });
+            _setTaskStatus({ tool: 'work', progress: 100, label: 'Kelion lucreaza...', phase: 'working' });
             toolResponses = results;
             currentMessage = undefined;
             currentImage = undefined;
-            _setTaskStatus({ tool: 'api-chat', progress: 30, label: '🔄 Retrimit rezultate la AI...', phase: 'thinking' });
+            _setTaskStatus({ tool: 'work', progress: 30, label: 'Kelion lucreaza...', phase: 'thinking' });
             continue;
           }
 

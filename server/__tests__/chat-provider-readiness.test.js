@@ -40,16 +40,26 @@ describe('chat provider readiness', () => {
     expect(res.status).toBe(503);
     expect(res.body.code).toBe('AI_PROVIDER_NOT_CONFIGURED');
     expect(res.body.error).toContain('OPENROUTER_API_KEY');
-    expect(res.body.error).toContain('GOOGLE_API_KEY');
+    expect(res.body.error).not.toContain('GOOGLE_API_KEY');
   }, 20000);
 
-  it('recognizes Google AI keys as a valid chat provider', () => {
+  it('does not recognize Google AI keys as a valid chat provider', () => {
     resetAiEnv({ GOOGLE_API_KEY: 'test-google-key' });
 
     const { hasAiProvider, hasGoogleProvider, hasOpenRouterProvider } = require('../src/services/modelRouter');
 
-    expect(hasAiProvider()).toBe(true);
-    expect(hasGoogleProvider()).toBe(true);
+    expect(hasAiProvider()).toBe(false);
+    expect(hasGoogleProvider()).toBe(false);
     expect(hasOpenRouterProvider()).toBe(false);
+  });
+
+  it('requires OpenRouter for chat readiness', () => {
+    resetAiEnv({ OPENROUTER_API_KEY: 'test-openrouter-key' });
+
+    const { hasAiProvider, hasGoogleProvider, hasOpenRouterProvider } = require('../src/services/modelRouter');
+
+    expect(hasAiProvider()).toBe(true);
+    expect(hasGoogleProvider()).toBe(false);
+    expect(hasOpenRouterProvider()).toBe(true);
   });
 });
