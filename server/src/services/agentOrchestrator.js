@@ -41,6 +41,18 @@ const agentGitHub = require('./agentGitHub');
 const agentBrowser = require('./agentBrowser');
 const agentSandbox = require('./agentSandbox');
 const agentDeploy = require('./agentDeploy');
+const PROTECTED_BRANCHES = new Set(['master', 'main', 'origin/master', 'origin/main', 'HEAD']);
+
+function isSafePrBranch(branch) {
+  const name = String(branch || '').trim();
+  return !!name
+    && !PROTECTED_BRANCHES.has(name)
+    && !name.startsWith('-')
+    && !name.includes('..')
+    && !name.includes('@{')
+    && !name.endsWith('.lock')
+    && /^[A-Za-z0-9._/-]+$/.test(name);
+}
 
 // agentWeb loaded lazily to avoid circular deps if not present
 let _agentWeb;
@@ -319,14 +331,26 @@ async function _executeStep(taskId, step, state) {
       }
       case 'push': {
         if (!state.approvedPush) { log('pending_approval', { reason: 'push' }); r = { ok: false, pendingApproval: true }; break; }
-        r = await agentShell.execCommand(`git push origin ${step.branch || 'HEAD'}`, 30000);
-        log('push', { branch: step.branch, ok: r.ok });
+        const branch = String(step.branch || '').trim();
+        if (!isSafePrBranch(branch)) {
+          r = { ok: false, error: 'Push requires an explicit non-master feature branch.' };
+          log('push', { branch, ok: false, error: r.error });
+          break;
+        }
+        r = await agentShell.execCommand(`git push origin ${branch}`, 30000);
+        log('push', { branch, ok: r.ok });
         break;
       }
       case 'pr': {
         if (!state.approvedPush) { log('pending_approval', { reason: 'pr' }); r = { ok: false, pendingApproval: true }; break; }
-        r = await agentGitHub.createPr(step.branch, step.title, step.body);
-        log('pr', { branch: step.branch, ok: r.ok });
+        const branch = String(step.branch || '').trim();
+        if (!isSafePrBranch(branch)) {
+          r = { ok: false, error: 'PR requires an explicit non-master feature branch.' };
+          log('pr', { branch, ok: false, error: r.error });
+          break;
+        }
+        r = await agentGitHub.createPr(branch, step.title, step.body);
+        log('pr', { branch, ok: r.ok });
         break;
       }
       case 'think': {
@@ -777,4 +801,4 @@ If complete is false, nextSteps should describe what remains to be done.` },
   }
 }
 
-module.exports = { startTask, approveTask, revertTask, isPathAllowed, isShellAllowed };
+module.exports = { startTask, approveTask, revertTask, isPathAllowed, isShellAllowed, isSafePrBranch };

@@ -5,11 +5,27 @@ const { URL } = require('url');
 
 const REPO_OWNER = process.env.GITHUB_REPO_OWNER || 'adrianenc11-hue';
 const REPO_NAME = process.env.GITHUB_REPO_NAME || 'kelionai-v2';
+const PROTECTED_BRANCHES = new Set(['master', 'main']);
+
+function getGithubToken() {
+  return process.env.GITHUB_TOKEN || process.env.AGENT_GITHUB_TOKEN || process.env.GH_TOKEN;
+}
+
+function isSafePrBranch(branch) {
+  const name = String(branch || '').trim();
+  return !!name
+    && !PROTECTED_BRANCHES.has(name)
+    && !name.startsWith('-')
+    && !name.includes('..')
+    && !name.includes('@{')
+    && !name.endsWith('.lock')
+    && /^[A-Za-z0-9._/-]+$/.test(name);
+}
 
 function githubRequest(path, method = 'GET', body = null) {
   return new Promise((resolve, reject) => {
-    const token = process.env.GITHUB_TOKEN;
-    if (!token) return resolve({ ok: false, error: 'GITHUB_TOKEN not configured.' });
+    const token = getGithubToken();
+    if (!token) return resolve({ ok: false, error: 'GITHUB_TOKEN, AGENT_GITHUB_TOKEN, or GH_TOKEN not configured.' });
     const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}${path}`;
     const parsed = new URL(url);
     const opts = {
@@ -48,6 +64,9 @@ function githubRequest(path, method = 'GET', body = null) {
 }
 
 async function createPr(branch, title, body = '', base = 'master') {
+  if (!isSafePrBranch(branch)) {
+    return { ok: false, error: 'PR creation requires a non-master feature branch.' };
+  }
   return githubRequest('/pulls', 'POST', { title, head: branch, base, body });
 }
 
@@ -56,7 +75,10 @@ async function listOpenPrs() {
 }
 
 async function mergePr(number) {
+  if (process.env.AGENT_ALLOW_PR_MERGE !== '1') {
+    return { ok: false, error: 'PR merge is disabled. Set AGENT_ALLOW_PR_MERGE=1 only after branch protection and required checks are enforced.' };
+  }
   return githubRequest(`/pulls/${number}/merge`, 'PUT', { merge_method: 'squash' });
 }
 
-module.exports = { createPr, listOpenPrs, mergePr };
+module.exports = { createPr, listOpenPrs, mergePr, isSafePrBranch };

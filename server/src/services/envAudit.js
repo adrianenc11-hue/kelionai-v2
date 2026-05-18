@@ -3,6 +3,8 @@
 
 const https = require('https');
 const http = require('http');
+const fs = require('fs');
+const path = require('path');
 const { URL } = require('url');
 
 function fetchJson(url, opts = {}) {
@@ -30,9 +32,9 @@ function fetchJson(url, opts = {}) {
 
 async function checkOpenRouter() {
   const key = process.env.OPENROUTER_API_KEY;
-  if (!key) return { name: 'OpenRouter API Key', ok: false, error: 'Not set' };
+  if (!key) return { name: 'OpenRouter API Key', ok: false, requiredForAutonomy: true, error: 'Not set' };
   const r = await fetchJson('https://openrouter.ai/api/v1/models', { headers: { 'Authorization': `Bearer ${key}` } });
-  return { name: 'OpenRouter API Key', ok: r.ok, status: r.status, error: r.ok ? null : 'Invalid key or rate limit' };
+  return { name: 'OpenRouter API Key', ok: r.ok, requiredForAutonomy: true, status: r.status, error: r.ok ? null : 'Invalid key or rate limit' };
 }
 
 async function checkElevenLabs() {
@@ -60,19 +62,39 @@ async function checkStripeWebhook() {
 }
 
 async function checkGithubToken() {
-  const key = process.env.GITHUB_TOKEN || process.env.AGENT_GITHUB_TOKEN;
-  if (!key) return { name: 'GitHub Token', ok: false, error: 'Not set (GITHUB_TOKEN or AGENT_GITHUB_TOKEN)' };
+  const key = process.env.GITHUB_TOKEN || process.env.AGENT_GITHUB_TOKEN || process.env.GH_TOKEN;
+  if (!key) return { name: 'GitHub Token', ok: false, requiredForAutonomy: true, error: 'Not set (GITHUB_TOKEN, AGENT_GITHUB_TOKEN, or GH_TOKEN)' };
   const r = await fetchJson('https://api.github.com/user', { headers: { 'Authorization': `token ${key}`, 'User-Agent': 'KelionAgent' } });
-  return { name: 'GitHub Token', ok: r.ok, status: r.status, error: r.ok ? null : 'Invalid token' };
+  return { name: 'GitHub Token', ok: r.ok, requiredForAutonomy: true, status: r.status, error: r.ok ? null : 'Invalid token' };
+}
+
+async function checkGoogleAiStudio() {
+  const keys = (process.env.GOOGLE_API_KEYS || process.env.GOOGLE_API_KEY || '')
+    .split(',')
+    .map(k => k.trim())
+    .filter(Boolean);
+  if (!keys.length) {
+    return { name: 'Google AI Studio Keys', ok: false, requiredForAutonomy: true, error: 'Not set (GOOGLE_API_KEY or GOOGLE_API_KEYS)' };
+  }
+  const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(keys[0])}`;
+  const r = await fetchJson(url);
+  return {
+    name: 'Google AI Studio Keys',
+    ok: r.ok,
+    requiredForAutonomy: true,
+    status: r.status,
+    value: `${keys.length} key(s) configured`,
+    error: r.ok ? null : 'Invalid Google AI key or quota/API access problem',
+  };
 }
 
 async function checkGoogleSearch() {
   const key = process.env.AGENT_GOOGLE_API_KEY || process.env.GOOGLE_CUSTOM_SEARCH_API_KEY;
   const cx = process.env.AGENT_GOOGLE_CX || process.env.GOOGLE_CUSTOM_SEARCH_CX;
-  if (!key || !cx) return { name: 'Google Search (Agent)', ok: false, error: 'AGENT_GOOGLE_API_KEY + AGENT_GOOGLE_CX (or GOOGLE_CUSTOM_SEARCH_API_KEY + CX) not both set' };
+  if (!key || !cx) return { name: 'Google Search (Agent)', ok: false, requiredForAutonomy: true, error: 'AGENT_GOOGLE_API_KEY + AGENT_GOOGLE_CX (or GOOGLE_CUSTOM_SEARCH_API_KEY + CX) not both set' };
   const url = `https://www.googleapis.com/customsearch/v1?key=${encodeURIComponent(key)}&cx=${encodeURIComponent(cx)}&q=test&num=1`;
   const r = await fetchJson(url);
-  return { name: 'Google Search (Agent)', ok: r.ok, status: r.status, error: r.ok ? null : 'Invalid key/CX or quota exceeded' };
+  return { name: 'Google Search (Agent)', ok: r.ok, requiredForAutonomy: true, status: r.status, error: r.ok ? null : 'Invalid key/CX or quota exceeded' };
 }
 
 async function checkRailwayToken() {
@@ -103,8 +125,52 @@ async function checkAgentEnabled() {
   return {
     name: 'AGENT_ENABLED',
     ok: enabled === '1',
+    requiredForAutonomy: true,
     value: enabled || 'not set',
     error: enabled === '1' ? null : 'Must be set to "1" for /api/agent/* routes',
+  };
+}
+
+async function checkAgentShellCwd() {
+  const raw = process.env.AGENT_SHELL_CWD;
+  const resolved = raw ? path.resolve(raw) : process.cwd();
+  const exists = fs.existsSync(resolved);
+  const hasPackage = exists && fs.existsSync(path.join(resolved, 'package.json'));
+  return {
+    name: 'AGENT_SHELL_CWD',
+    ok: !!raw && exists && hasPackage,
+    requiredForAutonomy: true,
+    value: raw ? resolved : 'not set',
+    error: !raw
+      ? 'Must be set explicitly to the repo root before AGENT_ENABLED=1'
+      : (!exists ? 'Path does not exist' : (!hasPackage ? 'Path does not look like the repo root' : null)),
+  };
+}
+
+async function checkMasterBranchProtection() {
+  const key = process.env.GITHUB_TOKEN || process.env.AGENT_GITHUB_TOKEN || process.env.GH_TOKEN;
+  const owner = process.env.GITHUB_REPO_OWNER || 'adrianenc11-hue';
+  const repo = process.env.GITHUB_REPO_NAME || 'kelionai-v2';
+  if (!key) {
+    return { name: 'Master Branch Protection', ok: false, requiredForAutonomy: true, error: 'Cannot verify without a GitHub token' };
+  }
+  const r = await fetchJson(`https://api.github.com/repos/${owner}/${repo}/branches/master/protection`, {
+    headers: {
+      'Authorization': `token ${key}`,
+      'Accept': 'application/vnd.github+json',
+      'User-Agent': 'KelionAgent',
+    },
+  });
+  const data = r.data || {};
+  const hasPrGate = !!data.required_pull_request_reviews || !!data.required_status_checks;
+  return {
+    name: 'Master Branch Protection',
+    ok: r.ok && hasPrGate,
+    requiredForAutonomy: true,
+    status: r.status,
+    error: r.ok
+      ? (hasPrGate ? null : 'Protection exists but PR/status gates are not enforced')
+      : 'master is not protected, token lacks permission, or repo/branch not found',
   };
 }
 
@@ -113,6 +179,7 @@ async function checkDatabaseUrl() {
   return {
     name: 'DATABASE_URL (Postgres)',
     ok: !!url,
+    requiredForAutonomy: true,
     value: url ? 'set' : 'not set',
     note: url ? 'Using Postgres/Supabase' : 'Using local SQLite (data wipes on redeploy unless volume mounted)',
   };
@@ -124,6 +191,8 @@ async function checkSessionSecrets() {
   return {
     name: 'Secrets',
     ok: !!(sess && jwt),
+    requiredForAutonomy: true,
+    error: (sess && jwt) ? null : 'SESSION_SECRET and JWT_SECRET must both be set',
     session: sess ? 'set' : 'missing — random on restart',
     jwt: jwt ? 'set' : 'missing — random on restart',
   };
@@ -132,6 +201,7 @@ async function checkSessionSecrets() {
 async function runEnvAudit() {
   const results = await Promise.all([
     checkOpenRouter(),
+    checkGoogleAiStudio(),
     checkElevenLabs(),
     checkStripe(),
     checkStripeWebhook(),
@@ -140,11 +210,26 @@ async function runEnvAudit() {
     checkRailwayToken(),
     checkSentry(),
     checkAgentEnabled(),
+    checkAgentShellCwd(),
+    checkMasterBranchProtection(),
     checkDatabaseUrl(),
     checkSessionSecrets(),
   ]);
   const fail = results.filter(r => !r.ok).length;
-  return { results, allOk: fail === 0, fail, total: results.length };
+  const autonomyRequired = results.filter(r => r.requiredForAutonomy);
+  const autonomyBlockers = autonomyRequired.filter(r => !r.ok);
+  return {
+    results,
+    allOk: fail === 0,
+    fail,
+    total: results.length,
+    autonomy: {
+      ready: autonomyBlockers.length === 0,
+      fail: autonomyBlockers.length,
+      total: autonomyRequired.length,
+      blockers: autonomyBlockers.map(r => ({ name: r.name, error: r.error || r.note || 'not ready' })),
+    },
+  };
 }
 
 module.exports = { runEnvAudit };

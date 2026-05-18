@@ -1899,7 +1899,7 @@ router.post('/pipeline', async (req, res) => {
       console.log('[resourceGov] All resources OFF (simple chat)');
     }
 
-    const { smartFetch } = require('../services/modelRouter');
+    const { smartFetch, getModel } = require('../services/modelRouter');
     const body = {
       messages,
       temperature: 0.6,
@@ -1908,8 +1908,16 @@ router.post('/pipeline', async (req, res) => {
     };
 
     let result;
+    let fallbackTriggered = false;
+    const preferredModel = getModel('chat');
+    const markFallback = (selectedModel) => {
+      if (selectedModel && selectedModel !== preferredModel) {
+        fallbackTriggered = true;
+      }
+    };
     try {
-      const { response } = await smartFetch('chat', body);
+      const { response, model } = await smartFetch('chat', body);
+      markFallback(model);
       result = await response.json();
     } catch (err) {
       throw new Error(`Realtime AI pipeline failed: ${err.message}`);
@@ -1968,7 +1976,8 @@ router.post('/pipeline', async (req, res) => {
       // Re-call smartFetch with tool results
       body.messages = messages;
       try {
-        const { response: nextRes } = await smartFetch('chat', body);
+        const { response: nextRes, model } = await smartFetch('chat', body);
+        markFallback(model);
         result = await nextRes.json();
       } catch (err) {
         console.error('[pipeline] Error in tool loop smartFetch:', err.message);
@@ -1981,7 +1990,7 @@ router.post('/pipeline', async (req, res) => {
     // Extract final text — only return .content (ignore any reasoning_content from CoT models)
     let assistantText = (finalMessage?.content || '').trim();
     if (fallbackTriggered) {
-      assistantText = "[SISTEM: Contul OpenRouter a rămas fără credit! Am trecut automat pe modelul de rezervă Gemini Free.]\n" + assistantText;
+      assistantText = "[SISTEM: Modelul principal nu a raspuns. Am trecut automat pe modelul de rezerva.]\n" + assistantText;
     }
     console.log('[pipeline] OpenRouter:', assistantText.slice(0, 100));
 

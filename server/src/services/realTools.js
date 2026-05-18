@@ -3122,9 +3122,26 @@ async function toolDiffEdit(args) {
 
 // GitHub REST API helper — uses GH_TOKEN env var, no gh CLI needed.
 const GITHUB_REPO = 'adrianenc11-hue/kelionai-v2';
+const PROTECTED_PR_BRANCHES = new Set(['master', 'main']);
+
+function _githubToken() {
+  return process.env.GITHUB_TOKEN || process.env.AGENT_GITHUB_TOKEN || process.env.GH_TOKEN;
+}
+
+function _isSafePrBranch(branch) {
+  const name = String(branch || '').trim();
+  return !!name
+    && !PROTECTED_PR_BRANCHES.has(name)
+    && !name.startsWith('-')
+    && !name.includes('..')
+    && !name.includes('@{')
+    && !name.endsWith('.lock')
+    && /^[A-Za-z0-9._/-]+$/.test(name);
+}
+
 async function _ghApi(path, method = 'GET', body = null) {
-  const token = process.env.GH_TOKEN;
-  if (!token) throw new Error('GH_TOKEN env var not set');
+  const token = _githubToken();
+  if (!token) throw new Error('GITHUB_TOKEN, AGENT_GITHUB_TOKEN, or GH_TOKEN env var not set');
   const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}${path}`, {
     method,
     headers: {
@@ -3143,8 +3160,12 @@ async function _ghApi(path, method = 'GET', body = null) {
 async function toolCreateGithubPr(args) {
   try {
     const title = String(args?.title || 'Automated Kelion PR');
-    const branch = String(args?.branch || 'feat/kelion-auto-' + Date.now());
+    const branch = String(args?.branch || 'feat/kelion-auto-' + Date.now()).trim();
     const message = String(args?.message || 'feat: automated updates');
+
+    if (!_isSafePrBranch(branch)) {
+      return { ok: false, error: 'create_github_pr requires a non-master feature branch.' };
+    }
 
     let gitStatus = '';
     try {
@@ -3156,10 +3177,10 @@ async function toolCreateGithubPr(args) {
       return { ok: false, error: 'No changes to commit' };
     }
 
-    await _exec(`git checkout -b ${branch}`, { cwd: REPO_ROOT });
+    await _exec(`git checkout -b "${branch}"`, { cwd: REPO_ROOT });
     await _exec(`git add .`, { cwd: REPO_ROOT });
     await _exec(`git commit -m "${message.replace(/"/g, '\\"')}"`, { cwd: REPO_ROOT });
-    await _exec(`git push -u origin ${branch}`, { cwd: REPO_ROOT });
+    await _exec(`git push -u origin "${branch}"`, { cwd: REPO_ROOT });
 
     // Create PR via GitHub REST API — merge is always manual by the admin
     const pr = await _ghApi('/pulls', 'POST', {

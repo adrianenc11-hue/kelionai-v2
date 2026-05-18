@@ -2,9 +2,9 @@
 
 const { exec } = require('child_process');
 const { promisify } = require('util');
+const fs = require('fs');
 const execAsync = promisify(exec);
 
-const ALLOWED_CWD = process.env.AGENT_SHELL_CWD || process.cwd();
 const BLOCKED_COMMANDS = [
   'rm -rf /',
   'rm -rf /*',
@@ -14,10 +14,25 @@ const BLOCKED_COMMANDS = [
   'fdisk',
   'format',
 ];
+const PROTECTED_BRANCH_PUSH = /\bgit\s+push\b[^\r\n;|&]*(\bmaster\b|\bmain\b|refs\/heads\/master|refs\/heads\/main|\bHEAD\b)/i;
+
+function getAllowedCwd() {
+  const cwd = process.env.AGENT_SHELL_CWD || process.cwd();
+  if (process.env.AGENT_ENABLED === '1' && !process.env.AGENT_SHELL_CWD) {
+    return {
+      ok: false,
+      error: 'AGENT_SHELL_CWD must be set explicitly when AGENT_ENABLED=1.',
+    };
+  }
+  if (!fs.existsSync(cwd)) {
+    return { ok: false, error: `AGENT_SHELL_CWD does not exist: ${cwd}` };
+  }
+  return { ok: true, cwd };
+}
 
 function isBlocked(cmd) {
   const c = cmd.toLowerCase().trim();
-  return BLOCKED_COMMANDS.some(b => c.includes(b.toLowerCase()));
+  return BLOCKED_COMMANDS.some(b => c.includes(b.toLowerCase())) || PROTECTED_BRANCH_PUSH.test(cmd);
 }
 
 async function execCommand(command, timeout = 30000) {
@@ -27,9 +42,13 @@ async function execCommand(command, timeout = 30000) {
   if (isBlocked(command)) {
     return { ok: false, error: 'Command blocked for safety.' };
   }
+  const cwdInfo = getAllowedCwd();
+  if (!cwdInfo.ok) {
+    return { ok: false, error: cwdInfo.error };
+  }
   try {
     const { stdout, stderr } = await execAsync(command, {
-      cwd: ALLOWED_CWD,
+      cwd: cwdInfo.cwd,
       timeout,
       maxBuffer: 5 * 1024 * 1024,
       shell: process.platform === 'win32' ? 'powershell.exe' : '/bin/bash',
@@ -46,4 +65,4 @@ async function execCommand(command, timeout = 30000) {
   }
 }
 
-module.exports = { execCommand };
+module.exports = { execCommand, isBlocked, getAllowedCwd };
