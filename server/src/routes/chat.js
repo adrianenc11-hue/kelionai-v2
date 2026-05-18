@@ -328,6 +328,23 @@ router.post('/', async (req, res) => {
 
       if (choice?.message?.tool_calls) {
         console.log(`[chat] Returning ${choice.message.tool_calls.length} tools to client for execution...`);
+        
+        // Save the assistant's tool calls to session history so the next request is valid.
+        const parts = [];
+        if (choice.message.content) {
+          parts.push({ text: choice.message.content });
+        }
+        choice.message.tool_calls.forEach(tc => {
+          parts.push({
+            functionCall: {
+              id: tc.id,
+              name: tc.function?.name || 'unknown',
+              args: tc.function?.arguments || '{}'
+            }
+          });
+        });
+        session.history.push({ role: 'assistant', parts });
+
         return res.json({
           reply: '',
           toolCalls: choice.message.tool_calls.map(tc => {
