@@ -36,6 +36,8 @@ jobs:
           # logout-media) were removed from the product surface in
           # Stage 1 and their acceptance scripts were dropped with
           # them — see DELIVERY_CONTRACT.md § "Out of scope".
+          - voice-claude-sync
+          - chat-roundtrip
           - voice-roundtrip
     steps:
       - name: Checkout
