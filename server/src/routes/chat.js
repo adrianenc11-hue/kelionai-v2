@@ -18,6 +18,7 @@ const router = Router();
 const sessions = new Map();
 const MAX_HISTORY = 20;
 const SESSION_TTL = 30 * 60 * 1000; // 30 min
+const CHAT_AI_TIMEOUT_MS = Number(process.env.CHAT_AI_TIMEOUT_MS) || 25_000;
 
 // Cleanup old sessions every 5 min
 setInterval(() => {
@@ -26,6 +27,18 @@ setInterval(() => {
     if (s.lastUsed < cutoff) sessions.delete(id);
   }
 }, 5 * 60 * 1000).unref();
+
+function withTimeout(promise, ms, label) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      const err = new Error(`${label} timed out after ${ms}ms`);
+      err.code = 'CHAT_AI_TIMEOUT';
+      reject(err);
+    }, ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
 
 router.post('/', async (req, res) => {
   const t0 = Date.now();
@@ -42,7 +55,7 @@ router.post('/', async (req, res) => {
     if (!hasAiProvider()) {
       return res.status(503).json({
         code: 'AI_PROVIDER_NOT_CONFIGURED',
-        error: 'AI provider is not configured. Set OPENROUTER_API_KEY or GOOGLE_API_KEY / GOOGLE_API_KEYS in Railway.',
+        error: 'AI provider is not configured. Set OPENROUTER_API_KEY in Railway.',
       });
     }
 
@@ -296,9 +309,13 @@ router.post('/', async (req, res) => {
           }]
         };
       } else {
-        const fetchRes = useTandem
-          ? await runTandem(taskType, body)
-          : await smartFetch(taskType, body, isHeavy, Boolean(fastMode) && isFastAllowed());
+        const fetchRes = await withTimeout(
+          useTandem
+            ? runTandem(taskType, body)
+            : smartFetch(taskType, body, isHeavy, Boolean(fastMode) && isFastAllowed()),
+          CHAT_AI_TIMEOUT_MS,
+          'chat model request'
+        );
         activeModel = fetchRes.model;
         step(`smartFetch ok model=${activeModel}`);
         result = await fetchRes.response.json();
@@ -395,7 +412,15 @@ router.post('/', async (req, res) => {
       return res.json({ reply, model: activeModel });
     } catch (err) {
       console.error(`[chat] AI generation failed at step=${currentStep}:`, err && err.stack || err && err.message || err);
+      if (err && err.code === 'CHAT_AI_TIMEOUT') {
+        return res.status(504).json({
+          code: 'CHAT_AI_TIMEOUT',
+          error: 'AI request timed out before the public edge limit. Please try again.',
+          ...(isAdmin ? { detail: String(err.message || err), step: currentStep } : {})
+        });
+      }
       return res.status(502).json({
+        code: 'AI_UPSTREAM_FAILED',
         error: 'AI is temporarily unavailable. Please try again.',
         ...(isAdmin ? { detail: String(err && err.message || err), step: currentStep } : {})
       });

@@ -438,6 +438,7 @@ app.get('/health', async (_req, res) => {
       database: startupHealth.database,
       ai: 'unknown',
       ai_provider: 'none',
+      openrouter: 'unknown',
       google: 'unknown',
       elevenlabs: 'unknown',
     },
@@ -452,11 +453,13 @@ app.get('/health', async (_req, res) => {
     health.services.runtime_secrets = 'ephemeral';
   }
 
-  // AI providers — Claude Opus only
-  const hasGoogleAI = !!process.env.GOOGLE_API_KEY;
-  health.services.google = hasGoogleAI ? 'configured' : 'not configured';
-  health.services.ai = hasGoogleAI ? 'configured' : 'not configured';
-  health.services.ai_provider = hasGoogleAI ? 'google' : 'none';
+  // AI brain provider — Claude/OpenRouter only. Google/Gemini must not make
+  // chat look healthy.
+  const hasOpenRouterAI = !!process.env.OPENROUTER_API_KEY;
+  health.services.openrouter = hasOpenRouterAI ? 'configured' : 'not configured';
+  health.services.google = 'disabled_for_chat';
+  health.services.ai = hasOpenRouterAI ? 'configured' : 'not configured';
+  health.services.ai_provider = hasOpenRouterAI ? 'openrouter' : 'none';
 
   // ElevenLabs (cloned voice TTS)
   health.services.elevenlabs = process.env.ELEVENLABS_API_KEY ? 'configured' : 'not configured';
