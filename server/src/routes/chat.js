@@ -38,9 +38,12 @@ router.post('/', async (req, res) => {
   let isAdmin = false;
   try {
     step('start');
-    const orKey = process.env.OPENROUTER_API_KEY;
-    if (!orKey) {
-      return res.status(503).json({ error: 'OPENROUTER_API_KEY not configured' });
+    const { hasAiProvider } = require('../services/modelRouter');
+    if (!hasAiProvider()) {
+      return res.status(503).json({
+        code: 'AI_PROVIDER_NOT_CONFIGURED',
+        error: 'AI provider is not configured. Set OPENROUTER_API_KEY or GOOGLE_API_KEY / GOOGLE_API_KEYS in Railway.',
+      });
     }
 
     // Auth / trial gating (same logic as realtime)
