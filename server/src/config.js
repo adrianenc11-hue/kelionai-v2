@@ -24,15 +24,22 @@ const optional = (name, fallback = '') => process.env[name] || fallback;
 const isProd = (process.env.NODE_ENV || 'development') === 'production';
 const isTest = process.env.NODE_ENV === 'test';
 
+const generatedSecretNames = [];
+
 const secret = (name) => {
   const value = process.env[name];
-  if (!value && isProd) throw new Error(`Missing required secret in production: ${name}`);
-  if (!value && !isTest) {
-    const generated = require('crypto').randomBytes(48).toString('hex');
-    console.warn(`[config] ${name} not set — generated a random ephemeral value (will change on restart)`);
-    return generated;
+  if (value) return value;
+  if (isTest) return 'test-only-secret';
+
+  const generated = require('crypto').randomBytes(48).toString('hex');
+  generatedSecretNames.push(name);
+
+  if (isProd) {
+    console.warn(`[config] ${name} not set - generated an ephemeral production fallback. Set ${name} in Railway to keep sessions stable across restarts.`);
+  } else {
+    console.warn(`[config] ${name} not set - generated a random ephemeral value (will change on restart)`);
   }
-  return value || 'test-only-secret';
+  return generated;
 };
 
 module.exports = {
@@ -64,6 +71,10 @@ module.exports = {
   jwt: {
     secret: secret('JWT_SECRET'),
     expiresIn: optional('JWT_EXPIRES_IN', '7d'),
+  },
+
+  runtime: {
+    generatedSecrets: generatedSecretNames,
   },
 
   appBaseUrl: optional('APP_BASE_URL',

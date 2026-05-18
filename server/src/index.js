@@ -69,10 +69,16 @@ app.disable('x-powered-by');
 // surface them without importing this module back.
 app.locals.processHandlerStats = processHandlerStats;
 
+const startupHealth = {
+  database: 'initializing',
+  databaseError: null,
+};
+
 // Initialize database, then seed admin if ADMIN_BOOTSTRAP_PASSWORD is set.
 // Seeding is idempotent — running every boot lets Adrian rotate the admin
 // password by just changing the Railway env var and redeploying.
 initDb().then(async () => {
+  startupHealth.database = 'connected';
   console.log('[kelion-startup] Database initialized');
   // Initialize Agent Mode tasks table if Agent Mode is enabled.
   if (process.env.AGENT_ENABLED === '1') {
@@ -106,6 +112,8 @@ initDb().then(async () => {
     console.warn('[kelion-startup] admin credit auto-heal failed:', err && err.message);
   }
 }).catch(err => {
+  startupHealth.database = 'error';
+  startupHealth.databaseError = err && err.message ? err.message : 'Database initialization failed';
   console.error('[kelion-startup] Database initialization failed:', err.message);
 });
 
@@ -427,7 +435,7 @@ app.get('/health', async (_req, res) => {
     ts: new Date().toISOString(),
     deploy_sha: deploySha,
     services: {
-      database: 'unknown',
+      database: startupHealth.database,
       ai: 'unknown',
       ai_provider: 'none',
       google: 'unknown',
@@ -435,18 +443,13 @@ app.get('/health', async (_req, res) => {
     },
   };
 
-  // Check database
-  try {
-    const { getDb } = require('./db');
-    const db = getDb();
-    if (db) {
-      await db.get('SELECT 1');
-      health.services.database = 'connected';
-    } else {
-      health.services.database = 'disconnected';
-    }
-  } catch {
-    health.services.database = 'error';
+  // Railway uses this endpoint as a liveness check. Keep it process-local
+  // so a slow database or external provider cannot fail an otherwise live app.
+  if (startupHealth.databaseError) {
+    health.services.database_error = startupHealth.databaseError;
+  }
+  if (config.runtime && config.runtime.generatedSecrets && config.runtime.generatedSecrets.length) {
+    health.services.runtime_secrets = 'ephemeral';
   }
 
   // AI providers — Claude Opus only
