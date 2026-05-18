@@ -76,7 +76,7 @@ const GOOGLE_KEYS = (process.env.GOOGLE_API_KEYS || process.env.GOOGLE_API_KEY |
   .map(k => k.trim())
   .filter(Boolean);
 if (GOOGLE_KEYS.length === 0) {
-  console.warn('[modelRouter] No GOOGLE_API_KEY or GOOGLE_API_KEYS set. Gemini calls will fail.');
+  console.log('[modelRouter] No GOOGLE_API_KEY or GOOGLE_API_KEYS set. Gemini calls are disabled.');
 }
 let _currentKeyIndex = 0;
 
@@ -586,7 +586,7 @@ async function verifyModelCompatibility(modelId, apiKey, fetchImpl) {
 async function checkLatestModels() {
   const orKey = process.env.OPENROUTER_API_KEY;
   if (!orKey) {
-    console.warn('[modelRouter] No OPENROUTER_API_KEY — skipping model update check.');
+    console.log('[modelRouter] No OPENROUTER_API_KEY - skipping model update check.');
     return null;
   }
 

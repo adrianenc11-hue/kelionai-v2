@@ -149,7 +149,7 @@ async function healAdminCredits() {
     if (!user) {
       const r = { healed: false, reason: 'admin user missing', email, floor };
       lastCreditHealResult = { ranAt: new Date().toISOString(), result: r };
-      console.warn(`[adminBootstrap] credit heal skipped — admin user not found (${email})`);
+      console.log(`[adminBootstrap] credit heal skipped - admin user not found (${email})`);
       return r;
     }
     const current = await getCreditsBalance(user.id);

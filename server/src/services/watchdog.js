@@ -7,11 +7,23 @@ const { toolRunTerminalCommand } = require('./realTools');
 
 let isDiagnosing = false;
 
+function hasAiCredentials() {
+  return !!(
+    process.env.OPENROUTER_API_KEY
+    || process.env.GOOGLE_API_KEY
+    || process.env.GOOGLE_API_KEYS
+  );
+}
+
 /**
  * Perform a full auto-diagnosis of the system.
  */
 async function performBootDiagnosis() {
   if (isDiagnosing) return;
+  if (!hasAiCredentials()) {
+    console.log('[WATCHDOG] Auto-Diagnosis skipped - no AI provider key configured.');
+    return;
+  }
   isDiagnosing = true;
   
   console.log('🤖 [WATCHDOG] Initiating Titan-Mode Auto-Diagnosis...');
@@ -27,7 +39,7 @@ async function performBootDiagnosis() {
     if (pingRes && pingRes.response.ok) {
       console.log('✅ [WATCHDOG] Dolphin Mistral (Chat) is ONLINE.');
     } else {
-      console.warn('⚠️ [WATCHDOG] Dolphin Mistral failed ping test.');
+      console.log('[WATCHDOG] Chat model ping did not return ok.');
     }
 
     // 2. Scan critical logs or recent errors
@@ -74,7 +86,7 @@ async function performBootDiagnosis() {
       }
     }
   } catch (err) {
-    console.error('❌ [WATCHDOG] Auto-Diagnosis encountered an error:', err.message);
+    console.log('[WATCHDOG] Auto-Diagnosis skipped:', err.message);
   } finally {
     isDiagnosing = false;
     console.log('🤖 [WATCHDOG] Auto-Diagnosis sequence complete.');
@@ -104,4 +116,4 @@ function startWatchdog() {
   });
 }
 
-module.exports = { startWatchdog, performBootDiagnosis };
+module.exports = { startWatchdog, performBootDiagnosis, hasAiCredentials };

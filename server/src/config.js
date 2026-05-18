@@ -35,9 +35,9 @@ const secret = (name) => {
   generatedSecretNames.push(name);
 
   if (isProd) {
-    console.warn(`[config] ${name} not set - generated an ephemeral production fallback. Set ${name} in Railway to keep sessions stable across restarts.`);
+    console.log(`[config] ${name} not set - generated an ephemeral production fallback. Set ${name} in Railway to keep sessions stable across restarts.`);
   } else {
-    console.warn(`[config] ${name} not set - generated a random ephemeral value (will change on restart)`);
+    console.log(`[config] ${name} not set - generated a random ephemeral value (will change on restart)`);
   }
   return generated;
 };

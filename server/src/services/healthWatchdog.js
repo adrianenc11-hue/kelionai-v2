@@ -60,7 +60,7 @@ function raiseAlert(id, severity, message) {
   if (severity === 'critical') {
     console.error(`${prefix} ${id}: ${message}`);
   } else if (severity === 'warning') {
-    console.warn(`${prefix} ${id}: ${message}`);
+    console.log(`${prefix} ${id}: ${message}`);
   } else {
     console.log(`${prefix} ${id}: ${message}`);
   }
@@ -271,7 +271,7 @@ async function checkModelUpdates() {
       resolveAlert('model_compat_fail');
     }
   } catch (err) {
-    console.warn('[Health-Watchdog] Model update check failed:', err?.message);
+    console.log('[Health-Watchdog] Model update check skipped:', err?.message);
   }
 }
 

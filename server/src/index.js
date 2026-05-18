@@ -123,8 +123,8 @@ if (config.isProduction) {
   const missing = requiredKeys.filter(key => !process.env[key]);
   
   if (missing.length > 0) {
-    console.warn(`[kelion-startup] WARNING: Missing required API keys: ${missing.join(', ')}`);
-    console.warn('[kelion-startup] AI features will not work without these keys');
+    console.log(`[kelion-startup] NOTICE: Missing API keys: ${missing.join(', ')}`);
+    console.log('[kelion-startup] AI features stay disabled until these keys are configured');
   }
 }
 
