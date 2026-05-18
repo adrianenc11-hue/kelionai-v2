@@ -45,7 +45,7 @@ describe('buildKelionPersona — minimal prompt with full tool catalog', () => {
     const prompt = buildKelionPersona({});
 
     it('enforces action-first', () => {
-      expect(prompt).toMatch(/Action-first/i);
+      expect(prompt).toMatch(/answer or action/i);
     });
 
     it('forbids placeholders', () => {
@@ -53,7 +53,7 @@ describe('buildKelionPersona — minimal prompt with full tool catalog', () => {
     });
 
     it('enforces response length', () => {
-      expect(prompt).toMatch(/<3 sentences/i);
+      expect(prompt).toMatch(/1-2 sentences/i);
     });
   });
 
