@@ -104,26 +104,22 @@ function composeMessage(memoryItem) {
 let _nextGenAlertSent = false;
 async function checkNextGenAvailability() {
   if (_nextGenAlertSent) return null;
-  const apiKey = process.env.GOOGLE_API_KEY;
-  if (!apiKey) return null;
   try {
-    const fetchImpl = typeof globalThis.fetch === 'function' ? globalThis.fetch : (await import('node-fetch')).default;
-    const res = await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
-    if (!res.ok) return null;
-    const data = await res.json();
-    const models = data.models || [];
-    // Checking for Gemini 4.0 or Claude 5 early access (hypothetical 2026/2027 edge)
-    const nextGen = models.find(m => 
-      (m.name.toLowerCase().includes('gemini-4') || m.name.toLowerCase().includes('claude-5')) && 
-      (m.supportedGenerationMethods || []).includes('bidiGenerateContent')
-    );
-    if (nextGen) {
+    // Delegate to modelRouter.checkLatestModels() — single source of truth.
+    // Adrian: "cauta nu tot adauga, verifica unicitatea softului in interior"
+    const { checkLatestModels } = require('./modelRouter');
+    const result = await checkLatestModels();
+    if (result && result.upgraded) {
       _nextGenAlertSent = true;
-      console.log('🚨 [PROACTIVE] NEXT-GEN MODEL DETECTED! 🚨', nextGen.name);
-      return { title: 'Kelion AI Update', body: `O nouă frontieră: ${nextGen.displayName || nextGen.name} este acum disponibil!`, reason: 'system_alert:next_gen' };
+      console.log(`[PROACTIVE] 🚀 Model auto-upgraded: ${result.from} → ${result.to}`);
+      return {
+        title: 'Kelion AI Update',
+        body: `Creierul a fost actualizat: ${result.to}. Performanță maximă activată.`,
+        reason: 'system_alert:model_upgrade',
+      };
     }
   } catch (err) {
-    // Ignore fetch errors
+    // Ignore — non-critical
   }
   return null;
 }

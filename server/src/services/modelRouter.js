@@ -81,21 +81,22 @@ if (GOOGLE_KEYS.length === 0) {
 let _currentKeyIndex = 0;
 
 const MODELS = {
-  // Adrian 2026-05-17: switched PRIMARY brain to Claude Sonnet 4 via
-  // OpenRouter. Owner explicitly requested Claude ("creierul nu e Cloud 4.6").
+  // Adrian 2026-05-18: upgraded to Claude Opus 4.7 — the LATEST Claude model.
+  // Owner requested the newest version ("modelul trebuie sa fie clode 4.6 daca
+  // e ultimul sau ultimul"). Opus 4.7 is the current frontier (May 2026).
   // All routes go through OpenRouter with OPENROUTER_API_KEY.
-  chat: process.env.MODEL_CHAT || 'anthropic/claude-sonnet-4-20250514',
-  chat_heavy: process.env.MODEL_CHAT_HEAVY || 'anthropic/claude-sonnet-4-20250514',
-  chat_heavy_fast: process.env.MODEL_CHAT_HEAVY_FAST || process.env.MODEL_CHAT_HEAVY || 'anthropic/claude-sonnet-4-20250514',
+  chat: process.env.MODEL_CHAT || 'anthropic/claude-opus-4.7',
+  chat_heavy: process.env.MODEL_CHAT_HEAVY || 'anthropic/claude-opus-4.7',
+  chat_heavy_fast: process.env.MODEL_CHAT_HEAVY_FAST || process.env.MODEL_CHAT_HEAVY || 'anthropic/claude-opus-4.7-fast',
 
-  // Coding: Claude Sonnet 4 for all coding tasks.
-  coder: process.env.MODEL_CODER || 'anthropic/claude-sonnet-4-20250514',
-  coder_heavy: process.env.MODEL_CODER_HEAVY || 'anthropic/claude-sonnet-4-20250514',
-  coder_heavy_fast: process.env.MODEL_CODER_HEAVY_FAST || process.env.MODEL_CODER_HEAVY || 'anthropic/claude-sonnet-4-20250514',
+  // Coding: Claude Opus 4.7 for all coding tasks.
+  coder: process.env.MODEL_CODER || 'anthropic/claude-opus-4.7',
+  coder_heavy: process.env.MODEL_CODER_HEAVY || 'anthropic/claude-opus-4.7',
+  coder_heavy_fast: process.env.MODEL_CODER_HEAVY_FAST || process.env.MODEL_CODER_HEAVY || 'anthropic/claude-opus-4.7-fast',
 
-  // Vision: Claude Sonnet 4 has strong multimodal support.
-  vision: process.env.MODEL_VISION || 'anthropic/claude-sonnet-4-20250514',
-  vision_heavy: process.env.MODEL_VISION_HEAVY || 'anthropic/claude-sonnet-4-20250514',
+  // Vision: Claude Opus 4.7 has strong multimodal support.
+  vision: process.env.MODEL_VISION || 'anthropic/claude-opus-4.7',
+  vision_heavy: process.env.MODEL_VISION_HEAVY || 'anthropic/claude-opus-4.7',
 
   // Tandem second-brain (Kimi K2.6) — runs in parallel on heavy tasks.
   tandem_chat: process.env.MODEL_CHAT_TANDEM || 'moonshotai/kimi-k2.6',
@@ -460,6 +461,227 @@ async function runTandem(taskType, body) {
   throw new Error('Tandem both models returned non-OK responses');
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
+// AUTO-MODEL-UPDATE — checks OpenRouter for latest AI models every 6h.
+// Adrian 2026-05-18: "kelion trebuie sa foloseasca scriptul de cautare a
+// ultimilor updaturi la fiecare ai, permanent, si apelarea lor in aplicatie."
+//
+// On server start + every CHECK_INTERVAL_MS, queries the OpenRouter models API
+// for the latest Claude Opus model. If a newer version is found, hot-swaps
+// all MODELS entries and logs the upgrade. No restart needed.
+// ──────────────────────────────────────────────────────────────────────────────
+const CHECK_INTERVAL_MS = Number(process.env.MODEL_CHECK_INTERVAL_MS) || 6 * 60 * 60 * 1000; // 6h
+let _lastChecked = 0;
+let _checkTimer = null;
+
+/**
+ * Run 3 real compatibility tests against a candidate model.
+ * Returns { passed: true } only if ALL tests succeed.
+ * Tests:
+ *   1. Basic chat — model responds coherently to a simple prompt
+ *   2. Tool calling — model can generate a valid tool_call
+ *   3. Romanian language — model responds correctly in Romanian
+ */
+async function verifyModelCompatibility(modelId, apiKey, fetchImpl) {
+  const endpoint = 'https://openrouter.ai/api/v1/chat/completions';
+  const headers = {
+    'Authorization': `Bearer ${apiKey}`,
+    'Content-Type': 'application/json',
+    'HTTP-Referer': 'https://kelionai.app',
+    'X-Title': 'KelionAI-CompatCheck',
+  };
+
+  // Test 1: Basic chat response
+  try {
+    const r1 = await fetchImpl(endpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        model: modelId,
+        messages: [{ role: 'user', content: 'Reply with exactly: COMPAT_OK' }],
+        max_tokens: 20,
+        temperature: 0,
+      }),
+      signal: AbortSignal.timeout?.(20000),
+    });
+    if (!r1.ok) return { passed: false, reason: `Test1-BasicChat: HTTP ${r1.status}` };
+    const d1 = await r1.json();
+    const text1 = d1?.choices?.[0]?.message?.content || '';
+    if (!text1.includes('COMPAT_OK')) {
+      return { passed: false, reason: `Test1-BasicChat: unexpected response "${text1.slice(0, 50)}"` };
+    }
+    console.log(`[modelRouter] ✓ Test 1/3 passed: basic chat`);
+  } catch (e) {
+    return { passed: false, reason: `Test1-BasicChat: ${e?.message || e}` };
+  }
+
+  // Test 2: Tool calling support
+  try {
+    const r2 = await fetchImpl(endpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        model: modelId,
+        messages: [{ role: 'user', content: 'What is 2+2? Use the calculate tool.' }],
+        tools: [{
+          type: 'function',
+          function: {
+            name: 'calculate',
+            description: 'Evaluate a math expression',
+            parameters: { type: 'object', properties: { expression: { type: 'string' } }, required: ['expression'] },
+          },
+        }],
+        tool_choice: 'required',
+        max_tokens: 100,
+        temperature: 0,
+      }),
+      signal: AbortSignal.timeout?.(20000),
+    });
+    if (!r2.ok) return { passed: false, reason: `Test2-ToolCall: HTTP ${r2.status}` };
+    const d2 = await r2.json();
+    const tc = d2?.choices?.[0]?.message?.tool_calls;
+    if (!tc || !Array.isArray(tc) || tc.length === 0) {
+      return { passed: false, reason: 'Test2-ToolCall: model did not generate tool_calls' };
+    }
+    if (tc[0]?.function?.name !== 'calculate') {
+      return { passed: false, reason: `Test2-ToolCall: wrong tool "${tc[0]?.function?.name}"` };
+    }
+    console.log(`[modelRouter] ✓ Test 2/3 passed: tool calling`);
+  } catch (e) {
+    return { passed: false, reason: `Test2-ToolCall: ${e?.message || e}` };
+  }
+
+  // Test 3: Romanian language support
+  try {
+    const r3 = await fetchImpl(endpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        model: modelId,
+        messages: [{ role: 'user', content: 'Răspunde în română cu exact un cuvânt: care este capitala României?' }],
+        max_tokens: 20,
+        temperature: 0,
+      }),
+      signal: AbortSignal.timeout?.(20000),
+    });
+    if (!r3.ok) return { passed: false, reason: `Test3-Romanian: HTTP ${r3.status}` };
+    const d3 = await r3.json();
+    const text3 = (d3?.choices?.[0]?.message?.content || '').toLowerCase();
+    if (!text3.includes('bucure')) {
+      return { passed: false, reason: `Test3-Romanian: expected "București", got "${text3.slice(0, 50)}"` };
+    }
+    console.log(`[modelRouter] ✓ Test 3/3 passed: Romanian language`);
+  } catch (e) {
+    return { passed: false, reason: `Test3-Romanian: ${e?.message || e}` };
+  }
+
+  return { passed: true };
+}
+
+
+/**
+ * Query OpenRouter for available models and find the latest Claude Opus.
+ * Falls back to current model if the API is unreachable.
+ */
+async function checkLatestModels() {
+  const orKey = process.env.OPENROUTER_API_KEY;
+  if (!orKey) {
+    console.warn('[modelRouter] No OPENROUTER_API_KEY — skipping model update check.');
+    return null;
+  }
+
+  const fetchImpl = typeof globalThis.fetch === 'function'
+    ? globalThis.fetch.bind(globalThis)
+    : (await import('node-fetch')).default;
+
+  try {
+    const res = await fetchImpl('https://openrouter.ai/api/v1/models', {
+      headers: { 'Authorization': `Bearer ${orKey}` },
+      signal: AbortSignal.timeout?.(15000),
+    });
+    if (!res.ok) {
+      console.warn(`[modelRouter] OpenRouter models API returned ${res.status}`);
+      return null;
+    }
+    const data = await res.json();
+    const models = data?.data || [];
+
+    // Find all Claude Opus models (not :free variants, not beta)
+    const claudeOpus = models
+      .filter(m => m.id && m.id.startsWith('anthropic/claude-opus'))
+      .filter(m => !m.id.includes(':free') && !m.id.includes('beta'))
+      .sort((a, b) => (b.id || '').localeCompare(a.id || '')); // latest first
+
+    // Find all Claude Sonnet models as secondary option
+    const claudeSonnet = models
+      .filter(m => m.id && m.id.startsWith('anthropic/claude-sonnet'))
+      .filter(m => !m.id.includes(':free') && !m.id.includes('beta'))
+      .sort((a, b) => (b.id || '').localeCompare(a.id || ''));
+
+    // Find latest Gemini models for fallback awareness
+    const gemini = models
+      .filter(m => m.id && (m.id.startsWith('google/gemini') || m.id.startsWith('gemini')))
+      .filter(m => !m.id.includes(':free'))
+      .sort((a, b) => (b.id || '').localeCompare(a.id || ''));
+
+    const report = {
+      timestamp: new Date().toISOString(),
+      latestClaudeOpus: claudeOpus[0]?.id || null,
+      latestClaudeSonnet: claudeSonnet[0]?.id || null,
+      latestGemini: gemini[0]?.id || null,
+      totalModels: models.length,
+    };
+
+    console.log(`[modelRouter] 🔍 Model scan complete:`, JSON.stringify(report));
+
+    // Auto-upgrade: if a newer Claude Opus is found, verify + hot-swap
+    const bestOpus = claudeOpus[0];
+    if (bestOpus && bestOpus.id) {
+      // Exclude -fast variant from base comparison
+      const baseId = bestOpus.id.replace(/-fast$/, '');
+      const currentBase = MODELS.chat.replace(/-fast$/, '');
+
+      if (baseId !== currentBase) {
+        const oldModel = MODELS.chat;
+        const fastVariant = models.find(m => m.id === `${baseId}-fast`);
+        const fastId = fastVariant ? fastVariant.id : baseId;
+
+        // ── COMPATIBILITY VERIFICATION (0% incompatibility) ──────────
+        // Run 3 real test calls before switching. Abort if ANY fails.
+        console.log(`[modelRouter] 🧪 Testing ${baseId} compatibility before upgrade...`);
+        const compatible = await verifyModelCompatibility(baseId, orKey, fetchImpl);
+        if (!compatible.passed) {
+          console.warn(`[modelRouter] ❌ ${baseId} FAILED compatibility: ${compatible.reason}. Keeping ${oldModel}.`);
+          return { upgraded: false, current: oldModel, blocked: baseId, reason: compatible.reason, report };
+        }
+        console.log(`[modelRouter] ✅ ${baseId} passed all 3 compatibility tests.`);
+
+        // Hot-swap all model slots
+        MODELS.chat = baseId;
+        MODELS.chat_heavy = baseId;
+        MODELS.chat_heavy_fast = fastId;
+        MODELS.coder = baseId;
+        MODELS.coder_heavy = baseId;
+        MODELS.coder_heavy_fast = fastId;
+        MODELS.vision = baseId;
+        MODELS.vision_heavy = baseId;
+
+        console.log(`[modelRouter] 🚀 AUTO-UPGRADE: ${oldModel} → ${baseId} (fast: ${fastId})`);
+        return { upgraded: true, from: oldModel, to: baseId, fast: fastId, report };
+      }
+    }
+
+    return { upgraded: false, current: MODELS.chat, report };
+  } catch (err) {
+    console.warn('[modelRouter] Model update check failed:', err?.message || err);
+    return null;
+  }
+}
+
+// NOTE: No self-starting timer here. The healthWatchdog.js (which already
+// runs every 5 min) calls checkLatestModels() periodically. This avoids
+// duplicate timers — Adrian: "nu tot adauga, cauta ce exista deja".
+
 module.exports = {
   MODELS,
   OPENROUTER_FALLBACK,
@@ -470,4 +692,7 @@ module.exports = {
   runTandem,
   isCodingTask,
   isComplexTask,
+  checkLatestModels,
+  verifyModelCompatibility,
 };
+

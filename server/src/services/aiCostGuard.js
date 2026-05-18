@@ -28,14 +28,18 @@ function _resetIfNewDay() {
  */
 function recordCost(model, usage = {}) {
   _resetIfNewDay();
-  // Approximate $/1M tokens (OpenRouter pricing May 2026)
+  // Adrian 2026-05-18: synced with modelRouter.js — primary brain is Claude Opus 4.7.
   const rates = {
     'anthropic/claude-opus-4.7': { input: 5.0, output: 25.0 },
     'anthropic/claude-opus-4.7-fast': { input: 30.0, output: 150.0 },
+    'anthropic/claude-sonnet-4-20250514': { input: 3.0, output: 15.0 },
+    'anthropic/claude-3-5-sonnet-20241022': { input: 3.0, output: 15.0 },
     'moonshotai/kimi-k2.6': { input: 0.73, output: 3.49 },
-    'gemini-2.5-pro': { input: 0, output: 0 },   // Google AI Studio free tier
+    'meta-llama/llama-3.3-70b-instruct': { input: 0.2, output: 0.2 },
+    'gemini-2.5-pro': { input: 0, output: 0 },
     'gemini-2.5-flash': { input: 0, output: 0 },
     'gemini-2.0-flash': { input: 0, output: 0 },
+    'google/gemini-2.0-flash-001': { input: 0, output: 0 },
   };
   const rate = rates[model] || { input: 1.0, output: 3.0 };
   const cost = ((usage.prompt_tokens || 0) * rate.input + (usage.completion_tokens || 0) * rate.output) / 1_000_000;
