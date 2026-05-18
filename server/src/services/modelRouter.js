@@ -80,6 +80,18 @@ if (GOOGLE_KEYS.length === 0) {
 }
 let _currentKeyIndex = 0;
 
+function hasOpenRouterProvider() {
+  return !!process.env.OPENROUTER_API_KEY;
+}
+
+function hasGoogleProvider() {
+  return GOOGLE_KEYS.length > 0;
+}
+
+function hasAiProvider() {
+  return hasOpenRouterProvider() || hasGoogleProvider();
+}
+
 const MODELS = {
   // Adrian 2026-05-18: upgraded to Claude Opus 4.7 — the LATEST Claude model.
   // Owner requested the newest version ("modelul trebuie sa fie clode 4.6 daca
@@ -293,6 +305,8 @@ async function smartFetch(taskType, body, useHeavy = false, fastMode = false) {
         console.warn(`[modelRouter] ${model} key ${keyIdx + 1} error: ${err.message}`);
       }
     }
+  } else if (endpoint.provider === 'openrouter' && !hasOpenRouterProvider()) {
+    console.log(`[modelRouter] Skipping ${model} via OpenRouter - OPENROUTER_API_KEY is not configured.`);
   } else {
     try {
       const response = await makePrimaryCall();
@@ -689,6 +703,9 @@ module.exports = {
   getEndpoint,
   getFallbackChain,
   smartFetch,
+  hasAiProvider,
+  hasGoogleProvider,
+  hasOpenRouterProvider,
   runTandem,
   isCodingTask,
   isComplexTask,

@@ -1849,9 +1849,18 @@ export function useKelionVoice({ audioRef, coords = null, onBalanceUpdate = null
               }),
             })
             if (!r.ok) {
-              const err = await r.json().catch(() => ({ error: 'Chat failed' }))
-              _setTaskStatus({ tool: 'api-chat', progress: 100, label: `❌ Server: ${err.error || r.status}`, phase: 'error' });
-              finalReply = err.error || 'Sorry, something went wrong.';
+              const rawError = await r.text().catch(() => '');
+              let err = {};
+              try {
+                err = rawError ? JSON.parse(rawError) : {};
+              } catch {
+                err = {};
+              }
+              const serverError = err.code === 'AI_PROVIDER_NOT_CONFIGURED'
+                ? 'Nu exista niciun provider AI configurat pe server. Seteaza OPENROUTER_API_KEY sau GOOGLE_API_KEY / GOOGLE_API_KEYS in Railway pentru kelionai.app.'
+                : (err.error || (rawError ? `Server ${r.status}: ${rawError.slice(0, 180)}` : `Server ${r.status}`));
+              _setTaskStatus({ tool: 'api-chat', progress: 100, label: `❌ Server: ${serverError}`, phase: 'error' });
+              finalReply = serverError;
               break;
             }
             data = await r.json()
