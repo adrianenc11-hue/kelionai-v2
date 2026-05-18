@@ -4,6 +4,21 @@ import { useState, useEffect, useCallback } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { KpiCard, KpiSkeleton, SparkChart, Skeleton, useToast } from './AdminComponents'
 
+function providerName(card) {
+  if (!card) return 'Provider necunoscut'
+  const known = {
+    openrouter: 'OpenRouter',
+    elevenlabs: 'ElevenLabs',
+    stripe: 'Stripe',
+    railway: 'Railway',
+    google: 'Google AI Studio',
+    googleai: 'Google AI Studio',
+    supabase: 'Supabase',
+  }
+  const id = String(card.id || card.provider || '').toLowerCase()
+  return card.providerLabel || card.name || known[id] || card.provider || card.id || 'Provider necunoscut'
+}
+
 export default function DashboardPage() {
   const { getCsrfToken } = useOutletContext()
   const toast = useToast()
@@ -180,7 +195,7 @@ export default function DashboardPage() {
         {loading ? <Skeleton height={60} count={3} /> : (
           credits?.cards && credits.cards.length > 0 ? (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 10 }}>
-              {credits.cards.map((card, i) => {
+              {credits.cards.map((card) => {
                 const statusMap = {
                   ok: { dot: 'online', badge: 'green', text: 'Operațional' },
                   low: { dot: 'warning', badge: 'amber', text: 'Credit scăzut' },
@@ -189,7 +204,7 @@ export default function DashboardPage() {
                 }
                 const st = statusMap[card.status] || statusMap.unconfigured
                 return (
-                  <div key={i} style={{
+                  <div key={card.id || card.provider || providerName(card)} style={{
                     padding: '14px 16px',
                     background: 'var(--admin-surface-2)',
                     borderRadius: 10,
@@ -198,7 +213,7 @@ export default function DashboardPage() {
                   }}>
                     <span className={`status-dot ${st.dot}`} />
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600 }}>{card.providerLabel || card.provider || `Provider ${i + 1}`}</div>
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>{providerName(card)}</div>
                       <div style={{ fontSize: 11, color: 'var(--admin-text-dim)', marginTop: 2 }}>
                         {card.balanceDisplay || card.message || '—'}
                       </div>

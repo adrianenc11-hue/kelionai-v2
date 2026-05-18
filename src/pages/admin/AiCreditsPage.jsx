@@ -16,6 +16,21 @@ function friendlyStatus(card) {
   }
 }
 
+function providerName(card) {
+  if (!card) return 'Provider necunoscut'
+  const known = {
+    openrouter: 'OpenRouter',
+    elevenlabs: 'ElevenLabs',
+    stripe: 'Stripe',
+    railway: 'Railway',
+    google: 'Google AI Studio',
+    googleai: 'Google AI Studio',
+    supabase: 'Supabase',
+  }
+  const id = String(card.id || card.provider || '').toLowerCase()
+  return card.providerLabel || card.name || known[id] || card.provider || card.id || 'Provider necunoscut'
+}
+
 export default function AiCreditsPage() {
   const { getCsrfToken } = useOutletContext()
   const toast = useToast()
@@ -136,10 +151,10 @@ export default function AiCreditsPage() {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {cards.map((card, i) => {
+              {cards.map((card) => {
                 const st = friendlyStatus(card)
                 return (
-                  <div key={i} style={{
+                  <div key={card.id || card.provider || providerName(card)} style={{
                     padding: '16px 20px',
                     background: toneBg[st.tone],
                     borderRadius: 10,
@@ -151,7 +166,7 @@ export default function AiCreditsPage() {
                     <span className={`status-dot ${st.tone === 'ok' ? 'online' : st.tone === 'error' ? 'offline' : 'warning'}`} />
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 600, fontSize: 14 }}>
-                        {card.providerLabel || card.provider || `Provider ${i + 1}`}
+                        {providerName(card)}
                       </div>
                       <div style={{ fontSize: 13, color: toneColors[st.tone], marginTop: 2 }}>
                         {st.headline}

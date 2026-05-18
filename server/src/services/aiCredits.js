@@ -224,7 +224,7 @@ async function probeOpenRouter() {
   const card = {
     id: 'openrouter',
     name: 'OpenRouter',
-    subtitle: 'LLM routing (Gemini 2.0 Flash - Free, Gemini Pro)',
+    subtitle: 'Claude/OpenRouter brain',
     configured: Boolean(apiKey),
     keyFingerprint: maskKey(apiKey),
     balance: null,
@@ -308,7 +308,11 @@ async function getAllCredits() {
     probeStripe(),
     probeRailway(),
   ]);
-  return [googleAI, openrouter, elevenlabs, stripe, railway];
+  return [googleAI, openrouter, elevenlabs, stripe, railway].map((card) => ({
+    ...card,
+    provider: card.id,
+    providerLabel: card.name || card.id,
+  }));
 }
 
 /**
