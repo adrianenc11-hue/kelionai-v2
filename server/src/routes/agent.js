@@ -14,6 +14,7 @@ const agentDiagnostics = require('../services/agentDiagnostics');
 const agentTasks = require('../services/agentTasks');
 const agentOrchestrator = require('../services/agentOrchestrator');
 const agentSandbox = require('../services/agentSandbox');
+const autonomySupervisor = require('../services/autonomySupervisor');
 const { isPathAllowed: _isPathAllowed, isShellAllowed: _isShellAllowed } = agentOrchestrator;
 
 const router = Router();
@@ -29,6 +30,18 @@ const agentLimiter = rateLimit({
 
 router.use(requireAdmin);
 router.use(agentLimiter);
+
+// Autonomy preflight
+router.get('/autonomy/status', async (req, res) => {
+  try {
+    const allowDegraded = req.query.allowDegraded === '1' || req.query.allowDegraded === 'true';
+    const result = await autonomySupervisor.checkAutonomyStatus({ allowDegraded });
+    res.status(result.ready ? 200 : 428).json(result);
+  } catch (err) {
+    console.error('[agent/autonomy/status]', err && err.message);
+    res.status(500).json({ ok: false, error: 'Autonomy status failed' });
+  }
+});
 
 // ── File System ──
 // All FS routes apply the same path guardrails as the orchestrator to prevent
@@ -387,14 +400,22 @@ router.delete('/tasks/:id', async (req, res) => {
 
 router.post('/dev/start', async (req, res) => {
   try {
-    const { description, codebaseSummary, approvedCommit, approvedPush } = req.body || {};
+    const { description, codebaseSummary, approvedCommit, approvedPush, autonomous, allowDegraded } = req.body || {};
     if (!description || typeof description !== 'string') {
       return res.status(400).json({ error: 'description required' });
+    }
+    const preflight = await autonomySupervisor.assertCanStart({
+      allowDegraded: Boolean(allowDegraded),
+    });
+    if (!preflight.ok) {
+      return res.status(428).json(preflight);
     }
     const result = await agentOrchestrator.startTask(description, {
       codebaseSummary: String(codebaseSummary || ''),
       approvedCommit: Boolean(approvedCommit),
       approvedPush: Boolean(approvedPush),
+      autonomous: autonomous !== false,
+      autonomyStatus: preflight.status,
     });
     res.status(result.ok ? 200 : 422).json(result);
   } catch (err) {

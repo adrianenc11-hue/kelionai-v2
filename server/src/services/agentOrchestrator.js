@@ -527,7 +527,7 @@ async function startTask(description, options = {}) {
 }
 
 async function _startTaskLocked(description, options = {}) {
-  const { approvedCommit = false, approvedPush = false, codebaseSummary = '' } = options;
+  const { approvedCommit = false, approvedPush = false, codebaseSummary = '', autonomyStatus = null } = options;
 
   const task = await createTask({
     title: description.slice(0, 120),
@@ -544,6 +544,7 @@ async function _startTaskLocked(description, options = {}) {
     modifiedPaths: new Set(),
     approvedCommit,
     approvedPush,
+    autonomyStatus,
     status: 'planning',
     repairCount: 0,
   };
@@ -652,6 +653,7 @@ async function _startTaskLocked(description, options = {}) {
     taskId,
     status: state.status,
     statusDetail: state.statusDetail,
+    autonomyStatus: state.autonomyStatus,
     logs: state.logs,
     narratives: state.narratives,
     modifiedPaths: Array.from(state.modifiedPaths),
