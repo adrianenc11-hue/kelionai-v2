@@ -45,11 +45,13 @@ module.exports = {
     clientSecret: optional('GOOGLE_CLIENT_SECRET'),
     redirectUri: optional('GOOGLE_REDIRECT_URI', ''),
     apiKey: optional('GOOGLE_API_KEY'),
-    chatModel: optional('GOOGLE_CHAT_MODEL', 'nvidia/nemotron-3-super-120b-a12b:free'),
-    liveModel: optional('GOOGLE_LIVE_MODEL', 'nvidia/nemotron-3-super-120b-a12b:free'),
+    // Adrian 2026-05-18: synced with modelRouter.js — Claude Sonnet 4 is the
+    // primary brain. These defaults are legacy fallbacks only; the real model
+    // selection goes through modelRouter.getModel() / smartFetch().
+    chatModel: optional('GOOGLE_CHAT_MODEL', 'anthropic/claude-opus-4.7'),
+    liveModel: optional('GOOGLE_LIVE_MODEL', 'anthropic/claude-opus-4.7'),
     ttsModel: optional('GOOGLE_TTS_MODEL', 'google/gemma-4-31b-it:free'),
     ttsVoiceKelion: optional('GOOGLE_TTS_VOICE_KELION', 'Kore'),
-    // All models are :free — always free mode
     freeMode: true,
   },
 

@@ -31,6 +31,18 @@ const TOOL_CATEGORIES = {
     'thinking_mode',
     'memory_sources',
     'run_command',
+    // Adrian 2026-05-18: added missing tools that should always be available
+    'session_persist',
+    'parallel_tools',
+    'task_orchestrator',
+    'deep_memory_architect',
+    'universal_executor',
+    'self_evaluate',
+    'smart_monitor',
+    'smart_alert',
+    'context_cache',
+    'system_bridge',
+    'mcp_protocol',
   ],
 
   // Greetings and simple conversation — no tools needed beyond CORE
@@ -108,6 +120,16 @@ const TOOL_CATEGORIES = {
     'execute_plan',
     'check_updates',
     'self_verify',
+    'auto_test',
+    'run_agent_eval',
+    'auto_install_dependency',
+    'auto_update_dependencies',
+    'learn_new_skill',
+    'devops_toolkit',
+    'verify_build',
+    'diff_edit',
+    'generate_mobile_app',
+    'task_planner',
   ],
 
   // GitHub
@@ -141,6 +163,9 @@ const TOOL_CATEGORIES = {
   // Voice and UI
   UI_VOICE: [
     'switch_voice',
+    'list_voice_clones',
+    'activate_voice_clone',
+    'identify_song',
     'ui_navigate',
     'play_radio',
   ],
@@ -154,6 +179,12 @@ const TOOL_CATEGORIES = {
     'send_email',
     'create_calendar_ics',
     'zapier_trigger',
+    'send_sms',
+    'scheduler_pro',
+    'automation_engine',
+    'communication_hub',
+    'clipboard_manager',
+    'scheduled_task',
   ],
 
   // User account
@@ -161,6 +192,10 @@ const TOOL_CATEGORIES = {
     'get_my_credits',
     'get_my_usage',
     'get_my_profile',
+    'upload_file',
+    'list_user_files',
+    'download_file',
+    'delete_file',
     'query_database',
     'conversation_summary',
   ],
@@ -171,11 +206,33 @@ const TOOL_CATEGORIES = {
     'read_docx',
     'ocr_image',
     'ocr_passport',
+    'document_parser',
+    'spreadsheet_analyze',
+    'ocr_engine',
+    'qr_code',
   ],
 
   // Image generation
   IMAGE_GEN: [
     'generate_image',
+    'image_edit',
+    'image_generator_editor',
+  ],
+
+  // Multimedia — video, audio, vision analysis
+  MULTIMEDIA: [
+    'video_analyze',
+    'audio_analyze',
+    'multimedia_analyzer',
+    'vision_analyze',
+    'screen_capture',
+  ],
+
+  // Hardware and cloud management
+  INFRASTRUCTURE: [
+    'hardware_manager',
+    'cloud_manager',
+    'spice_simulate',
   ],
 
   // Natural disasters / science
@@ -301,9 +358,12 @@ const CATEGORY_TRIGGERS = {
       /voce|voice|clonat|switch.*voice|schimb.*voce/i,
       /radio|europa.*fm|kiss.*fm|bbc/i,
       /studio|contact|meniu.*principal|main.*page/i,
+      /melodi[ea]|cântec|song|fredon|hum|versu|lyric/i,
+      /recunoș.*melod|identif.*song|ce.*cântec/i,
     ],
     keywords: ['voce', 'voice', 'clonată', 'radio', 'studio', 'contact',
-      'meniu', 'menu', 'pagina', 'page'],
+      'meniu', 'menu', 'pagina', 'page', 'melodie', 'cântec', 'song',
+      'fredonează', 'hum', 'versuri', 'lyrics'],
   },
   PRODUCTIVITY: {
     patterns: [
@@ -346,7 +406,26 @@ const CATEGORY_TRIGGERS = {
       /creează.*imagine|create.*picture/i,
     ],
     keywords: ['generează', 'generate', 'imagine', 'image', 'poză',
-      'picture', 'desenează', 'draw', 'pictează', 'paint'],
+      'picture', 'desenează', 'draw', 'pictează', 'paint',
+      'editează', 'edit', 'modifică', 'modify'],
+  },
+  MULTIMEDIA: {
+    patterns: [
+      /video|film|clip|youtube/i, /audio|sunet|sound|ascult/i,
+      /anali.*video|anali.*audio/i, /captură.*ecran|screenshot|screen.*capture/i,
+      /vizion.*|visionea/i,
+    ],
+    keywords: ['video', 'film', 'clip', 'youtube', 'audio', 'sunet', 'sound',
+      'captură', 'screenshot', 'ecran', 'screen', 'analiză video', 'analiză audio'],
+  },
+  INFRASTRUCTURE: {
+    patterns: [
+      /hardware|server|cloud|aws|gcp|azure/i,
+      /spice|circuit|simulare|simulate/i,
+      /manager.*cloud|manager.*hard/i,
+    ],
+    keywords: ['hardware', 'server', 'cloud', 'aws', 'gcp', 'azure',
+      'spice', 'circuit', 'simulare', 'simulate'],
   },
   SCIENCE: {
     patterns: [
@@ -363,6 +442,10 @@ for (const [cat, triggers] of Object.entries(CATEGORY_TRIGGERS)) {
     new RegExp('\\b' + kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i')
   );
 }
+
+// Cache: all tool names that appear in at least one TOOL_CATEGORIES entry.
+// Built lazily on first selectTools() call. Tools NOT in this set are auto-included.
+let _allCategorizedTools = null;
 
 /**
  * Analyze a user message and return the set of relevant tool categories.
@@ -429,6 +512,24 @@ function selectTools(message, allTools) {
       for (const name of tools) {
         selectedNames.add(name);
       }
+    }
+  }
+
+  // ── AUTO-INDEX: catch-all for tools not in any category ────────────
+  // Adrian 2026-05-18: "creiaza-i adaugare si indexare automata a tuturor
+  // toolurilor pe care le va adauga ulterior"
+  // Any tool in KELION_TOOLS that is NOT listed in ANY TOOL_CATEGORIES
+  // is automatically included in every request. This guarantees 0% tool
+  // invisibility — new tools work immediately without manual categorization.
+  if (!_allCategorizedTools) {
+    _allCategorizedTools = new Set();
+    for (const catTools of Object.values(TOOL_CATEGORIES)) {
+      for (const name of catTools) _allCategorizedTools.add(name);
+    }
+  }
+  for (const tool of allTools) {
+    if (!_allCategorizedTools.has(tool.name)) {
+      selectedNames.add(tool.name);
     }
   }
 

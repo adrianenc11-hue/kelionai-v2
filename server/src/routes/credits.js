@@ -774,6 +774,22 @@ const webhookHandler = async (req, res) => {
       console.log('[credits/webhook] fulfilled', {
         session: session.id, userId, minutes, duplicate: Boolean(result.duplicate),
       });
+
+      // Adrian 2026-05-18: "si sa anunte adaugare credit"
+      // Inject a system memory so Kelion knows the user just topped up
+      // and can thank them / announce it proactively on their next turn.
+      if (!result.duplicate) {
+        try {
+          const { saveMemoryItem } = require('../db');
+          await saveMemoryItem({
+            userId,
+            text: `[SISTEM] Utilizatorul a reîncărcat contul cu succes cu ${minutes} minute de credit. Confirmă-i și mulțumește-i scurt.`,
+            source: 'system_event',
+          });
+        } catch (e) {
+          console.error('[credits/webhook] failed to save memory item:', e.message);
+        }
+      }
     } else if (event.type === 'charge.refunded') {
       // Audit M3 — Stripe fires `charge.refunded` when the merchant
       // (or chargeback flow) refunds part or all of a charge. Previously

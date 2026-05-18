@@ -1,7 +1,7 @@
 'use strict';
 
-// POST /api/chat — primary text chat route via OpenRouter (Claude Opus / Gemini).
-// Supports escalation to heavy models (Opus 4.7) for coding/complex tasks.
+// POST /api/chat - primary text chat route via OpenRouter (Claude Opus 4.7).
+// Supports escalation to heavy models for coding/complex tasks.
 // Uses in-memory session history + real tool execution (search, weather, wiki).
 
 const { Router } = require('express');
@@ -148,11 +148,18 @@ router.post('/', async (req, res) => {
     const canUsePremium = isAdmin || (Number(creditsBalance) >= PREMIUM_CREDITS_THRESHOLD);
     // ── Cost Guard ───────────────────────────────────────────────────────────
     const budget = checkBudget();
-    if (budget.blocked && (codingTask || complexTask)) {
+    // Adrian 2026-05-18: "revenire dupa incarcare credit la varianta maxima"
+    // If the global server budget is blocked, we normally force the light model.
+    // However, if the user has purchased credits (balance > 0), they bypass the global
+    // block and get the premium model they paid for.
+    const hasPaidCredits = !isAdmin && Number(creditsBalance) > 0;
+    const isGlobalBlocked = budget.blocked && !hasPaidCredits;
+    
+    if (isGlobalBlocked && (codingTask || complexTask)) {
       console.warn(`[chat] Daily AI budget HARD CAP reached ($${budget.dailyCost.toFixed(2)}). Forcing light model.`);
     }
 
-    let isHeavy = (codingTask || complexTask) && canUsePremium && !budget.blocked;
+    let isHeavy = (codingTask || complexTask) && canUsePremium && !isGlobalBlocked;
     // Adrian: "Să lucreze cu agenți la orice task mai complex".
     // Lowering threshold to 150 chars and adding more keywords.
     const isSoftGreu = false; // Disabled to force frontend tool execution for live progress

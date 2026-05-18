@@ -243,6 +243,38 @@ async function checkMCPServers() {
   } catch (_) { /* MCP module may not be loaded yet */ }
 }
 
+// ── AI Model Auto-Update Check ──
+// Reuses modelRouter.checkLatestModels() — no new timer.
+// Runs every 12th cycle (= once per hour at 5min intervals).
+async function checkModelUpdates() {
+  if (_metrics.checksRun % 12 !== 0 && _metrics.checksRun > 1) return; // hourly
+  try {
+    const { checkLatestModels } = require('./modelRouter');
+    const result = await checkLatestModels();
+    if (!result) return;
+
+    _metrics.aiModel = {
+      current: result.current || result.to,
+      lastCheck: new Date().toISOString(),
+    };
+
+    if (result.upgraded) {
+      raiseAlert('model_auto_upgrade', 'info',
+        `Auto-upgraded AI model: ${result.from} → ${result.to}`);
+      _metrics.aiModel.upgradedFrom = result.from;
+      _metrics.aiModel.upgradedTo = result.to;
+    } else if (result.blocked) {
+      raiseAlert('model_compat_fail', 'warning',
+        `New model ${result.blocked} failed compatibility: ${result.reason}`);
+    } else {
+      resolveAlert('model_auto_upgrade');
+      resolveAlert('model_compat_fail');
+    }
+  } catch (err) {
+    console.warn('[Health-Watchdog] Model update check failed:', err?.message);
+  }
+}
+
 async function checkUptimeAndEventLoop() {
   // Check event loop lag — if > 100ms, something is blocking
   const start = Date.now();
@@ -277,6 +309,7 @@ async function runAllChecks() {
     await checkDatabase();
     await checkExternalAPIs();
     await checkMCPServers();
+    await checkModelUpdates();
   } catch (err) {
     console.error('[Health-Watchdog] Check cycle error:', err.message);
   }
