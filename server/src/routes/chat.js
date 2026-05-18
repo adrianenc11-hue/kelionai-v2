@@ -422,7 +422,7 @@ router.post('/', async (req, res) => {
       if (err && err.code === 'OPENROUTER_INSUFFICIENT_CREDITS') {
         return res.status(402).json({
           code: 'OPENROUTER_INSUFFICIENT_CREDITS',
-          error: 'OpenRouter has insufficient credits. Add credits in OpenRouter, then retry Kelion.',
+          error: 'AI/OpenRouter nu are credit. Adauga credit in OpenRouter, apoi testeaza din nou Kelion.',
           ...(isAdmin ? { detail: String(err.message || err), model: err.model, step: currentStep } : {})
         });
       }
